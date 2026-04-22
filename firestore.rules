@@ -1,0 +1,137 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================================
+    //  Helpers
+    // ============================================================
+    function estaAutenticado() {
+      return request.auth != null;
+    }
+
+    function esAdmin() {
+      return estaAutenticado()
+        && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'admin';
+    }
+
+    function esDueno(uid) {
+      return estaAutenticado() && request.auth.uid == uid;
+    }
+
+    /**
+     * Detecta si el request está intentando modificar rol o estado.
+     * Estos dos campos solo los puede cambiar un admin desde backoffice.
+     */
+    function intentaModificarCamposSensibles() {
+      return request.resource.data.rol != resource.data.rol
+        || request.resource.data.estado != resource.data.estado
+        || request.resource.data.consultorioId != resource.data.consultorioId;
+    }
+
+    // ============================================================
+    //  /usuarios/{uid}
+    // ============================================================
+    match /usuarios/{uid} {
+
+      // Cualquiera autenticado puede leer su propio doc.
+      // Un admin puede leer cualquier doc (para el panel).
+      allow read: if esDueno(uid) || esAdmin();
+
+      // Creación: solo el propio usuario puede crear su doc al loguearse por primera vez,
+      // y SOLO con rol=profesional y estado=pendiente.
+      // Esto impide que alguien se auto-promueva a admin al registrarse.
+      allow create: if esDueno(uid)
+        && request.resource.data.rol == 'profesional'
+        && request.resource.data.estado == 'pendiente';
+
+      // Update: el dueño puede editar su propio doc EXCEPTO rol/estado/consultorioId.
+      // Los admins pueden editar cualquier doc sin restricciones.
+      allow update: if esAdmin()
+        || (esDueno(uid) && !intentaModificarCamposSensibles());
+
+      // Delete: solo admins.
+      allow delete: if esAdmin();
+    }
+
+    // ============================================================
+    //  /consultorios/{consultorioId}
+    //  Por ahora, solo admins. Cuando el profesional tenga que leer
+    //  la config del consultorio (ej: % default), ampliamos esto.
+    // ============================================================
+    match /consultorios/{consultorioId} {
+      allow read, write: if esAdmin();
+    }
+
+    // ============================================================
+    //  /pacientes/{pacienteId}
+    // ============================================================
+    match /pacientes/{pacienteId} {
+      // Admin lee y escribe todo.
+      // Profesional lee y escribe SOLO sus propios pacientes
+      // (cuando profesionalUid == su uid).
+      allow read: if esAdmin()
+        || (estaAutenticado() && resource.data.profesionalUid == request.auth.uid);
+
+      allow create: if esAdmin()
+        || (estaAutenticado() && request.resource.data.profesionalUid == request.auth.uid);
+
+      allow update: if esAdmin()
+        || (estaAutenticado()
+            && resource.data.profesionalUid == request.auth.uid
+            && request.resource.data.profesionalUid == request.auth.uid);
+
+      allow delete: if esAdmin();
+    }
+
+    // ============================================================
+    //  /sesiones/{sesionId}
+    //  El profesional crea y lee sus sesiones.
+    //  El admin lee y escribe todas.
+    //  El profesional NO puede marcar una sesión como pagada — eso
+    //  solo lo hace el flujo de confirmación de pago desde el admin.
+    // ============================================================
+    match /sesiones/{sesionId} {
+      allow read: if esAdmin()
+        || (estaAutenticado() && resource.data.profesionalUid == request.auth.uid);
+
+      allow create: if esAdmin()
+        || (estaAutenticado()
+            && request.resource.data.profesionalUid == request.auth.uid
+            && request.resource.data.estadoPago == 'debido');
+
+      // El profesional puede editar datos básicos pero NO el estadoPago
+      allow update: if esAdmin()
+        || (estaAutenticado()
+            && resource.data.profesionalUid == request.auth.uid
+            && request.resource.data.estadoPago == resource.data.estadoPago);
+
+      allow delete: if esAdmin();
+    }
+
+    // ============================================================
+    //  /pagos/{pagoId}
+    //  El profesional crea pagos (como "pendientes" de confirmación).
+    //  El admin lee/escribe todo y confirma los pagos.
+    // ============================================================
+    match /pagos/{pagoId} {
+      allow read: if esAdmin()
+        || (estaAutenticado() && resource.data.profesionalUid == request.auth.uid);
+
+      // El profesional solo puede crear pagos a su nombre y en estado pendiente.
+      allow create: if esAdmin()
+        || (estaAutenticado()
+            && request.resource.data.profesionalUid == request.auth.uid
+            && request.resource.data.estado == 'pendiente');
+
+      // Solo el admin puede cambiar el estado a confirmado/rechazado.
+      allow update: if esAdmin();
+      allow delete: if esAdmin();
+    }
+
+    // ============================================================
+    //  Todo lo demás: bloqueado por defecto.
+    // ============================================================
+  }
+}
