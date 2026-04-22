@@ -1,0 +1,94 @@
+/* ============================================================
+   ConsulPay — Design Tokens
+   Paleta inspirada en Claude, tipografía mixta serif + sans
+   ============================================================ */
+
+:root {
+  /* ---------- Colores base ---------- */
+  --cp-bg: #F5F4EE;                   /* Fondo crema cálido */
+  --cp-surface: #FFFFFF;              /* Cards y paneles */
+  --cp-surface-hover: #EDEBE3;        /* Hover sutil */
+  --cp-surface-sunken: #EEECE4;       /* Inputs, áreas deprimidas */
+
+  --cp-border: rgba(28, 27, 23, 0.08);
+  --cp-border-strong: rgba(28, 27, 23, 0.15);
+  --cp-border-focus: rgba(193, 95, 60, 0.35);
+
+  /* ---------- Texto ---------- */
+  --cp-text: #1C1B17;                 /* Principal (casi negro, cálido) */
+  --cp-text-muted: #6B6960;           /* Secundario */
+  --cp-text-faint: #A39F93;           /* Terciario, placeholders */
+  --cp-text-on-accent: #FFFFFF;       /* Sobre color primario */
+
+  /* ---------- Acento primario (coral cálido) ---------- */
+  --cp-accent: #C15F3C;
+  --cp-accent-hover: #A94F30;
+  --cp-accent-dark: #8F4528;
+  --cp-accent-bg: #F5E5DD;            /* Tint muy suave */
+
+  /* ---------- Semánticos (desaturados) ---------- */
+  --cp-success: #4F6F3A;
+  --cp-success-bg: #E8EDDE;
+  --cp-warning: #B07D1F;
+  --cp-warning-bg: #F5EBD3;
+  --cp-danger: #A04436;
+  --cp-danger-bg: #F3DDD8;
+  --cp-info: #3E6F8A;
+  --cp-info-bg: #DDE7EE;
+
+  /* ---------- Tipografía ---------- */
+  --cp-font-serif: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  --cp-font-sans: 'Inter Tight', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --cp-font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  /* ---------- Escalas tipográficas ---------- */
+  --cp-text-xs: 11.5px;
+  --cp-text-sm: 12.5px;
+  --cp-text-base: 14px;
+  --cp-text-md: 15px;
+  --cp-text-lg: 17px;
+  --cp-text-xl: 20px;
+  --cp-text-2xl: 24px;
+  --cp-text-3xl: 32px;
+  --cp-text-4xl: 40px;
+
+  /* ---------- Radios ---------- */
+  --cp-radius-xs: 4px;
+  --cp-radius-sm: 6px;
+  --cp-radius-md: 10px;
+  --cp-radius-lg: 14px;
+  --cp-radius-xl: 20px;
+  --cp-radius-pill: 999px;
+
+  /* ---------- Spacing (base 4px) ---------- */
+  --cp-space-1: 4px;
+  --cp-space-2: 8px;
+  --cp-space-3: 12px;
+  --cp-space-4: 16px;
+  --cp-space-5: 20px;
+  --cp-space-6: 24px;
+  --cp-space-8: 32px;
+  --cp-space-10: 40px;
+  --cp-space-12: 48px;
+  --cp-space-16: 64px;
+
+  /* ---------- Transiciones ---------- */
+  --cp-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --cp-dur-fast: 120ms;
+  --cp-dur: 180ms;
+  --cp-dur-slow: 260ms;
+
+  /* ---------- Z-index ---------- */
+  --cp-z-sidebar: 10;
+  --cp-z-header: 20;
+  --cp-z-modal: 50;
+  --cp-z-toast: 60;
+
+  /* ---------- Sombras (mínimas y funcionales) ---------- */
+  --cp-shadow-focus: 0 0 0 3px var(--cp-border-focus);
+  --cp-shadow-popover: 0 4px 16px rgba(28, 27, 23, 0.08), 0 1px 3px rgba(28, 27, 23, 0.06);
+
+  /* ---------- Layout ---------- */
+  --cp-sidebar-width: 240px;
+  --cp-content-max: 1200px;
+}

@@ -1,0 +1,49 @@
+/* ============================================================
+   Badge
+   ============================================================ */
+
+.cp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: var(--cp-radius-pill);
+  font-size: var(--cp-text-xs);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.cp-badge::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.cp-badge--success {
+  background: var(--cp-success-bg);
+  color: var(--cp-success);
+}
+
+.cp-badge--warning {
+  background: var(--cp-warning-bg);
+  color: var(--cp-warning);
+}
+
+.cp-badge--danger {
+  background: var(--cp-danger-bg);
+  color: var(--cp-danger);
+}
+
+.cp-badge--info {
+  background: var(--cp-info-bg);
+  color: var(--cp-info);
+}
+
+.cp-badge--neutral {
+  background: var(--cp-surface-hover);
+  color: var(--cp-text-muted);
+}

@@ -1,0 +1,73 @@
+/* ============================================================
+   Estilos globales
+   ============================================================ */
+
+body {
+  font-family: var(--cp-font-sans);
+  font-size: var(--cp-text-base);
+  font-feature-settings: "ss01", "cv11";
+  background: var(--cp-bg);
+  color: var(--cp-text);
+}
+
+/* Selection */
+::selection {
+  background: var(--cp-accent-bg);
+  color: var(--cp-accent-dark);
+}
+
+/* Scrollbar (WebKit) sutil */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--cp-border-strong);
+  border-radius: var(--cp-radius-pill);
+  border: 2px solid var(--cp-bg);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--cp-text-faint);
+}
+
+/* Focus visible consistente */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--cp-shadow-focus);
+  border-radius: var(--cp-radius-sm);
+}
+
+/* Link por defecto */
+a {
+  color: var(--cp-accent);
+  transition: color var(--cp-dur) var(--cp-ease);
+}
+
+a:hover {
+  color: var(--cp-accent-hover);
+}
+
+/* Números tabulares por defecto en elementos numéricos */
+.cp-num {
+  font-family: var(--cp-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Helper: visually hidden */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

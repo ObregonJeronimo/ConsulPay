@@ -1,0 +1,19 @@
+/* ============================================================
+   Avatar — 5 variantes cálidas (earthy)
+   ============================================================ */
+
+.cp-avatar {
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 500;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.cp-avatar--sand  { background: #E3DDD4; color: #5F5646; }
+.cp-avatar--moss  { background: #D8E1DC; color: #3E5C4F; }
+.cp-avatar--clay  { background: #E5DBD8; color: #6A4A43; }
+.cp-avatar--dusk  { background: #DDD8E3; color: #534A75; }
+.cp-avatar--sky   { background: #D6DFE5; color: #3F5766; }

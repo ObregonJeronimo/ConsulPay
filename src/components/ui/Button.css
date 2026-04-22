@@ -1,0 +1,85 @@
+/* ============================================================
+   Button
+   ============================================================ */
+
+.cp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--cp-space-2);
+  border-radius: var(--cp-radius-md);
+  border: 1px solid transparent;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background var(--cp-dur-fast) var(--cp-ease),
+    border-color var(--cp-dur-fast) var(--cp-ease),
+    color var(--cp-dur-fast) var(--cp-ease),
+    transform var(--cp-dur-fast) var(--cp-ease);
+  white-space: nowrap;
+}
+
+.cp-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.cp-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cp-btn__icon {
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+}
+
+.cp-btn__icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* ---- Sizes ---- */
+.cp-btn--sm {
+  padding: 6px var(--cp-space-3);
+  font-size: 12.5px;
+}
+
+.cp-btn--md {
+  padding: 8px var(--cp-space-4);
+  font-size: 13.5px;
+}
+
+/* ---- Variants ---- */
+.cp-btn--primary {
+  background: var(--cp-accent);
+  color: var(--cp-text-on-accent);
+  border-color: var(--cp-accent);
+}
+
+.cp-btn--primary:hover:not(:disabled) {
+  background: var(--cp-accent-hover);
+  border-color: var(--cp-accent-hover);
+}
+
+.cp-btn--secondary {
+  background: var(--cp-surface);
+  color: var(--cp-text);
+  border-color: var(--cp-border-strong);
+}
+
+.cp-btn--secondary:hover:not(:disabled) {
+  background: var(--cp-surface-hover);
+}
+
+.cp-btn--ghost {
+  background: transparent;
+  color: var(--cp-text-muted);
+  border-color: transparent;
+}
+
+.cp-btn--ghost:hover:not(:disabled) {
+  background: var(--cp-surface-hover);
+  color: var(--cp-text);
+}

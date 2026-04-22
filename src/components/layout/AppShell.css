@@ -1,0 +1,26 @@
+/* ============================================================
+   AppShell — layout wrapper (sidebar + main content)
+   ============================================================ */
+
+.cp-shell {
+  display: grid;
+  grid-template-columns: var(--cp-sidebar-width) 1fr;
+  min-height: 100vh;
+}
+
+.cp-shell__main {
+  padding: var(--cp-space-10) var(--cp-space-12) var(--cp-space-16);
+  max-width: var(--cp-content-max);
+  width: 100%;
+}
+
+/* ---- Responsive: en mobile la sidebar se transforma en top bar ---- */
+@media (max-width: 900px) {
+  .cp-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .cp-shell__main {
+    padding: var(--cp-space-6) var(--cp-space-5) var(--cp-space-12);
+  }
+}

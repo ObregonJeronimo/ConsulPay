@@ -1,0 +1,14 @@
+/* ============================================================
+   Card
+   ============================================================ */
+
+.cp-card {
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-lg);
+}
+
+.cp-card--p-sm { padding: var(--cp-space-4); }
+.cp-card--p-md { padding: var(--cp-space-5) var(--cp-space-6); }
+.cp-card--p-lg { padding: var(--cp-space-6) var(--cp-space-8); }
+.cp-card--p-none { padding: 0; }

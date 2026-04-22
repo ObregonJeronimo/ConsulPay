@@ -1,0 +1,48 @@
+/* ============================================================
+   Metric — KPI card
+   ============================================================ */
+
+.cp-metric {
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-lg);
+  padding: var(--cp-space-5) 22px;
+}
+
+.cp-metric__label {
+  font-size: 12px;
+  color: var(--cp-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+  margin-bottom: var(--cp-space-2);
+}
+
+.cp-metric__value {
+  font-family: var(--cp-font-serif);
+  font-size: 30px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  color: var(--cp-text);
+}
+
+.cp-metric__sub {
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--cp-text-muted);
+}
+
+.cp-metric__trend--up {
+  color: var(--cp-success);
+  font-weight: 500;
+}
+
+.cp-metric__trend--down {
+  color: var(--cp-danger);
+  font-weight: 500;
+}
+
+.cp-metric__trend--neutral {
+  color: var(--cp-text-muted);
+}
