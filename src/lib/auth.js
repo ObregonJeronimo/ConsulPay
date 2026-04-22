@@ -125,9 +125,22 @@ export function traducirErrorAuth(error) {
     'auth/weak-password': 'La contraseña debe tener al menos 6 caracteres.',
     'auth/popup-closed-by-user': 'Cerraste la ventana antes de completar el login.',
     'auth/popup-blocked': 'El navegador bloqueó la ventana de Google. Permití popups e intentá de nuevo.',
+    'auth/cancelled-popup-request': 'La ventana anterior se cerró. Intentá de nuevo.',
     'auth/network-request-failed': 'Error de red. Verificá tu conexión.',
     'auth/too-many-requests': 'Demasiados intentos. Esperá unos minutos.',
+    'auth/operation-not-allowed': 'Este método de inicio de sesión no está habilitado. Habilitalo en Firebase Console → Authentication → Sign-in method.',
+    'auth/unauthorized-domain': 'El dominio no está autorizado. Agregalo en Firebase Console → Authentication → Settings → Authorized domains.',
+    'auth/account-exists-with-different-credential': 'Ya existe una cuenta con ese email usando otro método de inicio.',
   };
 
-  return mapa[code] ?? 'Ocurrió un error. Intentá de nuevo.';
+  // Log siempre en consola para debug
+  if (error) {
+    console.error('[Auth error]', error.code, error.message, error);
+  }
+
+  // Si tengo mensaje traducido, lo devuelvo. Si no, devuelvo el código crudo
+  // para que se vea qué está pasando (más útil que un genérico).
+  if (mapa[code]) return mapa[code];
+  if (code) return `Error de autenticación: ${code}`;
+  return 'Ocurrió un error inesperado. Revisá la consola (F12) para más detalle.';
 }
