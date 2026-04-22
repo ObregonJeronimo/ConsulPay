@@ -1,0 +1,27 @@
+/* ============================================================
+   Spinner
+   ============================================================ */
+
+.cp-spinner-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--cp-space-2);
+}
+
+.cp-spinner {
+  display: inline-block;
+  border-style: solid;
+  border-color: var(--cp-border-strong);
+  border-top-color: var(--cp-accent);
+  border-radius: 50%;
+  animation: cp-spin 0.8s linear infinite;
+}
+
+.cp-spinner__label {
+  font-size: 13px;
+  color: var(--cp-text-muted);
+}
+
+@keyframes cp-spin {
+  to { transform: rotate(360deg); }
+}

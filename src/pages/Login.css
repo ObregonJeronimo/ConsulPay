@@ -1,0 +1,235 @@
+/* ============================================================
+   Login — layout partido (form + hero)
+   ============================================================ */
+
+.cp-login {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+/* ---------- Panel izquierdo: form ---------- */
+.cp-login__form-side {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--cp-space-8) var(--cp-space-6);
+  background: var(--cp-bg);
+}
+
+.cp-login__container {
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--cp-space-6);
+}
+
+.cp-login__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--cp-space-3);
+}
+
+.cp-login__brand-mark {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--cp-accent);
+  color: var(--cp-text-on-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--cp-font-serif);
+  font-weight: 600;
+  font-size: 17px;
+  letter-spacing: -0.02em;
+}
+
+.cp-login__brand-name {
+  font-family: var(--cp-font-serif);
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.cp-login__heading {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cp-login__title {
+  font-family: var(--cp-font-serif);
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.cp-login__sub {
+  color: var(--cp-text-muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+/* ---------- Google button ---------- */
+.cp-login__google {
+  width: 100%;
+  height: 44px;
+  justify-content: center;
+  font-size: 14px;
+}
+
+/* ---------- Divider ---------- */
+.cp-login__divider {
+  display: flex;
+  align-items: center;
+  gap: var(--cp-space-3);
+  color: var(--cp-text-faint);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.cp-login__divider::before,
+.cp-login__divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--cp-border);
+}
+
+/* ---------- Form ---------- */
+.cp-login__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cp-space-4);
+}
+
+.cp-login__submit {
+  width: 100%;
+  height: 44px;
+  justify-content: center;
+  font-size: 14px;
+  margin-top: var(--cp-space-1);
+}
+
+.cp-login__error {
+  background: var(--cp-danger-bg);
+  color: var(--cp-danger);
+  border-radius: var(--cp-radius-md);
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* ---------- Switch login/registro ---------- */
+.cp-login__switch {
+  text-align: center;
+  font-size: 13px;
+  color: var(--cp-text-muted);
+}
+
+.cp-login__switch-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--cp-accent);
+  font-weight: 500;
+  cursor: pointer;
+  transition: color var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-login__switch-btn:hover:not(:disabled) {
+  color: var(--cp-accent-hover);
+  text-decoration: underline;
+}
+
+.cp-login__switch-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---------- Panel derecho: hero editorial ---------- */
+.cp-login__hero {
+  position: relative;
+  background: var(--cp-accent-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--cp-space-12);
+  overflow: hidden;
+}
+
+.cp-login__hero-content {
+  position: relative;
+  z-index: 2;
+  max-width: 460px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--cp-space-10);
+}
+
+.cp-login__quote {
+  font-family: var(--cp-font-serif);
+  font-size: 40px;
+  line-height: 1.15;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  color: var(--cp-accent-dark);
+}
+
+.cp-login__quote em {
+  font-style: italic;
+  color: var(--cp-accent);
+}
+
+.cp-login__hero-foot {
+  font-size: 12px;
+  color: var(--cp-accent-dark);
+  opacity: 0.6;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Decoración geométrica sutil detrás de la cita */
+.cp-login__hero-deco {
+  position: absolute;
+  right: -120px;
+  bottom: -120px;
+  width: 420px;
+  height: 420px;
+  border-radius: 50%;
+  background: var(--cp-accent);
+  opacity: 0.08;
+  z-index: 1;
+}
+
+.cp-login__hero-deco::before {
+  content: '';
+  position: absolute;
+  top: -180px;
+  left: -260px;
+  width: 340px;
+  height: 340px;
+  border-radius: 50%;
+  border: 2px solid var(--cp-accent);
+  opacity: 0.35;
+}
+
+/* ---------- Responsive: mobile ---------- */
+@media (max-width: 900px) {
+  .cp-login {
+    grid-template-columns: 1fr;
+  }
+
+  .cp-login__hero {
+    display: none;
+  }
+
+  .cp-login__form-side {
+    padding: var(--cp-space-6) var(--cp-space-5);
+  }
+}

@@ -1,0 +1,69 @@
+/* ============================================================
+   Input + Field wrapper
+   ============================================================ */
+
+.cp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cp-field__label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--cp-text);
+}
+
+.cp-input {
+  height: 40px;
+  padding: 0 14px;
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border-strong);
+  border-radius: var(--cp-radius-md);
+  color: var(--cp-text);
+  font-family: inherit;
+  font-size: 14px;
+  outline: none;
+  transition:
+    border-color var(--cp-dur-fast) var(--cp-ease),
+    box-shadow var(--cp-dur-fast) var(--cp-ease),
+    background var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-input::placeholder {
+  color: var(--cp-text-faint);
+}
+
+.cp-input:hover:not(:disabled) {
+  border-color: var(--cp-text-faint);
+}
+
+.cp-input:focus-visible {
+  border-color: var(--cp-accent);
+  box-shadow: var(--cp-shadow-focus);
+}
+
+.cp-input:disabled {
+  background: var(--cp-surface-sunken);
+  color: var(--cp-text-muted);
+  cursor: not-allowed;
+}
+
+.cp-input--error {
+  border-color: var(--cp-danger);
+}
+
+.cp-input--error:focus-visible {
+  border-color: var(--cp-danger);
+  box-shadow: 0 0 0 3px rgba(160, 68, 54, 0.2);
+}
+
+.cp-field__error {
+  font-size: 12.5px;
+  color: var(--cp-danger);
+}
+
+.cp-field__hint {
+  font-size: 12.5px;
+  color: var(--cp-text-muted);
+}
