@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import Button from '../../components/ui/Button.jsx';
 import Input from '../../components/ui/Input.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
-import Badge from '../../components/ui/Badge.jsx';
 
 import { useAuth } from '../../hooks/useAuth.js';
 import { useConsultorio } from '../../hooks/useConsultorio.js';
@@ -21,12 +20,53 @@ import {
 import './Configuracion.css';
 
 /* ============================================================
+   Hook: advertencia de cambios sin guardar al cerrar / refrescar
+   la pestaña. No cubre navegación interna por React Router (eso lo
+   manejamos con un confirm() manual en los click de tabs/links).
+   ============================================================ */
+function useUnsavedChangesWarning(dirty) {
+  useEffect(() => {
+    if (!dirty) return;
+    function onBeforeUnload(e) {
+      e.preventDefault();
+      // Chrome requiere returnValue seteado para mostrar el prompt
+      e.returnValue = '';
+    }
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [dirty]);
+}
+
+/* ============================================================
    Página principal
    ============================================================ */
 export default function Configuracion() {
   const { user } = useAuth();
   const { consultorio, loading } = useConsultorio();
   const [tab, setTab] = useState('datos');
+
+  // Cada tab reporta su estado "dirty" acá arriba, para que el switch de
+  // tab pueda advertir si se intenta salir con cambios sin guardar.
+  const [dirtyDatos, setDirtyDatos] = useState(false);
+  const [dirtyMetodos, setDirtyMetodos] = useState(false);
+
+  const anyDirty = dirtyDatos || dirtyMetodos;
+  useUnsavedChangesWarning(anyDirty);
+
+  function intentarCambiarTab(nuevoTab) {
+    if (nuevoTab === tab) return;
+    const dirtyDelTabActual = tab === 'datos' ? dirtyDatos : dirtyMetodos;
+    if (dirtyDelTabActual) {
+      const ok = confirm(
+        'Tenés cambios sin guardar en esta sección. Si cambiás de pestaña, se van a perder.\n\n¿Querés continuar de todas formas?',
+      );
+      if (!ok) return;
+      // Si confirma, descartamos el dirty del tab que estamos dejando
+      if (tab === 'datos') setDirtyDatos(false);
+      else setDirtyMetodos(false);
+    }
+    setTab(nuevoTab);
+  }
 
   if (loading) {
     return (
@@ -62,16 +102,18 @@ export default function Configuracion() {
       <div className="cp-tabs">
         <button
           className={`cp-tab ${tab === 'datos' ? 'cp-tab--active' : ''}`}
-          onClick={() => setTab('datos')}
+          onClick={() => intentarCambiarTab('datos')}
         >
           Datos del consultorio
+          {dirtyDatos && <span className="cp-tab__dot" aria-label="cambios sin guardar" />}
         </button>
         <button
           className={`cp-tab ${tab === 'metodos' ? 'cp-tab--active' : ''}`}
-          onClick={() => setTab('metodos')}
+          onClick={() => intentarCambiarTab('metodos')}
         >
           Métodos de pago
           <span className="cp-tab__count">{consultorio.metodosPagoPaciente?.length ?? 0}</span>
+          {dirtyMetodos && <span className="cp-tab__dot" aria-label="cambios sin guardar" />}
         </button>
       </div>
 
@@ -79,6 +121,7 @@ export default function Configuracion() {
         <TabDatos
           consultorio={consultorio}
           consultorioId={user.consultorioId}
+          onDirtyChange={setDirtyDatos}
         />
       )}
 
@@ -86,6 +129,7 @@ export default function Configuracion() {
         <TabMetodos
           metodos={consultorio.metodosPagoPaciente ?? []}
           consultorioId={user.consultorioId}
+          onDirtyChange={setDirtyMetodos}
         />
       )}
     </div>
@@ -95,8 +139,8 @@ export default function Configuracion() {
 /* ============================================================
    Tab: Datos del consultorio
    ============================================================ */
-function TabDatos({ consultorio, consultorioId }) {
-  const [form, setForm] = useState({
+function TabDatos({ consultorio, consultorioId, onDirtyChange }) {
+  const valorInicial = useMemo(() => ({
     nombre: consultorio.nombre || '',
     direccion: consultorio.direccion || '',
     telefono: consultorio.telefono || '',
@@ -104,22 +148,26 @@ function TabDatos({ consultorio, consultorioId }) {
     cuit: consultorio.cuit || '',
     cbuTransferencia: consultorio.cbuTransferencia || '',
     aliasTransferencia: consultorio.aliasTransferencia || '',
-  });
+  }), [consultorio]);
 
+  const [form, setForm] = useState(valorInicial);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
 
+  // Dirty = algún campo cambió respecto al valor inicial
+  const dirty = useMemo(() => {
+    return Object.keys(valorInicial).some((k) => form[k] !== valorInicial[k]);
+  }, [form, valorInicial]);
+
+  // Reportar el dirty al padre para el guard de tabs
   useEffect(() => {
-    setForm({
-      nombre: consultorio.nombre || '',
-      direccion: consultorio.direccion || '',
-      telefono: consultorio.telefono || '',
-      email: consultorio.email || '',
-      cuit: consultorio.cuit || '',
-      cbuTransferencia: consultorio.cbuTransferencia || '',
-      aliasTransferencia: consultorio.aliasTransferencia || '',
-    });
+    onDirtyChange(dirty);
+  }, [dirty, onDirtyChange]);
+
+  // Cuando llega un consultorio nuevo (ej: Firestore update externo), resetear form.
+  useEffect(() => {
+    setForm(valorInicial);
     // Intencional: solo queremos resetear el form cuando cambia el consultorio
     // completo (nueva instancia), no cuando el admin edita un campo del form.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -127,6 +175,12 @@ function TabDatos({ consultorio, consultorioId }) {
 
   function onChange(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
+    setSaved(false);
+  }
+
+  function onDescartar() {
+    setForm(valorInicial);
+    setError('');
     setSaved(false);
   }
 
@@ -216,19 +270,30 @@ function TabDatos({ consultorio, consultorioId }) {
 
       {error && <div className="cp-config-error">{error}</div>}
 
-      <div className="cp-config-footer">
-        {saved && (
-          <span className="cp-config-saved">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-            Cambios guardados
-          </span>
-        )}
-        <Button variant="primary" type="submit" disabled={saving}>
-          {saving ? <><Spinner size={14} /> Guardando…</> : 'Guardar cambios'}
-        </Button>
-      </div>
+      {dirty ? (
+        <div className="cp-config-footer cp-config-footer--sticky">
+          <span className="cp-config-unsaved">Tenés cambios sin guardar.</span>
+          <div style={{ display: 'flex', gap: 10, marginLeft: 'auto' }}>
+            <Button variant="secondary" type="button" onClick={onDescartar} disabled={saving}>
+              Descartar
+            </Button>
+            <Button variant="primary" type="submit" disabled={saving}>
+              {saving ? <><Spinner size={14} /> Guardando…</> : 'Guardar cambios'}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        saved && (
+          <div className="cp-config-footer">
+            <span className="cp-config-saved">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              Cambios guardados
+            </span>
+          </div>
+        )
+      )}
     </form>
   );
 }
@@ -236,13 +301,18 @@ function TabDatos({ consultorio, consultorioId }) {
 /* ============================================================
    Tab: Métodos de pago
    ============================================================ */
-function TabMetodos({ metodos: metodosOriginales, consultorioId }) {
+function TabMetodos({ metodos: metodosOriginales, consultorioId, onDirtyChange }) {
   const [metodos, setMetodos] = useState(metodosOriginales);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
   const [openNuevo, setOpenNuevo] = useState(false);
+
+  // Reportar dirty al padre
+  useEffect(() => {
+    onDirtyChange(dirty);
+  }, [dirty, onDirtyChange]);
 
   useEffect(() => {
     // Al recibir métodos del consultorio, normalizo los que no tienen tipo.
@@ -299,7 +369,15 @@ function TabMetodos({ metodos: metodosOriginales, consultorioId }) {
     setError('');
     setSaving(true);
     try {
-      await actualizarMetodosPago(consultorioId, metodos);
+      // Normalización final: convertimos los strings parciales que pueda
+      // haber dejado el usuario mientras editaba (ej: "" en un % mientras
+      // escribía) a números bien formados antes de persistir.
+      const metodosLimpios = metodos.map((m) => ({
+        ...m,
+        porcentajeConsultorio: Number(m.porcentajeConsultorio) || 0,
+        valorSesionDefault: Number(m.valorSesionDefault) || 0,
+      }));
+      await actualizarMetodosPago(consultorioId, metodosLimpios);
       setDirty(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
@@ -429,10 +507,16 @@ function MetodosGrupo({ titulo, hint, metodos, onUpdate, onDelete }) {
               <input
                 className="cp-metodo-row__input cp-metodo-row__input--num"
                 type="number"
-                value={m.valorSesionDefault ?? 0}
+                value={m.valorSesionDefault ?? ''}
                 min="0"
                 step="500"
-                onChange={(e) => onUpdate(m.id, 'valorSesionDefault', Number(e.target.value) || 0)}
+                onChange={(e) => {
+                  // Permitimos string vacío mientras el usuario edita, para
+                  // que pueda borrar todo y tipear desde cero sin que aparezca
+                  // un 0 bloqueante. La normalización a número ocurre al guardar.
+                  const v = e.target.value;
+                  onUpdate(m.id, 'valorSesionDefault', v === '' ? '' : Number(v));
+                }}
               />
             </div>
 
@@ -440,11 +524,14 @@ function MetodosGrupo({ titulo, hint, metodos, onUpdate, onDelete }) {
               <input
                 className="cp-metodo-row__input cp-metodo-row__input--num"
                 type="number"
-                value={m.porcentajeConsultorio}
+                value={m.porcentajeConsultorio ?? ''}
                 min="0"
                 max="100"
                 step="0.5"
-                onChange={(e) => onUpdate(m.id, 'porcentajeConsultorio', Number(e.target.value) || 0)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  onUpdate(m.id, 'porcentajeConsultorio', v === '' ? '' : Number(v));
+                }}
               />
               <span className="cp-metodo-row__suffix">%</span>
             </div>
