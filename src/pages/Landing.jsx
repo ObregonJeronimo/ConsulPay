@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 import { formatoARS } from '../lib/constants.js';
 import './Landing.css';
@@ -26,6 +26,8 @@ export default function Landing() {
    ============================================================ */
 function Nav() {
   const [scrolled, setScrolled] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -33,10 +35,27 @@ function Nav() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  // Click en el logo:
+  //   - Si ya estamos en la landing → scroll suave al top (hero section).
+  //   - Si estamos en otra ruta → navegar a la landing.
+  //
+  // Sin esto, un <Link to="/inicio"> no hace nada visible cuando ya estas
+  // en /inicio, porque React Router no dispara scroll al repetir la ruta.
+  function onLogoClick(e) {
+    const enLanding = location.pathname === '/inicio' || location.pathname === '/';
+    if (enLanding) {
+      e.preventDefault();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      // Dejamos que el Link maneje la navegación normalmente
+      // (que nos llevará a /inicio y cargará el hero en el top).
+    }
+  }
+
   return (
     <nav className={`lp-nav ${scrolled ? 'lp-nav--scrolled' : ''}`}>
       <div className="lp-nav__inner">
-        <Link to="/inicio" className="lp-nav__brand">
+        <Link to="/inicio" className="lp-nav__brand" onClick={onLogoClick}>
           <span className="lp-nav__mark">C</span>
           <span className="lp-nav__name">ConsulPay</span>
         </Link>
