@@ -18,7 +18,6 @@ import { getAuth } from 'firebase/auth';
 import {
   collection,
   onSnapshot,
-  orderBy,
   query,
   where,
 } from 'firebase/firestore';
@@ -65,6 +64,9 @@ export async function enviarInvitacion(params) {
 
 /**
  * Suscripción en vivo a las invitaciones del consultorio actual.
+ * Las ordenamos en memoria (no con orderBy en el query) para evitar
+ * depender de un índice compuesto de Firestore. Con volúmenes chicos
+ * (decenas de invitaciones por consultorio) es eficiente.
  * @param {string} consultorioId
  * @param {(invitaciones: Array) => void} callback
  * @returns unsubscribe
@@ -73,11 +75,15 @@ export function suscribirInvitaciones(consultorioId, callback) {
   const q = query(
     collection(db, 'invitaciones_profesional'),
     where('consultorioId', '==', consultorioId),
-    orderBy('createdAt', 'desc'),
   );
 
   return onSnapshot(q, (snap) => {
     const invitaciones = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    invitaciones.sort((a, b) => {
+      const aT = a.createdAt?.toMillis?.() ?? 0;
+      const bT = b.createdAt?.toMillis?.() ?? 0;
+      return bT - aT;
+    });
     callback(invitaciones);
   }, (err) => {
     console.error('Error en suscripción de invitaciones:', err);

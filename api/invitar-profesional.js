@@ -85,7 +85,7 @@ function jsonResponse(res, statusCode, data) {
 /* ============================================================
    Template del email
    ============================================================ */
-function buildEmailHtml({ nombre, consultorioNombre, adminNombre, porcentaje, aceptarUrl }) {
+function buildEmailHtml({ nombre, emailInvitado, consultorioNombre, adminNombre, aceptarUrl }) {
   return `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -127,8 +127,8 @@ function buildEmailHtml({ nombre, consultorioNombre, adminNombre, porcentaje, ac
                   <td style="font-size:14px;color:#1C1B17;padding:4px 0;text-align:right;font-weight:500;">${nombre}</td>
                 </tr>
                 <tr>
-                  <td style="font-size:13px;color:#6B6960;padding:4px 0;">% que cobra el consultorio</td>
-                  <td style="font-size:14px;color:#1C1B17;padding:4px 0;text-align:right;font-weight:500;">${porcentaje}%</td>
+                  <td style="font-size:13px;color:#6B6960;padding:4px 0;">Email</td>
+                  <td style="font-size:14px;color:#1C1B17;padding:4px 0;text-align:right;font-weight:500;"><a href="mailto:${emailInvitado}" style="color:#1C1B17;text-decoration:none;">${emailInvitado}</a></td>
                 </tr>
               </table>
             </td></tr>
@@ -283,9 +283,9 @@ export default async function handler(req, res) {
     const resend = new Resend(apiKey);
     const html = buildEmailHtml({
       nombre: nombre.trim(),
+      emailInvitado: emailLower,
       consultorioNombre: consultorioNombre || 'tu consultorio',
       adminNombre: userData.displayName || '',
-      porcentaje: porcentajeOverride ?? '—',
       aceptarUrl,
     });
 
