@@ -59,6 +59,21 @@
   color: var(--cp-accent-dark);
 }
 
+/* Puntito indicador de cambios sin guardar en un tab */
+.cp-tab__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--cp-accent);
+  flex-shrink: 0;
+  animation: cp-tab-dot-pulse 2s ease-in-out infinite;
+}
+
+@keyframes cp-tab-dot-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
 /* Section contenedor */
 .cp-config-section {
   display: flex;
@@ -369,29 +384,6 @@
   color: var(--cp-text-muted);
   line-height: 1.4;
   margin-top: 2px;
-}
-
-/* Página header reutilizado */
-.cp-page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  flex-wrap: wrap;
-  gap: var(--cp-space-4);
-}
-
-.cp-page-title {
-  font-family: var(--cp-font-serif);
-  font-size: 32px;
-  font-weight: 500;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
-  margin-bottom: var(--cp-space-1);
-}
-
-.cp-page-sub {
-  color: var(--cp-text-muted);
-  font-size: 14px;
 }
 
 /* Field label standalone */
