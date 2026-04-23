@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 
 import Avatar from '../../components/ui/Avatar.jsx';
 import Badge from '../../components/ui/Badge.jsx';
@@ -328,14 +329,14 @@ function EmptyPreconfig({ hayProfesionales, hayMetodos }) {
       </ul>
       <div className="cp-empty-pac__actions">
         {!hayProfesionales && (
-          <a href="/admin/profesionales" className="cp-empty-pac__link">
+          <Link to="/admin/profesionales" className="cp-empty-pac__link">
             Ir a Profesionales →
-          </a>
+          </Link>
         )}
         {!hayMetodos && (
-          <a href="/admin/configuracion" className="cp-empty-pac__link">
+          <Link to="/admin/configuracion" className="cp-empty-pac__link">
             Ir a Configuración →
-          </a>
+          </Link>
         )}
       </div>
     </div>
@@ -681,9 +682,9 @@ function PacienteModal({ paciente, profesionales, metodos, onClose, onGuardar })
               <div className="cp-valor-info__hint">
                 Definido por el método <strong>{metodoSeleccionado.nombre}</strong>.
                 {' '}
-                <a href="/admin/configuracion" className="cp-valor-info__link">
+                <Link to="/admin/configuracion" className="cp-valor-info__link" onClick={onClose}>
                   Editar en Configuración →
-                </a>
+                </Link>
               </div>
             </div>
           )}
