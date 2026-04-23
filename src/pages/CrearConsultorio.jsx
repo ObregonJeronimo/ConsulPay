@@ -19,10 +19,10 @@ import './CrearConsultorio.css';
    Métodos de pago preseteados (el admin los puede ajustar después)
    ============================================================ */
 const METODOS_DEFAULT = [
-  { id: 'particular', nombre: 'Particular', porcentajeConsultorio: 40, valorSesionDefault: 15000, activo: true },
-  { id: 'obra_social_ioma', nombre: 'IOMA', porcentajeConsultorio: 30, valorSesionDefault: 8500, activo: true },
-  { id: 'obra_social_apross', nombre: 'APROSS', porcentajeConsultorio: 35, valorSesionDefault: 9500, activo: true },
-  { id: 'prepaga', nombre: 'Prepaga', porcentajeConsultorio: 33, valorSesionDefault: 12000, activo: true },
+  { id: 'particular', nombre: 'Particular', tipo: 'inmediato', porcentajeConsultorio: 40, valorSesionDefault: 15000, activo: true },
+  { id: 'obra_social_ioma', nombre: 'IOMA', tipo: 'diferido', porcentajeConsultorio: 30, valorSesionDefault: 8500, activo: true },
+  { id: 'obra_social_apross', nombre: 'APROSS', tipo: 'diferido', porcentajeConsultorio: 22, valorSesionDefault: 9500, activo: true },
+  { id: 'prepaga', nombre: 'Prepaga', tipo: 'diferido', porcentajeConsultorio: 33, valorSesionDefault: 12000, activo: true },
 ];
 
 /* ============================================================

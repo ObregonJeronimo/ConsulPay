@@ -13,6 +13,7 @@ import Pendiente from './pages/Pendiente.jsx';
 import DashboardSuper from './pages/super/Dashboard.jsx';
 import DashboardAdmin from './pages/admin/Dashboard.jsx';
 import Profesionales from './pages/admin/Profesionales.jsx';
+import Configuracion from './pages/admin/Configuracion.jsx';
 import MiPanel from './pages/profesional/MiPanel.jsx';
 
 import { ROLES } from './lib/constants.js';
@@ -45,6 +46,7 @@ export default function App() {
             <Route element={<AppShell />}>
               <Route path="/admin" element={<DashboardAdmin />} />
               <Route path="/admin/profesionales" element={<Profesionales />} />
+              <Route path="/admin/configuracion" element={<Configuracion />} />
             </Route>
           </Route>
 

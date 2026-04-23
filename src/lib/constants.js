@@ -64,6 +64,21 @@ export const METODOS_PAGO = {
 };
 
 /* ============================================================
+   Tipos de método de pago del paciente
+   ============================================================ */
+export const TIPOS_METODO_PAGO = {
+  /** Paciente paga al profesional en el momento (particular, efectivo, etc.) */
+  INMEDIATO: 'inmediato',
+  /** Obra social / prepaga: el dinero llega meses después, en tandas */
+  DIFERIDO: 'diferido',
+};
+
+export const LABELS_TIPO_METODO = {
+  [TIPOS_METODO_PAGO.INMEDIATO]: 'Pago inmediato',
+  [TIPOS_METODO_PAGO.DIFERIDO]: 'Pago diferido (obra social)',
+};
+
+/* ============================================================
    Invitaciones a profesionales
    ============================================================ */
 export const ESTADOS_INVITACION = {

@@ -150,7 +150,6 @@ export default function Profesionales() {
               </div>
               <ProfesionalesTabla
                 profesionales={activos}
-                consultorio={consultorio}
                 onSuspender={(uid) => cambiarEstadoProfesional(uid, ESTADOS_USUARIO.SUSPENDIDO)}
               />
             </section>
@@ -163,7 +162,6 @@ export default function Profesionales() {
               </div>
               <ProfesionalesTabla
                 profesionales={suspendidos}
-                consultorio={consultorio}
                 onReactivar={(uid) => cambiarEstadoProfesional(uid, ESTADOS_USUARIO.ACTIVO)}
               />
             </section>
@@ -177,7 +175,6 @@ export default function Profesionales() {
           onClose={() => setOpenInvitar(false)}
           consultorioId={user.consultorioId}
           consultorioNombre={consultorio?.nombre || ''}
-          porcentajeDefault={30}
         />
       )}
     </div>
@@ -267,7 +264,7 @@ function InvitacionesLista({ invitaciones }) {
 /* ============================================================
    Tabla de profesionales activos/suspendidos
    ============================================================ */
-function ProfesionalesTabla({ profesionales, consultorio, onSuspender, onReactivar }) {
+function ProfesionalesTabla({ profesionales, onSuspender, onReactivar }) {
   return (
     <div className="cp-table-wrap">
       <table className="cp-table">
@@ -275,7 +272,6 @@ function ProfesionalesTabla({ profesionales, consultorio, onSuspender, onReactiv
           <tr>
             <th>Profesional</th>
             <th>Email</th>
-            <th className="cp-num-col">% consultorio</th>
             <th>Estado</th>
             <th aria-label="Acciones" />
           </tr>
@@ -295,9 +291,6 @@ function ProfesionalesTabla({ profesionales, consultorio, onSuspender, onReactiv
                 </div>
               </td>
               <td style={{ fontSize: 13.5, color: 'var(--cp-text-muted)' }}>{p.email}</td>
-              <td className="cp-num">
-                {p.porcentajeCustom ?? consultorio?.porcentajeDefault ?? '—'}%
-              </td>
               <td>
                 {p.estado === ESTADOS_USUARIO.ACTIVO && <Badge tone="success">Activo</Badge>}
                 {p.estado === ESTADOS_USUARIO.SUSPENDIDO && <Badge tone="danger">Suspendido</Badge>}
@@ -326,10 +319,9 @@ function ProfesionalesTabla({ profesionales, consultorio, onSuspender, onReactiv
 /* ============================================================
    Modal: Invitar profesional
    ============================================================ */
-function InvitarModal({ onClose, consultorioId, consultorioNombre, porcentajeDefault }) {
+function InvitarModal({ onClose, consultorioId, consultorioNombre }) {
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
-  const [porcentaje, setPorcentaje] = useState(String(porcentajeDefault));
   const [submitting, setSubmitting] = useState(false);
   const [resultado, setResultado] = useState(null); // {ok, aceptarUrl, warning} o null
   const [error, setError] = useState('');
@@ -344,7 +336,7 @@ function InvitarModal({ onClose, consultorioId, consultorioNombre, porcentajeDef
         nombre: nombre.trim(),
         consultorioId,
         consultorioNombre,
-        porcentajeOverride: Number(porcentaje) || null,
+        porcentajeOverride: null,
       });
       setResultado(res);
     } catch (err) {
@@ -355,7 +347,7 @@ function InvitarModal({ onClose, consultorioId, consultorioNombre, porcentajeDef
   }
 
   function reset() {
-    setNombre(''); setEmail(''); setPorcentaje(String(porcentajeDefault));
+    setNombre(''); setEmail('');
     setResultado(null); setError('');
   }
 
@@ -369,6 +361,8 @@ function InvitarModal({ onClose, consultorioId, consultorioNombre, porcentajeDef
             <h2 className="cp-modal__title">Invitar profesional</h2>
             <p className="cp-modal__sub">
               Le vamos a enviar un email con un link único para que se sume al consultorio.
+              Los porcentajes y valores de sesión dependen del método de pago de cada paciente,
+              configurables desde la sección <strong>Configuración</strong>.
             </p>
 
             <form onSubmit={onSubmit} className="cp-modal__form">
@@ -389,16 +383,6 @@ function InvitarModal({ onClose, consultorioId, consultorioNombre, porcentajeDef
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-              />
-              <Input
-                name="porcentaje"
-                type="number"
-                label="% que cobra el consultorio"
-                value={porcentaje}
-                onChange={(e) => setPorcentaje(e.target.value)}
-                min="0"
-                max="100"
-                hint="Podés usar un % distinto al default del consultorio para este profesional."
               />
 
               {error && <div className="cp-modal__error">{error}</div>}
