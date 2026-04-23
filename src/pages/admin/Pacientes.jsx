@@ -449,7 +449,9 @@ function PacientesTabla({
           {pacientes.map((p) => {
             const prof = mapaProfesionales[p.profesionalUid];
             const metodo = mapaMetodos[p.metodoPagoId];
-            const valor = p.valorSesionCustom ?? metodo?.valorSesionDefault ?? 0;
+            // Valor siempre viene del método. Compat con pacientes viejos
+            // que tenían valorSesionCustom: lo ignoramos, priorizamos el método.
+            const valor = metodo?.valorSesionDefault ?? 0;
             const archivado = p.estado === ESTADOS_PACIENTE.ARCHIVADO;
 
             return (
@@ -530,16 +532,13 @@ function PacienteModal({ paciente, profesionales, metodos, onClose, onGuardar })
     obraSocialNumero: paciente?.obraSocialNumero ?? '',
     profesionalUid: paciente?.profesionalUid ?? (profesionales[0]?.uid ?? ''),
     metodoPagoId: paciente?.metodoPagoId ?? (metodos.find((m) => m.activo !== false)?.id ?? metodos[0]?.id ?? ''),
-    valorSesionCustom: paciente?.valorSesionCustom ?? '',
     notas: paciente?.notas ?? '',
   }));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   const metodoSeleccionado = metodos.find((m) => m.id === form.metodoPagoId);
-  const valorEfectivo = form.valorSesionCustom
-    ? Number(form.valorSesionCustom)
-    : metodoSeleccionado?.valorSesionDefault ?? 0;
+  const valorDelMetodo = metodoSeleccionado?.valorSesionDefault ?? 0;
 
   function setField(k, v) {
     setForm((prev) => ({ ...prev, [k]: v }));
@@ -559,7 +558,8 @@ function PacienteModal({ paciente, profesionales, metodos, onClose, onGuardar })
         obraSocialNumero: form.obraSocialNumero,
         profesionalUid: form.profesionalUid,
         metodoPagoId: form.metodoPagoId,
-        valorSesionCustom: form.valorSesionCustom,
+        // valorSesionCustom ya no se setea desde acá — siempre usa el default del método
+        valorSesionCustom: null,
         notas: form.notas,
       });
     } catch (err) {
@@ -672,19 +672,21 @@ function PacienteModal({ paciente, profesionales, metodos, onClose, onGuardar })
             />
           )}
 
-          <div>
-            <Input
-              name="valorSesionCustom"
-              type="number"
-              label={`Valor de sesión (dejá vacío para usar el default del método)`}
-              placeholder={metodoSeleccionado?.valorSesionDefault?.toString() ?? ''}
-              value={form.valorSesionCustom}
-              onChange={(e) => setField('valorSesionCustom', e.target.value)}
-              min="0"
-              step="500"
-              hint={`Usando ${formatoARS.format(valorEfectivo)} por sesión`}
-            />
-          </div>
+          {metodoSeleccionado && (
+            <div className="cp-valor-info">
+              <div className="cp-valor-info__main">
+                <span className="cp-valor-info__label">Valor de sesión</span>
+                <span className="cp-valor-info__amount">{formatoARS.format(valorDelMetodo)}</span>
+              </div>
+              <div className="cp-valor-info__hint">
+                Definido por el método <strong>{metodoSeleccionado.nombre}</strong>.
+                {' '}
+                <a href="/admin/configuracion" className="cp-valor-info__link">
+                  Editar en Configuración →
+                </a>
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="cp-field__label" style={{ display: 'block', marginBottom: 6 }}>

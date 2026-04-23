@@ -86,7 +86,6 @@ export async function actualizarPaciente(pacienteId, campos) {
     'email',
     'obraSocialNumero',
     'metodoPagoId',
-    'valorSesionCustom',
     'notas',
     'estado',
   ];
@@ -94,9 +93,7 @@ export async function actualizarPaciente(pacienteId, campos) {
   const update = { updatedAt: serverTimestamp() };
   for (const c of permitidos) {
     if (campos[c] === undefined) continue;
-    if (c === 'valorSesionCustom') {
-      update[c] = campos[c] ? Number(campos[c]) : null;
-    } else if (typeof campos[c] === 'string') {
+    if (typeof campos[c] === 'string') {
       const trimmed = campos[c].trim();
       update[c] = trimmed === '' ? null : (c === 'email' ? trimmed.toLowerCase() : trimmed);
     } else {

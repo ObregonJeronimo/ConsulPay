@@ -95,7 +95,7 @@ export default function MisPacientes() {
             <tbody>
               {activos.map((p) => {
                 const metodo = mapaMetodos[p.metodoPagoId];
-                const valor = p.valorSesionCustom ?? metodo?.valorSesionDefault ?? 0;
+                const valor = metodo?.valorSesionDefault ?? 0;
                 return (
                   <tr key={p.id}>
                     <td>

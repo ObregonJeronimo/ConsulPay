@@ -271,3 +271,54 @@
   outline: none;
   border-color: var(--cp-accent);
 }
+
+/* ============================================================
+   Info pill: valor de sesión en modal (read-only, link a configuración)
+   ============================================================ */
+.cp-valor-info {
+  background: var(--cp-surface-sunken);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cp-valor-info__main {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.cp-valor-info__label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--cp-text);
+}
+
+.cp-valor-info__amount {
+  font-family: var(--cp-font-mono);
+  font-size: 16px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--cp-accent);
+  letter-spacing: -0.01em;
+}
+
+.cp-valor-info__hint {
+  font-size: 12.5px;
+  color: var(--cp-text-muted);
+  line-height: 1.45;
+}
+
+.cp-valor-info__link {
+  color: var(--cp-accent);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-valor-info__link:hover {
+  color: var(--cp-accent-dark);
+}
