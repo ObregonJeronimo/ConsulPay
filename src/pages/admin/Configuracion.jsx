@@ -16,6 +16,11 @@ import {
   actualizarMetodosPago,
   slugFromNombre,
 } from '../../lib/configuracion.js';
+import {
+  formatearCUIT,
+  soloDigitosCBU,
+  LARGOS,
+} from '../../lib/validaciones.js';
 
 import './Configuracion.css';
 
@@ -178,6 +183,21 @@ function TabDatos({ consultorio, consultorioId, onDirtyChange }) {
     setSaved(false);
   }
 
+  // Handlers específicos para campos con validación de formato.
+  // Nota: no usamos el generico onChange porque queremos aplicar el
+  // formatter/filtro ANTES de guardar en state, así el input refleja
+  // el valor ya validado en tiempo real (no hay flash de valor inválido).
+  function onChangeCUIT(e) {
+    // formatearCUIT internamente filtra no-dígitos y limita a 11,
+    // luego inserta los guiones en las posiciones correctas.
+    onChange('cuit', formatearCUIT(e.target.value));
+  }
+
+  function onChangeCBU(e) {
+    // soloDigitosCBU filtra letras/símbolos y trunca a 22 dígitos.
+    onChange('cbuTransferencia', soloDigitosCBU(e.target.value));
+  }
+
   function onDescartar() {
     setForm(valorInicial);
     setError('');
@@ -240,9 +260,11 @@ function TabDatos({ consultorio, consultorioId, onDirtyChange }) {
           <Input
             name="cuit"
             label="CUIT"
-            placeholder="30-XXXXXXXX-X"
+            placeholder="20-12345678-9"
             value={form.cuit}
-            onChange={(e) => onChange('cuit', e.target.value)}
+            onChange={onChangeCUIT}
+            inputMode="numeric"
+            maxLength={13}
           />
         </div>
       </div>
@@ -256,8 +278,16 @@ function TabDatos({ consultorio, consultorioId, onDirtyChange }) {
           <Input
             name="cbu"
             label="CBU / CVU"
+            placeholder="22 dígitos"
             value={form.cbuTransferencia}
-            onChange={(e) => onChange('cbuTransferencia', e.target.value)}
+            onChange={onChangeCBU}
+            inputMode="numeric"
+            maxLength={LARGOS.CBU}
+            hint={
+              form.cbuTransferencia && form.cbuTransferencia.length < LARGOS.CBU
+                ? `${form.cbuTransferencia.length}/${LARGOS.CBU} dígitos`
+                : undefined
+            }
           />
           <Input
             name="alias"
