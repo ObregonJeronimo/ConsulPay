@@ -245,8 +245,28 @@ function TabMetodos({ metodos: metodosOriginales, consultorioId }) {
   const [openNuevo, setOpenNuevo] = useState(false);
 
   useEffect(() => {
-    setMetodos(metodosOriginales);
-    setDirty(false);
+    // Al recibir métodos del consultorio, normalizo los que no tienen tipo.
+    const normalizados = (metodosOriginales ?? []).map((m) => {
+      if (m.tipo) return m;
+      const idLower = (m.id || '').toLowerCase();
+      const pareceDiferido = idLower.startsWith('obra_social')
+        || idLower.includes('prepaga')
+        || idLower.includes('apross')
+        || idLower.includes('ioma')
+        || idLower.includes('pami')
+        || idLower.includes('osde')
+        || idLower.includes('swiss');
+      return {
+        ...m,
+        tipo: pareceDiferido ? 'diferido' : 'inmediato',
+      };
+    });
+    setMetodos(normalizados);
+
+    // Si hubo que normalizar algo, el form queda dirty para que al guardar
+    // se persistan los tipos inferidos.
+    const cambio = (metodosOriginales ?? []).some((m) => !m.tipo);
+    setDirty(cambio);
   }, [metodosOriginales]);
 
   function updateMetodo(id, field, value) {
