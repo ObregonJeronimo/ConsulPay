@@ -125,13 +125,26 @@ export default function AceptarInvitacion() {
       const batch = writeBatch(db);
 
       // 1. Actualizar el doc del usuario: ligarlo al consultorio, activarlo
+      //
+      // FALLBACK DE NOMBRE: si el user no tiene displayName seteado (caso
+      // típico: se registró con email+password sin completar el campo de
+      // nombre), usamos el nombre que el admin puso en la invitación. Nunca
+      // pisamos un nombre ya existente (ej: el que vino de Google).
       const userRef = doc(db, 'usuarios', user.uid);
-      batch.update(userRef, {
+      const updates = {
         consultorioId: invitacion.consultorioId,
         estado: ESTADOS_USUARIO.ACTIVO,
         porcentajeCustom: invitacion.porcentajeOverride ?? null,
         // rol queda como profesional (era profesional por default al crearse)
-      });
+      };
+
+      const nombreActual = (user.displayName ?? '').trim();
+      const nombreInvitacion = (invitacion.nombre ?? '').trim();
+      if (!nombreActual && nombreInvitacion) {
+        updates.displayName = nombreInvitacion;
+      }
+
+      batch.update(userRef, updates);
 
       // 2. Marcar invitación como aceptada
       const invRef = doc(db, 'invitaciones_profesional', invitacion.id);
@@ -258,7 +271,10 @@ export default function AceptarInvitacion() {
         </div>
 
         {!user ? (
-          <AuthInline emailEsperado={invitacion.email} />
+          <AuthInline
+            emailEsperado={invitacion.email}
+            nombreSugerido={invitacion.nombre || ''}
+          />
         ) : user.email?.toLowerCase() !== invitacion.email.toLowerCase() ? (
           <div className="ai-warning">
             Esta invitación es para <strong>{invitacion.email}</strong>.
@@ -334,11 +350,14 @@ function StateCard({ icon, title, desc, action }) {
 /* ============================================================
    Auth inline (si no hay sesión)
    ============================================================ */
-function AuthInline({ emailEsperado }) {
-  const [mode, setMode] = useState('login');
+function AuthInline({ emailEsperado, nombreSugerido = '' }) {
+  // Si venimos con un nombre sugerido (el que el admin puso en la invitación),
+  // arrancamos en modo "register" para que el profesional vea ese nombre
+  // pre-llenado, más natural que entrar en "login".
+  const [mode, setMode] = useState(nombreSugerido ? 'register' : 'login');
   const [email, setEmail] = useState(emailEsperado);
   const [password, setPassword] = useState('');
-  const [nombre, setNombre] = useState('');
+  const [nombre, setNombre] = useState(nombreSugerido);
   const [loading, setLoading] = useState(null);
   const [error, setError] = useState('');
 
@@ -360,7 +379,12 @@ function AuthInline({ emailEsperado }) {
     setError(''); setLoading('email');
     try {
       if (isRegister) {
-        await registerWithEmail(email, password, nombre);
+        // Si el usuario dejó el campo nombre vacío, usamos el nombre sugerido
+        // de la invitación como fallback. Si tampoco hay sugerido, pasamos null
+        // (queda sin displayName hasta que acepte la invitación, donde el
+        // nombre de la invitación se aplica como fallback adicional).
+        const nombreFinal = nombre.trim() || nombreSugerido.trim() || null;
+        await registerWithEmail(email, password, nombreFinal);
       } else {
         await loginWithEmail(email, password);
       }
