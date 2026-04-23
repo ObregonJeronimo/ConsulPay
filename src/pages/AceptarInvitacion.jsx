@@ -94,6 +94,30 @@ export default function AceptarInvitacion() {
       return;
     }
 
+    // Validar que el usuario no sea superadmin
+    if (user.rol === 'superadmin') {
+      setError(
+        'Tu cuenta es de tipo superadmin y no puede ser profesional de un consultorio. Pedile al administrador que mande la invitación a otro email.',
+      );
+      return;
+    }
+
+    // Validar que el usuario no sea admin de otro consultorio
+    if (user.rol === 'admin' && user.consultorioId) {
+      setError(
+        'Ya sos administrador de otro consultorio. Un usuario no puede ser profesional si ya es admin.',
+      );
+      return;
+    }
+
+    // Validar que el usuario no esté ya ligado a otro consultorio
+    if (user.consultorioId && user.consultorioId !== invitacion.consultorioId) {
+      setError(
+        'Ya pertenecés a otro consultorio. No podés aceptar esta invitación mientras sigas en el otro.',
+      );
+      return;
+    }
+
     setPhase('aceptando');
     setError('');
 
