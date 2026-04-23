@@ -117,6 +117,7 @@ export default function Sidebar() {
         <nav className="cp-sidebar__section">
           <div className="cp-sidebar__label">Mi cuenta</div>
           <NavItem to="/mi-panel" end icon={<Icon.Home />}>Resumen</NavItem>
+          <NavItem to="/mi-panel/pacientes" icon={<Icon.Heart />}>Mis pacientes</NavItem>
           <NavItem to="/mi-panel/sesiones" icon={<Icon.Calendar />}>Mis sesiones</NavItem>
           <NavItem to="/mi-panel/pagos" icon={<Icon.Wallet />}>Mis pagos</NavItem>
         </nav>

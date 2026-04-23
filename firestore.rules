@@ -185,6 +185,13 @@ service cloud.firestore {
 
     // ============================================================
     //  /pacientes/{pacienteId}
+    //
+    //  POLÍTICA:
+    //   - Admin: CRUD completo sobre pacientes de su consultorio.
+    //   - Profesional: solo lee los pacientes asignados a él mismo.
+    //     (La UI del profesional es read-only. Si en el futuro queremos
+    //     que el profesional pueda editar notas/teléfono, se amplía acá.)
+    //   - Superadmin: todo.
     // ============================================================
     match /pacientes/{pacienteId} {
       allow read: if esSuperadmin()
@@ -192,16 +199,13 @@ service cloud.firestore {
         || (esProfesionalDe(resource.data.consultorioId)
             && resource.data.profesionalUid == request.auth.uid);
 
+      // Crear: solo admin del consultorio (o superadmin)
       allow create: if esSuperadmin()
-        || esAdminDe(request.resource.data.consultorioId)
-        || (esProfesionalDe(request.resource.data.consultorioId)
-            && request.resource.data.profesionalUid == request.auth.uid);
+        || esAdminDe(request.resource.data.consultorioId);
 
-      allow update: if esSuperadmin()
-        || esAdminDe(resource.data.consultorioId)
-        || (esProfesionalDe(resource.data.consultorioId)
-            && resource.data.profesionalUid == request.auth.uid
-            && request.resource.data.profesionalUid == request.auth.uid);
+      // Update: solo admin (o superadmin). Mantenemos el consultorioId inmutable.
+      allow update: if (esSuperadmin() || esAdminDe(resource.data.consultorioId))
+        && request.resource.data.consultorioId == resource.data.consultorioId;
 
       allow delete: if esSuperadmin() || esAdminDe(resource.data.consultorioId);
     }

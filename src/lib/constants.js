@@ -63,6 +63,11 @@ export const METODOS_PAGO = {
   UALA: 'uala',
 };
 
+export const ESTADOS_PACIENTE = {
+  ACTIVO: 'activo',
+  ARCHIVADO: 'archivado',
+};
+
 /* ============================================================
    Tipos de método de pago del paciente
    ============================================================ */

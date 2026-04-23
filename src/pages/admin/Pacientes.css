@@ -1,0 +1,273 @@
+/* ============================================================
+   Pacientes — Admin
+   ============================================================ */
+
+.cp-pacientes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cp-space-6);
+}
+
+/* Header reutilizado */
+.cp-pacientes .cp-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: var(--cp-space-4);
+}
+
+.cp-pacientes .cp-page-title {
+  font-family: var(--cp-font-serif);
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin-bottom: var(--cp-space-1);
+}
+
+.cp-pacientes .cp-page-sub {
+  color: var(--cp-text-muted);
+  font-size: 14px;
+}
+
+/* ============================================================
+   Empty states
+   ============================================================ */
+.cp-empty-pac {
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-lg);
+  padding: 60px 40px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--cp-space-3);
+}
+
+.cp-empty-pac__mark {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--cp-accent-bg);
+  color: var(--cp-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--cp-space-2);
+}
+
+.cp-empty-pac__mark svg {
+  width: 36px;
+  height: 36px;
+}
+
+.cp-empty-pac__title {
+  font-family: var(--cp-font-serif);
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+}
+
+.cp-empty-pac__desc {
+  color: var(--cp-text-muted);
+  font-size: 14.5px;
+  line-height: 1.55;
+  max-width: 440px;
+  margin-bottom: var(--cp-space-2);
+}
+
+.cp-empty-pac__checklist {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--cp-space-4) 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.cp-empty-pac__checklist li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--cp-text-muted);
+}
+
+.cp-empty-pac__check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--cp-surface-hover);
+  color: var(--cp-text-faint);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.cp-empty-pac__item--done { color: var(--cp-text); }
+.cp-empty-pac__item--done .cp-empty-pac__check {
+  background: var(--cp-success-bg);
+  color: var(--cp-success);
+}
+
+.cp-empty-pac__actions {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.cp-empty-pac__link {
+  color: var(--cp-accent);
+  font-weight: 500;
+  font-size: 14px;
+  text-decoration: none;
+  padding: 8px 14px;
+  border-radius: var(--cp-radius-sm);
+  border: 1px solid var(--cp-border);
+  transition: all var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-empty-pac__link:hover {
+  background: var(--cp-accent-bg);
+  border-color: var(--cp-accent);
+}
+
+/* ============================================================
+   Filtros
+   ============================================================ */
+.cp-filtros {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.cp-filtros__search {
+  flex: 1;
+  min-width: 220px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  padding: 0 12px;
+  transition: border-color var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-filtros__search:focus-within {
+  border-color: var(--cp-accent);
+}
+
+.cp-filtros__search svg {
+  color: var(--cp-text-faint);
+  flex-shrink: 0;
+}
+
+.cp-filtros__search input {
+  border: none;
+  background: transparent;
+  padding: 10px 8px;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--cp-text);
+  flex: 1;
+  outline: none;
+  min-width: 0;
+}
+
+.cp-filtros__select {
+  padding: 10px 14px;
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--cp-text);
+  cursor: pointer;
+  min-width: 180px;
+}
+
+.cp-filtros__select:focus {
+  outline: none;
+  border-color: var(--cp-accent);
+}
+
+.cp-filtros__check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--cp-text-muted);
+  cursor: pointer;
+  padding: 0 8px;
+}
+
+.cp-filtros__check input {
+  accent-color: var(--cp-accent);
+}
+
+.cp-pacientes__empty-filtered {
+  background: var(--cp-surface);
+  border: 1px dashed var(--cp-border-strong);
+  border-radius: var(--cp-radius-lg);
+  padding: 40px;
+  text-align: center;
+  color: var(--cp-text-muted);
+  font-size: 14px;
+}
+
+/* ============================================================
+   Tabla
+   ============================================================ */
+.cp-pacientes-table .cp-pac-row--archivado {
+  opacity: 0.55;
+}
+
+/* ============================================================
+   Modal paciente
+   ============================================================ */
+.cp-modal--wide {
+  max-width: 640px;
+}
+
+.cp-select {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--cp-text);
+  cursor: pointer;
+}
+
+.cp-select:focus {
+  outline: none;
+  border-color: var(--cp-accent);
+}
+
+.cp-textarea {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--cp-text);
+  resize: vertical;
+  min-height: 70px;
+}
+
+.cp-textarea:focus {
+  outline: none;
+  border-color: var(--cp-accent);
+}

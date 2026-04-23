@@ -14,7 +14,9 @@ import DashboardSuper from './pages/super/Dashboard.jsx';
 import DashboardAdmin from './pages/admin/Dashboard.jsx';
 import Profesionales from './pages/admin/Profesionales.jsx';
 import Configuracion from './pages/admin/Configuracion.jsx';
+import Pacientes from './pages/admin/Pacientes.jsx';
 import MiPanel from './pages/profesional/MiPanel.jsx';
+import MisPacientes from './pages/profesional/MisPacientes.jsx';
 
 import { ROLES } from './lib/constants.js';
 
@@ -46,6 +48,7 @@ export default function App() {
             <Route element={<AppShell />}>
               <Route path="/admin" element={<DashboardAdmin />} />
               <Route path="/admin/profesionales" element={<Profesionales />} />
+              <Route path="/admin/pacientes" element={<Pacientes />} />
               <Route path="/admin/configuracion" element={<Configuracion />} />
             </Route>
           </Route>
@@ -54,6 +57,7 @@ export default function App() {
           <Route element={<ProtectedRoute requireRole={ROLES.PROFESIONAL} />}>
             <Route element={<AppShell />}>
               <Route path="/mi-panel" element={<MiPanel />} />
+              <Route path="/mi-panel/pacientes" element={<MisPacientes />} />
             </Route>
           </Route>
 
