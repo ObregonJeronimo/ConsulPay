@@ -145,10 +145,28 @@ export function suscribirPacientesConsultorio(consultorioId, callback) {
   });
 }
 
-/** Solo los pacientes asignados a un profesional específico */
-export function suscribirPacientesProfesional(profesionalUid, callback) {
+/**
+ * Solo los pacientes asignados a un profesional específico dentro de su consultorio.
+ *
+ * IMPORTANTE: necesitamos filtrar ADEMÁS por consultorioId aunque parezca
+ * redundante, porque las Security Rules de Firestore requieren que la query
+ * filtre por TODOS los campos que la rule usa para decidir acceso. La rule de
+ * lectura necesita `resource.data.consultorioId` para evaluar esProfesionalDe(),
+ * y si la query no filtra por ese campo, Firestore rechaza toda la query con
+ * permission-denied, incluso si los docs individualmente fueran readables.
+ */
+export function suscribirPacientesProfesional(profesionalUid, consultorioId, callback) {
+  if (!profesionalUid || !consultorioId) {
+    // Sin los dos datos no podemos armar una query que pase las rules.
+    // Llamamos al callback con lista vacía y esperamos que vuelva a llamarse
+    // cuando el consultorioId esté disponible.
+    callback([]);
+    return () => {};
+  }
+
   const q = query(
     collection(db, 'pacientes'),
+    where('consultorioId', '==', consultorioId),
     where('profesionalUid', '==', profesionalUid),
   );
   return onSnapshot(q, (snap) => {
