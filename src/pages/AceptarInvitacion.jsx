@@ -249,10 +249,12 @@ export default function AceptarInvitacion() {
             <span className="ai-detail__label">Email</span>
             <span className="ai-detail__value">{invitacion.email}</span>
           </div>
-          <div className="ai-detail__row">
-            <span className="ai-detail__label">% que cobra el consultorio</span>
-            <span className="ai-detail__value">{invitacion.porcentajeOverride ?? '—'}%</span>
-          </div>
+          {invitacion.consultorioNombre && (
+            <div className="ai-detail__row">
+              <span className="ai-detail__label">Consultorio</span>
+              <span className="ai-detail__value">{invitacion.consultorioNombre}</span>
+            </div>
+          )}
         </div>
 
         {!user ? (
