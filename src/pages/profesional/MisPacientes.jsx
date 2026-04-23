@@ -28,13 +28,23 @@ export default function MisPacientes() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user?.uid) return;
-    const unsub = suscribirPacientesProfesional(user.uid, (data) => {
-      setPacientes(data);
+    // Necesitamos AMBOS datos para que la query pase las Security Rules.
+    // Si falta alguno (ej: consultorio todavía cargando), esperamos.
+    if (!user?.uid || !user?.consultorioId) {
       setLoading(false);
-    });
+      return;
+    }
+
+    const unsub = suscribirPacientesProfesional(
+      user.uid,
+      user.consultorioId,
+      (data) => {
+        setPacientes(data);
+        setLoading(false);
+      },
+    );
     return unsub;
-  }, [user?.uid]);
+  }, [user?.uid, user?.consultorioId]);
 
   const metodos = consultorio?.metodosPagoPaciente ?? [];
   const mapaMetodos = {};
