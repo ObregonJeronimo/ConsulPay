@@ -79,6 +79,10 @@ service cloud.firestore {
       // - Admin sobre un prof de su consultorio: puede cambiar estado (activar/suspender)
       //   y porcentajeCustom, PERO no rol ni consultorioId.
       // - El propio usuario: puede editar displayName/photoURL pero NO rol/consultorioId/estado
+      //   EXCEPCIÓN: puede auto-promoverse a admin al crear su primer consultorio.
+      //   La validación estricta de que efectivamente cree el consultorio la dejamos
+      //   del lado cliente (transacción) y en la regla de /consultorios (que exige
+      //   ownerUid=el que escribe). Acá solo permitimos el auto-upgrade controlado.
       allow update: if esSuperadmin()
         || (esAdmin()
             && resource.data.consultorioId == miUsuario().consultorioId
@@ -86,7 +90,13 @@ service cloud.firestore {
             && request.resource.data.consultorioId == resource.data.consultorioId)
         || (esDueno(uid)
             && !intentaEscalarPrivilegios()
-            && request.resource.data.estado == resource.data.estado);
+            && request.resource.data.estado == resource.data.estado)
+        || (esDueno(uid)
+            && resource.data.rol == 'profesional'
+            && resource.data.consultorioId == null
+            && request.resource.data.rol == 'admin'
+            && request.resource.data.consultorioId != null
+            && request.resource.data.estado == 'activo');
 
       // Delete: solo superadmin
       allow delete: if esSuperadmin();

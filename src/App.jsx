@@ -7,6 +7,7 @@ import AppShell from './components/layout/AppShell.jsx';
 
 import Landing from './pages/Landing.jsx';
 import Login from './pages/Login.jsx';
+import CrearConsultorio from './pages/CrearConsultorio.jsx';
 import Pendiente from './pages/Pendiente.jsx';
 import DashboardSuper from './pages/super/Dashboard.jsx';
 import DashboardAdmin from './pages/admin/Dashboard.jsx';
@@ -22,6 +23,7 @@ export default function App() {
           {/* ---------- Públicas ---------- */}
           <Route path="/inicio" element={<Landing />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/crear-consultorio" element={<CrearConsultorio />} />
 
           {/* ---------- Autenticadas sin shell ---------- */}
           <Route element={<ProtectedRoute requireActivo={false} />}>

@@ -1,96 +1,394 @@
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-/**
- * Landing pública — placeholder.
- * La versión definitiva con hero/features/CTAs se arma en el siguiente paso.
- */
+import { formatoARS } from '../lib/constants.js';
+import './Landing.css';
+
+/* ============================================================
+   Landing pública de ConsulPay
+   ============================================================ */
+
 export default function Landing() {
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 24,
-      background: 'var(--cp-bg)',
-    }}>
-      <div style={{
-        maxWidth: 560,
-        textAlign: 'center',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 24,
-      }}>
-        <div style={{
-          width: 56,
-          height: 56,
-          borderRadius: 14,
-          background: 'var(--cp-accent)',
-          color: '#fff',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontFamily: 'var(--cp-font-serif)',
-          fontWeight: 600,
-          fontSize: 28,
-          margin: '0 auto',
-        }}>C</div>
+    <div className="lp">
+      <Nav />
+      <Hero />
+      <ComoFunciona />
+      <Precios />
+      <CTAFinal />
+      <Footer />
+    </div>
+  );
+}
 
-        <h1 style={{
-          fontFamily: 'var(--cp-font-serif)',
-          fontSize: 44,
-          fontWeight: 500,
-          letterSpacing: '-0.025em',
-          lineHeight: 1.1,
-        }}>
-          ConsulPay
-        </h1>
+/* ============================================================
+   Nav
+   ============================================================ */
+function Nav() {
+  const [scrolled, setScrolled] = useState(false);
 
-        <p style={{ color: 'var(--cp-text-muted)', fontSize: 17, lineHeight: 1.6 }}>
-          Gestión simple para consultorios. Controlá profesionales, sesiones y pagos
-          desde un único lugar.
-        </p>
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 12 }}>
-          <Link
-            to="/crear-consultorio"
-            style={{
-              background: 'var(--cp-accent)',
-              color: '#fff',
-              padding: '12px 24px',
-              borderRadius: 'var(--cp-radius-md)',
-              fontWeight: 500,
-              textDecoration: 'none',
-              fontSize: 14.5,
-            }}
-          >
-            Crear consultorio
-          </Link>
-          <Link
-            to="/login"
-            style={{
-              background: 'var(--cp-surface)',
-              color: 'var(--cp-text)',
-              padding: '12px 24px',
-              borderRadius: 'var(--cp-radius-md)',
-              fontWeight: 500,
-              textDecoration: 'none',
-              fontSize: 14.5,
-              border: '1px solid var(--cp-border-strong)',
-            }}
-          >
-            Iniciar sesión
-          </Link>
+  return (
+    <nav className={`lp-nav ${scrolled ? 'lp-nav--scrolled' : ''}`}>
+      <div className="lp-nav__inner">
+        <Link to="/inicio" className="lp-nav__brand">
+          <span className="lp-nav__mark">C</span>
+          <span className="lp-nav__name">ConsulPay</span>
+        </Link>
+
+        <div className="lp-nav__links">
+          <a href="#como-funciona" className="lp-nav__link">Cómo funciona</a>
+          <a href="#precios" className="lp-nav__link">Precios</a>
         </div>
 
-        <p style={{
-          color: 'var(--cp-text-faint)',
-          fontSize: 12.5,
-          marginTop: 40,
-        }}>
-          🚧 Landing definitiva en construcción — próximamente hero editorial con features.
-        </p>
+        <div className="lp-nav__cta">
+          <Link to="/login" className="lp-nav__login">Iniciar sesión</Link>
+          <Link to="/crear-consultorio" className="lp-btn lp-btn--primary lp-btn--sm">
+            Crear consultorio
+          </Link>
+        </div>
+      </div>
+    </nav>
+  );
+}
+
+/* ============================================================
+   Hero
+   ============================================================ */
+function Hero() {
+  return (
+    <section className="lp-hero">
+      {/* Decoración de fondo: círculo coral tenue y línea diagonal */}
+      <div className="lp-hero__deco-1" aria-hidden="true" />
+      <div className="lp-hero__deco-2" aria-hidden="true" />
+
+      <div className="lp-hero__inner">
+        <div className="lp-hero__text">
+          <div className="lp-hero__eyebrow">
+            <span className="lp-hero__dot" /> Sistema de gestión para consultorios
+          </div>
+
+          <h1 className="lp-hero__title">
+            La plata del <em>consultorio</em>,
+            <br />
+            al día. <span className="lp-hero__title-alt">Siempre.</span>
+          </h1>
+
+          <p className="lp-hero__sub">
+            Administrá profesionales, pacientes y sesiones desde un único lugar.
+            Cada profesional sabe exactamente cuánto debe al consultorio, y paga con
+            un click vía Mercado Pago o transferencia.
+          </p>
+
+          <div className="lp-hero__ctas">
+            <Link to="/crear-consultorio" className="lp-btn lp-btn--primary">
+              Crear consultorio
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 12h14M13 5l7 7-7 7" />
+              </svg>
+            </Link>
+            <a href="#como-funciona" className="lp-btn lp-btn--secondary">
+              Ver cómo funciona
+            </a>
+          </div>
+
+          <p className="lp-hero__signature">
+            Hecho en Córdoba, Argentina · {new Date().getFullYear()}
+          </p>
+        </div>
+
+        <HeroCard />
+      </div>
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------
+   Card "viviente" del hero con números animados
+   ------------------------------------------------------------ */
+function HeroCard() {
+  return (
+    <div className="lp-hero-card" aria-hidden="true">
+      <div className="lp-hero-card__top">
+        <div>
+          <div className="lp-hero-card__label">Resumen del mes</div>
+          <div className="lp-hero-card__title">abril · 2026</div>
+        </div>
+        <div className="lp-hero-card__pill">
+          <span className="lp-hero-card__pulse" /> En vivo
+        </div>
+      </div>
+
+      <div className="lp-hero-card__metrics">
+        <Counter
+          label="Por cobrar"
+          target={485200}
+          formatter={(n) => formatoARS.format(n)}
+        />
+        <Counter
+          label="Cobrado"
+          target={1237800}
+          formatter={(n) => formatoARS.format(n)}
+        />
+        <Counter label="Sesiones" target={347} />
+        <Counter label="Profesionales" target={12} />
+      </div>
+
+      <div className="lp-hero-card__chart">
+        {[45, 58, 52, 67, 73, 82].map((h, i) => (
+          <div
+            key={i}
+            className={`lp-hero-card__bar ${i === 5 ? 'lp-hero-card__bar--active' : ''}`}
+            style={{ height: `${h}%`, animationDelay: `${600 + i * 80}ms` }}
+          />
+        ))}
+      </div>
+
+      <div className="lp-hero-card__foot">
+        <div className="lp-hero-card__dots">
+          <span /><span /><span />
+        </div>
+        <div className="lp-hero-card__url">consulpay.com/admin</div>
       </div>
     </div>
+  );
+}
+
+/* Contador animado desde 0 hasta target */
+function Counter({ label, target, formatter = (n) => String(n) }) {
+  const [value, setValue] = useState(0);
+  const startedRef = useRef(false);
+
+  useEffect(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+
+    const duration = 1400;
+    const start = performance.now();
+    const step = (now) => {
+      const progress = Math.min((now - start) / duration, 1);
+      // easeOutCubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setValue(Math.round(target * eased));
+      if (progress < 1) requestAnimationFrame(step);
+    };
+    const id = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(id);
+  }, [target]);
+
+  return (
+    <div className="lp-hero-card__metric">
+      <div className="lp-hero-card__metric-label">{label}</div>
+      <div className="lp-hero-card__metric-value">{formatter(value)}</div>
+    </div>
+  );
+}
+
+/* ============================================================
+   Cómo funciona — grid asimétrico
+   ============================================================ */
+function ComoFunciona() {
+  return (
+    <section id="como-funciona" className="lp-section">
+      <div className="lp-section__inner">
+        <div className="lp-section__head">
+          <div className="lp-section__eyebrow">Cómo funciona</div>
+          <h2 className="lp-section__title">
+            Tres pasos.
+            <br />
+            <em>Sin fricciones.</em>
+          </h2>
+        </div>
+
+        <div className="lp-steps">
+          <article className="lp-step lp-step--large">
+            <div className="lp-step__num">01</div>
+            <h3 className="lp-step__title">Creás tu consultorio en minutos</h3>
+            <p className="lp-step__desc">
+              Registrate con Google o email, definí el nombre del consultorio, los métodos
+              de pago que aceptás (obra social, prepaga, particular) y los valores de
+              sesión. Listo, ya podés empezar.
+            </p>
+            <div className="lp-step__decor" aria-hidden="true">
+              <span className="lp-step__chip">Obra social</span>
+              <span className="lp-step__chip lp-step__chip--accent">Particular · $15.000</span>
+              <span className="lp-step__chip">APROSS · 35%</span>
+            </div>
+          </article>
+
+          <article className="lp-step">
+            <div className="lp-step__num">02</div>
+            <h3 className="lp-step__title">Invitás a tus profesionales</h3>
+            <p className="lp-step__desc">
+              Enviás una invitación por email con el porcentaje que cobra el consultorio.
+              Cada profesional tiene su propio panel de autogestión.
+            </p>
+          </article>
+
+          <article className="lp-step">
+            <div className="lp-step__num">03</div>
+            <h3 className="lp-step__title">Gestionás y cobrás</h3>
+            <p className="lp-step__desc">
+              Registrás sesiones, el sistema calcula automáticamente cuánto debe cada profesional.
+              Ellos pagan con un click vía Mercado Pago, Ualá o transferencia.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ============================================================
+   Precios — tabla editorial
+   ============================================================ */
+function Precios() {
+  return (
+    <section id="precios" className="lp-section lp-section--alt">
+      <div className="lp-section__inner">
+        <div className="lp-section__head">
+          <div className="lp-section__eyebrow">Precios</div>
+          <h2 className="lp-section__title">
+            Pagás por lo que usás.
+            <br />
+            <em>Sin sorpresas.</em>
+          </h2>
+          <p className="lp-section__lead">
+            Empezás gratis. Cuando tu consultorio crece, pasás al Plan Pago y reducís
+            la comisión por transacción.
+          </p>
+        </div>
+
+        <div className="lp-pricing">
+          {/* Plan Free */}
+          <div className="lp-price-card">
+            <div className="lp-price-card__top">
+              <div className="lp-price-card__name">Free</div>
+              <div className="lp-price-card__tagline">Para empezar sin compromiso</div>
+            </div>
+
+            <div className="lp-price-card__price">
+              <span className="lp-price-card__amount">$0</span>
+              <span className="lp-price-card__period">/ mes</span>
+            </div>
+
+            <ul className="lp-price-card__features">
+              <li><CheckIcon /> Profesionales y pacientes ilimitados</li>
+              <li><CheckIcon /> Cálculo automático de deuda</li>
+              <li><CheckIcon /> Panel de autogestión para profesionales</li>
+              <li><CheckIcon /> Pagos vía transferencia manual</li>
+              <li className="lp-price-card__muted">
+                <CheckIcon /> 6% comisión ConsulPay por transacción MP
+              </li>
+            </ul>
+
+            <Link to="/crear-consultorio" className="lp-btn lp-btn--secondary lp-btn--full">
+              Empezar gratis
+            </Link>
+          </div>
+
+          {/* Plan Pago */}
+          <div className="lp-price-card lp-price-card--featured">
+            <div className="lp-price-card__badge">Recomendado</div>
+
+            <div className="lp-price-card__top">
+              <div className="lp-price-card__name">Pago</div>
+              <div className="lp-price-card__tagline">Menor comisión para consultorios activos</div>
+            </div>
+
+            <div className="lp-price-card__price">
+              <span className="lp-price-card__amount">$50.000</span>
+              <span className="lp-price-card__period">/ 30 días</span>
+            </div>
+
+            <ul className="lp-price-card__features">
+              <li><CheckIcon /> Todo lo del plan Free</li>
+              <li><CheckIcon /> Integración con Mercado Pago y Ualá</li>
+              <li><CheckIcon /> Split automático de pagos</li>
+              <li><CheckIcon /> Soporte prioritario</li>
+              <li className="lp-price-card__highlight">
+                <CheckIcon /> <strong>2%</strong> comisión ConsulPay por transacción MP
+              </li>
+            </ul>
+
+            <Link to="/crear-consultorio" className="lp-btn lp-btn--primary lp-btn--full">
+              Empezar con plan Pago
+            </Link>
+          </div>
+        </div>
+
+        <p className="lp-pricing__note">
+          Además de la comisión de ConsulPay, Mercado Pago aplica ~6% por cobro
+          inmediato. Los porcentajes se descuentan automáticamente de cada transacción.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+/* ============================================================
+   CTA final
+   ============================================================ */
+function CTAFinal() {
+  return (
+    <section className="lp-cta-final">
+      <div className="lp-cta-final__inner">
+        <h2 className="lp-cta-final__title">
+          Empezá hoy.
+          <br />
+          <em>Tardás cinco minutos.</em>
+        </h2>
+        <div className="lp-cta-final__buttons">
+          <Link to="/crear-consultorio" className="lp-btn lp-btn--primary lp-btn--lg">
+            Crear consultorio
+          </Link>
+          <Link to="/login" className="lp-btn lp-btn--ghost lp-btn--lg">
+            Ya tengo cuenta
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ============================================================
+   Footer
+   ============================================================ */
+function Footer() {
+  return (
+    <footer className="lp-footer">
+      <div className="lp-footer__inner">
+        <div className="lp-footer__brand">
+          <span className="lp-nav__mark">C</span>
+          <span className="lp-nav__name">ConsulPay</span>
+        </div>
+
+        <div className="lp-footer__text">
+          Gestión simple para consultorios · Córdoba, Argentina · {new Date().getFullYear()}
+        </div>
+
+        <div className="lp-footer__links">
+          <a href="#precios">Precios</a>
+          <a href="#como-funciona">Cómo funciona</a>
+          <Link to="/login">Iniciar sesión</Link>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+/* ============================================================
+   Ícono de check
+   ============================================================ */
+function CheckIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
   );
 }
