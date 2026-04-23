@@ -71,10 +71,16 @@ function iniciales(nombre, email) {
 
 export default function Sidebar() {
   const { user, signOut } = useAuth();
+
+  const esSuperadmin = user?.rol === ROLES.SUPERADMIN;
   const esAdmin = user?.rol === ROLES.ADMIN;
 
   const nombre = user?.displayName || user?.email?.split('@')[0] || 'Usuario';
-  const rolLabel = esAdmin ? 'Admin · Consultorio' : 'Profesional';
+  const rolLabel = esSuperadmin
+    ? 'Superadmin · ConsulPay'
+    : esAdmin
+      ? 'Admin · Consultorio'
+      : 'Profesional';
 
   return (
     <aside className="cp-sidebar">
@@ -83,7 +89,15 @@ export default function Sidebar() {
         <div className="cp-sidebar__brand-name">ConsulPay</div>
       </div>
 
-      {esAdmin ? (
+      {esSuperadmin ? (
+        <nav className="cp-sidebar__section">
+          <div className="cp-sidebar__label">Plataforma</div>
+          <NavItem to="/super" end icon={<Icon.Home />}>Resumen</NavItem>
+          <NavItem to="/super/consultorios" icon={<Icon.Users />}>Consultorios</NavItem>
+          <NavItem to="/super/pagos" icon={<Icon.Wallet />}>Pagos recibidos</NavItem>
+          <NavItem to="/super/configuracion" icon={<Icon.Settings />}>Configuración</NavItem>
+        </nav>
+      ) : esAdmin ? (
         <>
           <nav className="cp-sidebar__section">
             <div className="cp-sidebar__label">General</div>

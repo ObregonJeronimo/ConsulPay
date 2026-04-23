@@ -35,24 +35,22 @@ export default function Login() {
 
   const isRegister = mode === 'register';
 
-  function irPorRol(userDoc) {
+  function irAlDestino() {
     if (from) {
       navigate(from, { replace: true });
       return;
     }
-    if (userDoc?.rol === 'admin') {
-      navigate('/admin', { replace: true });
-    } else {
-      navigate('/mi-panel', { replace: true });
-    }
+    // Redirigir siempre a la raíz y que RootRedirect se encargue de
+    // elegir el destino según rol/estado. Así centralizamos esa lógica.
+    navigate('/', { replace: true });
   }
 
   async function onGoogle() {
     setError('');
     setLoading('google');
     try {
-      const userDoc = await loginWithGoogle();
-      irPorRol(userDoc);
+      await loginWithGoogle();
+      irAlDestino();
     } catch (err) {
       setError(traducirErrorAuth(err));
     } finally {
@@ -65,10 +63,12 @@ export default function Login() {
     setError('');
     setLoading('email');
     try {
-      const userDoc = isRegister
-        ? await registerWithEmail(email, password, displayName)
-        : await loginWithEmail(email, password);
-      irPorRol(userDoc);
+      if (isRegister) {
+        await registerWithEmail(email, password, displayName);
+      } else {
+        await loginWithEmail(email, password);
+      }
+      irAlDestino();
     } catch (err) {
       setError(traducirErrorAuth(err));
     } finally {

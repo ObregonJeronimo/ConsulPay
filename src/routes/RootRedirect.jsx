@@ -3,10 +3,11 @@
  *
  * En "/" decidimos a dónde mandar al usuario según su estado:
  *  - Cargando → spinner
- *  - Sin sesión → /login
+ *  - Sin sesión → a la landing pública (/inicio)
+ *  - Superadmin → /super
  *  - Admin → /admin
- *  - Profesional aprobado → /mi-panel
- *  - Profesional no aprobado → /pendiente
+ *  - Profesional activo → /mi-panel
+ *  - Profesional pendiente/suspendido → /pendiente
  */
 
 import { Navigate } from 'react-router-dom';
@@ -31,8 +32,9 @@ export default function RootRedirect() {
     );
   }
 
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/inicio" replace />;
+  if (user.rol === ROLES.SUPERADMIN) return <Navigate to="/super" replace />;
   if (user.rol === ROLES.ADMIN) return <Navigate to="/admin" replace />;
-  if (user.estado !== ESTADOS_USUARIO.APROBADO) return <Navigate to="/pendiente" replace />;
+  if (user.estado !== ESTADOS_USUARIO.ACTIVO) return <Navigate to="/pendiente" replace />;
   return <Navigate to="/mi-panel" replace />;
 }

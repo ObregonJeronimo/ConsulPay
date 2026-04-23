@@ -34,7 +34,16 @@ import { ESTADOS_USUARIO, ROLES } from './constants.js';
  * Asegura que exista un documento en usuarios/{uid}. Si no existe, lo crea
  * con rol=profesional y estado=pendiente. Si existe, lo devuelve intacto.
  *
- * Retorna siempre el doc actualizado: { uid, email, displayName, rol, estado, ... }
+ * NOTAS DE DISEÑO:
+ * - Creamos por defecto con rol=profesional porque es el rol menos privilegiado.
+ * - estado=pendiente porque todavía no pertenece a ningún consultorio (no hay
+ *   invitación registrada, o es un usuario que entró por accidente).
+ * - consultorioId=null porque todavía no está ligado a ninguno.
+ * - Cuando un usuario acepta una invitación de profesional, el flow de
+ *   "aceptar invitación" actualiza estos campos.
+ * - Los superadmin y admins se promueven manualmente o via flow de onboarding.
+ *
+ * Retorna siempre el doc actualizado.
  */
 async function ensureUserDoc(firebaseUser) {
   const userRef = doc(db, 'usuarios', firebaseUser.uid);
@@ -44,7 +53,6 @@ async function ensureUserDoc(firebaseUser) {
     return { uid: firebaseUser.uid, ...snap.data() };
   }
 
-  // Usuario nuevo: inicializar con rol básico
   const newUser = {
     email: firebaseUser.email ?? null,
     displayName: firebaseUser.displayName ?? null,

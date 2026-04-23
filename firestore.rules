@@ -10,10 +10,37 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function esAdmin() {
+    function miUsuario() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+    }
+
+    function tengoDoc() {
       return estaAutenticado()
-        && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
-        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'admin';
+        && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid));
+    }
+
+    function esSuperadmin() {
+      return tengoDoc() && miUsuario().rol == 'superadmin';
+    }
+
+    function esAdmin() {
+      return tengoDoc() && miUsuario().rol == 'admin';
+    }
+
+    function esProfesional() {
+      return tengoDoc() && miUsuario().rol == 'profesional';
+    }
+
+    /**
+     * El admin solo puede operar dentro de SU consultorio.
+     * `consultorioIdDelRecurso` es el consultorioId del doc que se está leyendo/escribiendo.
+     */
+    function esAdminDe(consultorioIdDelRecurso) {
+      return esAdmin() && miUsuario().consultorioId == consultorioIdDelRecurso;
+    }
+
+    function esProfesionalDe(consultorioIdDelRecurso) {
+      return esProfesional() && miUsuario().consultorioId == consultorioIdDelRecurso;
     }
 
     function esDueno(uid) {
@@ -21,117 +48,206 @@ service cloud.firestore {
     }
 
     /**
-     * Detecta si el request está intentando modificar rol o estado.
-     * Estos dos campos solo los puede cambiar un admin desde backoffice.
+     * True si el request intenta modificar campos que solo un superadmin
+     * puede cambiar (rol y consultorioId).
      */
-    function intentaModificarCamposSensibles() {
+    function intentaEscalarPrivilegios() {
       return request.resource.data.rol != resource.data.rol
-        || request.resource.data.estado != resource.data.estado
         || request.resource.data.consultorioId != resource.data.consultorioId;
     }
 
     // ============================================================
     //  /usuarios/{uid}
+    //  Cada usuario tiene su propio doc con rol y estado.
     // ============================================================
     match /usuarios/{uid} {
 
-      // Cualquiera autenticado puede leer su propio doc.
-      // Un admin puede leer cualquier doc (para el panel).
-      allow read: if esDueno(uid) || esAdmin();
+      // Lectura: cada uno su doc; admin ve los de su consultorio; super ve todo.
+      allow read: if esSuperadmin()
+        || esDueno(uid)
+        || (esAdmin() && resource.data.consultorioId == miUsuario().consultorioId);
 
-      // Creación: solo el propio usuario puede crear su doc al loguearse por primera vez,
-      // y SOLO con rol=profesional y estado=pendiente.
-      // Esto impide que alguien se auto-promueva a admin al registrarse.
+      // Creación: solo el propio usuario al loguearse por primera vez, y solo
+      // con rol=profesional y estado=pendiente. Nadie se auto-promueve.
       allow create: if esDueno(uid)
         && request.resource.data.rol == 'profesional'
-        && request.resource.data.estado == 'pendiente';
+        && request.resource.data.estado == 'pendiente'
+        && request.resource.data.consultorioId == null;
 
-      // Update: el dueño puede editar su propio doc EXCEPTO rol/estado/consultorioId.
-      // Los admins pueden editar cualquier doc sin restricciones.
-      allow update: if esAdmin()
-        || (esDueno(uid) && !intentaModificarCamposSensibles());
+      // Update:
+      // - Superadmin: libre
+      // - Admin sobre un prof de su consultorio: puede cambiar estado (activar/suspender)
+      //   y porcentajeCustom, PERO no rol ni consultorioId.
+      // - El propio usuario: puede editar displayName/photoURL pero NO rol/consultorioId/estado
+      allow update: if esSuperadmin()
+        || (esAdmin()
+            && resource.data.consultorioId == miUsuario().consultorioId
+            && request.resource.data.rol == resource.data.rol
+            && request.resource.data.consultorioId == resource.data.consultorioId)
+        || (esDueno(uid)
+            && !intentaEscalarPrivilegios()
+            && request.resource.data.estado == resource.data.estado);
 
-      // Delete: solo admins.
-      allow delete: if esAdmin();
+      // Delete: solo superadmin
+      allow delete: if esSuperadmin();
     }
 
     // ============================================================
     //  /consultorios/{consultorioId}
-    //  Por ahora, solo admins. Cuando el profesional tenga que leer
-    //  la config del consultorio (ej: % default), ampliamos esto.
     // ============================================================
     match /consultorios/{consultorioId} {
-      allow read, write: if esAdmin();
+
+      // Lectura:
+      // - Superadmin ve todos
+      // - Admin ve SU consultorio
+      // - Profesional ve SU consultorio (necesita leer metodos de pago, etc)
+      allow read: if esSuperadmin()
+        || (esAdmin() && miUsuario().consultorioId == consultorioId)
+        || (esProfesional() && miUsuario().consultorioId == consultorioId);
+
+      // Creación: cualquier admin autenticado puede crear un consultorio,
+      // siempre que se asigne a sí mismo como owner.
+      // Este es el onboarding "Crear consultorio".
+      allow create: if estaAutenticado()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.adminUids == [request.auth.uid]
+        && request.resource.data.plan == 'free'
+        && request.resource.data.estado == 'activo';
+
+      // Update:
+      // - Superadmin: libre (configura credenciales MP/Ualá, cambia plan, etc.)
+      // - Admin del consultorio: puede editar casi todo EXCEPTO campos sensibles
+      //   (mpConfig, ualaConfig, plan, planVenceEn, comisionConsulpay).
+      //   Esos los toca solo el superadmin.
+      allow update: if esSuperadmin()
+        || (esAdminDe(consultorioId)
+            && request.resource.data.plan == resource.data.plan
+            && request.resource.data.planVenceEn == resource.data.planVenceEn
+            && request.resource.data.comisionConsulpay == resource.data.comisionConsulpay
+            && request.resource.data.mpConfig == resource.data.mpConfig
+            && request.resource.data.ualaConfig == resource.data.ualaConfig
+            && request.resource.data.ownerUid == resource.data.ownerUid
+            && request.resource.data.estado == resource.data.estado);
+
+      allow delete: if esSuperadmin();
+    }
+
+    // ============================================================
+    //  /invitaciones_profesional/{invitacionId}
+    //  ID = email del invitado en minúscula
+    // ============================================================
+    match /invitaciones_profesional/{invitacionId} {
+
+      // Lectura:
+      // - Superadmin todo
+      // - Admin del consultorio que la creó
+      // - El propio invitado (comparando email) puede ver su invitación
+      //   para poder aceptarla.
+      allow read: if esSuperadmin()
+        || esAdminDe(resource.data.consultorioId)
+        || (estaAutenticado() && request.auth.token.email == resource.data.email);
+
+      // Creación: solo admins sobre SU consultorio
+      allow create: if esAdminDe(request.resource.data.consultorioId)
+        && request.resource.data.estado == 'pendiente';
+
+      // Update: admin del consultorio (para cancelar) o el invitado (para aceptar)
+      allow update: if esSuperadmin()
+        || esAdminDe(resource.data.consultorioId)
+        || (estaAutenticado()
+            && request.auth.token.email == resource.data.email
+            && request.resource.data.estado == 'aceptada');
+
+      allow delete: if esSuperadmin() || esAdminDe(resource.data.consultorioId);
     }
 
     // ============================================================
     //  /pacientes/{pacienteId}
     // ============================================================
     match /pacientes/{pacienteId} {
-      // Admin lee y escribe todo.
-      // Profesional lee y escribe SOLO sus propios pacientes
-      // (cuando profesionalUid == su uid).
-      allow read: if esAdmin()
-        || (estaAutenticado() && resource.data.profesionalUid == request.auth.uid);
+      allow read: if esSuperadmin()
+        || esAdminDe(resource.data.consultorioId)
+        || (esProfesionalDe(resource.data.consultorioId)
+            && resource.data.profesionalUid == request.auth.uid);
 
-      allow create: if esAdmin()
-        || (estaAutenticado() && request.resource.data.profesionalUid == request.auth.uid);
+      allow create: if esSuperadmin()
+        || esAdminDe(request.resource.data.consultorioId)
+        || (esProfesionalDe(request.resource.data.consultorioId)
+            && request.resource.data.profesionalUid == request.auth.uid);
 
-      allow update: if esAdmin()
-        || (estaAutenticado()
+      allow update: if esSuperadmin()
+        || esAdminDe(resource.data.consultorioId)
+        || (esProfesionalDe(resource.data.consultorioId)
             && resource.data.profesionalUid == request.auth.uid
             && request.resource.data.profesionalUid == request.auth.uid);
 
-      allow delete: if esAdmin();
+      allow delete: if esSuperadmin() || esAdminDe(resource.data.consultorioId);
     }
 
     // ============================================================
     //  /sesiones/{sesionId}
-    //  El profesional crea y lee sus sesiones.
-    //  El admin lee y escribe todas.
-    //  El profesional NO puede marcar una sesión como pagada — eso
-    //  solo lo hace el flujo de confirmación de pago desde el admin.
     // ============================================================
     match /sesiones/{sesionId} {
-      allow read: if esAdmin()
-        || (estaAutenticado() && resource.data.profesionalUid == request.auth.uid);
+      allow read: if esSuperadmin()
+        || esAdminDe(resource.data.consultorioId)
+        || (esProfesionalDe(resource.data.consultorioId)
+            && resource.data.profesionalUid == request.auth.uid);
 
-      allow create: if esAdmin()
-        || (estaAutenticado()
-            && request.resource.data.profesionalUid == request.auth.uid
-            && request.resource.data.estadoPago == 'debido');
+      // Admin y profesional pueden crear sesiones para su consultorio.
+      // Siempre nacen con estadoPago=debido — solo el admin lo cambia al confirmar pago.
+      allow create: if (esSuperadmin()
+        || esAdminDe(request.resource.data.consultorioId)
+        || (esProfesionalDe(request.resource.data.consultorioId)
+            && request.resource.data.profesionalUid == request.auth.uid))
+        && request.resource.data.estadoPago == 'debido';
 
-      // El profesional puede editar datos básicos pero NO el estadoPago
-      allow update: if esAdmin()
-        || (estaAutenticado()
+      // Update: el profesional puede editar datos pero NO estadoPago
+      allow update: if esSuperadmin()
+        || esAdminDe(resource.data.consultorioId)
+        || (esProfesionalDe(resource.data.consultorioId)
             && resource.data.profesionalUid == request.auth.uid
             && request.resource.data.estadoPago == resource.data.estadoPago);
 
-      allow delete: if esAdmin();
+      allow delete: if esSuperadmin() || esAdminDe(resource.data.consultorioId);
     }
 
     // ============================================================
-    //  /pagos/{pagoId}
-    //  El profesional crea pagos (como "pendientes" de confirmación).
-    //  El admin lee/escribe todo y confirma los pagos.
+    //  /pagos_consultorio/{pagoId}
+    //  Pagos de profesional → consultorio
     // ============================================================
-    match /pagos/{pagoId} {
-      allow read: if esAdmin()
-        || (estaAutenticado() && resource.data.profesionalUid == request.auth.uid);
+    match /pagos_consultorio/{pagoId} {
+      allow read: if esSuperadmin()
+        || esAdminDe(resource.data.consultorioId)
+        || (esProfesionalDe(resource.data.consultorioId)
+            && resource.data.profesionalUid == request.auth.uid);
 
-      // El profesional solo puede crear pagos a su nombre y en estado pendiente.
-      allow create: if esAdmin()
-        || (estaAutenticado()
+      // Profesional crea sus propios pagos en estado=pendiente
+      allow create: if esSuperadmin()
+        || (esProfesionalDe(request.resource.data.consultorioId)
             && request.resource.data.profesionalUid == request.auth.uid
             && request.resource.data.estado == 'pendiente');
 
-      // Solo el admin puede cambiar el estado a confirmado/rechazado.
-      allow update: if esAdmin();
-      allow delete: if esAdmin();
+      // Solo admin o super cambia estado (confirmar/rechazar)
+      allow update: if esSuperadmin() || esAdminDe(resource.data.consultorioId);
+
+      allow delete: if esSuperadmin();
     }
 
     // ============================================================
-    //  Todo lo demás: bloqueado por defecto.
+    //  /pagos_mensualidad/{pagoId}
+    //  Pagos de consultorio → ConsulPay (mensualidad del plan pago)
+    //  Solo super puede leer y escribir. El admin los ve a través de
+    //  una cloud function que expone solo los suyos (o lo implementamos
+    //  después). Por ahora: solo super.
+    // ============================================================
+    match /pagos_mensualidad/{pagoId} {
+      allow read: if esSuperadmin()
+        || esAdminDe(resource.data.consultorioId);
+      allow write: if esSuperadmin();
+    }
+
+    // ============================================================
+    //  Todo lo demás: bloqueado.
     // ============================================================
   }
 }
