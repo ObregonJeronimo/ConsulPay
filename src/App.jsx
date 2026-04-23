@@ -1,70 +1,97 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 import { AuthProvider } from './contexts/AuthContext.jsx';
 import ProtectedRoute from './routes/ProtectedRoute.jsx';
 import RootRedirect from './routes/RootRedirect.jsx';
 import AppShell from './components/layout/AppShell.jsx';
+import Spinner from './components/ui/Spinner.jsx';
 
 import Landing from './pages/Landing.jsx';
 import Login from './pages/Login.jsx';
-import CrearConsultorio from './pages/CrearConsultorio.jsx';
-import AceptarInvitacion from './pages/AceptarInvitacion.jsx';
-import Pendiente from './pages/Pendiente.jsx';
-import DashboardSuper from './pages/super/Dashboard.jsx';
-import DashboardAdmin from './pages/admin/Dashboard.jsx';
-import Profesionales from './pages/admin/Profesionales.jsx';
-import Configuracion from './pages/admin/Configuracion.jsx';
-import Pacientes from './pages/admin/Pacientes.jsx';
-import MiPanel from './pages/profesional/MiPanel.jsx';
-import MisPacientes from './pages/profesional/MisPacientes.jsx';
 
 import { ROLES } from './lib/constants.js';
+
+// Lazy: se cargan solo cuando el usuario navega a la ruta correspondiente.
+// Esto parte el bundle en chunks más chicos: quien solo visita la landing
+// no descarga el código del admin, y viceversa.
+const CrearConsultorio = lazy(() => import('./pages/CrearConsultorio.jsx'));
+const AceptarInvitacion = lazy(() => import('./pages/AceptarInvitacion.jsx'));
+const Pendiente = lazy(() => import('./pages/Pendiente.jsx'));
+const DashboardSuper = lazy(() => import('./pages/super/Dashboard.jsx'));
+const DashboardAdmin = lazy(() => import('./pages/admin/Dashboard.jsx'));
+const Profesionales = lazy(() => import('./pages/admin/Profesionales.jsx'));
+const Configuracion = lazy(() => import('./pages/admin/Configuracion.jsx'));
+const Pacientes = lazy(() => import('./pages/admin/Pacientes.jsx'));
+const MiPanel = lazy(() => import('./pages/profesional/MiPanel.jsx'));
+const MisPacientes = lazy(() => import('./pages/profesional/MisPacientes.jsx'));
+
+/**
+ * Fallback que se muestra mientras un chunk lazy está descargándose.
+ * Con conexiones rápidas es imperceptible; con conexiones lentas
+ * evita la pantalla en blanco.
+ */
+function RouteFallback() {
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: 'var(--cp-bg)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+    }}>
+      <Spinner size={28} />
+    </div>
+  );
+}
 
 export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <Routes>
-          {/* ---------- Públicas ---------- */}
-          <Route path="/inicio" element={<Landing />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/crear-consultorio" element={<CrearConsultorio />} />
-          <Route path="/aceptar-invitacion" element={<AceptarInvitacion />} />
+        <Suspense fallback={<RouteFallback />}>
+          <Routes>
+            {/* ---------- Públicas ---------- */}
+            <Route path="/inicio" element={<Landing />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/crear-consultorio" element={<CrearConsultorio />} />
+            <Route path="/aceptar-invitacion" element={<AceptarInvitacion />} />
 
-          {/* ---------- Autenticadas sin shell ---------- */}
-          <Route element={<ProtectedRoute requireActivo={false} />}>
-            <Route path="/pendiente" element={<Pendiente />} />
-          </Route>
-
-          {/* ---------- Superadmin ---------- */}
-          <Route element={<ProtectedRoute requireRole={ROLES.SUPERADMIN} />}>
-            <Route element={<AppShell />}>
-              <Route path="/super" element={<DashboardSuper />} />
+            {/* ---------- Autenticadas sin shell ---------- */}
+            <Route element={<ProtectedRoute requireActivo={false} />}>
+              <Route path="/pendiente" element={<Pendiente />} />
             </Route>
-          </Route>
 
-          {/* ---------- Admin de consultorio ---------- */}
-          <Route element={<ProtectedRoute requireRole={ROLES.ADMIN} />}>
-            <Route element={<AppShell />}>
-              <Route path="/admin" element={<DashboardAdmin />} />
-              <Route path="/admin/profesionales" element={<Profesionales />} />
-              <Route path="/admin/pacientes" element={<Pacientes />} />
-              <Route path="/admin/configuracion" element={<Configuracion />} />
+            {/* ---------- Superadmin ---------- */}
+            <Route element={<ProtectedRoute requireRole={ROLES.SUPERADMIN} />}>
+              <Route element={<AppShell />}>
+                <Route path="/super" element={<DashboardSuper />} />
+              </Route>
             </Route>
-          </Route>
 
-          {/* ---------- Profesional ---------- */}
-          <Route element={<ProtectedRoute requireRole={ROLES.PROFESIONAL} />}>
-            <Route element={<AppShell />}>
-              <Route path="/mi-panel" element={<MiPanel />} />
-              <Route path="/mi-panel/pacientes" element={<MisPacientes />} />
+            {/* ---------- Admin de consultorio ---------- */}
+            <Route element={<ProtectedRoute requireRole={ROLES.ADMIN} />}>
+              <Route element={<AppShell />}>
+                <Route path="/admin" element={<DashboardAdmin />} />
+                <Route path="/admin/profesionales" element={<Profesionales />} />
+                <Route path="/admin/pacientes" element={<Pacientes />} />
+                <Route path="/admin/configuracion" element={<Configuracion />} />
+              </Route>
             </Route>
-          </Route>
 
-          {/* ---------- Root: redirige según el estado de sesión ---------- */}
-          <Route path="/" element={<RootRedirect />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+            {/* ---------- Profesional ---------- */}
+            <Route element={<ProtectedRoute requireRole={ROLES.PROFESIONAL} />}>
+              <Route element={<AppShell />}>
+                <Route path="/mi-panel" element={<MiPanel />} />
+                <Route path="/mi-panel/pacientes" element={<MisPacientes />} />
+              </Route>
+            </Route>
+
+            {/* ---------- Root ---------- */}
+            <Route path="/" element={<RootRedirect />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     </AuthProvider>
   );
