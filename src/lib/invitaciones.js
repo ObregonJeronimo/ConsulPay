@@ -17,6 +17,8 @@
 import { getAuth } from 'firebase/auth';
 import {
   collection,
+  deleteDoc,
+  doc,
   onSnapshot,
   query,
   where,
@@ -96,4 +98,12 @@ export function suscribirInvitaciones(consultorioId, callback) {
  */
 export function filtrarPendientes(invitaciones) {
   return invitaciones.filter((i) => i.estado === ESTADOS_INVITACION.PENDIENTE);
+}
+
+/**
+ * Cancela (borra) una invitación. Solo el admin del consultorio puede hacerlo
+ * (las Security Rules validan).
+ */
+export async function cancelarInvitacion(invitacionId) {
+  await deleteDoc(doc(db, 'invitaciones_profesional', invitacionId));
 }

@@ -8,7 +8,7 @@ import Spinner from '../../components/ui/Spinner.jsx';
 
 import { useAuth } from '../../hooks/useAuth.js';
 import { ESTADOS_INVITACION, ESTADOS_USUARIO, formatoFechaLarga } from '../../lib/constants.js';
-import { enviarInvitacion, suscribirInvitaciones } from '../../lib/invitaciones.js';
+import { cancelarInvitacion, enviarInvitacion, suscribirInvitaciones } from '../../lib/invitaciones.js';
 import {
   cambiarEstadoProfesional,
   suscribirProfesionales,
@@ -139,7 +139,21 @@ export default function Profesionales() {
               <div className="cp-section-head">
                 <h2 className="cp-section-title">Invitaciones pendientes</h2>
               </div>
-              <InvitacionesLista invitaciones={invitacionesPendientes} />
+              <InvitacionesLista
+                invitaciones={invitacionesPendientes}
+                onCancelar={async (i) => {
+                  const ok = confirm(
+                    `¿Cancelar la invitación para ${i.email}?\n\nSi querés invitar a este profesional más adelante, vas a tener que enviar una nueva invitación.`,
+                  );
+                  if (!ok) return;
+                  try {
+                    await cancelarInvitacion(i.id);
+                  } catch (err) {
+                    console.error('Error cancelando invitación:', err);
+                    alert('No se pudo cancelar la invitación. Intentá de nuevo.');
+                  }
+                }}
+              />
             </section>
           )}
 
@@ -210,7 +224,7 @@ function EmptyState({ onInvitar }) {
 /* ============================================================
    Lista de invitaciones pendientes
    ============================================================ */
-function InvitacionesLista({ invitaciones }) {
+function InvitacionesLista({ invitaciones, onCancelar }) {
   const [copiedId, setCopiedId] = useState(null);
 
   function copiar(aceptarUrl, id) {
@@ -232,7 +246,7 @@ function InvitacionesLista({ invitaciones }) {
             <div className="cp-invitacion__body">
               <div className="cp-invitacion__nombre">{i.nombre}</div>
               <div className="cp-invitacion__meta">
-                {i.email} · {i.porcentajeOverride !== null ? `${i.porcentajeOverride}%` : 'default'}
+                {i.email}
                 {i.createdAt?.toDate && ` · enviada ${formatoFechaLarga.format(i.createdAt.toDate())}`}
               </div>
             </div>
@@ -252,6 +266,15 @@ function InvitacionesLista({ invitaciones }) {
                     <span>Copiar link</span>
                   </>
                 )}
+              </button>
+              <button
+                type="button"
+                className="cp-invitacion__cancel"
+                onClick={() => onCancelar(i)}
+                title="Cancelar invitación"
+                aria-label="Cancelar invitación"
+              >
+                <TrashIcon />
               </button>
             </div>
           </div>

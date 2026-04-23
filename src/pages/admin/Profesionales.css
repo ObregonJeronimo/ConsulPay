@@ -360,3 +360,24 @@
   from { opacity: 0; transform: translateY(10px) scale(0.98); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
+
+/* Botón cancelar invitación */
+.cp-invitacion__cancel {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--cp-radius-sm);
+  border: 1px solid var(--cp-border-strong);
+  background: transparent;
+  color: var(--cp-text-faint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-invitacion__cancel:hover {
+  background: var(--cp-danger-bg);
+  color: var(--cp-danger);
+  border-color: var(--cp-danger);
+}
