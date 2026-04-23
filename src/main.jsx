@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import './styles/tokens.css';
 import './styles/reset.css';
 import './styles/global.css';
+import './styles/shared-ui.css';
 
 import App from './App.jsx';
 
