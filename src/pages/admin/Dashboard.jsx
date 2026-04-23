@@ -1,245 +1,212 @@
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+
 import Metric from '../../components/ui/Metric.jsx';
-import Badge from '../../components/ui/Badge.jsx';
 import Button from '../../components/ui/Button.jsx';
-import Avatar from '../../components/ui/Avatar.jsx';
-import { formatoARS } from '../../lib/constants.js';
+import Spinner from '../../components/ui/Spinner.jsx';
+
+import { useAuth } from '../../hooks/useAuth.js';
+import { useConsultorio } from '../../hooks/useConsultorio.js';
+import { formatoARS, PLANES } from '../../lib/constants.js';
+import { suscribirProfesionales } from '../../lib/profesionales.js';
+import { suscribirInvitaciones } from '../../lib/invitaciones.js';
+
 import './Dashboard.css';
 
-/* --------------------------------------------------------------
-   Datos mock — reemplazar por queries a Firestore en el próximo sprint
-   -------------------------------------------------------------- */
-const METRICAS_MOCK = [
-  { label: 'Por cobrar', value: 485200, trend: '12%', trendDirection: 'up', sub: 'vs marzo' },
-  { label: 'Cobrado este mes', value: 1237800, trend: '8%', trendDirection: 'up', sub: 'vs marzo' },
-  { label: 'Profesionales activos', value: 12, sub: '2 pendientes de aprobación' },
-  { label: 'Sesiones del mes', value: 347, trend: '5%', trendDirection: 'up', sub: 'vs marzo' },
-];
-
-const PROFESIONALES_DEUDA = [
-  {
-    id: 1,
-    nombre: 'María Rodríguez',
-    iniciales: 'MR',
-    especialidad: 'Fonoaudiología',
-    porcentaje: 30,
-    sesiones: 42,
-    facturado: 378000,
-    debe: 113400,
-    estado: 'pendiente',
-    estadoLabel: 'Pendiente',
-  },
-  {
-    id: 2,
-    nombre: 'Lucía Fernández',
-    iniciales: 'LF',
-    especialidad: 'Psicología',
-    porcentaje: 35,
-    sesiones: 38,
-    facturado: 456000,
-    debe: 159600,
-    estado: 'pendiente',
-    estadoLabel: 'Pendiente',
-  },
-  {
-    id: 3,
-    nombre: 'Carlos Gómez',
-    iniciales: 'CG',
-    especialidad: 'Kinesiología',
-    porcentaje: 25,
-    sesiones: 29,
-    facturado: 203000,
-    debe: 50750,
-    estado: 'vencido',
-    estadoLabel: 'Vencido · 8 días',
-  },
-  {
-    id: 4,
-    nombre: 'Sofía Álvarez',
-    iniciales: 'SA',
-    especialidad: 'Nutrición',
-    porcentaje: 30,
-    sesiones: 18,
-    facturado: 144000,
-    debe: 43200,
-    estado: 'pagado',
-    estadoLabel: 'Pagado',
-  },
-];
-
-const REGISTROS_PENDIENTES = [
-  { id: 1, nombre: 'Valentina Paz', iniciales: 'VP', especialidad: 'Psicopedagogía', hace: 'hace 2 h' },
-  { id: 2, nombre: 'Diego Ramírez', iniciales: 'DR', especialidad: 'Terapia Ocupacional', hace: 'ayer' },
-];
-
-const INGRESOS_6M = [
-  { mes: 'Nov', valor: 45 },
-  { mes: 'Dic', valor: 58 },
-  { mes: 'Ene', valor: 52 },
-  { mes: 'Feb', valor: 67 },
-  { mes: 'Mar', valor: 73 },
-  { mes: 'Abr', valor: 82 },
-];
-
-const TONO_BADGE = {
-  pendiente: 'warning',
-  vencido: 'danger',
-  pagado: 'success',
-};
-
-/* --------------------------------------------------------------
-   Íconos inline usados en esta página
-   -------------------------------------------------------------- */
 const PlusIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 4v16m8-8H4" />
   </svg>
 );
 
-const CheckIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M5 13l4 4L19 7" />
+const UsersIcon = () => (
+  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-5.13a4 4 0 11-8 0 4 4 0 018 0zm6 3a3 3 0 11-6 0 3 3 0 016 0z" />
   </svg>
 );
 
-const XIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M6 18L18 6M6 6l12 12" />
-  </svg>
-);
-
-/* --------------------------------------------------------------
-   Componente principal
-   -------------------------------------------------------------- */
 export default function Dashboard() {
+  const { user } = useAuth();
+  const { consultorio, loading: loadingConsultorio } = useConsultorio();
+
+  const [profesionales, setProfesionales] = useState([]);
+  const [invitaciones, setInvitaciones] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user?.consultorioId) return;
+
+    let done = 0;
+    const check = () => { done++; if (done >= 2) setLoading(false); };
+
+    const unsubP = suscribirProfesionales(user.consultorioId, (data) => { setProfesionales(data); check(); });
+    const unsubI = suscribirInvitaciones(user.consultorioId, (data) => { setInvitaciones(data); check(); });
+
+    return () => { unsubP(); unsubI(); };
+  }, [user?.consultorioId]);
+
+  if (loadingConsultorio || loading) {
+    return (
+      <div className="cp-dashboard">
+        <div style={{ padding: 60, display: 'flex', justifyContent: 'center' }}>
+          <Spinner size={24} label="Cargando…" />
+        </div>
+      </div>
+    );
+  }
+
+  const profesionalesActivos = profesionales.filter((p) => p.estado === 'activo');
+  const invitacionesPendientes = invitaciones.filter((i) => i.estado === 'pendiente');
+
   const mesActual = new Intl.DateTimeFormat('es-AR', { month: 'long' }).format(new Date());
-  const mesCapitalizado = mesActual.charAt(0).toUpperCase() + mesActual.slice(1);
+
+  // Si no hay profesionales ni invitaciones, mostrar onboarding
+  if (profesionales.length === 0 && invitaciones.length === 0) {
+    return (
+      <div className="cp-dashboard">
+        <header className="cp-page-header">
+          <div>
+            <h1 className="cp-page-title">
+              Bienvenido{user?.displayName ? `, ${user.displayName.split(' ')[0]}` : ''}
+            </h1>
+            <p className="cp-page-sub">
+              Tu consultorio <strong>{consultorio?.nombre || ''}</strong> está listo para arrancar.
+            </p>
+          </div>
+        </header>
+
+        <OnboardingPasos />
+      </div>
+    );
+  }
 
   return (
     <div className="cp-dashboard">
-      {/* ---------- Header ---------- */}
       <header className="cp-page-header">
         <div>
           <h1 className="cp-page-title">Resumen de {mesActual}</h1>
-          <p className="cp-page-sub">Vista general del consultorio · actualizado hace unos segundos</p>
+          <p className="cp-page-sub">
+            {consultorio?.nombre}
+            {' · '}
+            <PlanBadge plan={consultorio?.plan} />
+          </p>
         </div>
-        <Button variant="primary" icon={<PlusIcon />}>
-          Registrar sesión
-        </Button>
+        <Link to="/admin/sesiones/nueva">
+          <Button variant="primary" icon={<PlusIcon />}>
+            Registrar sesión
+          </Button>
+        </Link>
       </header>
 
-      {/* ---------- Métricas ---------- */}
+      {/* Métricas — por ahora 0 en todos, se llenan cuando haya sesiones */}
       <section className="cp-metrics-grid">
-        {METRICAS_MOCK.map((m) => (
-          <Metric
-            key={m.label}
-            label={m.label}
-            value={typeof m.value === 'number' && m.label.toLowerCase().includes('cobr')
-              ? formatoARS.format(m.value)
-              : typeof m.value === 'number' && m.value > 1000
-                ? formatoARS.format(m.value)
-                : m.value}
-            trend={m.trend}
-            trendDirection={m.trendDirection}
-            sub={m.sub}
-          />
-        ))}
+        <Metric label="Por cobrar" value={formatoARS.format(0)} sub="Sin sesiones todavía" />
+        <Metric label="Cobrado este mes" value={formatoARS.format(0)} sub="Sin sesiones todavía" />
+        <Metric
+          label="Profesionales activos"
+          value={profesionalesActivos.length}
+          sub={invitacionesPendientes.length > 0 ? `${invitacionesPendientes.length} pendiente${invitacionesPendientes.length === 1 ? '' : 's'}` : null}
+        />
+        <Metric label="Sesiones del mes" value={0} sub="Sin registros todavía" />
       </section>
 
-      {/* ---------- Profesionales con deuda ---------- */}
+      {/* Placeholder hasta tener sesiones */}
       <section className="cp-section">
         <div className="cp-section-head">
           <h2 className="cp-section-title">Profesionales con deuda abierta</h2>
-          <a className="cp-section-link" href="/admin/profesionales">Ver todos →</a>
+          <Link to="/admin/profesionales" className="cp-section-link">Ver todos →</Link>
         </div>
-
-        <div className="cp-table-wrap">
-          <table className="cp-table">
-            <thead>
-              <tr>
-                <th>Profesional</th>
-                <th className="cp-num-col">Sesiones</th>
-                <th className="cp-num-col">Facturado</th>
-                <th className="cp-num-col">Debe</th>
-                <th>Estado</th>
-                <th aria-label="Acciones" />
-              </tr>
-            </thead>
-            <tbody>
-              {PROFESIONALES_DEUDA.map((p) => (
-                <tr key={p.id}>
-                  <td>
-                    <div className="cp-prof-cell">
-                      <Avatar initials={p.iniciales} size={32} />
-                      <div>
-                        <div className="cp-prof-name">{p.nombre}</div>
-                        <div className="cp-prof-meta">{p.especialidad} · {p.porcentaje}%</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="cp-num">{p.sesiones}</td>
-                  <td className="cp-num">{formatoARS.format(p.facturado)}</td>
-                  <td className="cp-num">{formatoARS.format(p.debe)}</td>
-                  <td><Badge tone={TONO_BADGE[p.estado]}>{p.estadoLabel}</Badge></td>
-                  <td style={{ textAlign: 'right' }}>
-                    <a className="cp-section-link" href={`/admin/profesionales/${p.id}`}>Ver detalle →</a>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="cp-placeholder-box">
+          <p style={{ color: 'var(--cp-text-muted)', fontSize: 14 }}>
+            Todavía no se registraron sesiones este mes. Cuando tus profesionales hagan
+            sesiones con pacientes, la deuda acumulada va a aparecer acá.
+          </p>
         </div>
       </section>
-
-      {/* ---------- Dos columnas ---------- */}
-      <section className="cp-two-col">
-        {/* Chart */}
-        <div className="cp-panel">
-          <h3 className="cp-panel-title">Ingresos últimos 6 meses</h3>
-          <div className="cp-chart-bars">
-            {INGRESOS_6M.map((m, i) => (
-              <div
-                key={m.mes}
-                className={`cp-bar ${i === INGRESOS_6M.length - 1 ? 'cp-bar--current' : ''}`}
-                style={{ height: `${m.valor}%` }}
-              />
-            ))}
-          </div>
-          <div className="cp-bar-labels">
-            {INGRESOS_6M.map((m) => (
-              <span key={m.mes}>{m.mes}</span>
-            ))}
-          </div>
-        </div>
-
-        {/* Pendientes */}
-        <div className="cp-panel">
-          <h3 className="cp-panel-title">Registros pendientes</h3>
-          {REGISTROS_PENDIENTES.length === 0 ? (
-            <p className="cp-empty">No hay solicitudes pendientes.</p>
-          ) : (
-            REGISTROS_PENDIENTES.map((r) => (
-              <div key={r.id} className="cp-pending-item">
-                <Avatar initials={r.iniciales} size={36} />
-                <div className="cp-pending-info">
-                  <div className="cp-pending-name">{r.nombre}</div>
-                  <div className="cp-pending-meta">{r.especialidad} · solicitó acceso {r.hace}</div>
-                </div>
-                <div className="cp-pending-actions">
-                  <button className="cp-icon-btn cp-icon-btn--approve" title="Aprobar" aria-label="Aprobar">
-                    <CheckIcon />
-                  </button>
-                  <button className="cp-icon-btn cp-icon-btn--reject" title="Rechazar" aria-label="Rechazar">
-                    <XIcon />
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </section>
-
-      {/* Marcador no usado pero guardado por si hace falta mostrar mes */}
-      <span hidden>{mesCapitalizado}</span>
     </div>
+  );
+}
+
+/* ============================================================
+   Onboarding: 3 pasos para arrancar
+   ============================================================ */
+function OnboardingPasos() {
+  const { consultorio } = useConsultorio();
+
+  const pasos = [
+    {
+      num: '01',
+      titulo: 'Invitá a tus profesionales',
+      desc: 'Sumá a los profesionales que trabajan en tu consultorio vía email. Ellos reciben un link para activar su cuenta.',
+      cta: 'Ir a Profesionales',
+      href: '/admin/profesionales',
+      activo: true,
+    },
+    {
+      num: '02',
+      titulo: 'Cargá los pacientes',
+      desc: 'Cada profesional carga sus pacientes con obra social y valor de sesión. Podés hacerlo vos también desde el admin.',
+      cta: 'Próximamente',
+      disabled: true,
+    },
+    {
+      num: '03',
+      titulo: 'Registrá sesiones',
+      desc: 'Cada sesión se registra con un click. El sistema calcula automáticamente cuánto debe cada profesional al consultorio.',
+      cta: 'Próximamente',
+      disabled: true,
+    },
+  ];
+
+  return (
+    <div className="cp-onboarding">
+      <div className="cp-onboarding__intro">
+        <div className="cp-onboarding__eyebrow">Primeros pasos</div>
+        <h2 className="cp-onboarding__title">
+          Tres pasos para que <em>ConsulPay</em> trabaje por vos.
+        </h2>
+      </div>
+
+      <div className="cp-onboarding__grid">
+        {pasos.map((p) => (
+          <article key={p.num} className={`cp-onboarding-step ${p.disabled ? 'cp-onboarding-step--disabled' : ''}`}>
+            <div className="cp-onboarding-step__num">{p.num}</div>
+            <h3 className="cp-onboarding-step__title">{p.titulo}</h3>
+            <p className="cp-onboarding-step__desc">{p.desc}</p>
+            {p.activo && p.href && (
+              <Link to={p.href} className="cp-onboarding-step__cta">
+                {p.cta} →
+              </Link>
+            )}
+            {p.disabled && <div className="cp-onboarding-step__cta--disabled">{p.cta}</div>}
+          </article>
+        ))}
+      </div>
+
+      {consultorio?.plan === PLANES.FREE && (
+        <div className="cp-onboarding__plan">
+          <div>
+            <div className="cp-onboarding__plan-label">Estás en el plan</div>
+            <div className="cp-onboarding__plan-name">Free</div>
+          </div>
+          <div className="cp-onboarding__plan-desc">
+            Usás ConsulPay sin pagar mensualidad. Cuando tus profesionales paguen vía Mercado Pago,
+            se queda un 6% ConsulPay. Podés cambiar al Plan Pago en cualquier momento desde Configuración.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   Plan badge
+   ============================================================ */
+function PlanBadge({ plan }) {
+  if (!plan) return null;
+  return (
+    <span className={`cp-plan-badge cp-plan-badge--${plan}`}>
+      {plan === PLANES.FREE ? 'Plan Free' : 'Plan Pago'}
+    </span>
   );
 }

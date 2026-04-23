@@ -1,0 +1,448 @@
+import { useEffect, useMemo, useState } from 'react';
+
+import Avatar from '../../components/ui/Avatar.jsx';
+import Badge from '../../components/ui/Badge.jsx';
+import Button from '../../components/ui/Button.jsx';
+import Input from '../../components/ui/Input.jsx';
+import Spinner from '../../components/ui/Spinner.jsx';
+
+import { useAuth } from '../../hooks/useAuth.js';
+import { ESTADOS_INVITACION, ESTADOS_USUARIO, formatoFechaLarga } from '../../lib/constants.js';
+import { enviarInvitacion, suscribirInvitaciones } from '../../lib/invitaciones.js';
+import {
+  cambiarEstadoProfesional,
+  suscribirProfesionales,
+} from '../../lib/profesionales.js';
+import { useConsultorio } from '../../hooks/useConsultorio.js';
+
+import './Profesionales.css';
+
+/* ============================================================
+   Íconos
+   ============================================================ */
+const PlusIcon = () => (
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 4v16m8-8H4" />
+  </svg>
+);
+
+const CopyIcon = () => (
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="9" y="9" width="13" height="13" rx="2" />
+    <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+  </svg>
+);
+
+const TrashIcon = () => (
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 6 5 6 21 6" />
+    <path d="M19 6l-2 14a2 2 0 01-2 2H9a2 2 0 01-2-2L5 6m5 0V4a2 2 0 012-2h0a2 2 0 012 2v2" />
+  </svg>
+);
+
+/* ============================================================
+   Helper: iniciales
+   ============================================================ */
+function iniciales(nombre) {
+  if (!nombre) return '·';
+  const partes = nombre.trim().split(/\s+/);
+  const first = partes[0]?.[0] ?? '';
+  const last = partes.length > 1 ? partes[partes.length - 1][0] : '';
+  return (first + last).toUpperCase();
+}
+
+/* ============================================================
+   Página principal
+   ============================================================ */
+export default function Profesionales() {
+  const { user } = useAuth();
+  const { consultorio } = useConsultorio();
+  const [profesionales, setProfesionales] = useState([]);
+  const [invitaciones, setInvitaciones] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [openInvitar, setOpenInvitar] = useState(false);
+
+  useEffect(() => {
+    if (!user?.consultorioId) return;
+
+    let cargados = 0;
+    const checkDone = () => {
+      cargados++;
+      if (cargados >= 2) setLoading(false);
+    };
+
+    const unsubProfs = suscribirProfesionales(user.consultorioId, (data) => {
+      setProfesionales(data);
+      checkDone();
+    });
+    const unsubInvs = suscribirInvitaciones(user.consultorioId, (data) => {
+      setInvitaciones(data);
+      checkDone();
+    });
+
+    return () => {
+      unsubProfs();
+      unsubInvs();
+    };
+  }, [user?.consultorioId]);
+
+  const invitacionesPendientes = useMemo(
+    () => invitaciones.filter((i) => i.estado === ESTADOS_INVITACION.PENDIENTE),
+    [invitaciones],
+  );
+
+  const activos = useMemo(
+    () => profesionales.filter((p) => p.estado === ESTADOS_USUARIO.ACTIVO),
+    [profesionales],
+  );
+  const suspendidos = useMemo(
+    () => profesionales.filter((p) => p.estado === ESTADOS_USUARIO.SUSPENDIDO),
+    [profesionales],
+  );
+
+  const totalAccionables = profesionales.length + invitacionesPendientes.length;
+
+  return (
+    <div className="cp-profs">
+
+      {/* Header */}
+      <header className="cp-page-header">
+        <div>
+          <h1 className="cp-page-title">Profesionales</h1>
+          <p className="cp-page-sub">
+            {loading
+              ? 'Cargando…'
+              : totalAccionables === 0
+                ? 'Todavía no invitaste a ningún profesional.'
+                : `${activos.length} activo${activos.length === 1 ? '' : 's'} · ${invitacionesPendientes.length} pendiente${invitacionesPendientes.length === 1 ? '' : 's'}`
+            }
+          </p>
+        </div>
+
+        {totalAccionables > 0 && (
+          <Button variant="primary" icon={<PlusIcon />} onClick={() => setOpenInvitar(true)}>
+            Invitar profesional
+          </Button>
+        )}
+      </header>
+
+      {loading ? (
+        <div className="cp-profs__loading">
+          <Spinner size={24} label="Cargando profesionales…" />
+        </div>
+      ) : totalAccionables === 0 ? (
+        <EmptyState onInvitar={() => setOpenInvitar(true)} />
+      ) : (
+        <>
+          {invitacionesPendientes.length > 0 && (
+            <section className="cp-section">
+              <div className="cp-section-head">
+                <h2 className="cp-section-title">Invitaciones pendientes</h2>
+              </div>
+              <InvitacionesLista invitaciones={invitacionesPendientes} />
+            </section>
+          )}
+
+          {activos.length > 0 && (
+            <section className="cp-section">
+              <div className="cp-section-head">
+                <h2 className="cp-section-title">Activos</h2>
+              </div>
+              <ProfesionalesTabla
+                profesionales={activos}
+                consultorio={consultorio}
+                onSuspender={(uid) => cambiarEstadoProfesional(uid, ESTADOS_USUARIO.SUSPENDIDO)}
+              />
+            </section>
+          )}
+
+          {suspendidos.length > 0 && (
+            <section className="cp-section">
+              <div className="cp-section-head">
+                <h2 className="cp-section-title">Suspendidos</h2>
+              </div>
+              <ProfesionalesTabla
+                profesionales={suspendidos}
+                consultorio={consultorio}
+                onReactivar={(uid) => cambiarEstadoProfesional(uid, ESTADOS_USUARIO.ACTIVO)}
+              />
+            </section>
+          )}
+        </>
+      )}
+
+      {/* Modal de invitar */}
+      {openInvitar && (
+        <InvitarModal
+          onClose={() => setOpenInvitar(false)}
+          consultorioId={user.consultorioId}
+          consultorioNombre={consultorio?.nombre || ''}
+          porcentajeDefault={30}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   Empty state
+   ============================================================ */
+function EmptyState({ onInvitar }) {
+  return (
+    <div className="cp-empty-profs">
+      <div className="cp-empty-profs__mark" aria-hidden="true">
+        <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="24" cy="24" r="8" />
+          <path d="M32 48c0-6-4-12-12-12S8 42 8 48" />
+          <circle cx="44" cy="20" r="6" />
+          <path d="M56 40c0-5-3-8-8-8s-6 2-7 4" />
+        </svg>
+      </div>
+      <h2 className="cp-empty-profs__title">Tu consultorio está vacío</h2>
+      <p className="cp-empty-profs__desc">
+        Invitá al primer profesional por email. Va a recibir un link para aceptar
+        la invitación y sumarse a tu consultorio.
+      </p>
+      <Button variant="primary" icon={<PlusIcon />} onClick={onInvitar}>
+        Invitar primer profesional
+      </Button>
+    </div>
+  );
+}
+
+/* ============================================================
+   Lista de invitaciones pendientes
+   ============================================================ */
+function InvitacionesLista({ invitaciones }) {
+  const [copiedId, setCopiedId] = useState(null);
+
+  function copiar(aceptarUrl, id) {
+    navigator.clipboard.writeText(aceptarUrl).then(() => {
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    }).catch(() => {
+      console.error('No se pudo copiar al portapapeles');
+    });
+  }
+
+  return (
+    <div className="cp-invitaciones">
+      {invitaciones.map((i) => {
+        const aceptarUrl = `${window.location.origin}/aceptar-invitacion?id=${encodeURIComponent(i.id)}`;
+        return (
+          <div key={i.id} className="cp-invitacion">
+            <Avatar initials={iniciales(i.nombre)} size={36} />
+            <div className="cp-invitacion__body">
+              <div className="cp-invitacion__nombre">{i.nombre}</div>
+              <div className="cp-invitacion__meta">
+                {i.email} · {i.porcentajeOverride !== null ? `${i.porcentajeOverride}%` : 'default'}
+                {i.createdAt?.toDate && ` · enviada ${formatoFechaLarga.format(i.createdAt.toDate())}`}
+              </div>
+            </div>
+            <div className="cp-invitacion__actions">
+              <Badge tone="warning">Pendiente</Badge>
+              <button
+                type="button"
+                className="cp-invitacion__copy"
+                onClick={() => copiar(aceptarUrl, i.id)}
+                title="Copiar link de invitación"
+              >
+                {copiedId === i.id ? (
+                  <span style={{ fontSize: 12 }}>¡Copiado!</span>
+                ) : (
+                  <>
+                    <CopyIcon />
+                    <span>Copiar link</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ============================================================
+   Tabla de profesionales activos/suspendidos
+   ============================================================ */
+function ProfesionalesTabla({ profesionales, consultorio, onSuspender, onReactivar }) {
+  return (
+    <div className="cp-table-wrap">
+      <table className="cp-table">
+        <thead>
+          <tr>
+            <th>Profesional</th>
+            <th>Email</th>
+            <th className="cp-num-col">% consultorio</th>
+            <th>Estado</th>
+            <th aria-label="Acciones" />
+          </tr>
+        </thead>
+        <tbody>
+          {profesionales.map((p) => (
+            <tr key={p.uid}>
+              <td>
+                <div className="cp-prof-cell">
+                  <Avatar initials={iniciales(p.displayName || p.email)} size={32} />
+                  <div>
+                    <div className="cp-prof-name">{p.displayName || '—'}</div>
+                    <div className="cp-prof-meta">
+                      Se unió {p.createdAt?.toDate && formatoFechaLarga.format(p.createdAt.toDate())}
+                    </div>
+                  </div>
+                </div>
+              </td>
+              <td style={{ fontSize: 13.5, color: 'var(--cp-text-muted)' }}>{p.email}</td>
+              <td className="cp-num">
+                {p.porcentajeCustom ?? consultorio?.porcentajeDefault ?? '—'}%
+              </td>
+              <td>
+                {p.estado === ESTADOS_USUARIO.ACTIVO && <Badge tone="success">Activo</Badge>}
+                {p.estado === ESTADOS_USUARIO.SUSPENDIDO && <Badge tone="danger">Suspendido</Badge>}
+                {p.estado === ESTADOS_USUARIO.PENDIENTE && <Badge tone="warning">Pendiente</Badge>}
+              </td>
+              <td style={{ textAlign: 'right' }}>
+                {onSuspender && (
+                  <button className="cp-prof-action" onClick={() => onSuspender(p.uid)}>
+                    Suspender
+                  </button>
+                )}
+                {onReactivar && (
+                  <button className="cp-prof-action" onClick={() => onReactivar(p.uid)}>
+                    Reactivar
+                  </button>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* ============================================================
+   Modal: Invitar profesional
+   ============================================================ */
+function InvitarModal({ onClose, consultorioId, consultorioNombre, porcentajeDefault }) {
+  const [nombre, setNombre] = useState('');
+  const [email, setEmail] = useState('');
+  const [porcentaje, setPorcentaje] = useState(String(porcentajeDefault));
+  const [submitting, setSubmitting] = useState(false);
+  const [resultado, setResultado] = useState(null); // {ok, aceptarUrl, warning} o null
+  const [error, setError] = useState('');
+
+  async function onSubmit(e) {
+    e.preventDefault();
+    setError('');
+    setSubmitting(true);
+    try {
+      const res = await enviarInvitacion({
+        email: email.trim(),
+        nombre: nombre.trim(),
+        consultorioId,
+        consultorioNombre,
+        porcentajeOverride: Number(porcentaje) || null,
+      });
+      setResultado(res);
+    } catch (err) {
+      setError(err.message || 'No se pudo enviar la invitación.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function reset() {
+    setNombre(''); setEmail(''); setPorcentaje(String(porcentajeDefault));
+    setResultado(null); setError('');
+  }
+
+  return (
+    <div className="cp-modal-overlay" onClick={onClose}>
+      <div className="cp-modal" onClick={(e) => e.stopPropagation()}>
+        <button className="cp-modal__close" onClick={onClose} aria-label="Cerrar">×</button>
+
+        {!resultado ? (
+          <>
+            <h2 className="cp-modal__title">Invitar profesional</h2>
+            <p className="cp-modal__sub">
+              Le vamos a enviar un email con un link único para que se sume al consultorio.
+            </p>
+
+            <form onSubmit={onSubmit} className="cp-modal__form">
+              <Input
+                name="nombre"
+                label="Nombre del profesional"
+                placeholder="María Rodríguez"
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+                required
+                autoFocus
+              />
+              <Input
+                name="email"
+                type="email"
+                label="Email"
+                placeholder="maria@mail.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+              <Input
+                name="porcentaje"
+                type="number"
+                label="% que cobra el consultorio"
+                value={porcentaje}
+                onChange={(e) => setPorcentaje(e.target.value)}
+                min="0"
+                max="100"
+                hint="Podés usar un % distinto al default del consultorio para este profesional."
+              />
+
+              {error && <div className="cp-modal__error">{error}</div>}
+
+              <div className="cp-modal__actions">
+                <Button variant="secondary" type="button" onClick={onClose} disabled={submitting}>
+                  Cancelar
+                </Button>
+                <Button variant="primary" type="submit" disabled={submitting}>
+                  {submitting ? <><Spinner size={14} /> Enviando…</> : 'Enviar invitación'}
+                </Button>
+              </div>
+            </form>
+          </>
+        ) : (
+          <>
+            <div className="cp-modal__success">
+              <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </div>
+            <h2 className="cp-modal__title">Invitación enviada</h2>
+            <p className="cp-modal__sub">
+              {resultado.emailEnviado
+                ? `Le enviamos un email a ${email} con el link de acceso.`
+                : (resultado.warning || 'La invitación se creó pero no se pudo enviar el email.')}
+            </p>
+
+            {!resultado.emailEnviado && resultado.aceptarUrl && (
+              <div className="cp-modal__fallback">
+                <div style={{ fontSize: 12, color: 'var(--cp-text-muted)', marginBottom: 6 }}>
+                  Link de invitación (copiá y mandáselo manual):
+                </div>
+                <div className="cp-modal__link">{resultado.aceptarUrl}</div>
+              </div>
+            )}
+
+            <div className="cp-modal__actions">
+              <Button variant="secondary" onClick={reset}>Invitar otro</Button>
+              <Button variant="primary" onClick={onClose}>Listo</Button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

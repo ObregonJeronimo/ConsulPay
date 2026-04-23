@@ -8,9 +8,11 @@ import AppShell from './components/layout/AppShell.jsx';
 import Landing from './pages/Landing.jsx';
 import Login from './pages/Login.jsx';
 import CrearConsultorio from './pages/CrearConsultorio.jsx';
+import AceptarInvitacion from './pages/AceptarInvitacion.jsx';
 import Pendiente from './pages/Pendiente.jsx';
 import DashboardSuper from './pages/super/Dashboard.jsx';
 import DashboardAdmin from './pages/admin/Dashboard.jsx';
+import Profesionales from './pages/admin/Profesionales.jsx';
 import MiPanel from './pages/profesional/MiPanel.jsx';
 
 import { ROLES } from './lib/constants.js';
@@ -24,6 +26,7 @@ export default function App() {
           <Route path="/inicio" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/crear-consultorio" element={<CrearConsultorio />} />
+          <Route path="/aceptar-invitacion" element={<AceptarInvitacion />} />
 
           {/* ---------- Autenticadas sin shell ---------- */}
           <Route element={<ProtectedRoute requireActivo={false} />}>
@@ -34,7 +37,6 @@ export default function App() {
           <Route element={<ProtectedRoute requireRole={ROLES.SUPERADMIN} />}>
             <Route element={<AppShell />}>
               <Route path="/super" element={<DashboardSuper />} />
-              {/* /super/consultorios, /super/pagos, /super/configuracion → próximamente */}
             </Route>
           </Route>
 
@@ -42,6 +44,7 @@ export default function App() {
           <Route element={<ProtectedRoute requireRole={ROLES.ADMIN} />}>
             <Route element={<AppShell />}>
               <Route path="/admin" element={<DashboardAdmin />} />
+              <Route path="/admin/profesionales" element={<Profesionales />} />
             </Route>
           </Route>
 

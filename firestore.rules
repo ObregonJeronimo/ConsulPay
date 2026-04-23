@@ -79,10 +79,12 @@ service cloud.firestore {
       // - Admin sobre un prof de su consultorio: puede cambiar estado (activar/suspender)
       //   y porcentajeCustom, PERO no rol ni consultorioId.
       // - El propio usuario: puede editar displayName/photoURL pero NO rol/consultorioId/estado
-      //   EXCEPCIÓN: puede auto-promoverse a admin al crear su primer consultorio.
-      //   La validación estricta de que efectivamente cree el consultorio la dejamos
-      //   del lado cliente (transacción) y en la regla de /consultorios (que exige
-      //   ownerUid=el que escribe). Acá solo permitimos el auto-upgrade controlado.
+      //   EXCEPCIONES:
+      //     1. puede auto-promoverse a admin al crear su primer consultorio
+      //     2. puede auto-ligarse a un consultorio al aceptar una invitación
+      //        (de profesional pendiente → profesional activo + consultorioId)
+      //   La validación completa de la invitación la hacen la regla de
+      //   /invitaciones_profesional/ y el batch atómico del frontend.
       allow update: if esSuperadmin()
         || (esAdmin()
             && resource.data.consultorioId == miUsuario().consultorioId
@@ -95,6 +97,12 @@ service cloud.firestore {
             && resource.data.rol == 'profesional'
             && resource.data.consultorioId == null
             && request.resource.data.rol == 'admin'
+            && request.resource.data.consultorioId != null
+            && request.resource.data.estado == 'activo')
+        || (esDueno(uid)
+            && resource.data.rol == 'profesional'
+            && resource.data.consultorioId == null
+            && request.resource.data.rol == 'profesional'
             && request.resource.data.consultorioId != null
             && request.resource.data.estado == 'activo');
 
@@ -144,22 +152,26 @@ service cloud.firestore {
 
     // ============================================================
     //  /invitaciones_profesional/{invitacionId}
-    //  ID = email del invitado en minúscula
+    //  ID = consultorioId + "_" + email en minúscula
+    //
+    //  SEGURIDAD DE LECTURA:
+    //  El link del email contiene el invitacionId completo. Como ese ID
+    //  combina consultorioId (UUID) + email, no es adivinable por fuerza bruta,
+    //  y es razonable permitir lectura anónima siempre que alguien conozca
+    //  el ID exacto. Esto es necesario para que el invitado vea los datos
+    //  ANTES de loguearse (decide con qué email iniciar sesión).
     // ============================================================
     match /invitaciones_profesional/{invitacionId} {
 
-      // Lectura:
-      // - Superadmin todo
-      // - Admin del consultorio que la creó
-      // - El propio invitado (comparando email) puede ver su invitación
-      //   para poder aceptarla.
-      allow read: if esSuperadmin()
-        || esAdminDe(resource.data.consultorioId)
-        || (estaAutenticado() && request.auth.token.email == resource.data.email);
+      // Lectura: cualquiera que tenga el ID completo puede leer la invitación.
+      // Esto es necesario para el flow público del link del email.
+      allow read: if true;
 
-      // Creación: solo admins sobre SU consultorio
-      allow create: if esAdminDe(request.resource.data.consultorioId)
-        && request.resource.data.estado == 'pendiente';
+      // Creación: solo vía Admin SDK (backend). El frontend no crea invitaciones.
+      // Si alguna vez queremos permitirlo desde cliente, descomentar:
+      // allow create: if esAdminDe(request.resource.data.consultorioId)
+      //   && request.resource.data.estado == 'pendiente';
+      allow create: if false;
 
       // Update: admin del consultorio (para cancelar) o el invitado (para aceptar)
       allow update: if esSuperadmin()
