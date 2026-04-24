@@ -1,13 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import Button from '../../components/ui/Button.jsx';
 import Input from '../../components/ui/Input.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
-import UnsavedChangesModal from '../../components/ui/UnsavedChangesModal.jsx';
 
 import { useAuth } from '../../hooks/useAuth.js';
 import { useConsultorio } from '../../hooks/useConsultorio.js';
-import { useUnsavedNavigationGuard } from '../../hooks/useUnsavedNavigationGuard.js';
 import {
   formatoARS,
   LABELS_TIPO_METODO,
@@ -27,81 +25,48 @@ import {
 import './Configuracion.css';
 
 /* ============================================================
+   Hook: advertencia de cambios sin guardar al cerrar / refrescar
+   la pestaña. No cubre navegación interna por React Router (eso lo
+   manejamos con un confirm() manual en los click de tabs/links).
+   ============================================================ */
+function useUnsavedChangesWarning(dirty) {
+  useEffect(() => {
+    if (!dirty) return;
+    function onBeforeUnload(e) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [dirty]);
+}
+
+/* ============================================================
    Página principal
-   ----------------------------------------------------------------
-   Esta página tiene dos tabs (Datos del consultorio / Métodos de pago),
-   cada uno con su propio formulario editable. La protección contra
-   perdida de cambios se centraliza acá via useUnsavedNavigationGuard,
-   que cubre:
-
-     1. Navegacion interna (click en sidebar, boton atras) → useBlocker
-     2. Cerrar/refrescar la pestaña                        → beforeunload
-     3. Cambio de tab dentro de Configuracion              → requestNavigation
-
-   Los tabs hijos exponen sus funciones de guardado via ref; el guard
-   invoca el guardado del tab que tiene el dirty activo cuando el
-   usuario elige "Guardar y continuar" en el modal.
    ============================================================ */
 export default function Configuracion() {
   const { user } = useAuth();
   const { consultorio, loading } = useConsultorio();
   const [tab, setTab] = useState('datos');
 
-  // Dirty de cada tab, reportado hacia arriba por onDirtyChange.
   const [dirtyDatos, setDirtyDatos] = useState(false);
   const [dirtyMetodos, setDirtyMetodos] = useState(false);
+
   const anyDirty = dirtyDatos || dirtyMetodos;
+  useUnsavedChangesWarning(anyDirty);
 
-  // Refs a los "save handlers" expuestos por cada tab. Cada tab, al
-  // montarse, registra su funcion de guardado aca. El guard las usa
-  // para ejecutar "Guardar y continuar" sin conocer los detalles del
-  // formulario interno.
-  const saveDatosRef = useRef(null);
-  const saveMetodosRef = useRef(null);
-
-  // Refs a los "discard handlers" de cada tab. Si el usuario elige
-  // "Descartar cambios", reseteamos el tab correspondiente para que
-  // dirty vuelva a false y no quede un estado zombie.
-  const discardDatosRef = useRef(null);
-  const discardMetodosRef = useRef(null);
-
-  // El onSave del guard: guarda el tab que esta sucio. Si ambos
-  // estan sucios (caso raro), guarda primero el activo; el otro
-  // queda dirty para la proxima vez.
-  const onSaveDesdeGuard = useCallback(async () => {
-    // Prioridad: guardar el tab activo primero si esta dirty.
-    if (tab === 'datos' && dirtyDatos && saveDatosRef.current) {
-      await saveDatosRef.current();
-    } else if (tab === 'metodos' && dirtyMetodos && saveMetodosRef.current) {
-      await saveMetodosRef.current();
-    } else if (dirtyDatos && saveDatosRef.current) {
-      await saveDatosRef.current();
-    } else if (dirtyMetodos && saveMetodosRef.current) {
-      await saveMetodosRef.current();
-    }
-  }, [tab, dirtyDatos, dirtyMetodos]);
-
-  const guard = useUnsavedNavigationGuard({
-    dirty: anyDirty,
-    onSave: onSaveDesdeGuard,
-  });
-
-  // Cambio de tab: si el tab actual esta sucio, pasamos por el modal.
-  // El guard decide si ejecuta el cambio (post-guardar o descartar) o
-  // lo cancela (el usuario elige quedarse).
   function intentarCambiarTab(nuevoTab) {
     if (nuevoTab === tab) return;
     const dirtyDelTabActual = tab === 'datos' ? dirtyDatos : dirtyMetodos;
-
-    guard.requestNavigation(() => {
-      // Si el modal nos trajo aca via "Descartar", reseteamos el form
-      // del tab que dejamos para que no quede dirty zombie.
-      if (dirtyDelTabActual) {
-        if (tab === 'datos' && discardDatosRef.current) discardDatosRef.current();
-        else if (tab === 'metodos' && discardMetodosRef.current) discardMetodosRef.current();
-      }
-      setTab(nuevoTab);
-    });
+    if (dirtyDelTabActual) {
+      const ok = confirm(
+        'Tenés cambios sin guardar en esta sección. Si cambiás de pestaña, se van a perder.\n\n¿Querés continuar de todas formas?',
+      );
+      if (!ok) return;
+      if (tab === 'datos') setDirtyDatos(false);
+      else setDirtyMetodos(false);
+    }
+    setTab(nuevoTab);
   }
 
   if (loading) {
@@ -158,8 +123,6 @@ export default function Configuracion() {
           consultorio={consultorio}
           consultorioId={user.consultorioId}
           onDirtyChange={setDirtyDatos}
-          saveRef={saveDatosRef}
-          discardRef={discardDatosRef}
         />
       )}
 
@@ -168,21 +131,8 @@ export default function Configuracion() {
           metodos={consultorio.metodosPagoPaciente ?? []}
           consultorioId={user.consultorioId}
           onDirtyChange={setDirtyMetodos}
-          saveRef={saveMetodosRef}
-          discardRef={discardMetodosRef}
         />
       )}
-
-      {/* Modal centralizado: cubre navegacion de sidebar, cambio de tab
-          interno y cualquier otra accion que pase por requestNavigation. */}
-      <UnsavedChangesModal
-        open={guard.modalOpen}
-        saving={guard.saving}
-        error={guard.error}
-        onSaveAndContinue={guard.onSaveAndContinue}
-        onCancel={guard.onCancel}
-        onDiscard={guard.onDiscard}
-      />
     </div>
   );
 }
@@ -190,7 +140,7 @@ export default function Configuracion() {
 /* ============================================================
    Tab: Datos del consultorio
    ============================================================ */
-function TabDatos({ consultorio, consultorioId, onDirtyChange, saveRef, discardRef }) {
+function TabDatos({ consultorio, consultorioId, onDirtyChange }) {
   const valorInicial = useMemo(() => ({
     nombre: consultorio.nombre || '',
     direccion: consultorio.direccion || '',
@@ -206,21 +156,16 @@ function TabDatos({ consultorio, consultorioId, onDirtyChange, saveRef, discardR
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
 
-  // Dirty = algún campo cambió respecto al valor inicial
   const dirty = useMemo(() => {
     return Object.keys(valorInicial).some((k) => form[k] !== valorInicial[k]);
   }, [form, valorInicial]);
 
-  // Reportar el dirty al padre para el guard de navegacion
   useEffect(() => {
     onDirtyChange(dirty);
   }, [dirty, onDirtyChange]);
 
-  // Cuando llega un consultorio nuevo (ej: Firestore update externo), resetear form.
   useEffect(() => {
     setForm(valorInicial);
-    // Intencional: solo queremos resetear el form cuando cambia el consultorio
-    // completo (nueva instancia), no cuando el admin edita un campo del form.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [consultorio.id]);
 
@@ -237,14 +182,17 @@ function TabDatos({ consultorio, consultorioId, onDirtyChange, saveRef, discardR
     onChange('cbuTransferencia', soloDigitosCBU(e.target.value));
   }
 
-  // Handler de guardado: usamos useCallback para que la referencia sea
-  // estable y el saveRef del padre no apunte a una funcion vieja que
-  // capturo un form anterior.
-  const guardar = useCallback(async () => {
+  function onDescartar() {
+    setForm(valorInicial);
+    setError('');
+    setSaved(false);
+  }
+
+  async function onGuardar(e) {
+    e.preventDefault();
     if (!form.nombre.trim()) {
-      const msg = 'El nombre del consultorio es obligatorio.';
-      setError(msg);
-      throw new Error(msg); // para que el modal muestre el error
+      setError('El nombre del consultorio es obligatorio.');
+      return;
     }
     setError('');
     setSaving(true);
@@ -255,41 +203,13 @@ function TabDatos({ consultorio, consultorioId, onDirtyChange, saveRef, discardR
     } catch (err) {
       console.error(err);
       setError(err.message || 'No se pudieron guardar los cambios.');
-      throw err; // propagar para que el modal lo muestre
     } finally {
       setSaving(false);
-    }
-  }, [form, consultorioId]);
-
-  const descartar = useCallback(() => {
-    setForm(valorInicial);
-    setError('');
-    setSaved(false);
-  }, [valorInicial]);
-
-  // Exponer guardar/descartar al padre via refs para el guard.
-  useEffect(() => {
-    saveRef.current = guardar;
-    discardRef.current = descartar;
-    return () => {
-      saveRef.current = null;
-      discardRef.current = null;
-    };
-  }, [guardar, descartar, saveRef, discardRef]);
-
-  // Handler del submit del form (boton "Guardar cambios" propio del tab).
-  // Internamente llama a guardar, ignorando el throw porque ya setea error en state.
-  async function onSubmit(e) {
-    e.preventDefault();
-    try {
-      await guardar();
-    } catch {
-      // Error ya esta en state local, no hace falta mas.
     }
   }
 
   return (
-    <form className="cp-config-section" onSubmit={onSubmit}>
+    <form className="cp-config-section" onSubmit={onGuardar}>
       <div className="cp-config-block">
         <h2 className="cp-config-block__title">Información general</h2>
         <Input
@@ -368,7 +288,7 @@ function TabDatos({ consultorio, consultorioId, onDirtyChange, saveRef, discardR
         <div className="cp-config-footer cp-config-footer--sticky">
           <span className="cp-config-unsaved">Tenés cambios sin guardar.</span>
           <div style={{ display: 'flex', gap: 10, marginLeft: 'auto' }}>
-            <Button variant="secondary" type="button" onClick={descartar} disabled={saving}>
+            <Button variant="secondary" type="button" onClick={onDescartar} disabled={saving}>
               Descartar
             </Button>
             <Button variant="primary" type="submit" disabled={saving}>
@@ -395,7 +315,7 @@ function TabDatos({ consultorio, consultorioId, onDirtyChange, saveRef, discardR
 /* ============================================================
    Tab: Métodos de pago
    ============================================================ */
-function TabMetodos({ metodos: metodosOriginales, consultorioId, onDirtyChange, saveRef, discardRef }) {
+function TabMetodos({ metodos: metodosOriginales, consultorioId, onDirtyChange }) {
   const [metodos, setMetodos] = useState(metodosOriginales);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -403,13 +323,11 @@ function TabMetodos({ metodos: metodosOriginales, consultorioId, onDirtyChange, 
   const [error, setError] = useState('');
   const [openNuevo, setOpenNuevo] = useState(false);
 
-  // Reportar dirty al padre
   useEffect(() => {
     onDirtyChange(dirty);
   }, [dirty, onDirtyChange]);
 
   useEffect(() => {
-    // Al recibir métodos del consultorio, normalizo los que no tienen tipo.
     const normalizados = (metodosOriginales ?? []).map((m) => {
       if (m.tipo) return m;
       const idLower = (m.id || '').toLowerCase();
@@ -427,8 +345,6 @@ function TabMetodos({ metodos: metodosOriginales, consultorioId, onDirtyChange, 
     });
     setMetodos(normalizados);
 
-    // Si hubo que normalizar algo, el form queda dirty para que al guardar
-    // se persistan los tipos inferidos.
     const cambio = (metodosOriginales ?? []).some((m) => !m.tipo);
     setDirty(cambio);
   }, [metodosOriginales]);
@@ -447,7 +363,6 @@ function TabMetodos({ metodos: metodosOriginales, consultorioId, onDirtyChange, 
   }
 
   function agregarMetodo(nuevo) {
-    // Evitar duplicados de id
     let id = nuevo.id;
     let suffix = 2;
     while (metodos.some((m) => m.id === id)) {
@@ -459,12 +374,10 @@ function TabMetodos({ metodos: metodosOriginales, consultorioId, onDirtyChange, 
     setSaved(false);
   }
 
-  const guardar = useCallback(async () => {
+  async function onGuardar() {
     setError('');
     setSaving(true);
     try {
-      // Normalización final: convertimos los strings parciales que pueda
-      // haber dejado el usuario mientras editaba a numeros bien formados.
       const metodosLimpios = metodos.map((m) => ({
         ...m,
         porcentajeConsultorio: Number(m.porcentajeConsultorio) || 0,
@@ -477,27 +390,10 @@ function TabMetodos({ metodos: metodosOriginales, consultorioId, onDirtyChange, 
     } catch (err) {
       console.error(err);
       setError(err.message || 'No se pudieron guardar los métodos.');
-      throw err;
     } finally {
       setSaving(false);
     }
-  }, [metodos, consultorioId]);
-
-  const descartar = useCallback(() => {
-    setMetodos(metodosOriginales);
-    setDirty(false);
-    setError('');
-    setSaved(false);
-  }, [metodosOriginales]);
-
-  useEffect(() => {
-    saveRef.current = guardar;
-    discardRef.current = descartar;
-    return () => {
-      saveRef.current = null;
-      discardRef.current = null;
-    };
-  }, [guardar, descartar, saveRef, discardRef]);
+  }
 
   const inmediatos = metodos.filter((m) => m.tipo === TIPOS_METODO_PAGO.INMEDIATO);
   const diferidos = metodos.filter((m) => m.tipo === TIPOS_METODO_PAGO.DIFERIDO);
@@ -551,10 +447,10 @@ function TabMetodos({ metodos: metodosOriginales, consultorioId, onDirtyChange, 
         <div className="cp-config-footer cp-config-footer--sticky">
           <span className="cp-config-unsaved">Tenés cambios sin guardar.</span>
           <div style={{ display: 'flex', gap: 10, marginLeft: 'auto' }}>
-            <Button variant="secondary" onClick={descartar} disabled={saving}>
+            <Button variant="secondary" onClick={() => { setMetodos(metodosOriginales); setDirty(false); }} disabled={saving}>
               Descartar
             </Button>
-            <Button variant="primary" onClick={() => guardar().catch(() => {})} disabled={saving}>
+            <Button variant="primary" onClick={onGuardar} disabled={saving}>
               {saving ? <><Spinner size={14} /> Guardando…</> : 'Guardar cambios'}
             </Button>
           </div>
