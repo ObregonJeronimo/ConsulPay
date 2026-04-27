@@ -1,0 +1,341 @@
+/* ============================================================
+   Solicitudes — Admin (/admin/solicitudes)
+   ----------------------------------------------------------------
+   Estilos especificos de la bandeja de aprobaciones y el modal de
+   detalle con diff. Los estilos genericos (cp-table, cp-modal,
+   cp-page-header, cp-badge*, cp-stat*) ya viven en shared-ui.css y
+   en Sesiones.css (cp-badge--rechazada, cp-badge--obsoleta) y se
+   reusan aca sin redefinir.
+   ============================================================ */
+
+.cp-solicitudes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cp-space-6);
+}
+
+/* ============================================================
+   Tabs (Pendientes / Resueltas)
+   ============================================================ */
+.cp-tabs-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  padding: 4px;
+  margin-top: 6px;
+}
+
+.cp-tabs-bar__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: transparent;
+  border: none;
+  border-radius: var(--cp-radius-sm);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--cp-text-muted);
+  cursor: pointer;
+  transition: background var(--cp-dur-fast) var(--cp-ease), color var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-tabs-bar__btn:hover:not(.cp-tabs-bar__btn--active) {
+  color: var(--cp-text);
+}
+
+.cp-tabs-bar__btn--active {
+  background: var(--cp-bg);
+  color: var(--cp-text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.cp-tabs-bar__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: var(--cp-radius-pill);
+  background: var(--cp-accent-bg);
+  color: var(--cp-accent-dark);
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.cp-tabs-bar__btn--active .cp-tabs-bar__count {
+  background: var(--cp-accent);
+  color: var(--cp-text-on-accent);
+}
+
+/* ============================================================
+   Tabla de solicitudes
+   ============================================================ */
+.cp-solicitudes-tabla__row {
+  cursor: pointer;
+  transition: background var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-solicitudes-tabla__row:hover {
+  background: var(--cp-surface-hover);
+}
+
+.cp-solicitudes-tabla__row--resuelta {
+  opacity: 0.75;
+}
+
+.cp-solicitud-tipo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.cp-solicitud-tipo--crear { color: var(--cp-success); }
+.cp-solicitud-tipo--modificar { color: var(--cp-accent); }
+.cp-solicitud-tipo--eliminar { color: var(--cp-danger); }
+
+.cp-solicitud-tipo svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ============================================================
+   Modal de detalle (diff antes / despues)
+   ============================================================ */
+.cp-modal--detalle {
+  max-width: 760px;
+}
+
+.cp-detalle-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: var(--cp-space-4);
+}
+
+.cp-detalle-header__autor {
+  font-size: 13px;
+  color: var(--cp-text-muted);
+}
+
+.cp-detalle-header__autor strong {
+  color: var(--cp-text);
+  font-weight: 500;
+}
+
+.cp-detalle-header__fecha {
+  font-size: 12.5px;
+  color: var(--cp-text-faint);
+}
+
+/* ============================================================
+   Diff de campos
+   ----------------------------------------------------------------
+   Para crear: solo mostramos "valores propuestos" (una columna).
+   Para modificar: dos columnas lado a lado (antes / despues), las
+     filas que cambian se resaltan en coral.
+   Para eliminar: una columna con los datos que se van a perder, en
+     tono "danger" para advertir.
+   ============================================================ */
+.cp-diff {
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  overflow: hidden;
+}
+
+.cp-diff__head {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--cp-bg);
+  border-bottom: 1px solid var(--cp-border);
+}
+
+.cp-diff__head--single {
+  grid-template-columns: 1fr;
+}
+
+.cp-diff__head-cell {
+  padding: 10px 14px;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--cp-text-muted);
+}
+
+.cp-diff__head-cell + .cp-diff__head-cell {
+  border-left: 1px solid var(--cp-border);
+}
+
+.cp-diff__head-cell--despues {
+  color: var(--cp-accent-dark);
+}
+
+.cp-diff__head-cell--eliminar {
+  color: var(--cp-danger);
+}
+
+.cp-diff__body {
+  display: flex;
+  flex-direction: column;
+}
+
+.cp-diff__row {
+  display: grid;
+  grid-template-columns: 140px 1fr 1fr;
+  border-bottom: 1px solid var(--cp-border);
+}
+
+.cp-diff__row--single {
+  grid-template-columns: 140px 1fr;
+}
+
+.cp-diff__row:last-child {
+  border-bottom: none;
+}
+
+.cp-diff__row--changed {
+  background: var(--cp-accent-bg);
+}
+
+.cp-diff__row--eliminar {
+  background: var(--cp-danger-bg);
+}
+
+.cp-diff__campo {
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--cp-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 500;
+  border-right: 1px solid var(--cp-border);
+  background: var(--cp-bg);
+}
+
+.cp-diff__valor {
+  padding: 10px 14px;
+  font-size: 13.5px;
+  color: var(--cp-text);
+  font-variant-numeric: tabular-nums;
+  border-right: 1px solid var(--cp-border);
+  word-break: break-word;
+}
+
+.cp-diff__valor:last-child {
+  border-right: none;
+}
+
+.cp-diff__valor--anterior {
+  color: var(--cp-text-muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--cp-text-faint);
+}
+
+.cp-diff__valor--despues {
+  color: var(--cp-accent-dark);
+  font-weight: 500;
+}
+
+.cp-diff__valor--vacio {
+  color: var(--cp-text-faint);
+  font-style: italic;
+}
+
+/* ============================================================
+   Aviso "Solicitud obsoleta" en el modal
+   ============================================================ */
+.cp-detalle-aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--cp-radius-md);
+  background: rgba(140, 140, 140, 0.12);
+  color: var(--cp-text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+  margin-top: var(--cp-space-3);
+}
+
+.cp-detalle-aviso--rechazada {
+  background: var(--cp-danger-bg);
+  color: var(--cp-danger);
+}
+
+.cp-detalle-aviso svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.cp-detalle-aviso strong {
+  display: block;
+  margin-bottom: 2px;
+  font-weight: 600;
+}
+
+/* ============================================================
+   Form de motivo de rechazo (textarea + botones)
+   ============================================================ */
+.cp-rechazo-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: var(--cp-space-3);
+  padding-top: var(--cp-space-3);
+  border-top: 1px solid var(--cp-border);
+}
+
+.cp-rechazo-form__label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--cp-text-muted);
+}
+
+/* ============================================================
+   Estados vacios / loading especificos
+   ============================================================ */
+.cp-solicitudes-empty {
+  background: var(--cp-surface);
+  border: 1px dashed var(--cp-border-strong);
+  border-radius: var(--cp-radius-lg);
+  padding: 60px 28px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.cp-solicitudes-empty__mark {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--cp-success-bg);
+  color: var(--cp-success);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cp-solicitudes-empty__title {
+  font-family: var(--cp-font-serif);
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+}
+
+.cp-solicitudes-empty__desc {
+  color: var(--cp-text-muted);
+  font-size: 14px;
+  max-width: 380px;
+  line-height: 1.55;
+}
