@@ -308,35 +308,10 @@
   .cp-metodo-row__input { padding: 6px 6px; font-size: 13px; }
 }
 
-/* ============================================================
-   Toggle (redefinido acá con prefijo cc- porque lo reusa el form)
-   ============================================================ */
-.cc-toggle {
-  width: 36px;
-  height: 20px;
-  border-radius: var(--cp-radius-pill);
-  background: var(--cp-border-strong);
-  position: relative;
-  cursor: pointer;
-  border: none;
-  padding: 0;
-  transition: background var(--cp-dur-fast) var(--cp-ease);
-}
-
-.cc-toggle__thumb {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--cp-surface);
-  transition: transform var(--cp-dur-fast) var(--cp-ease);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
-}
-
-.cc-toggle--on { background: var(--cp-accent); }
-.cc-toggle--on .cc-toggle__thumb { transform: translateX(16px); }
+/* NOTA: el toggle .cc-toggle vivia aca antes pero se movio a
+   src/styles/shared-ui.css porque tambien lo usa Profesionales.jsx
+   y al ser CSS de pagina lazy no estaba disponible al entrar
+   directo a /admin/profesionales. */
 
 /* ============================================================
    Modal: tipo options (radio cards)
