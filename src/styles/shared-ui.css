@@ -259,3 +259,51 @@
   from { opacity: 0; transform: translateY(10px) scale(0.98); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
+
+/* ============================================================
+   Toggle switch (.cc-toggle)
+   ----------------------------------------------------------------
+   Switch redondito on/off. Lo usan al menos:
+   - Configuracion.jsx (metodos de pago, tab "metodos")
+   - Profesionales.jsx (toggle "edicion directa")
+   Mas adelante puede sumarse a otras pantallas.
+
+   IMPORTANTE: vive en shared-ui.css, NO en el CSS de una pagina
+   especifica. Antes estaba duplicado en Configuracion.css y eso
+   causaba que el toggle de Profesionales.jsx no se viera al
+   entrar directo a esa pagina (el chunk de Configuracion.css
+   no se habia cargado todavia). Si vas a agregar otra variante
+   de toggle, hacelo aca.
+   ============================================================ */
+.cc-toggle {
+  width: 36px;
+  height: 20px;
+  border-radius: var(--cp-radius-pill);
+  background: var(--cp-border-strong);
+  position: relative;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+  transition: background var(--cp-dur-fast) var(--cp-ease);
+  flex-shrink: 0;
+}
+
+.cc-toggle:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.cc-toggle__thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--cp-surface);
+  transition: transform var(--cp-dur-fast) var(--cp-ease);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.cc-toggle--on { background: var(--cp-accent); }
+.cc-toggle--on .cc-toggle__thumb { transform: translateX(16px); }
