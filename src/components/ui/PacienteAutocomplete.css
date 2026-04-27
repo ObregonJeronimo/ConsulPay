@@ -1,0 +1,218 @@
+/* ============================================================
+   PacienteAutocomplete
+   ----------------------------------------------------------------
+   Estilos del componente de busqueda de paciente con dropdown.
+   Pensado para sentarse dentro de un form vertical (cp-modal__form),
+   donde ocupa el ancho completo del campo y abre un panel debajo.
+   ============================================================ */
+
+.cp-pac-ac {
+  position: relative;
+  width: 100%;
+}
+
+/* ============================================================
+   Input con icono de lupa y boton de limpiar
+   ============================================================ */
+.cp-pac-ac__input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.cp-pac-ac__icon {
+  position: absolute;
+  left: 12px;
+  width: 16px;
+  height: 16px;
+  color: var(--cp-text-faint);
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.cp-pac-ac__input {
+  width: 100%;
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  padding: 10px 36px 10px 36px;  /* espacio para lupa + boton x */
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--cp-text);
+  transition:
+    border-color var(--cp-dur-fast) var(--cp-ease),
+    box-shadow var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-pac-ac__input::placeholder {
+  color: var(--cp-text-faint);
+}
+
+.cp-pac-ac__input:focus {
+  outline: none;
+  border-color: var(--cp-accent);
+  box-shadow: 0 0 0 3px var(--cp-accent-bg);
+}
+
+.cp-pac-ac__input:disabled {
+  background: var(--cp-bg);
+  color: var(--cp-text-muted);
+  cursor: not-allowed;
+}
+
+.cp-pac-ac__clear {
+  position: absolute;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--cp-border);
+  color: var(--cp-text);
+  border: none;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-pac-ac__clear:hover {
+  background: var(--cp-border-strong);
+}
+
+/* ============================================================
+   Panel desplegable (lista de resultados, hint o estado vacio)
+   ----------------------------------------------------------------
+   Usa position absolute para flotar sobre el resto del form.
+   z-index alto porque el modal tambien tiene z-index alto.
+   ============================================================ */
+.cp-pac-ac__panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  box-shadow: 0 6px 24px -8px rgba(28, 27, 23, 0.16);
+  z-index: 10;
+  overflow: hidden;
+  animation: cp-pac-ac-fade-in 140ms var(--cp-ease) both;
+}
+
+@keyframes cp-pac-ac-fade-in {
+  from { opacity: 0; transform: translateY(-2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.cp-pac-ac__hint {
+  padding: 14px 16px;
+  font-size: 13px;
+  color: var(--cp-text-muted);
+  text-align: center;
+}
+
+.cp-pac-ac__hint strong {
+  color: var(--cp-text);
+  font-weight: 500;
+}
+
+/* ============================================================
+   Lista de resultados
+   ============================================================ */
+.cp-pac-ac__list {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.cp-pac-ac__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--cp-radius-sm);
+  cursor: pointer;
+  transition: background var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-pac-ac__item--active {
+  background: var(--cp-surface-hover);
+}
+
+.cp-pac-ac__item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.cp-pac-ac__item-nombre {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--cp-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cp-pac-ac__item-dni {
+  font-family: var(--cp-font-mono);
+  font-size: 12.5px;
+  color: var(--cp-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================
+   Tags / badges en items
+   ============================================================ */
+.cp-pac-ac__item-tags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.cp-pac-ac__tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--cp-radius-pill);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.cp-pac-ac__tag--exact {
+  background: var(--cp-accent-bg);
+  color: var(--cp-accent-dark);
+}
+
+.cp-pac-ac__tag--asignado {
+  background: var(--cp-success-bg);
+  color: var(--cp-success);
+}
+
+/* ============================================================
+   Mobile
+   ============================================================ */
+@media (max-width: 480px) {
+  .cp-pac-ac__item {
+    padding: 12px 12px;
+  }
+
+  .cp-pac-ac__item-tags {
+    gap: 4px;
+  }
+
+  .cp-pac-ac__tag {
+    font-size: 10.5px;
+    padding: 2px 6px;
+  }
+}
