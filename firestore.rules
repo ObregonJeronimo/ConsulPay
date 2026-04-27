@@ -152,28 +152,9 @@ service cloud.firestore {
 
     // ============================================================
     //  /sesiones/{sesionId}
-    //  ----------------------------------------------------------------
-    //  Cada sesion guarda un SNAPSHOT de los valores al momento de
-    //  registrarla: valorTotal, porcentajeConsultorio, montoConsultorio,
-    //  montoProfesional. Esto evita que cambios futuros en el metodo de
-    //  pago (por ejemplo subir el % del consultorio) afecten
-    //  retroactivamente sesiones ya cargadas.
-    //
-    //  REGLAS DE INTEGRIDAD FINANCIERA:
-    //  Para que un profesional no pueda inventar numeros a su favor,
-    //  validamos en las rules que los montos sean coherentes:
-    //
-    //    montoConsultorio = round(valorTotal * porcentajeConsultorio / 100)
-    //    montoProfesional = valorTotal - montoConsultorio
-    //
-    //  Como Firestore Rules no soporta float Math.round, usamos una
-    //  tolerancia de +/- 1 peso (sumamos/restamos 0.5 antes de comparar
-    //  con int) que cubre el redondeo del frontend sin abrir un agujero.
     // ============================================================
     function sesionSplitEsCoherente(data) {
-      // valorTotal * porcentaje / 100, con tolerancia de redondeo
       let calculado = data.valorTotal * data.porcentajeConsultorio / 100;
-      // Aceptamos diferencia de hasta 1 peso por redondeo del frontend
       return data.montoConsultorio >= calculado - 1
           && data.montoConsultorio <= calculado + 1
           && data.montoProfesional == data.valorTotal - data.montoConsultorio;
@@ -193,33 +174,46 @@ service cloud.firestore {
           && data.montoProfesional is number;
     }
 
+    /**
+     * En Fase B agregamos: el profesional puede crear/modificar/eliminar
+     * sesiones DIRECTAMENTE solo si su doc de usuario tiene
+     * permitirEdicionSesiones=true. Si es false o no existe el campo,
+     * el frontend tiene que crear una solicitud en lugar de tocar
+     * /sesiones/ directamente.
+     *
+     * NOTA: leemos miUsuario() para chequear el flag. Eso suma una
+     * lectura por validacion, pero es la forma mas limpia y segura.
+     */
+    function profesionalTieneConfianza() {
+      return esProfesional()
+        && miUsuario().permitirEdicionSesiones == true;
+    }
+
     match /sesiones/{sesionId} {
       allow read: if esSuperadmin()
         || esAdminDe(resource.data.consultorioId)
         || (esProfesionalDe(resource.data.consultorioId)
             && resource.data.profesionalUid == request.auth.uid);
 
-      // Crear: admin de su consultorio, o profesional de su consultorio
-      // creando UNA SESION SUYA. En ambos casos validamos que el split
-      // sea coherente (no se puede inventar plata).
+      // Crear directo: superadmin, admin del consultorio, o profesional
+      // CON CONFIANZA y para si mismo. Sin confianza, debe ir por
+      // solicitudes_sesion (la rule de aprobar genera la sesion via
+      // admin, asi que no necesita un camino aparte aca).
       allow create: if (esSuperadmin()
         || esAdminDe(request.resource.data.consultorioId)
-        || (esProfesionalDe(request.resource.data.consultorioId)
+        || (profesionalTieneConfianza()
+            && esProfesionalDe(request.resource.data.consultorioId)
             && request.resource.data.profesionalUid == request.auth.uid))
         && request.resource.data.estadoPago == 'debido'
         && sesionTieneCamposBasicos(request.resource.data)
         && sesionSplitEsCoherente(request.resource.data);
 
-      // Update:
-      //  - Admin: puede modificar todo dentro de su consultorio
-      //    (incluso reasignar profesional o cambiar estadoPago).
-      //  - Profesional: solo sus propias sesiones, NO puede cambiar
-      //    estadoPago, NO puede reasignar la sesion a otro profesional,
-      //    NO puede cambiar el consultorioId.
-      //  En ambos casos el split debe seguir siendo coherente.
+      // Update directo: admin libre, profesional con confianza solo sus
+      // sesiones sin tocar estadoPago/profesionalUid/consultorioId.
       allow update: if (esSuperadmin()
         || esAdminDe(resource.data.consultorioId)
-        || (esProfesionalDe(resource.data.consultorioId)
+        || (profesionalTieneConfianza()
+            && esProfesionalDe(resource.data.consultorioId)
             && resource.data.profesionalUid == request.auth.uid
             && request.resource.data.profesionalUid == resource.data.profesionalUid
             && request.resource.data.consultorioId == resource.data.consultorioId
@@ -227,15 +221,87 @@ service cloud.firestore {
         && sesionTieneCamposBasicos(request.resource.data)
         && sesionSplitEsCoherente(request.resource.data);
 
-      // Delete:
-      //  - Admin: libre dentro de su consultorio.
-      //  - Profesional: puede borrar SUS PROPIAS sesiones (revertir un
-      //    error de carga). Si en Fase B agregamos aprobaciones, esto
-      //    se restringe segun el flag permitirEdicionSesiones.
+      // Delete directo: admin libre, profesional con confianza solo
+      // sus sesiones.
       allow delete: if esSuperadmin()
+        || esAdminDe(resource.data.consultorioId)
+        || (profesionalTieneConfianza()
+            && esProfesionalDe(resource.data.consultorioId)
+            && resource.data.profesionalUid == request.auth.uid);
+    }
+
+    // ============================================================
+    //  /solicitudes_sesion/{solicitudId}
+    //  ----------------------------------------------------------------
+    //  Solicitudes de creacion/modificacion/eliminacion de sesiones
+    //  hechas por profesionales SIN confianza. El admin las resuelve.
+    // ============================================================
+    match /solicitudes_sesion/{solicitudId} {
+
+      // Lectura: super, admin del consultorio, profesional que la creo
+      allow read: if esSuperadmin()
         || esAdminDe(resource.data.consultorioId)
         || (esProfesionalDe(resource.data.consultorioId)
             && resource.data.profesionalUid == request.auth.uid);
+
+      // Crear: solo el profesional autenticado, para SU consultorio,
+      // sobre SI MISMO. La solicitud nace pendiente.
+      // No validamos aqui que NO tenga confianza — un profesional con
+      // confianza tambien podria solicitar (no tiene sentido practico
+      // pero no rompe nada). El frontend usa el flag para decidir si
+      // crea solicitud o crea directo, no las rules.
+      allow create: if esProfesionalDe(request.resource.data.consultorioId)
+        && request.resource.data.profesionalUid == request.auth.uid
+        && request.resource.data.estado == 'pendiente'
+        && (request.resource.data.tipo == 'crear'
+            || request.resource.data.tipo == 'modificar'
+            || request.resource.data.tipo == 'eliminar');
+
+      // Update: solo admin del consultorio (resolver = aprobar/rechazar/
+      // marcar obsoleta). El campo consultorioId y profesionalUid no
+      // se pueden cambiar.
+      allow update: if esSuperadmin()
+        || (esAdminDe(resource.data.consultorioId)
+            && request.resource.data.consultorioId == resource.data.consultorioId
+            && request.resource.data.profesionalUid == resource.data.profesionalUid
+            && request.resource.data.tipo == resource.data.tipo
+            && (request.resource.data.estado == 'aprobada'
+                || request.resource.data.estado == 'rechazada'
+                || request.resource.data.estado == 'obsoleta'));
+
+      // Delete: solo super, no se borran solicitudes (queda como historial)
+      allow delete: if esSuperadmin();
+    }
+
+    // ============================================================
+    //  /logs_sesion/{logId}
+    //  ----------------------------------------------------------------
+    //  Logs de auditoria. Inmutables: solo se crean, nunca se editan
+    //  ni se borran (excepto super).
+    // ============================================================
+    match /logs_sesion/{logId} {
+
+      // Lectura: super, admin del consultorio, profesional cuyo actor sea el
+      // o cuyo log refiera a una solicitud suya. Para simplificar:
+      // permitimos lectura a admin del consultorio y al profesional que es
+      // actor del log.
+      allow read: if esSuperadmin()
+        || esAdminDe(resource.data.consultorioId)
+        || (esProfesionalDe(resource.data.consultorioId)
+            && resource.data.actorUid == request.auth.uid);
+
+      // Crear: cualquier admin/profesional autenticado del consultorio,
+      // siempre que actorUid sea el mismo que esta autenticado (no se
+      // puede crear logs en nombre de otro).
+      allow create: if estaAutenticado()
+        && request.resource.data.actorUid == request.auth.uid
+        && (esSuperadmin()
+            || esAdminDe(request.resource.data.consultorioId)
+            || esProfesionalDe(request.resource.data.consultorioId));
+
+      // Update y delete: prohibidos (logs son inmutables)
+      allow update: if false;
+      allow delete: if esSuperadmin();
     }
 
     // ============================================================
