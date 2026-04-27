@@ -1,0 +1,83 @@
+{
+  "indexes": [
+    {
+      "_comment": "suscribirSesionesProfesional: consultorioId + profesionalUid + fecha (range + orderBy)",
+      "collectionGroup": "sesiones",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "consultorioId", "order": "ASCENDING" },
+        { "fieldPath": "profesionalUid", "order": "ASCENDING" },
+        { "fieldPath": "fecha", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "_comment": "suscribirSesionesConsultorio: consultorioId + fecha (range + orderBy)",
+      "collectionGroup": "sesiones",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "consultorioId", "order": "ASCENDING" },
+        { "fieldPath": "fecha", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "_comment": "suscribirSolicitudesPendientes: consultorioId + estado + createdAt desc (badge sidebar admin)",
+      "collectionGroup": "solicitudes_sesion",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "consultorioId", "order": "ASCENDING" },
+        { "fieldPath": "estado", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "_comment": "suscribirTodasSolicitudes: consultorioId + createdAt desc (bandeja admin con tabs)",
+      "collectionGroup": "solicitudes_sesion",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "consultorioId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "_comment": "suscribirSolicitudesDelProfesional: consultorioId + profesionalUid + createdAt desc (panel mis solicitudes)",
+      "collectionGroup": "solicitudes_sesion",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "consultorioId", "order": "ASCENDING" },
+        { "fieldPath": "profesionalUid", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "_comment": "validarNoHayPendienteParaSesion + marcarPendientesComoObsoletas: consultorioId + sesionId + estado",
+      "collectionGroup": "solicitudes_sesion",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "consultorioId", "order": "ASCENDING" },
+        { "fieldPath": "sesionId", "order": "ASCENDING" },
+        { "fieldPath": "estado", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "_comment": "suscribirLogsDeSesion: consultorioId + sesionId + createdAt desc",
+      "collectionGroup": "logs_sesion",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "consultorioId", "order": "ASCENDING" },
+        { "fieldPath": "sesionId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "_comment": "suscribirLogsDeSolicitud: consultorioId + solicitudId + createdAt desc (timeline en modal)",
+      "collectionGroup": "logs_sesion",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "consultorioId", "order": "ASCENDING" },
+        { "fieldPath": "solicitudId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
