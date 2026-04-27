@@ -60,3 +60,19 @@ export async function setPorcentajeCustom(uid, porcentaje) {
     : Number(porcentaje);
   await updateDoc(doc(db, 'usuarios', uid), { porcentajeCustom: valor });
 }
+
+/**
+ * Activa o desactiva el flag de "edicion directa de sesiones" para un
+ * profesional. Cuando esta en true, el profesional puede crear/editar/
+ * eliminar sesiones sin pasar por aprobacion del admin. Cuando esta en
+ * false (o no existe), sus acciones generan solicitudes que el admin
+ * debe aprobar.
+ *
+ * Default seguro: si nunca fue seteado, las rules tratan al profesional
+ * como SIN confianza. El admin debe activarlo explicitamente.
+ */
+export async function setPermitirEdicionSesiones(uid, valor) {
+  await updateDoc(doc(db, 'usuarios', uid), {
+    permitirEdicionSesiones: !!valor,
+  });
+}
