@@ -94,6 +94,47 @@ export const ESTADOS_INVITACION = {
 };
 
 /* ============================================================
+   Solicitudes de modificacion de sesiones (Fase B de sesiones)
+   ----------------------------------------------------------------
+   Cuando un profesional NO tiene confianza (permitirEdicionSesiones
+   = false) sus acciones sobre sesiones generan una solicitud que
+   queda pendiente hasta que el admin la apruebe o rechace.
+   ============================================================ */
+export const TIPOS_SOLICITUD_SESION = {
+  CREAR: 'crear',           // Crear una sesion nueva
+  MODIFICAR: 'modificar',   // Modificar una sesion existente
+  ELIMINAR: 'eliminar',     // Eliminar una sesion
+};
+
+export const ESTADOS_SOLICITUD_SESION = {
+  PENDIENTE: 'pendiente',     // Esperando que el admin la resuelva
+  APROBADA: 'aprobada',       // Admin la acepto y se aplico
+  RECHAZADA: 'rechazada',     // Admin la rechazo (con motivo opcional)
+  OBSOLETA: 'obsoleta',       // La sesion fue modificada/eliminada por otro
+                              //  camino antes de que el admin resolviera
+};
+
+export const LABELS_TIPO_SOLICITUD = {
+  [TIPOS_SOLICITUD_SESION.CREAR]: 'Crear sesión',
+  [TIPOS_SOLICITUD_SESION.MODIFICAR]: 'Modificar sesión',
+  [TIPOS_SOLICITUD_SESION.ELIMINAR]: 'Eliminar sesión',
+};
+
+/* ============================================================
+   Logs de auditoria de sesiones (Fase C de sesiones)
+   ============================================================ */
+export const TIPOS_LOG_SESION = {
+  CREADA: 'creada',
+  MODIFICADA: 'modificada',
+  ELIMINADA: 'eliminada',
+  ESTADO_PAGO: 'estado_pago',          // Cambio de pagada/debida
+  SOLICITUD_CREADA: 'solicitud_creada',
+  SOLICITUD_APROBADA: 'solicitud_aprobada',
+  SOLICITUD_RECHAZADA: 'solicitud_rechazada',
+  SOLICITUD_OBSOLETA: 'solicitud_obsoleta',
+};
+
+/* ============================================================
    Formateadores regionales (Argentina)
    ============================================================ */
 export const formatoARS = new Intl.NumberFormat('es-AR', {
