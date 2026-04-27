@@ -254,6 +254,17 @@
   color: var(--cp-info, #4a6c9b);
 }
 
+/* Estados de solicitudes (Fase B) */
+.cp-badge--rechazada {
+  background: var(--cp-danger-bg);
+  color: var(--cp-danger);
+}
+
+.cp-badge--obsoleta {
+  background: rgba(140, 140, 140, 0.15);
+  color: var(--cp-text-muted);
+}
+
 /* Acciones en fila (editar / eliminar / toggle pago) */
 .cp-sesiones-tabla__actions {
   display: flex;
@@ -282,13 +293,18 @@
   border-color: var(--cp-border-strong);
 }
 
-.cp-icon-btn--danger:hover {
+.cp-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.cp-icon-btn--danger:hover:not(:disabled) {
   background: var(--cp-danger-bg);
   color: var(--cp-danger);
   border-color: var(--cp-danger);
 }
 
-.cp-icon-btn--success:hover {
+.cp-icon-btn--success:hover:not(:disabled) {
   background: var(--cp-success-bg);
   color: var(--cp-success);
   border-color: var(--cp-success);
@@ -439,4 +455,119 @@
 .cp-select:focus {
   outline: none;
   border-color: var(--cp-accent);
+}
+
+/* ============================================================
+   Banner "Modo con aprobacion" (Fase B, vista profesional)
+   ----------------------------------------------------------------
+   Aviso visible para que el profesional sin confianza entienda que
+   sus acciones generan solicitudes en lugar de cambios directos.
+   ============================================================ */
+.cp-aprobacion-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: var(--cp-accent-bg);
+  border: 1px solid var(--cp-accent);
+  border-radius: var(--cp-radius-md);
+  padding: 14px 16px;
+  color: var(--cp-text);
+}
+
+.cp-aprobacion-banner svg {
+  flex-shrink: 0;
+  color: var(--cp-accent);
+  margin-top: 2px;
+}
+
+.cp-aprobacion-banner > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.cp-aprobacion-banner strong {
+  color: var(--cp-accent-dark);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.cp-aprobacion-banner span {
+  font-size: 13px;
+  color: var(--cp-text-muted);
+  line-height: 1.5;
+}
+
+/* ============================================================
+   Panel "Mis solicitudes recientes" (Fase B, vista profesional)
+   ============================================================ */
+.cp-solicitudes-panel {
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-lg);
+  overflow: hidden;
+}
+
+.cp-solicitudes-panel__head {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--cp-border);
+}
+
+.cp-solicitudes-panel__title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--cp-font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cp-text);
+  margin: 0;
+}
+
+.cp-solicitudes-panel__count {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  background: var(--cp-accent-bg);
+  color: var(--cp-accent-dark);
+  font-size: 11.5px;
+  font-weight: 500;
+  border-radius: var(--cp-radius-pill);
+}
+
+.cp-solicitudes-panel__list {
+  display: flex;
+  flex-direction: column;
+}
+
+.cp-solicitud-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--cp-border);
+}
+
+.cp-solicitud-row:last-child {
+  border-bottom: none;
+}
+
+.cp-solicitud-row__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.cp-solicitud-row__title {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--cp-text);
+}
+
+.cp-solicitud-row__motivo {
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--cp-text-muted);
+  font-style: italic;
+  line-height: 1.45;
 }
