@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Avatar from '../../components/ui/Avatar.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Input from '../../components/ui/Input.jsx';
+import PacienteAutocomplete from '../../components/ui/PacienteAutocomplete.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
 
 import { useAuth } from '../../hooks/useAuth.js';
@@ -645,13 +646,6 @@ export function SesionModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  const pacientesOrdenados = useMemo(() => {
-    if (!profesionalUid) return pacientes;
-    const asignados = pacientes.filter((p) => p.profesionalUid === profesionalUid);
-    const resto = pacientes.filter((p) => p.profesionalUid !== profesionalUid);
-    return [...asignados, ...resto];
-  }, [pacientes, profesionalUid]);
-
   useEffect(() => {
     if (!pacienteId || !esNueva) return;
     const pac = pacientes.find((p) => p.id === pacienteId);
@@ -749,21 +743,24 @@ export function SesionModal({
             </div>
           )}
 
+          {/*
+            PacienteAutocomplete reemplaza al <select>. Permite buscar
+            por DNI o nombre/apellido en un mismo input. Pasamos el
+            profesionalUid actual para que sus pacientes asignados
+            aparezcan primero con badge "Tu paciente".
+          */}
           <div>
             <label className="cp-field__label" style={{ display: 'block', marginBottom: 6 }}>
               Paciente
             </label>
-            <select
-              className="cp-select"
+            <PacienteAutocomplete
+              pacientes={pacientes}
               value={pacienteId}
-              onChange={(e) => setPacienteId(e.target.value)}
+              onChange={setPacienteId}
+              profesionalUid={profesionalUid}
+              placeholder="Ingrese DNI o nombre"
               required
-            >
-              <option value="" disabled>Elegir paciente…</option>
-              {pacientesOrdenados.map((p) => (
-                <option key={p.id} value={p.id}>{nombrePaciente(p)}</option>
-              ))}
-            </select>
+            />
           </div>
 
           <div className="cp-sesion-modal__row-2">
