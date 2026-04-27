@@ -9,7 +9,9 @@ import { useConsultorio } from '../../hooks/useConsultorio.js';
 import {
   ESTADOS_PACIENTE,
   ESTADOS_PAGO_SESION,
+  ESTADOS_SOLICITUD_SESION,
   formatoARS,
+  LABELS_TIPO_SOLICITUD,
   TIPOS_METODO_PAGO,
 } from '../../lib/constants.js';
 import { suscribirPacientesProfesional } from '../../lib/pacientes.js';
@@ -23,6 +25,13 @@ import {
   suscribirSesionesProfesional,
   totalesGlobales,
 } from '../../lib/sesiones.js';
+import {
+  armarPayloadParaSolicitud,
+  solicitarCrearSesion,
+  solicitarEliminarSesion,
+  solicitarModificarSesion,
+  suscribirSolicitudesDelProfesional,
+} from '../../lib/solicitudes.js';
 
 import { SesionModal } from '../admin/Sesiones.jsx';
 import '../admin/Sesiones.css';
@@ -57,6 +66,12 @@ const TrashIcon = () => (
     <path d="M19 6l-2 14a2 2 0 01-2 2H9a2 2 0 01-2-2L5 6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
   </svg>
 );
+const ClockIcon = () => (
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <polyline points="12 6 12 12 16 14" />
+  </svg>
+);
 
 /* ============================================================
    Helpers
@@ -75,11 +90,6 @@ function formatoFechaHoraCorta(date) {
   return { dia, hora };
 }
 
-/* ============================================================
-   Selector de mes (mismo componente que admin, duplicado por
-   ahora — si en el futuro tenemos 3 paginas con esto lo subimos
-   a un shared component)
-   ============================================================ */
 function SelectorMes({ mes, setMes }) {
   const hoy = inicioDeMes(new Date());
   const esEsteMes = mes.getFullYear() === hoy.getFullYear() && mes.getMonth() === hoy.getMonth();
@@ -121,11 +131,16 @@ export default function MisSesiones() {
 
   const [sesiones, setSesiones] = useState([]);
   const [pacientes, setPacientes] = useState([]);
+  const [solicitudes, setSolicitudes] = useState([]);
   const [loadingSesiones, setLoadingSesiones] = useState(true);
 
   const [editando, setEditando] = useState(null); // null | 'nueva' | sesion
 
-  // Suscripcion a sesiones del profesional, acotada al mes
+  // Si no tiene confianza, mostramos un banner aclaratorio y las acciones
+  // crean solicitudes en lugar de tocar /sesiones/ directamente.
+  const tieneConfianza = !!user?.permitirEdicionSesiones;
+
+  // Suscripciones
   useEffect(() => {
     if (!user?.uid || !user?.consultorioId) return;
     setLoadingSesiones(true);
@@ -143,10 +158,14 @@ export default function MisSesiones() {
     return unsub;
   }, [user?.uid, user?.consultorioId, mes]);
 
-  // Pacientes asignados al profesional (para el modal)
   useEffect(() => {
     if (!user?.uid || !user?.consultorioId) return;
     return suscribirPacientesProfesional(user.uid, user.consultorioId, setPacientes);
+  }, [user?.uid, user?.consultorioId]);
+
+  useEffect(() => {
+    if (!user?.uid || !user?.consultorioId) return;
+    return suscribirSolicitudesDelProfesional(user.consultorioId, user.uid, setSolicitudes);
   }, [user?.uid, user?.consultorioId]);
 
   const pacientesActivos = useMemo(
@@ -165,31 +184,98 @@ export default function MisSesiones() {
     return m;
   }, [pacientes]);
 
-  // Stats del mes (desde la perspectiva del profesional)
+  // Set de sesionId con solicitudes pendientes (para deshabilitar editar/eliminar
+  // en esas filas mientras la solicitud se resuelve)
+  const sesionesConPendiente = useMemo(() => {
+    const set = new Set();
+    for (const s of solicitudes) {
+      if (s.estado === ESTADOS_SOLICITUD_SESION.PENDIENTE && s.sesionId) {
+        set.add(s.sesionId);
+      }
+    }
+    return set;
+  }, [solicitudes]);
+
+  // Las 5 ultimas solicitudes resueltas / pendientes para mostrar arriba
+  const solicitudesParaMostrar = useMemo(() => {
+    return solicitudes.slice(0, 5);
+  }, [solicitudes]);
+
+  const solicitudesPendientesCount = useMemo(
+    () => solicitudes.filter((s) => s.estado === ESTADOS_SOLICITUD_SESION.PENDIENTE).length,
+    [solicitudes],
+  );
+
   const stats = useMemo(() => totalesGlobales(sesiones), [sesiones]);
   const yaPagueAlConsultorio = stats.totalConsultorio - stats.debido;
 
-  /* ---- Handlers ---- */
+  /* ---- Handlers: ramifican segun tieneConfianza ---- */
+
+  // Buscamos el paciente para ponerlo en la descripcion de la solicitud/log.
+  function nombrePacienteDeInput(input) {
+    const pac = mapaPacientes[input.pacienteId];
+    return pac ? nombrePaciente(pac) : null;
+  }
+  function nombrePacienteDeSesion(sesion) {
+    const pac = mapaPacientes[sesion.pacienteId];
+    return pac ? nombrePaciente(pac) : null;
+  }
 
   async function handleGuardar(input) {
     if (editando === 'nueva') {
-      await crearSesion(input, user.uid);
+      if (tieneConfianza) {
+        await crearSesion(input, user.uid);
+      } else {
+        await solicitarCrearSesion({
+          consultorioId: user.consultorioId,
+          profesionalUid: user.uid,
+          profesionalNombre: user.displayName || user.email,
+          pacienteNombre: nombrePacienteDeInput(input),
+          payloadPropuesto: armarPayloadParaSolicitud(input),
+        });
+      }
     } else {
-      await actualizarSesion(editando.id, input, user.uid);
+      // Editar sesion existente
+      if (tieneConfianza) {
+        await actualizarSesion(editando.id, input, user.uid);
+      } else {
+        await solicitarModificarSesion({
+          consultorioId: user.consultorioId,
+          sesionId: editando.id,
+          profesionalUid: user.uid,
+          profesionalNombre: user.displayName || user.email,
+          pacienteNombre: nombrePacienteDeSesion(editando),
+          payloadPropuesto: armarPayloadParaSolicitud(input),
+        });
+      }
     }
     setEditando(null);
   }
 
   async function handleEliminar(sesion) {
     const pac = mapaPacientes[sesion.pacienteId];
-    const ok = confirm(
-      `¿Eliminar la sesión del ${formatoFechaHoraCorta(sesion.fecha).dia} con ${pac ? nombrePaciente(pac) : 'el paciente'}?\n\nEsta acción no se puede deshacer.`,
-    );
+    const nombrePac = pac ? nombrePaciente(pac) : 'el paciente';
+
+    const mensaje = tieneConfianza
+      ? `¿Eliminar la sesión del ${formatoFechaHoraCorta(sesion.fecha).dia} con ${nombrePac}?\n\nEsta acción no se puede deshacer.`
+      : `¿Solicitar eliminación de la sesión del ${formatoFechaHoraCorta(sesion.fecha).dia} con ${nombrePac}?\n\nLa eliminación quedará pendiente hasta que el administrador la apruebe.`;
+
+    const ok = confirm(mensaje);
     if (!ok) return;
     try {
-      await eliminarSesion(sesion.id);
+      if (tieneConfianza) {
+        await eliminarSesion(sesion.id);
+      } else {
+        await solicitarEliminarSesion({
+          consultorioId: user.consultorioId,
+          sesionId: sesion.id,
+          profesionalUid: user.uid,
+          profesionalNombre: user.displayName || user.email,
+          pacienteNombre: nombrePac,
+        });
+      }
     } catch (err) {
-      alert(err.message || 'No se pudo eliminar la sesión.');
+      alert(err.message || 'No se pudo procesar la acción.');
     }
   }
 
@@ -225,9 +311,33 @@ export default function MisSesiones() {
           onClick={() => setEditando('nueva')}
           disabled={!hayPrereqs}
         >
-          Registrar sesión
+          {tieneConfianza ? 'Registrar sesión' : 'Solicitar nueva sesión'}
         </Button>
       </header>
+
+      {/* Banner de modo "con aprobacion" */}
+      {!tieneConfianza && (
+        <div className="cp-aprobacion-banner">
+          <ClockIcon />
+          <div>
+            <strong>Modo con aprobación</strong>
+            <span>
+              Tus acciones sobre sesiones (crear, modificar, eliminar) requieren la aprobación
+              del administrador del consultorio. Cada solicitud queda registrada y vas a poder
+              ver su estado acá.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Panel de solicitudes recientes */}
+      {!tieneConfianza && solicitudesParaMostrar.length > 0 && (
+        <SolicitudesPanel
+          solicitudes={solicitudesParaMostrar}
+          mapaPacientes={mapaPacientes}
+          totalPendientes={solicitudesPendientesCount}
+        />
+      )}
 
       {!hayPrereqs && (
         <div className="cp-sesiones-empty">
@@ -268,13 +378,14 @@ export default function MisSesiones() {
                 automático de cuánto te queda y cuánto le debés al consultorio.
               </p>
               <Button variant="primary" icon={<PlusIcon />} onClick={() => setEditando('nueva')}>
-                Registrar primera sesión
+                {tieneConfianza ? 'Registrar primera sesión' : 'Solicitar primera sesión'}
               </Button>
             </div>
           ) : (
             <TablaMisSesiones
               sesiones={sesiones}
               mapaPacientes={mapaPacientes}
+              sesionesConPendiente={sesionesConPendiente}
               onEditar={(s) => setEditando(s)}
               onEliminar={handleEliminar}
             />
@@ -285,12 +396,14 @@ export default function MisSesiones() {
       {editando && (
         <SesionModal
           sesion={editando === 'nueva' ? null : editando}
-          profesionales={[]} /* no se usa cuando esAdmin=false */
+          profesionales={[]}
           pacientes={pacientesActivos}
           metodos={metodos}
           esAdmin={false}
           consultorioId={user.consultorioId}
           profesionalUidFijo={user.uid}
+          // Pasamos el flag para que el modal pueda ajustar el copy del boton
+          modoSolicitud={!tieneConfianza}
           onClose={() => setEditando(null)}
           onGuardar={handleGuardar}
         />
@@ -300,10 +413,81 @@ export default function MisSesiones() {
 }
 
 /* ============================================================
+   Banner + panel de solicitudes
+   ============================================================ */
+function SolicitudesPanel({ solicitudes, mapaPacientes, totalPendientes }) {
+  return (
+    <div className="cp-solicitudes-panel">
+      <div className="cp-solicitudes-panel__head">
+        <h3 className="cp-solicitudes-panel__title">
+          Mis solicitudes recientes
+          {totalPendientes > 0 && (
+            <span className="cp-solicitudes-panel__count">{totalPendientes} pendiente{totalPendientes === 1 ? '' : 's'}</span>
+          )}
+        </h3>
+      </div>
+      <div className="cp-solicitudes-panel__list">
+        {solicitudes.map((s) => {
+          const pac = s.payloadPropuesto?.pacienteId
+            ? mapaPacientes[s.payloadPropuesto.pacienteId]
+            : (s.payloadAnterior?.pacienteId ? mapaPacientes[s.payloadAnterior.pacienteId] : null);
+          const nombrePac = pac ? nombrePaciente(pac) : 'paciente desconocido';
+
+          let icon, badgeClass, badgeText;
+          switch (s.estado) {
+            case ESTADOS_SOLICITUD_SESION.PENDIENTE:
+              icon = <ClockIcon />;
+              badgeClass = 'cp-badge--debido';
+              badgeText = 'Pendiente';
+              break;
+            case ESTADOS_SOLICITUD_SESION.APROBADA:
+              badgeClass = 'cp-badge--pagada';
+              badgeText = 'Aprobada';
+              break;
+            case ESTADOS_SOLICITUD_SESION.RECHAZADA:
+              badgeClass = 'cp-badge--rechazada';
+              badgeText = 'Rechazada';
+              break;
+            case ESTADOS_SOLICITUD_SESION.OBSOLETA:
+              badgeClass = 'cp-badge--obsoleta';
+              badgeText = 'Obsoleta';
+              break;
+            default:
+              badgeClass = '';
+              badgeText = s.estado;
+          }
+
+          return (
+            <div key={s.id} className="cp-solicitud-row">
+              <div className="cp-solicitud-row__main">
+                <div className="cp-solicitud-row__title">
+                  {LABELS_TIPO_SOLICITUD[s.tipo]} — {nombrePac}
+                </div>
+                {s.estado === ESTADOS_SOLICITUD_SESION.RECHAZADA && s.motivoRechazo && (
+                  <div className="cp-solicitud-row__motivo">
+                    Motivo: {s.motivoRechazo}
+                  </div>
+                )}
+                {s.estado === ESTADOS_SOLICITUD_SESION.OBSOLETA && (
+                  <div className="cp-solicitud-row__motivo">
+                    La sesión fue modificada por otro camino. Si querés, podés volver a solicitar.
+                  </div>
+                )}
+              </div>
+              <span className={`cp-badge ${badgeClass}`}>
+                {icon}
+                {badgeText}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
    Stats desde la perspectiva del profesional
-   ----------------------------------------------------------------
-   "Lo que cobré / Lo que debo / Lo que ya pagué" en vez de los
-   numeros del consultorio.
    ============================================================ */
 function StatsProfesional({ stats, yaPagado }) {
   return (
@@ -333,9 +517,14 @@ function StatsProfesional({ stats, yaPagado }) {
 }
 
 /* ============================================================
-   Tabla de sesiones del profesional (mas compacta que la del admin)
+   Tabla de sesiones del profesional
+   ----------------------------------------------------------------
+   Ahora marcamos las sesiones que tienen una solicitud pendiente:
+   los botones de editar/eliminar quedan deshabilitados con tooltip
+   explicativo, para evitar que el profesional intente otra accion
+   sobre una sesion ya cuestionada.
    ============================================================ */
-function TablaMisSesiones({ sesiones, mapaPacientes, onEditar, onEliminar }) {
+function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, onEditar, onEliminar }) {
   return (
     <div className="cp-table-wrap">
       <table className="cp-table cp-sesiones-tabla">
@@ -356,12 +545,14 @@ function TablaMisSesiones({ sesiones, mapaPacientes, onEditar, onEliminar }) {
             const pac = mapaPacientes[s.pacienteId];
             const f = formatoFechaHoraCorta(s.fecha);
             const pagada = s.estadoPago === ESTADOS_PAGO_SESION.PAGADO;
+            const tienePendiente = sesionesConPendiente.has(s.id);
+            const accionesDisabled = pagada || tienePendiente;
 
             return (
               <tr
                 key={s.id}
                 className={`cp-sesiones-tabla__row ${pagada ? 'cp-sesiones-tabla__row--pagada' : ''}`}
-                onClick={() => onEditar(s)}
+                onClick={() => !accionesDisabled && onEditar(s)}
               >
                 <td>
                   <div className="cp-fecha-cell">
@@ -393,28 +584,35 @@ function TablaMisSesiones({ sesiones, mapaPacientes, onEditar, onEliminar }) {
                   {formatoARS.format(s.montoConsultorio)}
                 </td>
                 <td>
-                  <span className={`cp-badge ${pagada ? 'cp-badge--pagada' : 'cp-badge--debido'}`}>
-                    <span className="cp-badge__dot" />
-                    {pagada ? 'Pagada' : 'Debida'}
-                  </span>
+                  {tienePendiente ? (
+                    <span className="cp-badge cp-badge--debido">
+                      <ClockIcon />
+                      Solicitud pendiente
+                    </span>
+                  ) : (
+                    <span className={`cp-badge ${pagada ? 'cp-badge--pagada' : 'cp-badge--debido'}`}>
+                      <span className="cp-badge__dot" />
+                      {pagada ? 'Pagada' : 'Debida'}
+                    </span>
+                  )}
                 </td>
                 <td onClick={(e) => e.stopPropagation()}>
                   <div className="cp-sesiones-tabla__actions">
                     <button
                       className="cp-icon-btn"
                       onClick={() => onEditar(s)}
-                      title="Editar"
+                      title={tienePendiente ? 'Hay una solicitud pendiente para esta sesión' : 'Editar'}
                       aria-label="Editar"
-                      disabled={pagada}
+                      disabled={accionesDisabled}
                     >
                       <EditIcon />
                     </button>
                     <button
                       className="cp-icon-btn cp-icon-btn--danger"
                       onClick={() => onEliminar(s)}
-                      title="Eliminar"
+                      title={tienePendiente ? 'Hay una solicitud pendiente para esta sesión' : 'Eliminar'}
                       aria-label="Eliminar"
-                      disabled={pagada}
+                      disabled={accionesDisabled}
                     >
                       <TrashIcon />
                     </button>
