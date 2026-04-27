@@ -20,6 +20,37 @@
   justify-content: center;
 }
 
+/* Hint debajo del titulo de seccion (ej: explica que hace el toggle
+   de edicion directa en la seccion de Activos) */
+.cp-section-hint {
+  font-size: 12.5px;
+  color: var(--cp-text-muted);
+  line-height: 1.5;
+  margin-top: 4px;
+  max-width: 720px;
+}
+
+/* ============================================================
+   Toggle "Edicion directa" en columna de la tabla
+   ============================================================ */
+.cp-edicion-directa {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cp-edicion-directa__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12.5px;
+  color: var(--cp-text-muted);
+}
+
+.cp-edicion-directa__label svg {
+  color: var(--cp-text-faint);
+}
+
 /* ============================================================
    Empty state específico de Profesionales
    ============================================================ */
