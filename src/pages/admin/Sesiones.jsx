@@ -796,6 +796,13 @@ export function SesionModal({
             </div>
           </div>
 
+          {/*
+            Input de valor: step="any" permite cualquier monto entero o
+            decimal. Antes era step="500" (heredado de Fase A donde se
+            asumio que los montos serian multiplos redondos), pero eso
+            disparaba la validacion nativa del navegador con valores
+            como 19222 (copagos, ajustes, sesiones especiales).
+          */}
           <Input
             name="valor"
             type="number"
@@ -803,10 +810,10 @@ export function SesionModal({
             value={valor}
             onChange={(e) => setValor(e.target.value)}
             min="0"
-            step="500"
+            step="any"
             required
             hint={metodoSeleccionado
-              ? `Default del método: ${formatoARS.format(metodoSeleccionado.valorSesionDefault ?? 0)} — podés ajustarlo si esta sesión fue distinta.`
+              ? `Default del método: ${formatoARS.format(metodoSeleccionado.valorSesionDefault ?? 0)} — podés cargar cualquier monto si esta sesión fue distinta.`
               : 'Elegí un método primero para ver el valor sugerido.'}
           />
 
