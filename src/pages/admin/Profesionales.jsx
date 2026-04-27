@@ -11,6 +11,7 @@ import { ESTADOS_INVITACION, ESTADOS_USUARIO, formatoFechaLarga } from '../../li
 import { cancelarInvitacion, enviarInvitacion, suscribirInvitaciones } from '../../lib/invitaciones.js';
 import {
   cambiarEstadoProfesional,
+  setPermitirEdicionSesiones,
   suscribirProfesionales,
 } from '../../lib/profesionales.js';
 import { useConsultorio } from '../../hooks/useConsultorio.js';
@@ -37,6 +38,14 @@ const TrashIcon = () => (
   <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="3 6 5 6 21 6" />
     <path d="M19 6l-2 14a2 2 0 01-2 2H9a2 2 0 01-2-2L5 6m5 0V4a2 2 0 012-2h0a2 2 0 012 2v2" />
+  </svg>
+);
+
+const InfoIcon = () => (
+  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <line x1="12" y1="16" x2="12" y2="12" />
+    <line x1="12" y1="8" x2="12.01" y2="8" />
   </svg>
 );
 
@@ -161,6 +170,10 @@ export default function Profesionales() {
             <section className="cp-section">
               <div className="cp-section-head">
                 <h2 className="cp-section-title">Activos</h2>
+                <p className="cp-section-hint">
+                  Si activás <strong>edición directa</strong>, el profesional puede registrar y modificar sesiones sin tu aprobación.
+                  Si está apagada, cada cambio te llega como solicitud.
+                </p>
               </div>
               <ProfesionalesTabla
                 profesionales={activos}
@@ -296,6 +309,8 @@ function ProfesionalesTabla({ profesionales, onSuspender, onReactivar }) {
             <th>Profesional</th>
             <th>Email</th>
             <th>Estado</th>
+            {/* Solo mostramos la columna de confianza para activos */}
+            {onSuspender && <th>Edición directa</th>}
             <th aria-label="Acciones" />
           </tr>
         </thead>
@@ -319,6 +334,11 @@ function ProfesionalesTabla({ profesionales, onSuspender, onReactivar }) {
                 {p.estado === ESTADOS_USUARIO.SUSPENDIDO && <Badge tone="danger">Suspendido</Badge>}
                 {p.estado === ESTADOS_USUARIO.PENDIENTE && <Badge tone="warning">Pendiente</Badge>}
               </td>
+              {onSuspender && (
+                <td>
+                  <ToggleEdicionDirecta profesional={p} />
+                </td>
+              )}
               <td style={{ textAlign: 'right' }}>
                 {onSuspender && (
                   <button className="cp-prof-action" onClick={() => onSuspender(p.uid)}>
@@ -340,13 +360,57 @@ function ProfesionalesTabla({ profesionales, onSuspender, onReactivar }) {
 }
 
 /* ============================================================
+   Toggle inline para "Edicion directa de sesiones"
+   ============================================================ */
+function ToggleEdicionDirecta({ profesional }) {
+  const [updating, setUpdating] = useState(false);
+  const activo = !!profesional.permitirEdicionSesiones;
+
+  async function onToggle() {
+    if (updating) return;
+    setUpdating(true);
+    try {
+      await setPermitirEdicionSesiones(profesional.uid, !activo);
+    } catch (err) {
+      console.error('Error actualizando edicion directa:', err);
+      alert('No se pudo cambiar la configuración. Intentá de nuevo.');
+    } finally {
+      setUpdating(false);
+    }
+  }
+
+  const tooltip = activo
+    ? 'El profesional puede registrar y modificar sesiones directamente. Cambios quedan en log de auditoría.'
+    : 'Los cambios del profesional sobre sesiones requieren tu aprobación.';
+
+  return (
+    <div className="cp-edicion-directa" title={tooltip}>
+      <button
+        type="button"
+        className={`cc-toggle ${activo ? 'cc-toggle--on' : ''}`}
+        onClick={onToggle}
+        disabled={updating}
+        aria-pressed={activo}
+        aria-label={activo ? 'Desactivar edición directa' : 'Activar edición directa'}
+      >
+        <span className="cc-toggle__thumb" />
+      </button>
+      <span className="cp-edicion-directa__label">
+        {activo ? 'Sí' : 'Con aprobación'}
+        <InfoIcon />
+      </span>
+    </div>
+  );
+}
+
+/* ============================================================
    Modal: Invitar profesional
    ============================================================ */
 function InvitarModal({ onClose, consultorioId, consultorioNombre }) {
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [resultado, setResultado] = useState(null); // {ok, aceptarUrl, warning} o null
+  const [resultado, setResultado] = useState(null);
   const [error, setError] = useState('');
 
   async function onSubmit(e) {
