@@ -17,7 +17,6 @@ import {
 import { suscribirPacientesConsultorio } from '../../lib/pacientes.js';
 import { suscribirProfesionales } from '../../lib/profesionales.js';
 import {
-  agregarPorProfesional,
   calcularSplit,
   crearSesion,
   actualizarSesion,
@@ -30,6 +29,7 @@ import {
   suscribirSesionesConsultorio,
   totalesGlobales,
 } from '../../lib/sesiones.js';
+import { marcarPendientesComoObsoletas } from '../../lib/solicitudes.js';
 
 import './Sesiones.css';
 
@@ -94,7 +94,6 @@ function inicialesPaciente(p) {
   return ((p.apellido?.[0] ?? '') + (p.nombre?.[0] ?? '')).toUpperCase() || '·';
 }
 
-/** Formato corto: "12 abr · 14:30" */
 function formatoFechaHoraCorta(date) {
   if (!date) return '—';
   const d = date.toDate ? date.toDate() : new Date(date);
@@ -103,7 +102,6 @@ function formatoFechaHoraCorta(date) {
   return { dia, hora };
 }
 
-/** Convierte un Date a string "YYYY-MM-DDTHH:MM" para input datetime-local. */
 function dateAInputValue(d) {
   if (!d) return '';
   const date = d instanceof Date ? d : new Date(d);
@@ -118,7 +116,6 @@ export default function Sesiones() {
   const { user } = useAuth();
   const { consultorio, loading: loadingConsultorio } = useConsultorio();
 
-  // Mes seleccionado (primer dia del mes para simplificar)
   const [mes, setMes] = useState(() => inicioDeMes(new Date()));
 
   const [sesiones, setSesiones] = useState([]);
@@ -126,16 +123,13 @@ export default function Sesiones() {
   const [profesionales, setProfesionales] = useState([]);
   const [loadingSesiones, setLoadingSesiones] = useState(true);
 
-  // Filtros
   const [busqueda, setBusqueda] = useState('');
   const [filtroProfesional, setFiltroProfesional] = useState('todos');
   const [filtroMetodo, setFiltroMetodo] = useState('todos');
   const [filtroEstado, setFiltroEstado] = useState('todos');
 
-  // Modal de alta/edicion
-  const [editando, setEditando] = useState(null); // null | 'nueva' | sesion
+  const [editando, setEditando] = useState(null);
 
-  // Suscripcion a sesiones (acotada al mes)
   useEffect(() => {
     if (!user?.consultorioId) return;
     setLoadingSesiones(true);
@@ -152,13 +146,11 @@ export default function Sesiones() {
     return unsub;
   }, [user?.consultorioId, mes]);
 
-  // Pacientes (para el modal y para resolver nombres)
   useEffect(() => {
     if (!user?.consultorioId) return;
     return suscribirPacientesConsultorio(user.consultorioId, setPacientes);
   }, [user?.consultorioId]);
 
-  // Profesionales (para filtro y modal)
   useEffect(() => {
     if (!user?.consultorioId) return;
     return suscribirProfesionales(user.consultorioId, setProfesionales);
@@ -191,7 +183,6 @@ export default function Sesiones() {
     return m;
   }, [pacientes]);
 
-  // Filtrado en memoria
   const sesionesFiltradas = useMemo(() => {
     let list = sesiones;
 
@@ -219,17 +210,34 @@ export default function Sesiones() {
     return list;
   }, [sesiones, busqueda, filtroProfesional, filtroMetodo, filtroEstado, mapaPacientes, mapaProfesionales]);
 
-  // Stats globales del mes (sobre TODAS las sesiones del mes, no las filtradas)
   const stats = useMemo(() => totalesGlobales(sesiones), [sesiones]);
   const cobrado = stats.totalConsultorio - stats.debido;
 
-  /* ---- Handlers ---- */
+  /* ---- Handlers ----
+     IMPORTANTE Fase B: cuando el admin modifica/elimina directamente una
+     sesion, si hay solicitudes pendientes para esa misma sesion las
+     marcamos como obsoletas. Asi el profesional que solicito ve que su
+     pedido quedo invalidado y puede volver a solicitar si quiere.
+   */
 
   async function handleGuardar(input) {
     if (editando === 'nueva') {
       await crearSesion(input, user.uid);
     } else {
       await actualizarSesion(editando.id, input, user.uid);
+      // Si habia solicitudes pendientes para esta sesion, ahora son obsoletas
+      try {
+        await marcarPendientesComoObsoletas({
+          consultorioId: user.consultorioId,
+          sesionId: editando.id,
+          motivo: 'La sesión fue modificada directamente por el administrador.',
+          adminUid: user.uid,
+          adminNombre: user.displayName || user.email,
+        });
+      } catch (err) {
+        console.error('Error marcando solicitudes como obsoletas:', err);
+        // No bloqueamos el flow principal si falla
+      }
     }
     setEditando(null);
   }
@@ -241,6 +249,19 @@ export default function Sesiones() {
     );
     if (!ok) return;
     try {
+      // Marcar pendientes como obsoletas ANTES de eliminar la sesion,
+      // porque despues no vamos a poder leer el sesionId si la sesion ya no existe.
+      try {
+        await marcarPendientesComoObsoletas({
+          consultorioId: user.consultorioId,
+          sesionId: sesion.id,
+          motivo: 'La sesión fue eliminada directamente por el administrador.',
+          adminUid: user.uid,
+          adminNombre: user.displayName || user.email,
+        });
+      } catch (err) {
+        console.error('Error marcando solicitudes como obsoletas:', err);
+      }
       await eliminarSesion(sesion.id);
     } catch (err) {
       alert(err.message || 'No se pudo eliminar la sesión.');
@@ -258,8 +279,6 @@ export default function Sesiones() {
       alert(err.message || 'No se pudo cambiar el estado.');
     }
   }
-
-  /* ---- Renders ---- */
 
   if (loadingConsultorio) {
     return (
@@ -588,9 +607,12 @@ function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, onEditar, o
 /* ============================================================
    Modal de alta/edicion de sesion
    ----------------------------------------------------------------
-   Reutilizable entre admin y profesional. La diferencia es:
-   - Admin ve dropdown de profesional al inicio (puede elegir por quien)
-   - Profesional NO ve ese dropdown (siempre se registra el mismo)
+   Reutilizable entre admin y profesional.
+   - Admin ve dropdown de profesional al inicio
+   - Profesional NO ve ese dropdown
+   - modoSolicitud=true: ajustamos copy del titulo, subtitulo y boton
+     para reflejar que la accion va a generar una solicitud, no a
+     ejecutar el cambio directamente.
    ============================================================ */
 export function SesionModal({
   sesion,
@@ -599,13 +621,13 @@ export function SesionModal({
   metodos,
   esAdmin,
   consultorioId,
-  profesionalUidFijo,  // si esAdmin=false, se usa este como profesional automatico
+  profesionalUidFijo,
+  modoSolicitud = false,
   onClose,
   onGuardar,
 }) {
   const esNueva = !sesion;
 
-  // Estado del form
   const [profesionalUid, setProfesionalUid] = useState(
     sesion?.profesionalUid ?? profesionalUidFijo ?? profesionales[0]?.uid ?? ''
   );
@@ -623,8 +645,6 @@ export function SesionModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  // Pacientes disponibles segun el profesional seleccionado.
-  // Mostramos primero los asignados a ese profesional, despues el resto.
   const pacientesOrdenados = useMemo(() => {
     if (!profesionalUid) return pacientes;
     const asignados = pacientes.filter((p) => p.profesionalUid === profesionalUid);
@@ -632,7 +652,6 @@ export function SesionModal({
     return [...asignados, ...resto];
   }, [pacientes, profesionalUid]);
 
-  // Auto-completar metodo y valor al elegir paciente (si no son nuevos)
   useEffect(() => {
     if (!pacienteId || !esNueva) return;
     const pac = pacientes.find((p) => p.id === pacienteId);
@@ -642,7 +661,6 @@ export function SesionModal({
     }
   }, [pacienteId, esNueva]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-completar valor al elegir metodo (si no se modifico manualmente)
   useEffect(() => {
     if (!metodoId || !esNueva) return;
     const m = metodos.find((x) => x.id === metodoId);
@@ -655,6 +673,25 @@ export function SesionModal({
   const porcentaje = Number(metodoSeleccionado?.porcentajeConsultorio ?? 0);
   const valorNum = Number(valor) || 0;
   const split = calcularSplit(valorNum, porcentaje);
+
+  /* ---- Copy dinamico segun modo ---- */
+  const titulo = esNueva
+    ? (modoSolicitud ? 'Solicitar nueva sesión' : 'Registrar sesión')
+    : (modoSolicitud ? 'Solicitar modificación' : 'Editar sesión');
+
+  const subtitulo = esNueva
+    ? (modoSolicitud
+      ? 'Cargá los datos de la sesión que querés crear. La solicitud quedará pendiente de aprobación del administrador.'
+      : 'Cargá los datos de la sesión. El cálculo del split se hace automáticamente según el método.')
+    : (modoSolicitud
+      ? 'Modificá los datos de esta sesión. Los cambios quedarán pendientes de aprobación del administrador.'
+      : 'Modificá los datos de esta sesión.');
+
+  const labelBoton = submitting
+    ? 'Enviando…'
+    : esNueva
+      ? (modoSolicitud ? 'Enviar solicitud' : 'Registrar sesión')
+      : (modoSolicitud ? 'Enviar solicitud de cambio' : 'Guardar cambios');
 
   async function onSubmit(e) {
     e.preventDefault();
@@ -689,14 +726,8 @@ export function SesionModal({
       <div className="cp-modal cp-modal--wide" onClick={(e) => e.stopPropagation()}>
         <button className="cp-modal__close" onClick={onClose} aria-label="Cerrar">×</button>
 
-        <h2 className="cp-modal__title">
-          {esNueva ? 'Registrar sesión' : 'Editar sesión'}
-        </h2>
-        <p className="cp-modal__sub">
-          {esNueva
-            ? 'Cargá los datos de la sesión. El cálculo del split se hace automáticamente según el método.'
-            : 'Modificá los datos de esta sesión.'}
-        </p>
+        <h2 className="cp-modal__title">{titulo}</h2>
+        <p className="cp-modal__sub">{subtitulo}</p>
 
         <form className="cp-modal__form" onSubmit={onSubmit}>
           {esAdmin && (
@@ -818,8 +849,8 @@ export function SesionModal({
             </Button>
             <Button variant="primary" type="submit" disabled={submitting}>
               {submitting
-                ? <><Spinner size={14} /> Guardando…</>
-                : (esNueva ? 'Registrar sesión' : 'Guardar cambios')}
+                ? <><Spinner size={14} /> {labelBoton}</>
+                : labelBoton}
             </Button>
           </div>
         </form>
