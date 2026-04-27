@@ -1,7 +1,9 @@
+import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 
 import { useAuth } from '../../hooks/useAuth.js';
 import { ROLES } from '../../lib/constants.js';
+import { suscribirSolicitudesPendientes } from '../../lib/solicitudes.js';
 import Avatar from '../ui/Avatar.jsx';
 import './Sidebar.css';
 
@@ -32,6 +34,12 @@ const Icon = {
       <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
     </svg>
   ),
+  Inbox: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
+      <path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z" />
+    </svg>
+  ),
   Settings: () => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="3" />
@@ -45,7 +53,7 @@ const Icon = {
   ),
 };
 
-function NavItem({ to, icon, children, end = false }) {
+function NavItem({ to, icon, children, end = false, badge }) {
   return (
     <NavLink
       to={to}
@@ -53,7 +61,12 @@ function NavItem({ to, icon, children, end = false }) {
       className={({ isActive }) => `cp-nav-item${isActive ? ' cp-nav-item--active' : ''}`}
     >
       <span className="cp-nav-item__icon">{icon}</span>
-      <span>{children}</span>
+      <span className="cp-nav-item__label">{children}</span>
+      {badge != null && badge > 0 && (
+        <span className="cp-nav-item__badge" aria-label={`${badge} pendiente${badge === 1 ? '' : 's'}`}>
+          {badge > 99 ? '99+' : badge}
+        </span>
+      )}
     </NavLink>
   );
 }
@@ -74,6 +87,18 @@ export default function Sidebar() {
 
   const esSuperadmin = user?.rol === ROLES.SUPERADMIN;
   const esAdmin = user?.rol === ROLES.ADMIN;
+
+  // Conteo live de solicitudes pendientes (solo para admin).
+  // Suscribimos siempre que sea admin con consultorioId; el unsub es seguro
+  // si la suscripcion devuelve una funcion vacia (cuando faltan datos).
+  const [solicitudesPendientes, setSolicitudesPendientes] = useState(0);
+  useEffect(() => {
+    if (!esAdmin || !user?.consultorioId) return;
+    const unsub = suscribirSolicitudesPendientes(user.consultorioId, (lista) => {
+      setSolicitudesPendientes(lista.length);
+    });
+    return unsub;
+  }, [esAdmin, user?.consultorioId]);
 
   const nombre = user?.displayName || user?.email?.split('@')[0] || 'Usuario';
   const rolLabel = esSuperadmin
@@ -104,6 +129,13 @@ export default function Sidebar() {
             <NavItem to="/admin" end icon={<Icon.Home />}>Resumen</NavItem>
             <NavItem to="/admin/profesionales" icon={<Icon.Users />}>Profesionales</NavItem>
             <NavItem to="/admin/sesiones" icon={<Icon.Calendar />}>Sesiones</NavItem>
+            <NavItem
+              to="/admin/solicitudes"
+              icon={<Icon.Inbox />}
+              badge={solicitudesPendientes}
+            >
+              Solicitudes
+            </NavItem>
             <NavItem to="/admin/pagos" icon={<Icon.Wallet />}>Pagos</NavItem>
             <NavItem to="/admin/pacientes" icon={<Icon.Heart />}>Pacientes</NavItem>
           </nav>
