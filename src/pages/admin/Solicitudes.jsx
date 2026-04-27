@@ -9,9 +9,11 @@ import {
   ESTADOS_SOLICITUD_SESION,
   formatoARS,
   LABELS_TIPO_SOLICITUD,
+  TIPOS_LOG_SESION,
   TIPOS_METODO_PAGO,
   TIPOS_SOLICITUD_SESION,
 } from '../../lib/constants.js';
+import { suscribirLogsDeSolicitud } from '../../lib/logs.js';
 import { suscribirPacientesConsultorio } from '../../lib/pacientes.js';
 import { suscribirProfesionales } from '../../lib/profesionales.js';
 import {
@@ -21,7 +23,7 @@ import {
 } from '../../lib/solicitudes.js';
 
 import './Solicitudes.css';
-import './Sesiones.css';   // reusamos cp-badge*, cp-modal*, cp-stat*
+import './Sesiones.css';
 
 /* ============================================================
    Iconos
@@ -132,10 +134,9 @@ export default function Solicitudes() {
   const [profesionales, setProfesionales] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const [tab, setTab] = useState('pendientes'); // 'pendientes' | 'resueltas'
+  const [tab, setTab] = useState('pendientes');
   const [seleccionada, setSeleccionada] = useState(null);
 
-  // Suscripcion live a TODAS las solicitudes del consultorio
   useEffect(() => {
     if (!user?.consultorioId) return;
     setLoading(true);
@@ -168,7 +169,6 @@ export default function Solicitudes() {
     return m;
   }, [profesionales]);
 
-  // Particion: pendientes / resueltas
   const pendientes = useMemo(
     () => solicitudes.filter((s) => s.estado === ESTADOS_SOLICITUD_SESION.PENDIENTE),
     [solicitudes],
@@ -180,9 +180,6 @@ export default function Solicitudes() {
 
   const lista = tab === 'pendientes' ? pendientes : resueltas;
 
-  /* Cuando se actualiza la solicitud seleccionada (ej: el live llega y la
-     marca como resuelta), refrescamos la referencia para que el modal
-     muestre el estado real. */
   useEffect(() => {
     if (!seleccionada) return;
     const fresh = solicitudes.find((s) => s.id === seleccionada.id);
@@ -245,6 +242,7 @@ export default function Solicitudes() {
           mapaProfesionales={mapaProfesionales}
           adminUid={user.uid}
           adminNombre={user.displayName || user.email}
+          consultorioId={user.consultorioId}
           onClose={() => setSeleccionada(null)}
         />
       )}
@@ -306,11 +304,8 @@ function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSel
         <tbody>
           {solicitudes.map((s) => {
             const prof = mapaProfesionales[s.profesionalUid];
-            // El paciente puede venir del payload propuesto (crear/modificar)
-            // o del anterior (eliminar/modificar)
             const pacienteId = s.payloadPropuesto?.pacienteId || s.payloadAnterior?.pacienteId;
             const pac = pacienteId ? mapaPacientes[pacienteId] : null;
-
             const resuelta = s.estado !== ESTADOS_SOLICITUD_SESION.PENDIENTE;
 
             return (
@@ -363,9 +358,9 @@ function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSel
 }
 
 /* ============================================================
-   Modal de detalle con diff antes/despues
+   Modal de detalle con diff antes/despues + historial (Fase C.2)
    ============================================================ */
-function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, adminUid, adminNombre, onClose }) {
+function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, adminUid, adminNombre, consultorioId, onClose }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [mostrandoMotivo, setMostrandoMotivo] = useState(false);
@@ -476,7 +471,7 @@ function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, adminUid, a
           </div>
         )}
 
-        {/* Form de motivo de rechazo (solo cuando se desplega) */}
+        {/* Form de motivo de rechazo */}
         {esPendiente && mostrandoMotivo && (
           <div className="cp-rechazo-form">
             <label className="cp-rechazo-form__label">
@@ -494,6 +489,9 @@ function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, adminUid, a
         )}
 
         {error && <div className="cp-modal__error" style={{ marginTop: 12 }}>{error}</div>}
+
+        {/* Historial de auditoria (Fase C.2) */}
+        <HistorialPanel consultorioId={consultorioId} solicitudId={solicitud.id} />
 
         {/* Acciones */}
         <div className="cp-modal__actions">
@@ -534,12 +532,77 @@ function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, adminUid, a
 }
 
 /* ============================================================
-   Diff: muestra los cambios segun el tipo
+   HistorialPanel — muestra los logs de auditoria de la solicitud
    ----------------------------------------------------------------
-   Crear: una columna con los datos propuestos.
-   Modificar: dos columnas, antes vs despues, filas que cambian
-     resaltadas.
-   Eliminar: una columna con los datos que se van a perder.
+   Se suscribe en vivo a /logs_sesion/ filtrado por solicitudId.
+   Para cada log mostramos: icono segun tipo, descripcion, autor,
+   fecha relativa.
+   ============================================================ */
+function HistorialPanel({ consultorioId, solicitudId }) {
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!consultorioId || !solicitudId) return;
+    setLoading(true);
+    const unsub = suscribirLogsDeSolicitud(consultorioId, solicitudId, (data) => {
+      setLogs(data);
+      setLoading(false);
+    });
+    return unsub;
+  }, [consultorioId, solicitudId]);
+
+  if (loading) {
+    return (
+      <div className="cp-historial">
+        <h3 className="cp-historial__title">Historial</h3>
+        <div style={{ padding: 16, display: 'flex', justifyContent: 'center' }}>
+          <Spinner size={16} />
+        </div>
+      </div>
+    );
+  }
+
+  if (logs.length === 0) {
+    // No deberia pasar (siempre hay al menos el log de creacion) pero por las dudas
+    return null;
+  }
+
+  return (
+    <div className="cp-historial">
+      <h3 className="cp-historial__title">
+        Historial
+        <span className="cp-historial__count">{logs.length} evento{logs.length === 1 ? '' : 's'}</span>
+      </h3>
+      <ol className="cp-historial__list">
+        {logs.map((log) => (
+          <li key={log.id} className="cp-historial__item">
+            <span className={`cp-historial__dot cp-historial__dot--${tipoColor(log.tipo)}`} />
+            <div className="cp-historial__contenido">
+              <div className="cp-historial__descripcion">{log.descripcion}</div>
+              <div className="cp-historial__meta">
+                {log.actorNombre || 'Usuario'} · {formatoFechaCompleta(log.createdAt)}
+              </div>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+function tipoColor(tipo) {
+  switch (tipo) {
+    case TIPOS_LOG_SESION.SOLICITUD_CREADA: return 'pendiente';
+    case TIPOS_LOG_SESION.SOLICITUD_APROBADA: return 'success';
+    case TIPOS_LOG_SESION.SOLICITUD_RECHAZADA: return 'danger';
+    case TIPOS_LOG_SESION.SOLICITUD_OBSOLETA: return 'muted';
+    default: return 'muted';
+  }
+}
+
+/* ============================================================
+   Diff
    ============================================================ */
 function Diff({ solicitud, pac }) {
   const { tipo, payloadPropuesto, payloadAnterior } = solicitud;
@@ -552,7 +615,6 @@ function Diff({ solicitud, pac }) {
     return <DiffSingle payload={payloadAnterior} pac={pac} encabezado="Sesión a eliminar" tono="eliminar" />;
   }
 
-  // Modificar
   return <DiffDoble anterior={payloadAnterior} propuesto={payloadPropuesto} pac={pac} />;
 }
 
@@ -597,7 +659,6 @@ function valorFormateado(payload, key) {
 }
 
 function compararValor(a, b, key) {
-  // Para fechas comparamos en milisegundos
   if (key === 'fecha') {
     const ma = a?.toMillis ? a.toMillis() : (a ? new Date(a).getTime() : null);
     const mb = b?.toMillis ? b.toMillis() : (b ? new Date(b).getTime() : null);
@@ -615,7 +676,6 @@ function DiffSingle({ payload, pac, encabezado, tono }) {
         </div>
       </div>
       <div className="cp-diff__body">
-        {/* Paciente al tope si se puede resolver */}
         {pac && (
           <div className={`cp-diff__row cp-diff__row--single ${tono === 'eliminar' ? 'cp-diff__row--eliminar' : ''}`}>
             <div className="cp-diff__campo">Paciente</div>
@@ -660,7 +720,6 @@ function DiffDoble({ anterior, propuesto, pac }) {
         {CAMPOS_DIFF.map(({ key, label }) => {
           const vAnt = valorFormateado(anterior, key);
           const vNue = valorFormateado(propuesto, key);
-          // Saltamos solo si AMBOS son null (excepto notas, que igual queremos mostrar para auditar)
           if (vAnt == null && vNue == null && key !== 'notas') return null;
 
           const cambio = !compararValor(anterior?.[key], propuesto?.[key], key);
