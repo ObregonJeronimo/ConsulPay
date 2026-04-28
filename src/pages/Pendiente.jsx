@@ -8,18 +8,28 @@ export default function Pendiente() {
 
   const rechazado = user?.estado === ESTADOS_USUARIO.RECHAZADO;
   const suspendido = user?.estado === ESTADOS_USUARIO.SUSPENDIDO;
+  const retirado = user?.estado === ESTADOS_USUARIO.RETIRADO;
 
-  const titulo = rechazado
-    ? 'Cuenta rechazada'
-    : suspendido
-      ? 'Cuenta suspendida'
-      : 'Cuenta pendiente de aprobación';
+  const titulo = retirado
+    ? 'Acceso al consultorio cerrado'
+    : rechazado
+      ? 'Cuenta rechazada'
+      : suspendido
+        ? 'Cuenta suspendida'
+        : 'Cuenta pendiente de aprobación';
 
-  const mensaje = rechazado
-    ? 'Tu solicitud de acceso no fue aprobada por el administrador.'
-    : suspendido
-      ? 'Tu cuenta fue suspendida. Contactá al administrador del consultorio para más información.'
-      : 'Gracias por registrarte. Un administrador debe aprobar tu cuenta antes de que puedas acceder al panel.';
+  const mensaje = retirado
+    ? 'Ya no formás parte de este consultorio. Tus datos y registros se preservan, pero no podés iniciar sesión en el panel. Si querés volver a trabajar acá, contactá al administrador del consultorio para que te invite nuevamente.'
+    : rechazado
+      ? 'Tu solicitud de acceso no fue aprobada por el administrador.'
+      : suspendido
+        ? 'Tu cuenta fue suspendida. Contactá al administrador del consultorio para más información.'
+        : 'Gracias por registrarte. Un administrador debe aprobar tu cuenta antes de que puedas acceder al panel.';
+
+  // El estado "retirado" es definitivo desde el punto de vista del profesional:
+  // no tiene sentido ofrecer "Volver a comprobar" porque solo el admin puede
+  // reincorporarlo (y aun asi necesita iniciar sesion de nuevo).
+  const mostrarVolverAComprobar = !rechazado && !suspendido && !retirado;
 
   return (
     <div className="cp-pendiente">
@@ -39,7 +49,7 @@ export default function Pendiente() {
         )}
 
         <div className="cp-pendiente__actions">
-          {!rechazado && !suspendido && (
+          {mostrarVolverAComprobar && (
             <Button variant="secondary" onClick={refresh}>
               Volver a comprobar
             </Button>

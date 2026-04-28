@@ -42,6 +42,20 @@ export default function ProtectedRoute({ requireRole, requireActivo = true }) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
+  /*
+    Estado 'retirado': el usuario ya no forma parte del consultorio.
+    Lo redirigimos a /pendiente (que detecta el estado y muestra
+    el mensaje apropiado: 'Acceso al consultorio cerrado').
+
+    Lo chequeamos ANTES del corte por rol porque queremos que aplique
+    a cualquier rol (admin retirado, profesional retirado, etc.). El
+    superadmin no entra a este caso porque su flujo no permite
+    retirarse.
+  */
+  if (user.rol !== ROLES.SUPERADMIN && user.estado === ESTADOS_USUARIO.RETIRADO) {
+    return <Navigate to="/pendiente" replace />;
+  }
+
   // Superadmin: carta blanca siempre
   if (user.rol === ROLES.SUPERADMIN) {
     return <Outlet />;
