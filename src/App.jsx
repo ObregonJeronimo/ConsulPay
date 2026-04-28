@@ -20,6 +20,7 @@ const AceptarInvitacion = lazy(() => import('./pages/AceptarInvitacion.jsx'));
 const Pendiente = lazy(() => import('./pages/Pendiente.jsx'));
 const DashboardSuper = lazy(() => import('./pages/super/Dashboard.jsx'));
 const ConfiguracionSuper = lazy(() => import('./pages/super/ConfiguracionSuper.jsx'));
+const ConsultoriosSuper = lazy(() => import('./pages/super/ConsultoriosSuper.jsx'));
 const DashboardAdmin = lazy(() => import('./pages/admin/Dashboard.jsx'));
 const Profesionales = lazy(() => import('./pages/admin/Profesionales.jsx'));
 const Configuracion = lazy(() => import('./pages/admin/Configuracion.jsx'));
@@ -70,6 +71,7 @@ export default function App() {
             <Route element={<ProtectedRoute requireRole={ROLES.SUPERADMIN} />}>
               <Route element={<AppShell />}>
                 <Route path="/super" element={<DashboardSuper />} />
+                <Route path="/super/consultorios" element={<ConsultoriosSuper />} />
                 <Route path="/super/configuracion" element={<ConfiguracionSuper />} />
               </Route>
             </Route>

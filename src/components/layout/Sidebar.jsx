@@ -128,7 +128,7 @@ export default function Sidebar() {
         <nav className="cp-sidebar__section">
           <div className="cp-sidebar__label">Plataforma</div>
           <NavItem to="/super" end icon={<Icon.Home />}>Resumen</NavItem>
-          <NavItem to="/super/consultorios" icon={<Icon.Users />}>Consultorios</NavItem>
+          <NavItem to="/super/consultorios" icon={<Icon.Users />}>Consultorios y usuarios</NavItem>
           <NavItem to="/super/pagos" icon={<Icon.Wallet />}>Pagos recibidos</NavItem>
           <NavItem to="/super/configuracion" icon={<Icon.Settings />}>Configuración</NavItem>
         </nav>
