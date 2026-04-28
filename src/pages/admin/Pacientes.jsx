@@ -56,6 +56,19 @@ const ArchiveIcon = () => (
   </svg>
 );
 
+const FolderIcon = () => (
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
+  </svg>
+);
+
+const RotateIcon = () => (
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="1 4 1 10 7 10" />
+    <path d="M3.51 15a9 9 0 102.13-9.36L1 10" />
+  </svg>
+);
+
 /* ============================================================
    Helpers
    ============================================================ */
@@ -83,9 +96,10 @@ export default function Pacientes() {
   const [busqueda, setBusqueda] = useState('');
   const [filtroProfesional, setFiltroProfesional] = useState('todos');
   const [filtroMetodo, setFiltroMetodo] = useState('todos');
-  const [mostrarArchivados, setMostrarArchivados] = useState(false);
 
   const [editandoPaciente, setEditandoPaciente] = useState(null); // null | 'nuevo' | paciente
+  const [archivandoPaciente, setArchivandoPaciente] = useState(null); // null | paciente
+  const [verArchivados, setVerArchivados] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -116,26 +130,33 @@ export default function Pacientes() {
     [consultorio?.metodosPagoPaciente],
   );
 
-  // Mapa uid → profesional (para mostrar nombre)
   const mapaProfesionales = useMemo(() => {
     const m = {};
     for (const p of profesionales) m[p.uid] = p;
     return m;
   }, [profesionales]);
 
-  // Mapa id → método (para mostrar nombre)
   const mapaMetodos = useMemo(() => {
     const m = {};
     for (const x of metodos) m[x.id] = x;
     return m;
   }, [metodos]);
 
-  const pacientesFiltrados = useMemo(() => {
-    let list = pacientes;
+  // La tabla principal SOLO muestra activos. Los archivados viven en su
+  // propio panel desplegable y nunca se mezclan con la tabla principal
+  // (decision de UX para evitar el checkbox "mostrar archivados" del original).
+  const pacientesActivos = useMemo(
+    () => pacientes.filter((p) => p.estado === ESTADOS_PACIENTE.ACTIVO),
+    [pacientes],
+  );
 
-    if (!mostrarArchivados) {
-      list = list.filter((p) => p.estado === ESTADOS_PACIENTE.ACTIVO);
-    }
+  const pacientesArchivados = useMemo(
+    () => pacientes.filter((p) => p.estado === ESTADOS_PACIENTE.ARCHIVADO),
+    [pacientes],
+  );
+
+  const pacientesFiltrados = useMemo(() => {
+    let list = pacientesActivos;
 
     if (filtroProfesional !== 'todos') {
       list = list.filter((p) => p.profesionalUid === filtroProfesional);
@@ -156,10 +177,10 @@ export default function Pacientes() {
     }
 
     return list;
-  }, [pacientes, busqueda, filtroProfesional, filtroMetodo, mostrarArchivados]);
+  }, [pacientesActivos, busqueda, filtroProfesional, filtroMetodo]);
 
-  const activosTotal = pacientes.filter((p) => p.estado === ESTADOS_PACIENTE.ACTIVO).length;
-  const archivadosTotal = pacientes.filter((p) => p.estado === ESTADOS_PACIENTE.ARCHIVADO).length;
+  const activosTotal = pacientesActivos.length;
+  const archivadosTotal = pacientesArchivados.length;
 
   async function handleGuardar(data) {
     setError('');
@@ -180,13 +201,16 @@ export default function Pacientes() {
     }
   }
 
-  async function handleArchivar(paciente) {
-    const ok = confirm(
-      `¿Archivar a ${nombreCompleto(paciente)}?\n\nLa información queda guardada y podés reactivarlo cuando quieras.`,
-    );
-    if (!ok) return;
+  /* ---- Archivado: ahora pasa por modal de confirmacion ---- */
+  function pedirArchivar(paciente) {
+    setArchivandoPaciente(paciente);
+  }
+
+  async function confirmarArchivar() {
+    if (!archivandoPaciente) return;
     try {
-      await archivarPaciente(paciente.id);
+      await archivarPaciente(archivandoPaciente.id);
+      setArchivandoPaciente(null);
     } catch (err) {
       setError(err.message || 'No se pudo archivar el paciente');
     }
@@ -263,14 +287,25 @@ export default function Pacientes() {
             setFiltroProfesional={setFiltroProfesional}
             filtroMetodo={filtroMetodo}
             setFiltroMetodo={setFiltroMetodo}
-            mostrarArchivados={mostrarArchivados}
-            setMostrarArchivados={setMostrarArchivados}
             profesionales={profesionalesActivos}
             metodos={metodos}
             archivadosTotal={archivadosTotal}
+            verArchivados={verArchivados}
+            onToggleArchivados={() => setVerArchivados((v) => !v)}
           />
 
           {error && <div className="cp-config-error">{error}</div>}
+
+          {/* Panel desplegable de archivados (visible solo si verArchivados=true) */}
+          {verArchivados && archivadosTotal > 0 && (
+            <PanelArchivados
+              pacientes={pacientesArchivados}
+              mapaProfesionales={mapaProfesionales}
+              mapaMetodos={mapaMetodos}
+              onReactivar={handleReactivar}
+              onCerrar={() => setVerArchivados(false)}
+            />
+          )}
 
           {pacientesFiltrados.length === 0 ? (
             <div className="cp-pacientes__empty-filtered">
@@ -282,8 +317,7 @@ export default function Pacientes() {
               mapaProfesionales={mapaProfesionales}
               mapaMetodos={mapaMetodos}
               onEditar={(p) => setEditandoPaciente(p)}
-              onArchivar={handleArchivar}
-              onReactivar={handleReactivar}
+              onArchivar={pedirArchivar}
             />
           )}
         </>
@@ -296,6 +330,14 @@ export default function Pacientes() {
           metodos={metodos}
           onClose={() => setEditandoPaciente(null)}
           onGuardar={handleGuardar}
+        />
+      )}
+
+      {archivandoPaciente && (
+        <ConfirmarArchivadoModal
+          paciente={archivandoPaciente}
+          onCancelar={() => setArchivandoPaciente(null)}
+          onConfirmar={confirmarArchivar}
         />
       )}
     </div>
@@ -366,13 +408,17 @@ function EmptyState({ onAgregar }) {
 
 /* ============================================================
    Barra de filtros
+   ----------------------------------------------------------------
+   Antes tenia un checkbox "Mostrar archivados". Ahora es un boton
+   que abre/cierra el PanelArchivados. Si no hay archivados, el
+   boton no se renderiza.
    ============================================================ */
 function FiltrosBar({
   busqueda, setBusqueda,
   filtroProfesional, setFiltroProfesional,
   filtroMetodo, setFiltroMetodo,
-  mostrarArchivados, setMostrarArchivados,
-  profesionales, metodos, archivadosTotal,
+  profesionales, metodos,
+  archivadosTotal, verArchivados, onToggleArchivados,
 }) {
   return (
     <div className="cp-filtros">
@@ -409,21 +455,94 @@ function FiltrosBar({
       </select>
 
       {archivadosTotal > 0 && (
-        <label className="cp-filtros__check">
-          <input
-            type="checkbox"
-            checked={mostrarArchivados}
-            onChange={(e) => setMostrarArchivados(e.target.checked)}
-          />
-          Mostrar archivados
-        </label>
+        <button
+          type="button"
+          className={`cp-archivados-btn ${verArchivados ? 'cp-archivados-btn--active' : ''}`}
+          onClick={onToggleArchivados}
+        >
+          <FolderIcon />
+          {verArchivados ? 'Ocultar archivados' : 'Ver pacientes archivados'}
+          <span className="cp-archivados-btn__count">{archivadosTotal}</span>
+        </button>
       )}
     </div>
   );
 }
 
 /* ============================================================
-   Tabla de pacientes
+   Panel de archivados (desplegable)
+   ----------------------------------------------------------------
+   Aparece arriba de la tabla principal cuando el admin clickea
+   "Ver pacientes archivados". Lista cada paciente archivado con
+   sus datos basicos y un boton "Reactivar". Es independiente de
+   la tabla principal: filtros y busqueda no afectan a este panel
+   (intencional, asi el admin siempre ve la lista completa de
+   archivados sin tener que limpiar filtros).
+   ============================================================ */
+function PanelArchivados({ pacientes, mapaProfesionales, mapaMetodos, onReactivar, onCerrar }) {
+  return (
+    <div className="cp-archivados-panel">
+      <div className="cp-archivados-panel__head">
+        <div>
+          <h3 className="cp-archivados-panel__title">
+            <FolderIcon />
+            Pacientes archivados
+            <span className="cp-archivados-panel__count">{pacientes.length}</span>
+          </h3>
+          <p className="cp-archivados-panel__hint">
+            Estos pacientes no aparecen en la tabla principal ni en búsquedas activas.
+            Podés reactivarlos cuando quieras.
+          </p>
+        </div>
+        <button
+          type="button"
+          className="cp-archivados-panel__close"
+          onClick={onCerrar}
+          aria-label="Cerrar panel"
+        >
+          ×
+        </button>
+      </div>
+
+      <ul className="cp-archivados-panel__list">
+        {pacientes.map((p) => {
+          const prof = mapaProfesionales[p.profesionalUid];
+          const metodo = mapaMetodos[p.metodoPagoId];
+          return (
+            <li key={p.id} className="cp-archivado-row">
+              <div className="cp-archivado-row__main">
+                <Avatar initials={iniciales(p.nombre, p.apellido)} size={32} />
+                <div className="cp-archivado-row__info">
+                  <div className="cp-archivado-row__name">
+                    {nombreCompleto(p)}
+                  </div>
+                  <div className="cp-archivado-row__meta">
+                    {p.dni ? `DNI ${p.dni}` : 'Sin DNI'}
+                    {' · '}
+                    {prof ? (prof.displayName || prof.email) : 'Sin profesional'}
+                    {metodo && ` · ${metodo.nombre}`}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="cp-archivado-row__btn"
+                onClick={() => onReactivar(p)}
+                title="Reactivar paciente"
+              >
+                <RotateIcon />
+                Reactivar
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+/* ============================================================
+   Tabla de pacientes (solo activos ahora)
    ============================================================ */
 function PacientesTabla({
   pacientes,
@@ -431,7 +550,6 @@ function PacientesTabla({
   mapaMetodos,
   onEditar,
   onArchivar,
-  onReactivar,
 }) {
   return (
     <div className="cp-table-wrap">
@@ -450,20 +568,16 @@ function PacientesTabla({
           {pacientes.map((p) => {
             const prof = mapaProfesionales[p.profesionalUid];
             const metodo = mapaMetodos[p.metodoPagoId];
-            // Valor siempre viene del método. Compat con pacientes viejos
-            // que tenían valorSesionCustom: lo ignoramos, priorizamos el método.
             const valor = metodo?.valorSesionDefault ?? 0;
-            const archivado = p.estado === ESTADOS_PACIENTE.ARCHIVADO;
 
             return (
-              <tr key={p.id} className={archivado ? 'cp-pac-row--archivado' : ''}>
+              <tr key={p.id}>
                 <td>
                   <div className="cp-prof-cell">
                     <Avatar initials={iniciales(p.nombre, p.apellido)} size={32} />
                     <div>
                       <div className="cp-prof-name">
                         {nombreCompleto(p)}
-                        {archivado && <Badge tone="neutral" style={{ marginLeft: 8 }}>Archivado</Badge>}
                       </div>
                       <div className="cp-prof-meta">
                         {p.dni ? `DNI ${p.dni}` : ''}
@@ -491,30 +605,90 @@ function PacientesTabla({
                   >
                     <EditIcon />
                   </button>
-                  {archivado ? (
-                    <button
-                      className="cp-prof-action"
-                      onClick={() => onReactivar(p)}
-                      style={{ marginLeft: 6 }}
-                    >
-                      Reactivar
-                    </button>
-                  ) : (
-                    <button
-                      className="cp-prof-action"
-                      onClick={() => onArchivar(p)}
-                      style={{ marginLeft: 6 }}
-                      title="Archivar"
-                    >
-                      <ArchiveIcon />
-                    </button>
-                  )}
+                  <button
+                    className="cp-prof-action"
+                    onClick={() => onArchivar(p)}
+                    style={{ marginLeft: 6 }}
+                    title="Archivar"
+                  >
+                    <ArchiveIcon />
+                  </button>
                 </td>
               </tr>
             );
           })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/* ============================================================
+   Modal de confirmacion de archivado
+   ----------------------------------------------------------------
+   Reemplaza al confirm() nativo. Sigue el patron visual del resto
+   de modales del sistema (cp-modal-overlay + cp-modal). Sin
+   eliminacion ni timer — solo confirmacion clara con copy explicando
+   que el paciente queda archivado y se puede reactivar despues.
+   ============================================================ */
+function ConfirmarArchivadoModal({ paciente, onCancelar, onConfirmar }) {
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleArchivar() {
+    setSubmitting(true);
+    try {
+      await onConfirmar();
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="cp-modal-overlay" onClick={onCancelar}>
+      <div className="cp-modal cp-modal--confirm-archive" onClick={(e) => e.stopPropagation()}>
+        <button
+          className="cp-modal__close"
+          onClick={onCancelar}
+          aria-label="Cerrar"
+          disabled={submitting}
+        >
+          ×
+        </button>
+
+        <div className="cp-confirm-archive__icon">
+          <ArchiveIcon />
+        </div>
+
+        <h2 className="cp-modal__title">
+          ¿Archivar a {nombreCompleto(paciente)}?
+        </h2>
+        <p className="cp-modal__sub">
+          El paciente dejará de aparecer en las búsquedas y listados activos.
+          Toda su información queda guardada y vas a poder reactivarlo desde{' '}
+          <strong>Ver pacientes archivados</strong> cuando quieras.
+        </p>
+
+        <div className="cp-modal__actions">
+          <Button
+            variant="secondary"
+            type="button"
+            onClick={onCancelar}
+            disabled={submitting}
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="primary"
+            type="button"
+            onClick={handleArchivar}
+            disabled={submitting}
+          >
+            {submitting
+              ? <><Spinner size={14} /> Archivando…</>
+              : 'Archivar'}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -559,7 +733,6 @@ function PacienteModal({ paciente, profesionales, metodos, onClose, onGuardar })
         obraSocialNumero: form.obraSocialNumero,
         profesionalUid: form.profesionalUid,
         metodoPagoId: form.metodoPagoId,
-        // valorSesionCustom ya no se setea desde acá — siempre usa el default del método
         valorSesionCustom: null,
         notas: form.notas,
       });
