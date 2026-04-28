@@ -31,8 +31,24 @@ service cloud.firestore {
       return tengoDoc() && miUsuario().rol == 'profesional';
     }
 
+    /**
+     * esAdminDe(): chequea que el caller sea admin Y que efectivamente
+     * pertenezca al consultorio (esté en adminUids[] del doc del consultorio).
+     *
+     * Defensa en profundidad para multi-admin: no alcanza con que el doc
+     * de usuario diga consultorioId=X y rol=admin. Tambien tiene que
+     * estar listado en /consultorios/X/adminUids. Si algun dia los
+     * datos quedan inconsistentes (ej: alguien edita /usuarios/{uid}.consultorioId
+     * a mano sin invitarlo al consultorio), no se le da acceso.
+     *
+     * El acceso al doc del consultorio cuesta una read extra por cada
+     * validacion, pero es aceptable: las rules cachean reads dentro de
+     * la misma evaluacion, y los docs de consultorios son chicos.
+     */
     function esAdminDe(consultorioIdDelRecurso) {
-      return esAdmin() && miUsuario().consultorioId == consultorioIdDelRecurso;
+      return esAdmin()
+        && miUsuario().consultorioId == consultorioIdDelRecurso
+        && request.auth.uid in get(/databases/$(database)/documents/consultorios/$(consultorioIdDelRecurso)).data.adminUids;
     }
 
     function esProfesionalDe(consultorioIdDelRecurso) {
@@ -101,15 +117,51 @@ service cloud.firestore {
         && request.resource.data.plan == 'free'
         && request.resource.data.estado == 'activo';
 
+      /*
+        Update del consultorio. Casos validos:
+
+        1. SUPERADMIN — puede tocar cualquier cosa.
+
+        2. ADMIN del consultorio — puede:
+           a. Editar campos basicos (nombre, direccion, metodos de pago,
+              CBU, etc.) sin tocar campos sensibles ni admins.
+           b. Modificar el array adminUids (agregar nuevos admins o
+              remover existentes), siempre que:
+              - El ownerUid se mantenga sin cambios (transferencia
+                de ownership es un caso separado).
+              - El nuevo adminUids siga conteniendo al ownerUid (no
+                podes "destronar" al owner removiendolo de admins).
+              - El nuevo adminUids no quede vacio (defensa basica).
+
+        3. OWNER del consultorio (ownerUid actual) — ademas de lo anterior,
+           puede transferir ownership cambiando ownerUid, siempre que el
+           nuevo owner este en el adminUids resultante.
+
+        Campos siempre blindados (solo superadmin los toca):
+           plan, planVenceEn, comisionConsulpay, mpConfig, ualaConfig, estado.
+      */
       allow update: if esSuperadmin()
         || (esAdminDe(consultorioId)
+            // Campos siempre blindados
             && request.resource.data.plan == resource.data.plan
             && request.resource.data.planVenceEn == resource.data.planVenceEn
             && request.resource.data.comisionConsulpay == resource.data.comisionConsulpay
             && request.resource.data.mpConfig == resource.data.mpConfig
             && request.resource.data.ualaConfig == resource.data.ualaConfig
-            && request.resource.data.ownerUid == resource.data.ownerUid
-            && request.resource.data.estado == resource.data.estado);
+            && request.resource.data.estado == resource.data.estado
+            // Reglas sobre owner y admins:
+            && (
+              // Caso a + b: cualquier admin puede tocar adminUids,
+              // pero ownerUid se mantiene
+              (request.resource.data.ownerUid == resource.data.ownerUid
+                && request.resource.data.ownerUid in request.resource.data.adminUids
+                && request.resource.data.adminUids.size() >= 1)
+              ||
+              // Caso c: solo el owner actual puede transferir ownership
+              (resource.data.ownerUid == request.auth.uid
+                && request.resource.data.ownerUid in request.resource.data.adminUids
+                && request.resource.data.adminUids.size() >= 1)
+            ));
 
       allow delete: if esSuperadmin();
     }

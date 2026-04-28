@@ -221,14 +221,26 @@ export default async function handler(req, res) {
   const emailLower = email.trim().toLowerCase();
   const db = getFirestore();
 
-  // Verificar que el usuario autenticado sea admin del consultorio indicado
+  // Verificar que el usuario autenticado sea admin del consultorio indicado.
+  // Chequeamos las DOS condiciones (igual que firestore.rules / esAdminDe):
+  //  - userData.consultorioId == consultorioId (el consultorio activo del user)
+  //  - uid esta listado en consultorios/{consultorioId}.adminUids[]
+  // Esto previene casos inconsistentes donde alguien edita /usuarios a mano
+  // sin agregar el uid al array de admins del consultorio.
   const userDoc = await db.collection('usuarios').doc(uid).get();
   if (!userDoc.exists) {
     return jsonResponse(res, 403, { error: 'Tu usuario no existe.' });
   }
   const userData = userDoc.data();
   const esSuperadmin = userData.rol === 'superadmin';
-  const esAdminDelConsultorio = userData.rol === 'admin' && userData.consultorioId === consultorioId;
+
+  let esAdminDelConsultorio = false;
+  if (!esSuperadmin && userData.rol === 'admin' && userData.consultorioId === consultorioId) {
+    const consDoc = await db.collection('consultorios').doc(consultorioId).get();
+    const adminUids = consDoc.exists ? (consDoc.data().adminUids || []) : [];
+    esAdminDelConsultorio = adminUids.includes(uid);
+  }
+
   if (!esSuperadmin && !esAdminDelConsultorio) {
     return jsonResponse(res, 403, { error: 'No sos admin de ese consultorio.' });
   }
