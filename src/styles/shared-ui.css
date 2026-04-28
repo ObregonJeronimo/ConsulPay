@@ -318,3 +318,38 @@
 
 .cc-toggle--on { background: var(--cp-accent); }
 .cc-toggle--on .cc-toggle__thumb { transform: translateX(16px); }
+
+/* ============================================================
+   Avisos de deuda (M4 retiro)
+   ----------------------------------------------------------------
+   Reusados desde:
+     - Modal RetirarProfesionalModal (admin retira)
+     - Modal SalirConsultorioModal (profesional auto-retira)
+   ============================================================ */
+
+.cp-retiro-deuda-aviso {
+  margin-top: 16px;
+  padding: 12px 14px;
+  background: var(--cp-danger-bg);
+  border: 1px solid var(--cp-danger);
+  border-radius: var(--cp-radius-md);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--cp-danger);
+  text-align: left;
+}
+
+.cp-retiro-deuda-aviso strong {
+  color: var(--cp-danger);
+}
+
+.cp-retiro-deuda-ok {
+  margin-top: 16px;
+  padding: 10px 14px;
+  background: var(--cp-success-bg);
+  border: 1px solid var(--cp-success);
+  border-radius: var(--cp-radius-md);
+  font-size: 13px;
+  color: var(--cp-success);
+  text-align: left;
+}
