@@ -153,10 +153,10 @@ service cloud.firestore {
            plan, planVenceEn, comisionConsulpay,
            mpIntegrado, mpConfig, ualaIntegrado, ualaConfig, estado.
 
-        Los campos mp*/uala* los escribe el backend via firebase-admin
-        (que saltea las rules) cuando el admin completa el OAuth o
-        desconecta. La rule no permite que el frontend los modifique
-        directamente.
+        Los campos de mpConfig y ualaConfig los escribe el backend
+        via firebase-admin (que saltea las rules) cuando el admin
+        completa el OAuth o desconecta. La rule no permite que el
+        frontend los modifique directamente.
       */
       allow update: if esSuperadmin()
         || (esAdminDe(consultorioId)
