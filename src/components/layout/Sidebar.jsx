@@ -29,9 +29,19 @@ const Icon = {
       <path d="M3 10h18M7 15h2m4 0h4M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
     </svg>
   ),
-  Heart: () => (
+  /*
+    UserPlus: persona con un + al lado. Reemplaza al icono "Heart"
+    anterior, que era inadecuado para representar pacientes (un
+    consultorio es un contexto medico, no afectivo). Usamos el
+    UserPlus de Feather Icons (mismo set visual que el resto del
+    sidebar) para mantener coherencia.
+  */
+  UserPlus: () => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
+      <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+      <circle cx="8.5" cy="7" r="4" />
+      <line x1="20" y1="8" x2="20" y2="14" />
+      <line x1="23" y1="11" x2="17" y2="11" />
     </svg>
   ),
   Inbox: () => (
@@ -137,7 +147,7 @@ export default function Sidebar() {
               Solicitudes
             </NavItem>
             <NavItem to="/admin/pagos" icon={<Icon.Wallet />}>Pagos</NavItem>
-            <NavItem to="/admin/pacientes" icon={<Icon.Heart />}>Pacientes</NavItem>
+            <NavItem to="/admin/pacientes" icon={<Icon.UserPlus />}>Pacientes</NavItem>
           </nav>
 
           <nav className="cp-sidebar__section">
@@ -149,7 +159,7 @@ export default function Sidebar() {
         <nav className="cp-sidebar__section">
           <div className="cp-sidebar__label">Mi cuenta</div>
           <NavItem to="/mi-panel" end icon={<Icon.Home />}>Resumen</NavItem>
-          <NavItem to="/mi-panel/pacientes" icon={<Icon.Heart />}>Mis pacientes</NavItem>
+          <NavItem to="/mi-panel/pacientes" icon={<Icon.UserPlus />}>Mis pacientes</NavItem>
           <NavItem to="/mi-panel/sesiones" icon={<Icon.Calendar />}>Mis sesiones</NavItem>
           <NavItem to="/mi-panel/pagos" icon={<Icon.Wallet />}>Mis pagos</NavItem>
         </nav>
