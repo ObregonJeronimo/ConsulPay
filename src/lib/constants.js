@@ -18,6 +18,9 @@ export const ESTADOS_USUARIO = {
   ACTIVO: 'activo',
   PENDIENTE: 'pendiente',     // Profesional invitado que aún no fue aceptado por admin
   SUSPENDIDO: 'suspendido',   // Deshabilitado manualmente
+  RETIRADO: 'retirado',       // Profesional que dejó el consultorio (soft-delete).
+                              // Sus registros historicos (sesiones, pagos) se preservan.
+                              // No puede crear nuevas sesiones ni iniciar sesion en el panel.
 };
 
 /* ============================================================
