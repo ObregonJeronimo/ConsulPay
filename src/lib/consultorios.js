@@ -8,6 +8,7 @@
 import { doc, runTransaction, serverTimestamp } from 'firebase/firestore';
 
 import { db } from './firebase.js';
+import { obtenerConfigGlobal } from './configGlobal.js';
 import { ESTADOS_CONSULTORIO, ESTADOS_USUARIO, PLANES, ROLES } from './constants.js';
 
 /**
@@ -45,6 +46,18 @@ export async function crearConsultorio(params) {
   if (!ownerUid) throw new Error('ownerUid requerido');
   if (!nombreConsultorio?.trim()) throw new Error('El nombre del consultorio es obligatorio');
 
+  // Leemos la comision global del plan free ANTES de la transaction.
+  // Si no existe el doc /config/global, usa los defaults de fabrica (6%).
+  // Es una lectura mas, pero no es critica — si falla, igual creamos el
+  // consultorio con el default del plan.
+  let comisionInicial = 6; // fallback en caso de error de red al leer config
+  try {
+    const configGlobal = await obtenerConfigGlobal();
+    comisionInicial = configGlobal.comisionFree;
+  } catch (err) {
+    console.warn('No se pudo leer config global, usando default 6%:', err);
+  }
+
   // Genero un id nuevo para el consultorio
   const consultorioRef = doc(db, 'consultorios', crypto.randomUUID());
   const userRef = doc(db, 'usuarios', ownerUid);
@@ -75,7 +88,7 @@ export async function crearConsultorio(params) {
       adminUids: [ownerUid],
       plan: PLANES.FREE,
       planVenceEn: null,
-      comisionConsulpay: 6, // 6% en free
+      comisionConsulpay: comisionInicial,
       mpIntegrado: false,
       mpConfig: null,
       ualaIntegrado: false,

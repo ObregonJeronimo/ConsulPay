@@ -353,3 +353,27 @@
   color: var(--cp-success);
   text-align: left;
 }
+
+/* ============================================================
+   Avisos genericos de error y exito de formulario.
+   Originalmente vivian en Configuracion.css (admin), pero los reusamos
+   tambien desde paginas super-admin asi que los movimos aca.
+   ============================================================ */
+
+.cp-config-error {
+  background: var(--cp-danger-bg);
+  color: var(--cp-danger);
+  border-radius: var(--cp-radius-md);
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.cp-config-ok {
+  background: var(--cp-success-bg);
+  border: 1px solid var(--cp-success);
+  color: var(--cp-success);
+  padding: 10px 14px;
+  border-radius: var(--cp-radius-md);
+  font-size: 13.5px;
+}

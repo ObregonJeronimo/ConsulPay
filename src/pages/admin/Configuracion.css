@@ -116,14 +116,7 @@
   .cp-config-block { padding: 20px 22px; }
 }
 
-.cp-config-error {
-  background: var(--cp-danger-bg);
-  color: var(--cp-danger);
-  border-radius: var(--cp-radius-md);
-  padding: 10px 14px;
-  font-size: 13px;
-  line-height: 1.4;
-}
+/* .cp-config-error movido a shared-ui.css para reutilizacion */
 
 .cp-config-footer {
   display: flex;
@@ -372,14 +365,7 @@
    Tab Administradores
    ============================================================ */
 
-.cp-config-ok {
-  background: var(--cp-success-bg);
-  border: 1px solid var(--cp-success);
-  color: var(--cp-success);
-  padding: 10px 14px;
-  border-radius: var(--cp-radius-md);
-  font-size: 13.5px;
-}
+/* .cp-config-ok movido a shared-ui.css para reutilizacion */
 
 .cp-admins-list {
   list-style: none;

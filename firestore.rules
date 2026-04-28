@@ -398,6 +398,23 @@ service cloud.firestore {
     }
 
     // ============================================================
+    //  /config/{docId}
+    //  ----------------------------------------------------------------
+    //  Configuracion global de la plataforma. Por ahora solo existe
+    //  /config/global que tiene comisionFree y comisionPro.
+    //
+    //  Cualquier user autenticado puede leer (porque el frontend de
+    //  "crear consultorio" la consulta para inicializar el campo
+    //  comisionConsulpay del consultorio nuevo).
+    //
+    //  Solo el superadmin escribe (cambia las comisiones globales).
+    // ============================================================
+    match /config/{docId} {
+      allow read: if estaAutenticado();
+      allow write: if esSuperadmin();
+    }
+
+    // ============================================================
     //  Todo lo demas: bloqueado.
     // ============================================================
   }
