@@ -367,3 +367,198 @@
   font-weight: 500;
   color: var(--cp-text);
 }
+
+/* ============================================================
+   Tab Administradores
+   ============================================================ */
+
+.cp-config-ok {
+  background: var(--cp-success-bg);
+  border: 1px solid var(--cp-success);
+  color: var(--cp-success);
+  padding: 10px 14px;
+  border-radius: var(--cp-radius-md);
+  font-size: 13.5px;
+}
+
+.cp-admins-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cp-admin-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  transition: border-color var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-admin-row:hover {
+  border-color: var(--cp-border-strong);
+}
+
+.cp-admin-row__main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.cp-admin-row__info {
+  min-width: 0;
+}
+
+.cp-admin-row__name {
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--cp-text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cp-admin-row__email {
+  font-size: 12.5px;
+  color: var(--cp-text-muted);
+  margin-top: 2px;
+}
+
+.cp-admin-row__actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.cp-admin-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--cp-radius-pill);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.cp-admin-badge--owner {
+  background: var(--cp-accent-bg);
+  color: var(--cp-accent-dark);
+}
+
+.cp-admin-badge--you {
+  background: var(--cp-surface-sunken);
+  color: var(--cp-text-muted);
+}
+
+.cp-admin-action {
+  background: transparent;
+  border: 1px solid var(--cp-border-strong);
+  border-radius: var(--cp-radius-sm);
+  padding: 6px 12px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-admin-action--neutral {
+  color: var(--cp-text);
+}
+
+.cp-admin-action--neutral:hover {
+  background: var(--cp-surface-hover);
+  border-color: var(--cp-text-muted);
+}
+
+.cp-admin-action--danger {
+  color: var(--cp-danger);
+  border-color: var(--cp-danger);
+}
+
+.cp-admin-action--danger:hover {
+  background: var(--cp-danger-bg);
+}
+
+.cp-admins-divider {
+  border: none;
+  border-top: 1px solid var(--cp-border);
+  margin: 28px 0;
+}
+
+.cp-admins-promote__title {
+  font-family: var(--cp-font-serif);
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin: 0 0 6px;
+}
+
+.cp-admins-promote__hint {
+  font-size: 13px;
+  color: var(--cp-text-muted);
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+
+.cp-admins-promote__row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.cp-admins-promote__row .cp-select {
+  flex: 1;
+  min-width: 220px;
+}
+
+.cp-admins-promote__empty {
+  background: var(--cp-surface-sunken);
+  border: 1px dashed var(--cp-border-strong);
+  padding: 20px;
+  text-align: center;
+  border-radius: var(--cp-radius-md);
+  color: var(--cp-text-muted);
+  font-size: 13px;
+}
+
+/* ============================================================
+   Modal de confirmacion de accion sobre admin
+   (remover / transferir ownership)
+   ============================================================ */
+.cp-modal--confirm-admin {
+  max-width: 460px;
+}
+
+.cp-modal--confirm-admin .cp-modal__sub {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--cp-text-muted);
+}
+
+.cp-modal--confirm-admin .cp-modal__sub strong {
+  color: var(--cp-text);
+}
+
+/* Mobile */
+@media (max-width: 640px) {
+  .cp-admin-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .cp-admin-row__actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}

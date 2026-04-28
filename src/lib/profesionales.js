@@ -17,6 +17,10 @@ import { ESTADOS_USUARIO, ROLES } from './constants.js';
 /**
  * Suscripción en vivo a los profesionales del consultorio.
  * Incluye activos y suspendidos (la UI los separa visualmente).
+ *
+ * NOTA: filtra solo por rol=profesional. Si necesitas TODOS los
+ * miembros (incluyendo admins del consultorio), usa
+ * suscribirMiembrosConsultorio().
  */
 export function suscribirProfesionales(consultorioId, callback) {
   const q = query(
@@ -36,6 +40,35 @@ export function suscribirProfesionales(consultorioId, callback) {
     callback(profesionales);
   }, (err) => {
     console.error('Error en suscripción de profesionales:', err);
+    callback([]);
+  });
+}
+
+/**
+ * Suscripción en vivo a TODOS los miembros del consultorio (admins +
+ * profesionales). Para la UI de gestion de admins (M3) que necesita
+ * mostrar la lista de admins actuales y los profesionales que se
+ * pueden promover.
+ *
+ * NO filtra por rol — devuelve todos los users con el consultorioId
+ * dado. La UI separa por rol y por estar/no estar en adminUids.
+ */
+export function suscribirMiembrosConsultorio(consultorioId, callback) {
+  const q = query(
+    collection(db, 'usuarios'),
+    where('consultorioId', '==', consultorioId),
+  );
+
+  return onSnapshot(q, (snap) => {
+    const miembros = snap.docs.map((d) => ({ uid: d.id, ...d.data() }));
+    miembros.sort((a, b) => {
+      const aT = a.createdAt?.toMillis?.() ?? 0;
+      const bT = b.createdAt?.toMillis?.() ?? 0;
+      return bT - aT;
+    });
+    callback(miembros);
+  }, (err) => {
+    console.error('Error en suscripción de miembros del consultorio:', err);
     callback([]);
   });
 }

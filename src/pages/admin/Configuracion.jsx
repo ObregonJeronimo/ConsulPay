@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 
+import Avatar from '../../components/ui/Avatar.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Input from '../../components/ui/Input.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
@@ -7,15 +8,23 @@ import Spinner from '../../components/ui/Spinner.jsx';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useConsultorio } from '../../hooks/useConsultorio.js';
 import {
+  ESTADOS_USUARIO,
   formatoARS,
   LABELS_TIPO_METODO,
+  ROLES,
   TIPOS_METODO_PAGO,
 } from '../../lib/constants.js';
+import {
+  promoverAAdmin,
+  removerAdmin,
+  transferirOwnership,
+} from '../../lib/admins.js';
 import {
   actualizarDatosConsultorio,
   actualizarMetodosPago,
   slugFromNombre,
 } from '../../lib/configuracion.js';
+import { suscribirMiembrosConsultorio } from '../../lib/profesionales.js';
 import {
   formatearCUIT,
   soloDigitosCBU,
@@ -116,6 +125,13 @@ export default function Configuracion() {
           <span className="cp-tab__count">{consultorio.metodosPagoPaciente?.length ?? 0}</span>
           {dirtyMetodos && <span className="cp-tab__dot" aria-label="cambios sin guardar" />}
         </button>
+        <button
+          className={`cp-tab ${tab === 'admins' ? 'cp-tab--active' : ''}`}
+          onClick={() => intentarCambiarTab('admins')}
+        >
+          Administradores
+          <span className="cp-tab__count">{consultorio.adminUids?.length ?? 0}</span>
+        </button>
       </div>
 
       {tab === 'datos' && (
@@ -131,6 +147,13 @@ export default function Configuracion() {
           metodos={consultorio.metodosPagoPaciente ?? []}
           consultorioId={user.consultorioId}
           onDirtyChange={setDirtyMetodos}
+        />
+      )}
+
+      {tab === 'admins' && (
+        <TabAdministradores
+          consultorio={consultorio}
+          callerUid={user.uid}
         />
       )}
     </div>
@@ -675,6 +698,362 @@ function ModalNuevoMetodo({ onClose, onAgregar }) {
             <Button variant="primary" type="submit">Agregar método</Button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   Tab: Administradores
+   ----------------------------------------------------------------
+   Permite gestionar quienes son admins del consultorio. Tres acciones:
+     - Promover a un profesional a admin
+     - Remover a un admin (ex-admin baja a profesional)
+     - Transferir ownership (solo el owner actual puede)
+
+   Reglas de permisos en la UI:
+     - Cualquier admin ve la lista y puede promover/remover
+     - Solo el owner ve el boton "Transferir ownership"
+     - Nadie puede remover al owner (las rules tambien lo bloquean)
+     - Si quedaria un solo admin, no se puede remover (las rules lo bloquean)
+   ============================================================ */
+
+function inicialesNombre(p) {
+  const nombre = p.displayName || p.email || '';
+  const partes = nombre.trim().split(/\s+/);
+  if (partes.length >= 2) {
+    return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase();
+  }
+  return (nombre[0] || '·').toUpperCase();
+}
+
+function nombreVisible(p) {
+  return p.displayName || p.email || `Usuario ${p.uid.slice(0, 6)}`;
+}
+
+function TabAdministradores({ consultorio, callerUid }) {
+  const [miembros, setMiembros] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const [accion, setAccion] = useState(null); // { tipo: 'remover'|'transferir'|'promover', uid? }
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [okMsg, setOkMsg] = useState('');
+  const [profesionalAPromover, setProfesionalAPromover] = useState('');
+
+  useEffect(() => {
+    const unsub = suscribirMiembrosConsultorio(consultorio.id, (lista) => {
+      setMiembros(lista);
+      setCargando(false);
+    });
+    return unsub;
+  }, [consultorio.id]);
+
+  const adminUids = useMemo(() => consultorio.adminUids || [], [consultorio.adminUids]);
+  const ownerUid = consultorio.ownerUid;
+
+  // Mapa uid -> miembro para lookups rapidos
+  const mapMiembros = useMemo(() => {
+    const m = {};
+    for (const x of miembros) m[x.uid] = x;
+    return m;
+  }, [miembros]);
+
+  // Lista ordenada de admins: owner primero, despues el resto por nombre
+  const admins = useMemo(() => {
+    const owner = mapMiembros[ownerUid];
+    const otros = adminUids
+      .filter((uid) => uid !== ownerUid)
+      .map((uid) => mapMiembros[uid])
+      .filter(Boolean)
+      .sort((a, b) => nombreVisible(a).localeCompare(nombreVisible(b), 'es'));
+    return owner ? [owner, ...otros] : otros;
+  }, [adminUids, ownerUid, mapMiembros]);
+
+  // Profesionales activos del consultorio que NO son admins (candidatos a promover)
+  const profesionalesPromocionables = useMemo(() => {
+    return miembros.filter((m) =>
+      m.rol === ROLES.PROFESIONAL
+      && m.estado === ESTADOS_USUARIO.ACTIVO
+      && !adminUids.includes(m.uid)
+    );
+  }, [miembros, adminUids]);
+
+  const callerEsOwner = callerUid === ownerUid;
+
+  function limpiarFeedback() {
+    setError('');
+    setOkMsg('');
+  }
+
+  /* ---- Handlers ---- */
+
+  async function handlePromover() {
+    if (!profesionalAPromover) return;
+    limpiarFeedback();
+    setSubmitting(true);
+    try {
+      const profesional = mapMiembros[profesionalAPromover];
+      const nombre = profesional ? nombreVisible(profesional) : 'el profesional';
+      await promoverAAdmin({
+        consultorioId: consultorio.id,
+        callerUid,
+        nuevoUid: profesionalAPromover,
+      });
+      setOkMsg(`${nombre} fue promovido a administrador.`);
+      setProfesionalAPromover('');
+    } catch (err) {
+      setError(err.message || 'No se pudo promover.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleRemover() {
+    if (!accion || accion.tipo !== 'remover') return;
+    limpiarFeedback();
+    setSubmitting(true);
+    try {
+      await removerAdmin({
+        consultorioId: consultorio.id,
+        callerUid,
+        uidARemover: accion.uid,
+      });
+      const removido = mapMiembros[accion.uid];
+      const nombre = removido ? nombreVisible(removido) : 'El administrador';
+      setOkMsg(`${nombre} ya no es administrador.`);
+      setAccion(null);
+    } catch (err) {
+      setError(err.message || 'No se pudo remover.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleTransferir() {
+    if (!accion || accion.tipo !== 'transferir') return;
+    limpiarFeedback();
+    setSubmitting(true);
+    try {
+      await transferirOwnership({
+        consultorioId: consultorio.id,
+        callerUid,
+        nuevoOwnerUid: accion.uid,
+      });
+      const nuevo = mapMiembros[accion.uid];
+      const nombre = nuevo ? nombreVisible(nuevo) : 'El nuevo dueño';
+      setOkMsg(`Ahora ${nombre} es el dueño del consultorio.`);
+      setAccion(null);
+    } catch (err) {
+      setError(err.message || 'No se pudo transferir.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (cargando) {
+    return (
+      <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}>
+        <Spinner size={20} label="Cargando administradores…" />
+      </div>
+    );
+  }
+
+  return (
+    <section className="cp-config-section">
+      <header className="cp-config-section__head">
+        <h2 className="cp-config-section__title">Administradores del consultorio</h2>
+        <p className="cp-config-section__sub">
+          Las personas con acceso completo a la gestión del consultorio.
+          {callerEsOwner
+            ? ' Sos el dueño del consultorio.'
+            : ' Sos administrador del consultorio.'}
+        </p>
+      </header>
+
+      {error && <div className="cp-config-error" role="alert">{error}</div>}
+      {okMsg && <div className="cp-config-ok" role="status">{okMsg}</div>}
+
+      <ul className="cp-admins-list">
+        {admins.map((admin) => {
+          const esOwner = admin.uid === ownerUid;
+          const esCaller = admin.uid === callerUid;
+          const puedeRemover = !esOwner; // El owner no se puede remover
+          const puedeTransferirA = callerEsOwner && !esOwner; // Solo el owner transfiere, y solo a no-owner
+
+          return (
+            <li key={admin.uid} className="cp-admin-row">
+              <div className="cp-admin-row__main">
+                <Avatar initials={inicialesNombre(admin)} size={36} />
+                <div className="cp-admin-row__info">
+                  <div className="cp-admin-row__name">
+                    {nombreVisible(admin)}
+                    {esOwner && <span className="cp-admin-badge cp-admin-badge--owner">Dueño</span>}
+                    {esCaller && <span className="cp-admin-badge cp-admin-badge--you">Vos</span>}
+                  </div>
+                  <div className="cp-admin-row__email">{admin.email}</div>
+                </div>
+              </div>
+
+              <div className="cp-admin-row__actions">
+                {puedeTransferirA && (
+                  <button
+                    type="button"
+                    className="cp-admin-action cp-admin-action--neutral"
+                    onClick={() => { limpiarFeedback(); setAccion({ tipo: 'transferir', uid: admin.uid }); }}
+                  >
+                    Transferir ownership
+                  </button>
+                )}
+                {puedeRemover && (
+                  <button
+                    type="button"
+                    className="cp-admin-action cp-admin-action--danger"
+                    onClick={() => { limpiarFeedback(); setAccion({ tipo: 'remover', uid: admin.uid }); }}
+                  >
+                    {esCaller ? 'Salir como admin' : 'Remover admin'}
+                  </button>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+
+      <hr className="cp-admins-divider" />
+
+      <div className="cp-admins-promote">
+        <h3 className="cp-admins-promote__title">Promover a un profesional a administrador</h3>
+        <p className="cp-admins-promote__hint">
+          Solo aparecen los profesionales activos del consultorio. Si querés invitar a alguien
+          de afuera, primero invítalo como profesional desde la sección de Profesionales.
+        </p>
+
+        {profesionalesPromocionables.length === 0 ? (
+          <div className="cp-admins-promote__empty">
+            No hay profesionales activos para promover en este momento.
+          </div>
+        ) : (
+          <div className="cp-admins-promote__row">
+            <select
+              className="cp-select"
+              value={profesionalAPromover}
+              onChange={(e) => setProfesionalAPromover(e.target.value)}
+              disabled={submitting}
+            >
+              <option value="">Elegí un profesional…</option>
+              {profesionalesPromocionables.map((p) => (
+                <option key={p.uid} value={p.uid}>
+                  {nombreVisible(p)} {p.email ? `· ${p.email}` : ''}
+                </option>
+              ))}
+            </select>
+            <Button
+              variant="primary"
+              type="button"
+              onClick={handlePromover}
+              disabled={!profesionalAPromover || submitting}
+            >
+              {submitting && accion === null ? 'Promoviendo…' : 'Promover a admin'}
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Modal de confirmacion de remover admin */}
+      {accion?.tipo === 'remover' && (
+        <ConfirmarAccionAdminModal
+          titulo={
+            accion.uid === callerUid
+              ? '¿Salir como administrador?'
+              : `¿Remover a ${nombreVisible(mapMiembros[accion.uid] || {})} como administrador?`
+          }
+          descripcion={
+            accion.uid === callerUid
+              ? 'Vas a perder el acceso al panel de administración del consultorio. Volverás a ser un profesional, pero seguirás trabajando en el consultorio. Otro administrador podrá volver a promoverte si querés.'
+              : 'El usuario va a dejar de ser administrador y volverá a ser profesional del consultorio. Sus sesiones, pacientes y registros se mantienen intactos.'
+          }
+          textoAccion={accion.uid === callerUid ? 'Salir' : 'Remover'}
+          onCancelar={() => setAccion(null)}
+          onConfirmar={handleRemover}
+          submitting={submitting}
+          variantePeligrosa
+        />
+      )}
+
+      {/* Modal de confirmacion de transferencia de ownership */}
+      {accion?.tipo === 'transferir' && (
+        <ConfirmarAccionAdminModal
+          titulo={`¿Transferir ownership a ${nombreVisible(mapMiembros[accion.uid] || {})}?`}
+          descripcion={
+            <>
+              Vas a dejar de ser el dueño del consultorio. {nombreVisible(mapMiembros[accion.uid] || {})}{' '}
+              pasará a ser el nuevo dueño y va a poder, entre otras cosas, transferir
+              el ownership a otra persona o expulsarte del rol de administrador.
+              <br /><br />
+              <strong>Esta acción no se puede deshacer salvo que el nuevo dueño te transfiera el ownership de vuelta.</strong>
+            </>
+          }
+          textoAccion="Transferir"
+          onCancelar={() => setAccion(null)}
+          onConfirmar={handleTransferir}
+          submitting={submitting}
+        />
+      )}
+    </section>
+  );
+}
+
+/**
+ * Modal generico de confirmacion para acciones de gestion de admins.
+ * Sigue el mismo patron visual que ConfirmarArchivadoModal en Pacientes,
+ * pero generalizado para reutilizar entre "remover admin" y "transferir
+ * ownership".
+ */
+function ConfirmarAccionAdminModal({
+  titulo,
+  descripcion,
+  textoAccion,
+  onCancelar,
+  onConfirmar,
+  submitting,
+  variantePeligrosa = false,
+}) {
+  return (
+    <div className="cp-modal-overlay" onClick={onCancelar}>
+      <div
+        className="cp-modal cp-modal--confirm-admin"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          className="cp-modal__close"
+          onClick={onCancelar}
+          aria-label="Cerrar"
+          disabled={submitting}
+        >×</button>
+
+        <h2 className="cp-modal__title">{titulo}</h2>
+        <div className="cp-modal__sub">{descripcion}</div>
+
+        <div className="cp-modal__actions">
+          <Button
+            variant="secondary"
+            type="button"
+            onClick={onCancelar}
+            disabled={submitting}
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant={variantePeligrosa ? 'danger' : 'primary'}
+            type="button"
+            onClick={onConfirmar}
+            disabled={submitting}
+          >
+            {submitting
+              ? <><Spinner size={14} /> Procesando…</>
+              : textoAccion}
+          </Button>
+        </div>
       </div>
     </div>
   );

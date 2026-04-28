@@ -83,3 +83,13 @@
   background: var(--cp-surface-hover);
   color: var(--cp-text);
 }
+
+.cp-btn--danger {
+  background: var(--cp-danger);
+  color: var(--cp-text-on-accent);
+  border-color: var(--cp-danger);
+}
+
+.cp-btn--danger:hover:not(:disabled) {
+  filter: brightness(0.94);
+}

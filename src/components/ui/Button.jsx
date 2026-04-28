@@ -2,7 +2,7 @@ import './Button.css';
 
 /**
  * Botón genérico
- * @param {'primary' | 'secondary' | 'ghost'} variant
+ * @param {'primary' | 'secondary' | 'ghost' | 'danger'} variant
  * @param {'sm' | 'md'} size
  */
 export default function Button({
