@@ -86,6 +86,18 @@ service cloud.firestore {
         || (esDueno(uid)
             && !intentaEscalarPrivilegios()
             && request.resource.data.estado == resource.data.estado)
+        // Auto-retiro: el dueño del doc puede cambiar su estado de
+        // 'activo' a 'retirado' (sin tocar rol ni consultorioId).
+        // La validacion de "no tener deuda" la hace el codigo cliente
+        // antes de llamar a updateDoc — las rules no la pueden hacer
+        // porque requeriria una query que las rules no soportan.
+        // El riesgo es que un user bypassee el cliente, pero la deuda
+        // queda registrada igual en /sesiones, asi que no hay perdida
+        // de informacion contable.
+        || (esDueno(uid)
+            && !intentaEscalarPrivilegios()
+            && resource.data.estado == 'activo'
+            && request.resource.data.estado == 'retirado')
         || (esDueno(uid)
             && resource.data.rol == 'profesional'
             && resource.data.consultorioId == null

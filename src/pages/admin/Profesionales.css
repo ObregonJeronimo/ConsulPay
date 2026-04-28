@@ -180,3 +180,43 @@
   color: var(--cp-danger);
   border-color: var(--cp-danger);
 }
+
+/* ============================================================
+   Profesionales retirados (M4)
+   ============================================================ */
+
+.cp-prof-row--retirado {
+  opacity: 0.65;
+}
+
+.cp-prof-row--retirado:hover {
+  opacity: 0.85;
+}
+
+/* Aviso de deuda en el modal de retiro */
+.cp-retiro-deuda-aviso {
+  margin-top: 16px;
+  padding: 12px 14px;
+  background: var(--cp-danger-bg);
+  border: 1px solid var(--cp-danger);
+  border-radius: var(--cp-radius-md);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--cp-danger);
+  text-align: left;
+}
+
+.cp-retiro-deuda-aviso strong {
+  color: var(--cp-danger);
+}
+
+.cp-retiro-deuda-ok {
+  margin-top: 16px;
+  padding: 10px 14px;
+  background: var(--cp-success-bg);
+  border: 1px solid var(--cp-success);
+  border-radius: var(--cp-radius-md);
+  font-size: 13px;
+  color: var(--cp-success);
+  text-align: left;
+}

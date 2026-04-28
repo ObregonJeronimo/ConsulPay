@@ -10,7 +10,9 @@ import { useAuth } from '../../hooks/useAuth.js';
 import { ESTADOS_INVITACION, ESTADOS_USUARIO, formatoFechaLarga } from '../../lib/constants.js';
 import { cancelarInvitacion, enviarInvitacion, suscribirInvitaciones } from '../../lib/invitaciones.js';
 import {
+  calcularDeudaProfesional,
   cambiarEstadoProfesional,
+  retirarProfesional,
   setPermitirEdicionSesiones,
   suscribirProfesionales,
 } from '../../lib/profesionales.js';
@@ -108,8 +110,19 @@ export default function Profesionales() {
     () => profesionales.filter((p) => p.estado === ESTADOS_USUARIO.SUSPENDIDO),
     [profesionales],
   );
+  const retirados = useMemo(
+    () => profesionales.filter((p) => p.estado === ESTADOS_USUARIO.RETIRADO),
+    [profesionales],
+  );
 
-  const totalAccionables = profesionales.length + invitacionesPendientes.length;
+  // State para el modal de confirmacion de retiro.
+  // Guarda el profesional que el admin clickeo "Retirar" y todavia no confirmo.
+  const [retirando, setRetirando] = useState(null);
+
+  // Total accionable: solo cuenta los que el admin gestiona "en vivo".
+  // Los retirados NO entran al total accionable, pero pueden existir y
+  // tener su seccion separada al final.
+  const totalAccionables = activos.length + suspendidos.length + invitacionesPendientes.length;
 
   return (
     <div className="cp-profs">
@@ -178,6 +191,7 @@ export default function Profesionales() {
               <ProfesionalesTabla
                 profesionales={activos}
                 onSuspender={(uid) => cambiarEstadoProfesional(uid, ESTADOS_USUARIO.SUSPENDIDO)}
+                onRetirar={(p) => setRetirando(p)}
               />
             </section>
           )}
@@ -190,7 +204,22 @@ export default function Profesionales() {
               <ProfesionalesTabla
                 profesionales={suspendidos}
                 onReactivar={(uid) => cambiarEstadoProfesional(uid, ESTADOS_USUARIO.ACTIVO)}
+                onRetirar={(p) => setRetirando(p)}
               />
+            </section>
+          )}
+
+          {retirados.length > 0 && (
+            <section className="cp-section">
+              <div className="cp-section-head">
+                <h2 className="cp-section-title">Retirados</h2>
+                <p className="cp-section-hint">
+                  Profesionales que dejaron el consultorio. Sus sesiones, pagos y registros
+                  históricos se mantienen para auditoría. No pueden iniciar sesión ni crear
+                  nuevas sesiones.
+                </p>
+              </div>
+              <ProfesionalesTablaRetirados profesionales={retirados} />
             </section>
           )}
         </>
@@ -202,6 +231,16 @@ export default function Profesionales() {
           onClose={() => setOpenInvitar(false)}
           consultorioId={user.consultorioId}
           consultorioNombre={consultorio?.nombre || ''}
+        />
+      )}
+
+      {/* Modal de confirmacion de retiro */}
+      {retirando && (
+        <RetirarProfesionalModal
+          profesional={retirando}
+          consultorioId={user.consultorioId}
+          onCancelar={() => setRetirando(null)}
+          onCompletado={() => setRetirando(null)}
         />
       )}
     </div>
@@ -300,7 +339,7 @@ function InvitacionesLista({ invitaciones, onCancelar }) {
 /* ============================================================
    Tabla de profesionales activos/suspendidos
    ============================================================ */
-function ProfesionalesTabla({ profesionales, onSuspender, onReactivar }) {
+function ProfesionalesTabla({ profesionales, onSuspender, onReactivar, onRetirar }) {
   return (
     <div className="cp-table-wrap">
       <table className="cp-table">
@@ -350,9 +389,71 @@ function ProfesionalesTabla({ profesionales, onSuspender, onReactivar }) {
                     Reactivar
                   </button>
                 )}
+                {onRetirar && (
+                  <button
+                    className="cp-prof-action cp-prof-action--danger"
+                    onClick={() => onRetirar(p)}
+                    style={{ marginLeft: 6 }}
+                  >
+                    Retirar
+                  </button>
+                )}
               </td>
             </tr>
           ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* ============================================================
+   Tabla read-only de profesionales retirados.
+   No tiene acciones — los registros se preservan y los datos no se
+   pueden modificar. Si en algun momento queremos "reincorporar" a
+   un retirado, eso seria una accion separada (cambiar estado de
+   retirado a activo manualmente).
+   ============================================================ */
+function ProfesionalesTablaRetirados({ profesionales }) {
+  return (
+    <div className="cp-table-wrap">
+      <table className="cp-table">
+        <thead>
+          <tr>
+            <th>Profesional</th>
+            <th>Email</th>
+            <th>Retiro</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {profesionales.map((p) => {
+            const retiradoAt = p.retiradoAt?.toDate
+              ? p.retiradoAt.toDate()
+              : (p.retiradoAt instanceof Date ? p.retiradoAt : null);
+            return (
+              <tr key={p.uid} className="cp-prof-row--retirado">
+                <td>
+                  <div className="cp-prof-cell">
+                    <Avatar initials={iniciales(p.displayName || p.email)} size={32} />
+                    <div>
+                      <div className="cp-prof-name">{p.displayName || '—'}</div>
+                      <div className="cp-prof-meta">
+                        Se había unido {p.createdAt?.toDate && formatoFechaLarga.format(p.createdAt.toDate())}
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                <td style={{ fontSize: 13.5, color: 'var(--cp-text-muted)' }}>{p.email}</td>
+                <td style={{ fontSize: 13.5, color: 'var(--cp-text-muted)' }}>
+                  {retiradoAt ? formatoFechaLarga.format(retiradoAt) : '—'}
+                </td>
+                <td>
+                  <Badge tone="neutral">Retirado</Badge>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -513,6 +614,114 @@ function InvitarModal({ onClose, consultorioId, consultorioNombre }) {
             </div>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   Modal de retiro de profesional (desde la vista admin)
+   ----------------------------------------------------------------
+   Antes de mostrar la confirmacion, lee la deuda actual del profesional
+   y la muestra al admin como informacion (no bloquea: el admin puede
+   retirar igual). Cuando se ejecuta:
+     - Cambia estado del profesional a 'retirado'
+     - retiradoAt = ahora
+   No toca consultorioId — el doc sigue ligado al consultorio para que
+   las sesiones historicas sean legibles.
+   ============================================================ */
+function RetirarProfesionalModal({ profesional, consultorioId, onCancelar, onCompletado }) {
+  const [deuda, setDeuda] = useState(null);
+  const [cargandoDeuda, setCargandoDeuda] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelado = false;
+    (async () => {
+      try {
+        const d = await calcularDeudaProfesional(consultorioId, profesional.uid);
+        if (!cancelado) {
+          setDeuda(d);
+          setCargandoDeuda(false);
+        }
+      } catch (err) {
+        if (!cancelado) {
+          console.error('Error calculando deuda:', err);
+          setDeuda({ cantidad: 0, total: 0 });
+          setCargandoDeuda(false);
+        }
+      }
+    })();
+    return () => { cancelado = true; };
+  }, [consultorioId, profesional.uid]);
+
+  async function handleRetirar() {
+    setError('');
+    setSubmitting(true);
+    try {
+      await retirarProfesional({
+        uid: profesional.uid,
+        consultorioId,
+        esAutoRetiro: false, // admin retira: no validamos deuda
+      });
+      onCompletado();
+    } catch (err) {
+      setError(err.message || 'No se pudo retirar.');
+      setSubmitting(false);
+    }
+  }
+
+  const nombre = profesional.displayName || profesional.email || 'el profesional';
+  const tieneDeuda = deuda && deuda.cantidad > 0;
+
+  return (
+    <div className="cp-modal-overlay" onClick={onCancelar}>
+      <div className="cp-modal cp-modal--confirm-archive" onClick={(e) => e.stopPropagation()}>
+        <button
+          className="cp-modal__close"
+          onClick={onCancelar}
+          aria-label="Cerrar"
+          disabled={submitting}
+        >
+          ×
+        </button>
+
+        <h2 className="cp-modal__title">¿Retirar a {nombre} del consultorio?</h2>
+        <div className="cp-modal__sub">
+          El profesional ya no podrá iniciar sesión ni crear nuevas sesiones, pero sus
+          registros históricos (sesiones, pagos, pacientes asignados) se preservan
+          intactos.
+
+          {cargandoDeuda ? (
+            <div style={{ marginTop: 16, color: 'var(--cp-text-faint)', fontSize: 13 }}>
+              Calculando deuda…
+            </div>
+          ) : tieneDeuda ? (
+            <div className="cp-retiro-deuda-aviso">
+              <strong>Atención:</strong> tiene{' '}
+              <strong>{deuda.cantidad} sesión{deuda.cantidad === 1 ? '' : 'es'}</strong>{' '}
+              sin pagar al consultorio por un total de{' '}
+              <strong>${deuda.total.toLocaleString('es-AR')}</strong>.
+              Esta deuda se mantendrá registrada y podrá saldarse después.
+            </div>
+          ) : (
+            <div className="cp-retiro-deuda-ok">
+              ✓ No tiene deuda pendiente con el consultorio.
+            </div>
+          )}
+        </div>
+
+        {error && <div className="cp-modal__error">{error}</div>}
+
+        <div className="cp-modal__actions">
+          <Button variant="secondary" type="button" onClick={onCancelar} disabled={submitting}>
+            Cancelar
+          </Button>
+          <Button variant="danger" type="button" onClick={handleRetirar} disabled={submitting || cargandoDeuda}>
+            {submitting ? <><Spinner size={14} /> Retirando…</> : 'Retirar profesional'}
+          </Button>
+        </div>
       </div>
     </div>
   );

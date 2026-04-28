@@ -138,6 +138,17 @@
   border-color: var(--cp-text-muted);
 }
 
+.cp-prof-action--danger {
+  color: var(--cp-danger);
+  border-color: var(--cp-danger);
+}
+
+.cp-prof-action--danger:hover {
+  background: var(--cp-danger-bg);
+  color: var(--cp-danger);
+  border-color: var(--cp-danger);
+}
+
 /* ============================================================
    Modal genérico
    ============================================================ */
