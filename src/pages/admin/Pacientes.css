@@ -199,18 +199,64 @@
   border-color: var(--cp-accent);
 }
 
-.cp-filtros__check {
+/* ============================================================
+   Boton "Ver pacientes archivados"
+   ----------------------------------------------------------------
+   Reemplaza al checkbox "Mostrar archivados". Cuando esta activo
+   (panel abierto) cambia a fondo accent-bg para indicar el estado.
+   El counter al final muestra cuantos archivados hay total.
+   ============================================================ */
+.cp-archivados-btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  padding: 10px 14px;
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
   color: var(--cp-text-muted);
   cursor: pointer;
-  padding: 0 8px;
+  transition: all var(--cp-dur-fast) var(--cp-ease);
 }
 
-.cp-filtros__check input {
-  accent-color: var(--cp-accent);
+.cp-archivados-btn:hover {
+  border-color: var(--cp-text-muted);
+  color: var(--cp-text);
+}
+
+.cp-archivados-btn--active {
+  background: var(--cp-accent-bg);
+  border-color: var(--cp-accent);
+  color: var(--cp-accent-dark);
+}
+
+.cp-archivados-btn svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.cp-archivados-btn__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: var(--cp-radius-pill);
+  background: var(--cp-bg);
+  color: var(--cp-text-muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.cp-archivados-btn--active .cp-archivados-btn__count {
+  background: var(--cp-accent);
+  color: var(--cp-text-on-accent);
 }
 
 .cp-pacientes__empty-filtered {
@@ -224,6 +270,180 @@
 }
 
 /* ============================================================
+   Panel desplegable de archivados
+   ----------------------------------------------------------------
+   Container con borde dasheado para distinguirlo visualmente de
+   la tabla principal (es informacion "secundaria"). Header con
+   titulo + counter + boton de cerrar. Lista de items con avatar,
+   datos basicos y boton "Reactivar".
+   ============================================================ */
+.cp-archivados-panel {
+  background: var(--cp-surface);
+  border: 1px dashed var(--cp-border-strong);
+  border-radius: var(--cp-radius-lg);
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: cp-archivados-fade 200ms var(--cp-ease) both;
+}
+
+@keyframes cp-archivados-fade {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.cp-archivados-panel__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.cp-archivados-panel__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--cp-font-serif);
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.cp-archivados-panel__title svg {
+  width: 16px;
+  height: 16px;
+  color: var(--cp-text-muted);
+}
+
+.cp-archivados-panel__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: var(--cp-radius-pill);
+  background: var(--cp-bg);
+  color: var(--cp-text-muted);
+  font-family: var(--cp-font-sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.cp-archivados-panel__hint {
+  font-size: 12.5px;
+  color: var(--cp-text-muted);
+  margin: 4px 0 0;
+  line-height: 1.45;
+}
+
+.cp-archivados-panel__close {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--cp-radius-sm);
+  background: transparent;
+  border: none;
+  color: var(--cp-text-faint);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-archivados-panel__close:hover {
+  background: var(--cp-surface-hover);
+  color: var(--cp-text);
+}
+
+.cp-archivados-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cp-archivado-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--cp-bg);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  transition: border-color var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-archivado-row:hover {
+  border-color: var(--cp-border-strong);
+}
+
+.cp-archivado-row__main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.cp-archivado-row__info {
+  min-width: 0;
+}
+
+.cp-archivado-row__name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--cp-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cp-archivado-row__meta {
+  font-size: 12px;
+  color: var(--cp-text-muted);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cp-archivado-row__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border-strong);
+  border-radius: var(--cp-radius-sm);
+  color: var(--cp-text);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-archivado-row__btn:hover {
+  background: var(--cp-success-bg);
+  border-color: var(--cp-success);
+  color: var(--cp-success);
+}
+
+.cp-archivado-row__btn svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+/* ============================================================
    Tabla
    ============================================================ */
 .cp-pacientes-table .cp-pac-row--archivado {
@@ -231,7 +451,48 @@
 }
 
 /* ============================================================
-   Modal paciente
+   Modal de confirmacion de archivado
+   ----------------------------------------------------------------
+   Variante mas compacta del modal generico. Tiene un icono
+   decorativo arriba del titulo (en accent-bg circular) para
+   reforzar visualmente la accion.
+   ============================================================ */
+.cp-modal--confirm-archive {
+  max-width: 440px;
+  text-align: center;
+}
+
+.cp-modal--confirm-archive .cp-modal__title {
+  margin-top: var(--cp-space-3);
+}
+
+.cp-modal--confirm-archive .cp-modal__sub {
+  margin-bottom: var(--cp-space-4);
+}
+
+.cp-modal--confirm-archive .cp-modal__actions {
+  justify-content: center;
+}
+
+.cp-confirm-archive__icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--cp-accent-bg);
+  color: var(--cp-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+}
+
+.cp-confirm-archive__icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* ============================================================
+   Modal paciente (crear/editar)
    ============================================================ */
 .cp-modal--wide {
   max-width: 640px;
@@ -321,4 +582,24 @@
 
 .cp-valor-info__link:hover {
   color: var(--cp-accent-dark);
+}
+
+/* ============================================================
+   Mobile
+   ============================================================ */
+@media (max-width: 640px) {
+  .cp-archivado-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .cp-archivado-row__btn {
+    align-self: flex-end;
+  }
+
+  .cp-archivados-btn {
+    width: 100%;
+    justify-content: center;
+  }
 }
