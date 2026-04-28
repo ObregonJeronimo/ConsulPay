@@ -21,7 +21,7 @@ import {
   signOut as firebaseSignOut,
   updateProfile,
 } from 'firebase/auth';
-import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
 
 import { auth, db, googleProvider } from './firebase.js';
 import { ESTADOS_USUARIO, ROLES } from './constants.js';
@@ -33,15 +33,6 @@ import { ESTADOS_USUARIO, ROLES } from './constants.js';
 /**
  * Asegura que exista un documento en usuarios/{uid}. Si no existe, lo crea
  * con rol=profesional y estado=pendiente. Si existe, lo devuelve intacto.
- *
- * NOTAS DE DISEÑO:
- * - Creamos por defecto con rol=profesional porque es el rol menos privilegiado.
- * - estado=pendiente porque todavía no pertenece a ningún consultorio (no hay
- *   invitación registrada, o es un usuario que entró por accidente).
- * - consultorioId=null porque todavía no está ligado a ninguno.
- * - Cuando un usuario acepta una invitación de profesional, el flow de
- *   "aceptar invitación" actualiza estos campos.
- * - Los superadmin y admins se promueven manualmente o via flow de onboarding.
  *
  * Retorna siempre el doc actualizado.
  */
@@ -71,26 +62,16 @@ async function ensureUserDoc(firebaseUser) {
    API pública
    ============================================================ */
 
-/**
- * Login con popup de Google.
- * @returns {Promise<Object>} el doc del usuario en Firestore
- */
 export async function loginWithGoogle() {
   const credential = await signInWithPopup(auth, googleProvider);
   return await ensureUserDoc(credential.user);
 }
 
-/**
- * Login con email + password.
- */
 export async function loginWithEmail(email, password) {
   const credential = await signInWithEmailAndPassword(auth, email, password);
   return await ensureUserDoc(credential.user);
 }
 
-/**
- * Registro con email + password. Setea el displayName si se provee.
- */
 export async function registerWithEmail(email, password, displayName) {
   const credential = await createUserWithEmailAndPassword(auth, email, password);
 
@@ -101,19 +82,53 @@ export async function registerWithEmail(email, password, displayName) {
   return await ensureUserDoc(credential.user);
 }
 
-/**
- * Cierra sesión.
- */
 export async function signOut() {
   await firebaseSignOut(auth);
 }
 
 /**
- * Dado un FirebaseUser, devuelve el doc extendido de Firestore.
- * Útil en el onAuthStateChanged del contexto.
+ * Lectura one-shot del doc del usuario. Usada en login/registro para
+ * garantizar que el doc exista antes de empezar a suscribirse en vivo.
  */
 export async function getUserDoc(firebaseUser) {
   return await ensureUserDoc(firebaseUser);
+}
+
+/**
+ * Suscribe en vivo al doc /usuarios/{uid}.
+ *
+ * El callback recibe { uid, ...data } cuando el doc existe, o null si no
+ * existe (caso borde: alguien lo borró desde Firestore Console mientras
+ * el user estaba logueado).
+ *
+ * Devuelve un unsubscribe que el caller debe llamar al desmontarse o
+ * cuando cambie de usuario, para evitar leaks de suscripciones.
+ *
+ * Es la base del comportamiento "live" del AuthContext: cualquier cambio
+ * en el doc del usuario (rol, estado, consultorioId,
+ * permitirEdicionSesiones, etc.) se refleja al instante en
+ * useAuth().user sin necesidad de re-login.
+ *
+ * IMPORTANTE: el caller debe haber llamado primero a getUserDoc para
+ * garantizar que el doc exista. Si el doc no existe cuando se levanta
+ * la suscripción, el primer callback va a venir con null.
+ */
+export function suscribirUserDoc(uid, callback) {
+  const userRef = doc(db, 'usuarios', uid);
+  return onSnapshot(
+    userRef,
+    (snap) => {
+      if (snap.exists()) {
+        callback({ uid: snap.id, ...snap.data() });
+      } else {
+        callback(null);
+      }
+    },
+    (err) => {
+      console.error('[Auth] Error en suscripción al doc del usuario:', err);
+      callback(null);
+    },
+  );
 }
 
 /* ============================================================
@@ -141,13 +156,10 @@ export function traducirErrorAuth(error) {
     'auth/account-exists-with-different-credential': 'Ya existe una cuenta con ese email usando otro método de inicio.',
   };
 
-  // Log siempre en consola para debug
   if (error) {
     console.error('[Auth error]', error.code, error.message, error);
   }
 
-  // Si tengo mensaje traducido, lo devuelvo. Si no, devuelvo el código crudo
-  // para que se vea qué está pasando (más útil que un genérico).
   if (mapa[code]) return mapa[code];
   if (code) return `Error de autenticación: ${code}`;
   return 'Ocurrió un error inesperado. Revisá la consola (F12) para más detalle.';
