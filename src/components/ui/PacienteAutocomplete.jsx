@@ -76,13 +76,17 @@ function formatearDNI(dni) {
 }
 
 /**
- * Detecta si el query parece un DNI: tiene mayoria de digitos
- * (>=3 digitos consecutivos despues de limpiar puntos/espacios).
- * Si es DNI, comparamos contra dni; si no, contra nombre+apellido.
+ * Detecta si el query parece un DNI: tiene >= 2 digitos despues de
+ * limpiar puntos/espacios.
+ *
+ * NOTA HISTORICA: el umbral inicial era >= 3 digitos pero un usuario
+ * reporto que escribir "45" no encontraba un DNI que empezaba con 45.
+ * Bajamos a >= 2 para que sea consistente con el umbral general de
+ * busqueda (que tambien es 2 caracteres). Ver buscarPacientes().
  */
 function pareceDNI(query) {
   const limpio = dniSoloDigitos(query);
-  return limpio.length >= 3;
+  return limpio.length >= 2;
 }
 
 /**
