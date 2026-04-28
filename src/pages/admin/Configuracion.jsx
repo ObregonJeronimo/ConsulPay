@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import Avatar from '../../components/ui/Avatar.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -24,6 +25,11 @@ import {
   actualizarMetodosPago,
   slugFromNombre,
 } from '../../lib/configuracion.js';
+import {
+  desconectarMP,
+  diasHastaVencimiento,
+  iniciarConexionMP,
+} from '../../lib/mpIntegracion.js';
 import { suscribirMiembrosConsultorio } from '../../lib/profesionales.js';
 import {
   formatearCUIT,
@@ -57,12 +63,22 @@ export default function Configuracion() {
   const { user } = useAuth();
   const { consultorio, loading } = useConsultorio();
   const [tab, setTab] = useState('datos');
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [dirtyDatos, setDirtyDatos] = useState(false);
   const [dirtyMetodos, setDirtyMetodos] = useState(false);
 
   const anyDirty = dirtyDatos || dirtyMetodos;
   useUnsavedChangesWarning(anyDirty);
+
+  // Si volvemos del callback OAuth de MP, abrimos la pestania Pagos
+  // automaticamente para que el admin vea el resultado.
+  useEffect(() => {
+    const mp = searchParams.get('mp');
+    if (mp === 'connected' || mp === 'error') {
+      setTab('pagos');
+    }
+  }, [searchParams]);
 
   function intentarCambiarTab(nuevoTab) {
     if (nuevoTab === tab) return;
@@ -132,6 +148,13 @@ export default function Configuracion() {
           Administradores
           <span className="cp-tab__count">{consultorio.adminUids?.length ?? 0}</span>
         </button>
+        <button
+          className={`cp-tab ${tab === 'pagos' ? 'cp-tab--active' : ''}`}
+          onClick={() => intentarCambiarTab('pagos')}
+        >
+          Pagos
+          {consultorio.mpIntegrado && <span className="cp-tab__count cp-tab__count--ok">✓</span>}
+        </button>
       </div>
 
       {tab === 'datos' && (
@@ -154,6 +177,14 @@ export default function Configuracion() {
         <TabAdministradores
           consultorio={consultorio}
           callerUid={user.uid}
+        />
+      )}
+
+      {tab === 'pagos' && (
+        <TabPagos
+          consultorio={consultorio}
+          searchParams={searchParams}
+          onLimpiarParams={() => setSearchParams({})}
         />
       )}
     </div>
@@ -1052,6 +1083,238 @@ function ConfirmarAccionAdminModal({
             {submitting
               ? <><Spinner size={14} /> Procesando…</>
               : textoAccion}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   Tab: Pagos (integracion Mercado Pago)
+   ----------------------------------------------------------------
+   - Si no esta conectada: card con explicacion + boton "Conectar MP"
+   - Si esta conectada: card con info + boton "Desconectar"
+   - Maneja query params ?mp=connected | ?mp=error&reason=xxx que vienen
+     del callback OAuth.
+   ============================================================ */
+
+const REASON_LABELS = {
+  access_denied: 'Cancelaste la autorización en Mercado Pago.',
+  state_invalido: 'El enlace de autorización no es válido o ya fue usado.',
+  state_ya_usado: 'El enlace de autorización ya fue usado.',
+  state_expirado: 'El enlace de autorización expiró. Volvé a intentarlo.',
+  intercambio_fallido: 'Mercado Pago rechazó la autorización. Intentá de nuevo.',
+  encriptacion_fallida: 'Error interno guardando las credenciales.',
+  guardado_fallido: 'Error guardando la integración. Intentá de nuevo.',
+  servidor_no_configurado: 'El servidor no está bien configurado.',
+  consultorio_no_existe: 'El consultorio ya no existe.',
+  metodo_invalido: 'Método HTTP inválido.',
+  faltan_parametros: 'Faltan parámetros en la respuesta de Mercado Pago.',
+  state_proveedor_invalido: 'Tipo de proveedor inválido.',
+  state_corrupto: 'El estado del flow está corrupto.',
+};
+
+function TabPagos({ consultorio, searchParams, onLimpiarParams }) {
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [okMsg, setOkMsg] = useState('');
+  const [openDesconectar, setOpenDesconectar] = useState(false);
+
+  // Procesar resultado del callback OAuth
+  useEffect(() => {
+    const mp = searchParams.get('mp');
+    if (mp === 'connected') {
+      setOkMsg('Cuenta de Mercado Pago vinculada correctamente.');
+      // Limpiamos los query params para que no se vuelva a disparar
+      onLimpiarParams();
+    } else if (mp === 'error') {
+      const reason = searchParams.get('reason') || '';
+      const msg = REASON_LABELS[reason] || `No se pudo conectar (${reason || 'error desconocido'}).`;
+      setError(msg);
+      onLimpiarParams();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function handleConectar() {
+    setError('');
+    setOkMsg('');
+    setSubmitting(true);
+    try {
+      await iniciarConexionMP(consultorio.id);
+      // Si llega aca sin redireccion fue raro
+    } catch (err) {
+      setError(err.message || 'No se pudo iniciar la conexión.');
+      setSubmitting(false);
+    }
+  }
+
+  async function handleDesconectar() {
+    setError('');
+    setOkMsg('');
+    setSubmitting(true);
+    try {
+      await desconectarMP(consultorio.id);
+      setOkMsg('Cuenta de Mercado Pago desconectada.');
+      setOpenDesconectar(false);
+    } catch (err) {
+      setError(err.message || 'No se pudo desconectar.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const integrado = consultorio.mpIntegrado === true && consultorio.mpConfig != null;
+
+  return (
+    <section className="cp-config-section">
+      <header className="cp-config-section__head">
+        <h2 className="cp-config-section__title">Mercado Pago</h2>
+        <p className="cp-config-section__sub">
+          Vinculá tu cuenta de Mercado Pago para que los profesionales puedan pagarte
+          su parte de las sesiones automáticamente. ConsulPay procesa el pago y se
+          queda con su comisión ({consultorio.comisionConsulpay ?? '—'}%).
+        </p>
+      </header>
+
+      {error && <div className="cp-config-error" role="alert">{error}</div>}
+      {okMsg && <div className="cp-config-ok" role="status">{okMsg}</div>}
+
+      {integrado ? (
+        <MPConectadaCard
+          mpConfig={consultorio.mpConfig}
+          onDesconectar={() => setOpenDesconectar(true)}
+          submitting={submitting}
+        />
+      ) : (
+        <MPDesconectadaCard
+          onConectar={handleConectar}
+          submitting={submitting}
+        />
+      )}
+
+      {openDesconectar && (
+        <DesconectarMPModal
+          onCancelar={() => setOpenDesconectar(false)}
+          onConfirmar={handleDesconectar}
+          submitting={submitting}
+        />
+      )}
+    </section>
+  );
+}
+
+function MPDesconectadaCard({ onConectar, submitting }) {
+  return (
+    <div className="cp-mp-card cp-mp-card--off">
+      <div className="cp-mp-card__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor"
+          strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="6" width="20" height="14" rx="2" />
+          <line x1="2" y1="11" x2="22" y2="11" />
+          <line x1="6" y1="15" x2="10" y2="15" />
+        </svg>
+      </div>
+      <div className="cp-mp-card__body">
+        <h3 className="cp-mp-card__title">Cuenta no vinculada</h3>
+        <p className="cp-mp-card__hint">
+          Al conectar Mercado Pago, los pagos de tus profesionales caen directamente
+          en tu cuenta de MP. ConsulPay solo procesa la transacción y se queda con su
+          comisión.
+        </p>
+        <div className="cp-mp-card__actions">
+          <Button variant="primary" onClick={onConectar} disabled={submitting}>
+            {submitting ? <><Spinner size={14} /> Redirigiendo a Mercado Pago…</> : 'Conectar Mercado Pago'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MPConectadaCard({ mpConfig, onDesconectar, submitting }) {
+  const venc = diasHastaVencimiento(mpConfig.expiresAt);
+  const conectadoAt = mpConfig.connectedAt?.toDate
+    ? mpConfig.connectedAt.toDate()
+    : (mpConfig.connectedAt instanceof Date ? mpConfig.connectedAt : null);
+
+  return (
+    <div className="cp-mp-card cp-mp-card--on">
+      <div className="cp-mp-card__icon cp-mp-card__icon--ok" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor"
+          strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+      </div>
+      <div className="cp-mp-card__body">
+        <h3 className="cp-mp-card__title">
+          Cuenta vinculada
+          {mpConfig.livemode === false && (
+            <span className="cp-admin-badge cp-admin-badge--you">Sandbox</span>
+          )}
+        </h3>
+        <dl className="cp-mp-card__meta">
+          <div>
+            <dt>User ID de Mercado Pago</dt>
+            <dd>{mpConfig.userIdMP}</dd>
+          </div>
+          {conectadoAt && (
+            <div>
+              <dt>Conectada el</dt>
+              <dd>{conectadoAt.toLocaleDateString('es-AR', {
+                day: 'numeric', month: 'long', year: 'numeric',
+              })}</dd>
+            </div>
+          )}
+          {venc && (
+            <div>
+              <dt>Vencimiento del token</dt>
+              <dd>
+                {venc.vencido
+                  ? <span style={{ color: 'var(--cp-danger)' }}>Vencido — reconectá</span>
+                  : `${venc.dias} días`}
+                {!venc.vencido && venc.dias < 14 && (
+                  <span className="cp-mp-card__warn"> · se renovará automáticamente</span>
+                )}
+              </dd>
+            </div>
+          )}
+        </dl>
+        <div className="cp-mp-card__actions">
+          <Button
+            variant="secondary"
+            onClick={onDesconectar}
+            disabled={submitting}
+          >
+            Desconectar
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DesconectarMPModal({ onCancelar, onConfirmar, submitting }) {
+  return (
+    <div className="cp-modal-overlay" onClick={onCancelar}>
+      <div className="cp-modal cp-modal--confirm-admin" onClick={(e) => e.stopPropagation()}>
+        <button className="cp-modal__close" onClick={onCancelar} aria-label="Cerrar"
+          disabled={submitting}>×</button>
+
+        <h2 className="cp-modal__title">¿Desconectar Mercado Pago?</h2>
+        <div className="cp-modal__sub">
+          Los profesionales van a dejar de poder pagarte por ConsulPay hasta que reconectes.
+          Verán un mensaje "El método de pago está deshabilitado, contactá al dueño del consultorio".
+          {' '}Tus pagos en curso (si hubiera) se mantienen intactos. Podés reconectar cuando quieras.
+        </div>
+
+        <div className="cp-modal__actions">
+          <Button variant="secondary" type="button" onClick={onCancelar} disabled={submitting}>
+            Cancelar
+          </Button>
+          <Button variant="danger" type="button" onClick={onConfirmar} disabled={submitting}>
+            {submitting ? <><Spinner size={14} /> Desconectando…</> : 'Desconectar'}
           </Button>
         </div>
       </div>

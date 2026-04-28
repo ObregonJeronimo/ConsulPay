@@ -20,67 +20,12 @@
  *  Authorization: Bearer <firebase_id_token>
  */
 
-import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { Resend } from 'resend';
 
-/* ============================================================
-   Inicialización única de firebase-admin
-   ============================================================ */
-
-/**
- * Firebase Admin SDK se autentica con Application Default Credentials.
- * En Vercel usamos una service account cuyas keys van en env var FIREBASE_ADMIN_KEY
- * como JSON stringificado.
- *
- * Si FIREBASE_ADMIN_KEY no está seteado, intentamos modo "sin credenciales"
- * (funciona para algunos setups con OAuth del proyecto Vercel).
- */
-function initAdmin() {
-  if (getApps().length > 0) return;
-
-  const raw = process.env.FIREBASE_ADMIN_KEY;
-  if (!raw) {
-    // Fallback: sin service account. Esto solo funciona si Vercel y Firebase
-    // están en el mismo proyecto Google Cloud (no es nuestro caso).
-    throw new Error(
-      'FIREBASE_ADMIN_KEY no está configurado. Agregalo en Vercel Env Vars.',
-    );
-  }
-
-  const serviceAccount = typeof raw === 'string' ? JSON.parse(raw) : raw;
-  initializeApp({ credential: cert(serviceAccount) });
-}
-
-/* ============================================================
-   Helper: parsear body JSON
-   ============================================================ */
-async function readJsonBody(req) {
-  if (req.body && typeof req.body === 'object') return req.body;
-
-  return new Promise((resolve, reject) => {
-    let data = '';
-    req.on('data', (chunk) => { data += chunk; });
-    req.on('end', () => {
-      try {
-        resolve(data ? JSON.parse(data) : {});
-      } catch (e) {
-        reject(e);
-      }
-    });
-    req.on('error', reject);
-  });
-}
-
-/* ============================================================
-   Helper: enviar respuesta JSON
-   ============================================================ */
-function jsonResponse(res, statusCode, data) {
-  res.statusCode = statusCode;
-  res.setHeader('Content-Type', 'application/json');
-  res.end(JSON.stringify(data));
-}
+import { initAdmin } from './_lib/firebase-admin.js';
+import { jsonResponse, readJsonBody } from './_lib/http.js';
 
 /* ============================================================
    Template del email

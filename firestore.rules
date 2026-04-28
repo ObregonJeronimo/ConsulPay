@@ -149,8 +149,14 @@ service cloud.firestore {
            puede transferir ownership cambiando ownerUid, siempre que el
            nuevo owner este en el adminUids resultante.
 
-        Campos siempre blindados (solo superadmin los toca):
-           plan, planVenceEn, comisionConsulpay, mpConfig, ualaConfig, estado.
+        Campos siempre blindados (solo superadmin / backend los toca):
+           plan, planVenceEn, comisionConsulpay,
+           mpIntegrado, mpConfig, ualaIntegrado, ualaConfig, estado.
+
+        Los campos mp*/uala* los escribe el backend via firebase-admin
+        (que saltea las rules) cuando el admin completa el OAuth o
+        desconecta. La rule no permite que el frontend los modifique
+        directamente.
       */
       allow update: if esSuperadmin()
         || (esAdminDe(consultorioId)
@@ -158,7 +164,9 @@ service cloud.firestore {
             && request.resource.data.plan == resource.data.plan
             && request.resource.data.planVenceEn == resource.data.planVenceEn
             && request.resource.data.comisionConsulpay == resource.data.comisionConsulpay
+            && request.resource.data.mpIntegrado == resource.data.mpIntegrado
             && request.resource.data.mpConfig == resource.data.mpConfig
+            && request.resource.data.ualaIntegrado == resource.data.ualaIntegrado
             && request.resource.data.ualaConfig == resource.data.ualaConfig
             && request.resource.data.estado == resource.data.estado
             // Reglas sobre owner y admins:
@@ -412,6 +420,21 @@ service cloud.firestore {
     match /config/{docId} {
       allow read: if estaAutenticado();
       allow write: if esSuperadmin();
+    }
+
+    // ============================================================
+    //  /oauth_states/{state}
+    //  ----------------------------------------------------------------
+    //  Tokens random temporales (TTL 10 min) que vinculan un flow
+    //  OAuth con el admin/consultorio que lo inicio. Son escritos y
+    //  leidos UNICAMENTE por el backend serverless (firebase-admin
+    //  saltea estas rules). El frontend NUNCA los toca.
+    //
+    //  Bloqueamos todos los accesos del lado cliente. Si por algun
+    //  bug el frontend intenta leer, va a fallar — y eso esta bien.
+    // ============================================================
+    match /oauth_states/{state} {
+      allow read, write: if false;
     }
 
     // ============================================================
