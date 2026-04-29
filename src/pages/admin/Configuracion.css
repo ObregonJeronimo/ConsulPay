@@ -59,7 +59,6 @@
   color: var(--cp-accent-dark);
 }
 
-/* Puntito indicador de cambios sin guardar en un tab */
 .cp-tab__dot {
   width: 7px;
   height: 7px;
@@ -74,7 +73,6 @@
   50% { opacity: 0.55; }
 }
 
-/* Section contenedor */
 .cp-config-section {
   display: flex;
   flex-direction: column;
@@ -115,8 +113,6 @@
   .cp-config-row { grid-template-columns: 1fr; }
   .cp-config-block { padding: 20px 22px; }
 }
-
-/* .cp-config-error movido a shared-ui.css para reutilizacion */
 
 .cp-config-footer {
   display: flex;
@@ -301,11 +297,6 @@
   .cp-metodo-row__input { padding: 6px 6px; font-size: 13px; }
 }
 
-/* NOTA: el toggle .cc-toggle vivia aca antes pero se movio a
-   src/styles/shared-ui.css porque tambien lo usa Profesionales.jsx
-   y al ser CSS de pagina lazy no estaba disponible al entrar
-   directo a /admin/profesionales. */
-
 /* ============================================================
    Modal: tipo options (radio cards)
    ============================================================ */
@@ -354,7 +345,6 @@
   margin-top: 2px;
 }
 
-/* Field label standalone */
 .cp-field__label {
   font-size: 13px;
   font-weight: 500;
@@ -364,8 +354,6 @@
 /* ============================================================
    Tab Administradores
    ============================================================ */
-
-/* .cp-config-ok movido a shared-ui.css para reutilizacion */
 
 .cp-admins-list {
   list-style: none;
@@ -520,7 +508,6 @@
 
 /* ============================================================
    Modal de confirmacion de accion sobre admin
-   (remover / transferir ownership)
    ============================================================ */
 .cp-modal--confirm-admin {
   max-width: 460px;
@@ -536,7 +523,6 @@
   color: var(--cp-text);
 }
 
-/* Mobile */
 @media (max-width: 640px) {
   .cp-admin-row {
     flex-direction: column;
@@ -651,33 +637,6 @@
   margin-top: 4px;
 }
 
-/* Aviso preventivo en card de "Conectar MP" — explica al user que va
-   a ser redirigido y que tiene que loguearse en MP si no esta logueado. */
-.cp-mp-card__aviso {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 12px 14px;
-  background: var(--cp-bg);
-  border: 1px solid var(--cp-border);
-  border-left: 3px solid var(--cp-accent);
-  border-radius: var(--cp-radius-md);
-  font-size: 12.5px;
-  line-height: 1.5;
-  color: var(--cp-text-muted);
-  margin-bottom: 16px;
-}
-
-.cp-mp-card__aviso svg {
-  flex-shrink: 0;
-  margin-top: 1px;
-  color: var(--cp-accent);
-}
-
-.cp-mp-card__aviso strong {
-  color: var(--cp-text);
-}
-
 @media (max-width: 600px) {
   .cp-mp-card {
     flex-direction: column;
@@ -688,8 +647,96 @@
   }
 }
 
-/* Counter ok en pestaña Pagos cuando ya esta conectada */
 .cp-tab__count--ok {
   background: var(--cp-success);
   color: var(--cp-text-on-accent);
+}
+
+/* ============================================================
+   Modal de "Conectar Mercado Pago" (paso a paso preventivo)
+   ============================================================ */
+.cp-modal--conectar-mp {
+  max-width: 540px;
+}
+
+.cp-modal--conectar-mp .cp-modal__sub {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--cp-text-muted);
+}
+
+.cp-modal--conectar-mp .cp-modal__sub strong {
+  color: var(--cp-text);
+}
+
+.cp-modal-conectar__steps {
+  list-style: none;
+  counter-reset: cp-step;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cp-modal-conectar__steps li {
+  counter-increment: cp-step;
+  position: relative;
+  padding: 12px 14px 12px 44px;
+  background: var(--cp-bg);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.cp-modal-conectar__steps li::before {
+  content: counter(cp-step);
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--cp-accent);
+  color: var(--cp-text-on-accent);
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cp-modal-conectar__steps strong {
+  color: var(--cp-text);
+}
+
+.cp-modal-conectar__steps em {
+  font-style: normal;
+  font-weight: 500;
+  color: var(--cp-text);
+  background: var(--cp-accent-bg);
+  padding: 0 5px;
+  border-radius: 3px;
+}
+
+.cp-modal-conectar__actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.cp-modal-conectar__actions .cp-btn {
+  flex-shrink: 0;
+}
+
+@media (max-width: 600px) {
+  .cp-modal-conectar__actions {
+    flex-direction: column-reverse;
+  }
+  .cp-modal-conectar__actions .cp-btn {
+    width: 100%;
+  }
 }
