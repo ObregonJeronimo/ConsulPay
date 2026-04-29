@@ -740,3 +740,311 @@
     width: 100%;
   }
 }
+
+/* ============================================================
+   Tab Plan (suscripcion al Plan Pro)
+   ============================================================ */
+
+.cp-plan-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px 26px;
+  border-radius: var(--cp-radius-lg);
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+}
+
+.cp-plan-card--free {
+  border-color: var(--cp-border);
+}
+
+.cp-plan-card--pro {
+  border-color: var(--cp-accent);
+  background: linear-gradient(
+    135deg,
+    var(--cp-accent-bg) 0%,
+    var(--cp-surface) 60%
+  );
+}
+
+.cp-plan-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.cp-plan-card__plan-label {
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cp-text-faint);
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.cp-plan-card__plan-name {
+  font-family: var(--cp-font-serif);
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin: 0;
+  color: var(--cp-text);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cp-plan-card__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: var(--cp-radius-pill);
+  background: var(--cp-accent);
+  color: var(--cp-text-on-accent);
+  font-family: var(--cp-font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.cp-plan-card__comision {
+  text-align: right;
+}
+
+.cp-plan-card__comision-label {
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cp-text-faint);
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.cp-plan-card__comision-value {
+  font-family: var(--cp-font-serif);
+  font-size: 28px;
+  font-weight: 500;
+  color: var(--cp-text);
+  letter-spacing: -0.01em;
+}
+
+.cp-plan-card--pro .cp-plan-card__comision-value {
+  color: var(--cp-accent-dark);
+}
+
+.cp-plan-card__meta {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--cp-border);
+}
+
+.cp-plan-card__meta > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cp-plan-card__meta dt {
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cp-text-faint);
+  font-weight: 500;
+}
+
+.cp-plan-card__meta dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--cp-text);
+}
+
+.cp-plan-card__pending {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--cp-warning-bg, var(--cp-surface-sunken));
+  border: 1px solid var(--cp-warning, var(--cp-border-strong));
+  border-radius: var(--cp-radius-md);
+  font-size: 13px;
+  color: var(--cp-text);
+  line-height: 1.5;
+}
+
+.cp-plan-card__actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.cp-plan-card__cancel-notice {
+  padding: 12px 14px;
+  background: var(--cp-surface-sunken);
+  border: 1px dashed var(--cp-border-strong);
+  border-radius: var(--cp-radius-md);
+  font-size: 13px;
+  color: var(--cp-text-muted);
+  line-height: 1.55;
+}
+
+.cp-plan-card__cancel-notice strong {
+  color: var(--cp-text);
+}
+
+@media (max-width: 600px) {
+  .cp-plan-card__head {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .cp-plan-card__comision {
+    text-align: left;
+  }
+}
+
+/* ----- Comparativa Free vs Pro (solo si Free) ----- */
+
+.cp-plan-compare {
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-lg);
+  padding: 24px 26px;
+}
+
+.cp-plan-compare__title {
+  font-family: var(--cp-font-serif);
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin: 0 0 18px;
+}
+
+.cp-plan-compare__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.cp-plan-compare__card {
+  padding: 20px;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  background: var(--cp-bg);
+}
+
+.cp-plan-compare__card--pro {
+  border-color: var(--cp-accent);
+  background: var(--cp-accent-bg);
+}
+
+.cp-plan-compare__card-name {
+  font-family: var(--cp-font-serif);
+  font-size: 17px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.cp-plan-compare__price {
+  font-family: var(--cp-font-serif);
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--cp-text);
+  letter-spacing: -0.01em;
+  margin-bottom: 14px;
+}
+
+.cp-plan-compare__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cp-plan-compare__list li {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--cp-text);
+  padding-left: 18px;
+  position: relative;
+}
+
+.cp-plan-compare__list li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--cp-success);
+  font-weight: 600;
+}
+
+.cp-plan-compare__card--pro .cp-plan-compare__list li::before {
+  color: var(--cp-accent-dark);
+}
+
+.cp-plan-compare__hint {
+  font-size: 12.5px;
+  color: var(--cp-text-muted);
+  font-style: italic;
+  margin: 18px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--cp-border);
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .cp-plan-compare__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ----- Historial de cobros mensualidad ----- */
+
+.cp-plan-historial {
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-lg);
+  padding: 24px 26px;
+}
+
+.cp-plan-historial__title {
+  font-family: var(--cp-font-serif);
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin: 0 0 16px;
+}
+
+.cp-plan-historial__status {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: var(--cp-radius-pill);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.cp-plan-historial__status--approved {
+  background: var(--cp-success-bg);
+  color: var(--cp-success);
+}
+
+.cp-plan-historial__status--rejected {
+  background: var(--cp-danger-bg);
+  color: var(--cp-danger);
+}
+
+.cp-plan-historial__status--pending {
+  background: var(--cp-surface-sunken);
+  color: var(--cp-text-muted);
+}
