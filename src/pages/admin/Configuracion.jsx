@@ -28,7 +28,7 @@ import {
 import {
   desconectarMP,
   diasHastaVencimiento,
-  iniciarConexionMP,
+  obtenerUrlConexionMP,
 } from '../../lib/mpIntegracion.js';
 import { suscribirMiembrosConsultorio } from '../../lib/profesionales.js';
 import {
@@ -736,17 +736,6 @@ function ModalNuevoMetodo({ onClose, onAgregar }) {
 
 /* ============================================================
    Tab: Administradores
-   ----------------------------------------------------------------
-   Permite gestionar quienes son admins del consultorio. Tres acciones:
-     - Promover a un profesional a admin
-     - Remover a un admin (ex-admin baja a profesional)
-     - Transferir ownership (solo el owner actual puede)
-
-   Reglas de permisos en la UI:
-     - Cualquier admin ve la lista y puede promover/remover
-     - Solo el owner ve el boton "Transferir ownership"
-     - Nadie puede remover al owner (las rules tambien lo bloquean)
-     - Si quedaria un solo admin, no se puede remover (las rules lo bloquean)
    ============================================================ */
 
 function inicialesNombre(p) {
@@ -765,7 +754,7 @@ function nombreVisible(p) {
 function TabAdministradores({ consultorio, callerUid }) {
   const [miembros, setMiembros] = useState([]);
   const [cargando, setCargando] = useState(true);
-  const [accion, setAccion] = useState(null); // { tipo: 'remover'|'transferir'|'promover', uid? }
+  const [accion, setAccion] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [okMsg, setOkMsg] = useState('');
@@ -782,14 +771,12 @@ function TabAdministradores({ consultorio, callerUid }) {
   const adminUids = useMemo(() => consultorio.adminUids || [], [consultorio.adminUids]);
   const ownerUid = consultorio.ownerUid;
 
-  // Mapa uid -> miembro para lookups rapidos
   const mapMiembros = useMemo(() => {
     const m = {};
     for (const x of miembros) m[x.uid] = x;
     return m;
   }, [miembros]);
 
-  // Lista ordenada de admins: owner primero, despues el resto por nombre
   const admins = useMemo(() => {
     const owner = mapMiembros[ownerUid];
     const otros = adminUids
@@ -800,7 +787,6 @@ function TabAdministradores({ consultorio, callerUid }) {
     return owner ? [owner, ...otros] : otros;
   }, [adminUids, ownerUid, mapMiembros]);
 
-  // Profesionales activos del consultorio que NO son admins (candidatos a promover)
   const profesionalesPromocionables = useMemo(() => {
     return miembros.filter((m) =>
       m.rol === ROLES.PROFESIONAL
@@ -815,8 +801,6 @@ function TabAdministradores({ consultorio, callerUid }) {
     setError('');
     setOkMsg('');
   }
-
-  /* ---- Handlers ---- */
 
   async function handlePromover() {
     if (!profesionalAPromover) return;
@@ -908,8 +892,8 @@ function TabAdministradores({ consultorio, callerUid }) {
         {admins.map((admin) => {
           const esOwner = admin.uid === ownerUid;
           const esCaller = admin.uid === callerUid;
-          const puedeRemover = !esOwner; // El owner no se puede remover
-          const puedeTransferirA = callerEsOwner && !esOwner; // Solo el owner transfiere, y solo a no-owner
+          const puedeRemover = !esOwner;
+          const puedeTransferirA = callerEsOwner && !esOwner;
 
           return (
             <li key={admin.uid} className="cp-admin-row">
@@ -990,7 +974,6 @@ function TabAdministradores({ consultorio, callerUid }) {
         )}
       </div>
 
-      {/* Modal de confirmacion de remover admin */}
       {accion?.tipo === 'remover' && (
         <ConfirmarAccionAdminModal
           titulo={
@@ -1011,7 +994,6 @@ function TabAdministradores({ consultorio, callerUid }) {
         />
       )}
 
-      {/* Modal de confirmacion de transferencia de ownership */}
       {accion?.tipo === 'transferir' && (
         <ConfirmarAccionAdminModal
           titulo={`¿Transferir ownership a ${nombreVisible(mapMiembros[accion.uid] || {})}?`}
@@ -1034,12 +1016,6 @@ function TabAdministradores({ consultorio, callerUid }) {
   );
 }
 
-/**
- * Modal generico de confirmacion para acciones de gestion de admins.
- * Sigue el mismo patron visual que ConfirmarArchivadoModal en Pacientes,
- * pero generalizado para reutilizar entre "remover admin" y "transferir
- * ownership".
- */
 function ConfirmarAccionAdminModal({
   titulo,
   descripcion,
@@ -1093,10 +1069,14 @@ function ConfirmarAccionAdminModal({
 /* ============================================================
    Tab: Pagos (integracion Mercado Pago)
    ----------------------------------------------------------------
-   - Si no esta conectada: card con explicacion + boton "Conectar MP"
-   - Si esta conectada: card con info + boton "Desconectar"
-   - Maneja query params ?mp=connected | ?mp=error&reason=xxx que vienen
-     del callback OAuth.
+   Flow nuevo (post-bug "invalid session"):
+   1. User clickea "Conectar MP"
+   2. Abrimos un modal preventivo que le explica:
+      - Que va a ir a MP
+      - Que tiene que estar logueado en MP
+      - Que puede abrir MP en otra pestaña primero
+   3. En background pedimos al backend la authorize URL
+   4. Cuando el user clickea "Continuar a MP", redirigimos
    ============================================================ */
 
 const REASON_LABELS = {
@@ -1120,13 +1100,13 @@ function TabPagos({ consultorio, searchParams, onLimpiarParams }) {
   const [error, setError] = useState('');
   const [okMsg, setOkMsg] = useState('');
   const [openDesconectar, setOpenDesconectar] = useState(false);
+  const [openConectarModal, setOpenConectarModal] = useState(false);
 
   // Procesar resultado del callback OAuth
   useEffect(() => {
     const mp = searchParams.get('mp');
     if (mp === 'connected') {
       setOkMsg('Cuenta de Mercado Pago vinculada correctamente.');
-      // Limpiamos los query params para que no se vuelva a disparar
       onLimpiarParams();
     } else if (mp === 'error') {
       const reason = searchParams.get('reason') || '';
@@ -1136,19 +1116,6 @@ function TabPagos({ consultorio, searchParams, onLimpiarParams }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  async function handleConectar() {
-    setError('');
-    setOkMsg('');
-    setSubmitting(true);
-    try {
-      await iniciarConexionMP(consultorio.id);
-      // Si llega aca sin redireccion fue raro
-    } catch (err) {
-      setError(err.message || 'No se pudo iniciar la conexión.');
-      setSubmitting(false);
-    }
-  }
 
   async function handleDesconectar() {
     setError('');
@@ -1189,8 +1156,7 @@ function TabPagos({ consultorio, searchParams, onLimpiarParams }) {
         />
       ) : (
         <MPDesconectadaCard
-          onConectar={handleConectar}
-          submitting={submitting}
+          onAbrirModal={() => { setError(''); setOpenConectarModal(true); }}
         />
       )}
 
@@ -1201,11 +1167,19 @@ function TabPagos({ consultorio, searchParams, onLimpiarParams }) {
           submitting={submitting}
         />
       )}
+
+      {openConectarModal && (
+        <ConectarMPModal
+          consultorioId={consultorio.id}
+          onCancelar={() => setOpenConectarModal(false)}
+          onError={(msg) => { setError(msg); setOpenConectarModal(false); }}
+        />
+      )}
     </section>
   );
 }
 
-function MPDesconectadaCard({ onConectar, submitting }) {
+function MPDesconectadaCard({ onAbrirModal }) {
   return (
     <div className="cp-mp-card cp-mp-card--off">
       <div className="cp-mp-card__icon" aria-hidden="true">
@@ -1224,31 +1198,107 @@ function MPDesconectadaCard({ onConectar, submitting }) {
           comisión.
         </p>
 
-        {/*
-          Aviso preventivo: el OAuth de MP requiere que el user este logueado
-          en MP para que la pantalla de "Autorizar a consulpay" funcione.
-          El backend ya envuelve la authorize URL en /login?go=, asi que MP
-          fuerza el login si no hay sesion. Pero igual avisamos al user que
-          va a ir a MP para que tenga claro lo que va a pasar y no se asuste
-          si le aparece la pantalla de login de MP.
-        */}
-        <div className="cp-mp-card__aviso">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
-            strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="16" x2="12" y2="12" />
-            <line x1="12" y1="8" x2="12.01" y2="8" />
-          </svg>
-          <span>
-            Te vamos a llevar a Mercado Pago para autorizar la conexión.{' '}
-            <strong>Si no estás logueado en MP, primero te va a pedir iniciar sesión.</strong>{' '}
-            Asegurate de usar la cuenta MP en la que querés recibir los pagos del consultorio.
-          </span>
+        <div className="cp-mp-card__actions">
+          <Button variant="primary" onClick={onAbrirModal}>
+            Conectar Mercado Pago
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Modal preventivo que se abre al darle "Conectar Mercado Pago".
+ *
+ * Lo que hace:
+ *  1. Apenas se abre, llama al backend en background para obtener la
+ *     authorize URL (asi cuando el user clickea "Continuar a MP" la
+ *     URL ya esta lista — sin esperas).
+ *  2. Le explica al user QUE va a pasar: que va a ir a MP, que tiene
+ *     que estar logueado, que puede abrir MP en otra pestaña primero.
+ *  3. Le da dos botones:
+ *       - "Abrir Mercado Pago primero" (target=_blank a www.mp...)
+ *       - "Continuar a Mercado Pago" (redirige usando la URL ya cargada)
+ */
+function ConectarMPModal({ consultorioId, onCancelar, onError }) {
+  const [authorizeUrl, setAuthorizeUrl] = useState(null);
+  const [loadingUrl, setLoadingUrl] = useState(true);
+
+  useEffect(() => {
+    let cancelado = false;
+    obtenerUrlConexionMP(consultorioId)
+      .then((url) => {
+        if (cancelado) return;
+        setAuthorizeUrl(url);
+        setLoadingUrl(false);
+      })
+      .catch((err) => {
+        if (cancelado) return;
+        onError(err.message || 'No se pudo iniciar la conexión con Mercado Pago.');
+      });
+    return () => { cancelado = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [consultorioId]);
+
+  function handleAbrirMP() {
+    // Abre MP en una pestaña nueva. El user se loguea y vuelve a esta pestaña
+    // para clickear "Continuar".
+    window.open('https://www.mercadopago.com.ar/', '_blank', 'noopener,noreferrer');
+  }
+
+  function handleContinuar() {
+    if (!authorizeUrl) return;
+    window.location.assign(authorizeUrl);
+  }
+
+  return (
+    <div className="cp-modal-overlay" onClick={onCancelar}>
+      <div className="cp-modal cp-modal--conectar-mp" onClick={(e) => e.stopPropagation()}>
+        <button className="cp-modal__close" onClick={onCancelar} aria-label="Cerrar">×</button>
+
+        <h2 className="cp-modal__title">Antes de continuar a Mercado Pago</h2>
+
+        <div className="cp-modal__sub">
+          <p style={{ margin: '0 0 14px' }}>
+            Te vamos a llevar a Mercado Pago para autorizar la conexión a tu consultorio.
+            <strong> Asegurate de tener sesión activa en Mercado Pago con la cuenta correcta</strong>
+            {' '}— la cuenta donde querés recibir los pagos de tus profesionales.
+          </p>
+
+          <ol className="cp-modal-conectar__steps">
+            <li>
+              <strong>Si todavía no estás logueado en Mercado Pago:</strong>
+              {' '}clickeá <em>Abrir Mercado Pago</em> abajo. Se abre en una pestaña nueva.
+              Iniciá sesión ahí, y después volvé a esta pestaña.
+            </li>
+            <li>
+              <strong>Cuando estés logueado en MP en otra pestaña</strong>{' '}
+              (o si ya lo estabas), clickeá <em>Continuar a Mercado Pago</em> y vas a ver la
+              pantalla de "Autorizar a consulpay".
+            </li>
+          </ol>
         </div>
 
-        <div className="cp-mp-card__actions">
-          <Button variant="primary" onClick={onConectar} disabled={submitting}>
-            {submitting ? <><Spinner size={14} /> Redirigiendo a Mercado Pago…</> : 'Conectar Mercado Pago'}
+        <div className="cp-modal__actions cp-modal-conectar__actions">
+          <Button variant="secondary" type="button" onClick={handleAbrirMP}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 6 }}>
+              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+              <polyline points="15 3 21 3 21 9" />
+              <line x1="10" y1="14" x2="21" y2="3" />
+            </svg>
+            Abrir Mercado Pago
+          </Button>
+          <Button
+            variant="primary"
+            type="button"
+            onClick={handleContinuar}
+            disabled={loadingUrl}
+          >
+            {loadingUrl
+              ? <><Spinner size={14} /> Preparando…</>
+              : 'Continuar a Mercado Pago'}
           </Button>
         </div>
       </div>
