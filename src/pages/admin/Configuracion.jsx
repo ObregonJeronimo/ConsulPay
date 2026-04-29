@@ -1223,6 +1223,29 @@ function MPDesconectadaCard({ onConectar, submitting }) {
           en tu cuenta de MP. ConsulPay solo procesa la transacción y se queda con su
           comisión.
         </p>
+
+        {/*
+          Aviso preventivo: el OAuth de MP requiere que el user este logueado
+          en MP para que la pantalla de "Autorizar a consulpay" funcione.
+          El backend ya envuelve la authorize URL en /login?go=, asi que MP
+          fuerza el login si no hay sesion. Pero igual avisamos al user que
+          va a ir a MP para que tenga claro lo que va a pasar y no se asuste
+          si le aparece la pantalla de login de MP.
+        */}
+        <div className="cp-mp-card__aviso">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+            strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="16" x2="12" y2="12" />
+            <line x1="12" y1="8" x2="12.01" y2="8" />
+          </svg>
+          <span>
+            Te vamos a llevar a Mercado Pago para autorizar la conexión.{' '}
+            <strong>Si no estás logueado en MP, primero te va a pedir iniciar sesión.</strong>{' '}
+            Asegurate de usar la cuenta MP en la que querés recibir los pagos del consultorio.
+          </span>
+        </div>
+
         <div className="cp-mp-card__actions">
           <Button variant="primary" onClick={onConectar} disabled={submitting}>
             {submitting ? <><Spinner size={14} /> Redirigiendo a Mercado Pago…</> : 'Conectar Mercado Pago'}
