@@ -77,6 +77,25 @@
         { "fieldPath": "solicitudId", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "_comment": "suscribirPagosDelConsultorio: consultorioId + createdAt desc (admin Pagos)",
+      "collectionGroup": "pagos_consultorio",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "consultorioId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "_comment": "suscribirPagosDelProfesional: consultorioId + profesionalUid + createdAt desc (profesional MisPagos)",
+      "collectionGroup": "pagos_consultorio",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "consultorioId", "order": "ASCENDING" },
+        { "fieldPath": "profesionalUid", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
