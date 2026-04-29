@@ -293,27 +293,6 @@ service cloud.firestore {
 
     // ============================================================
     //  /solicitudes_sesion/{solicitudId}
-    //  ----------------------------------------------------------------
-    //  Solicitudes de creacion/modificacion/eliminacion de sesiones
-    //  hechas por profesionales SIN confianza. El admin las resuelve.
-    //
-    //  RULE DE LECTURA AMPLIA (post-bugfix):
-    //  Originalmente la rule era restrictiva: el profesional solo podia
-    //  leer SUS PROPIAS solicitudes (filtradas por profesionalUid). Eso
-    //  rompia la query de validarNoHayPendienteParaSesion(), que busca
-    //  cualquier solicitud pendiente sobre una sesion sin filtrar por
-    //  profesionalUid. Por el "query rules contract" de Firestore, si
-    //  la rule no garantiza que TODOS los docs candidatos sean legibles,
-    //  la query falla con "Missing or insufficient permissions" — incluso
-    //  si en la realidad la query no devuelve docs ajenos.
-    //
-    //  La solucion es permitir lectura a cualquier profesional del
-    //  consultorio. No es una concesion de seguridad significativa: las
-    //  solicitudes solo contienen metadata operativa (que se pidio
-    //  cambiar y cuando). Datos sensibles del paciente y del split
-    //  economico siguen viviendo en /sesiones/ y /pacientes/, que
-    //  mantienen su rule estricta (solo el profesional asignado puede
-    //  leer las suyas).
     // ============================================================
     match /solicitudes_sesion/{solicitudId} {
 
@@ -321,8 +300,6 @@ service cloud.firestore {
         || esAdminDe(resource.data.consultorioId)
         || esProfesionalDe(resource.data.consultorioId);
 
-      // Crear: solo el profesional autenticado, para SU consultorio,
-      // sobre SI MISMO. La solicitud nace pendiente.
       allow create: if esProfesionalDe(request.resource.data.consultorioId)
         && request.resource.data.profesionalUid == request.auth.uid
         && request.resource.data.estado == 'pendiente'
@@ -330,8 +307,6 @@ service cloud.firestore {
             || request.resource.data.tipo == 'modificar'
             || request.resource.data.tipo == 'eliminar');
 
-      // Update: solo admin del consultorio (resolver = aprobar/rechazar/
-      // marcar obsoleta).
       allow update: if esSuperadmin()
         || (esAdminDe(resource.data.consultorioId)
             && request.resource.data.consultorioId == resource.data.consultorioId
@@ -341,22 +316,11 @@ service cloud.firestore {
                 || request.resource.data.estado == 'rechazada'
                 || request.resource.data.estado == 'obsoleta'));
 
-      // Delete: solo super, no se borran solicitudes (queda como historial)
       allow delete: if esSuperadmin();
     }
 
     // ============================================================
     //  /logs_sesion/{logId}
-    //  ----------------------------------------------------------------
-    //  Logs de auditoria. Inmutables: solo se crean, nunca se editan
-    //  ni se borran (excepto super).
-    //
-    //  RULE DE LECTURA AMPLIA (mismo motivo que solicitudes_sesion):
-    //  Cualquier profesional del consultorio puede leer todos los logs
-    //  del consultorio. Esto evita el mismo problema de query rules
-    //  contract en queries que filtran por solicitudId/sesionId pero
-    //  no por actorUid. No es concesion significativa de seguridad
-    //  porque los logs son metadata de auditoria.
     // ============================================================
     match /logs_sesion/{logId} {
 
@@ -364,21 +328,33 @@ service cloud.firestore {
         || esAdminDe(resource.data.consultorioId)
         || esProfesionalDe(resource.data.consultorioId);
 
-      // Crear: cualquier admin/profesional autenticado del consultorio,
-      // siempre que actorUid sea el mismo que esta autenticado.
       allow create: if estaAutenticado()
         && request.resource.data.actorUid == request.auth.uid
         && (esSuperadmin()
             || esAdminDe(request.resource.data.consultorioId)
             || esProfesionalDe(request.resource.data.consultorioId));
 
-      // Update y delete: prohibidos (logs son inmutables)
       allow update: if false;
       allow delete: if esSuperadmin();
     }
 
     // ============================================================
     //  /pagos_consultorio/{pagoId}
+    //  ----------------------------------------------------------------
+    //  Pagos de profesionales al consultorio (saldar deuda de sesiones).
+    //  Los crea y modifica EXCLUSIVAMENTE el backend serverless
+    //  (firebase-admin saltea las rules) en /api/mp/crear-pago y
+    //  /api/mp/webhook. El frontend NUNCA escribe directamente.
+    //
+    //  Razon: la creacion de un pago dispara una llamada externa a MP
+    //  que requiere validar autenticacion, monto, sesiones, integrar
+    //  con MP API, encriptar tokens, etc. Todo eso vive en el backend.
+    //  El frontend ni tiene acceso al access_token de MP del consultorio.
+    //
+    //  Lectura abierta a:
+    //    - superadmin
+    //    - admin del consultorio (ve los pagos recibidos)
+    //    - profesional dueño del pago (ve sus propios pagos)
     // ============================================================
     match /pagos_consultorio/{pagoId} {
       allow read: if esSuperadmin()
@@ -386,36 +362,25 @@ service cloud.firestore {
         || (esProfesionalDe(resource.data.consultorioId)
             && resource.data.profesionalUid == request.auth.uid);
 
-      allow create: if esSuperadmin()
-        || (esProfesionalDe(request.resource.data.consultorioId)
-            && request.resource.data.profesionalUid == request.auth.uid
-            && request.resource.data.estado == 'pendiente');
-
-      allow update: if esSuperadmin() || esAdminDe(resource.data.consultorioId);
-
-      allow delete: if esSuperadmin();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     // ============================================================
     //  /pagos_mensualidad/{pagoId}
+    //  ----------------------------------------------------------------
+    //  Pagos de mensualidad del Plan Pro (consultorios → ConsulPay).
+    //  Misma logica: solo backend escribe.
     // ============================================================
     match /pagos_mensualidad/{pagoId} {
       allow read: if esSuperadmin()
         || esAdminDe(resource.data.consultorioId);
-      allow write: if esSuperadmin();
+      allow write: if false;
     }
 
     // ============================================================
     //  /config/{docId}
-    //  ----------------------------------------------------------------
-    //  Configuracion global de la plataforma. Por ahora solo existe
-    //  /config/global que tiene comisionFree y comisionPro.
-    //
-    //  Cualquier user autenticado puede leer (porque el frontend de
-    //  "crear consultorio" la consulta para inicializar el campo
-    //  comisionConsulpay del consultorio nuevo).
-    //
-    //  Solo el superadmin escribe (cambia las comisiones globales).
     // ============================================================
     match /config/{docId} {
       allow read: if estaAutenticado();
@@ -424,14 +389,6 @@ service cloud.firestore {
 
     // ============================================================
     //  /oauth_states/{state}
-    //  ----------------------------------------------------------------
-    //  Tokens random temporales (TTL 10 min) que vinculan un flow
-    //  OAuth con el admin/consultorio que lo inicio. Son escritos y
-    //  leidos UNICAMENTE por el backend serverless (firebase-admin
-    //  saltea estas rules). El frontend NUNCA los toca.
-    //
-    //  Bloqueamos todos los accesos del lado cliente. Si por algun
-    //  bug el frontend intenta leer, va a fallar — y eso esta bien.
     // ============================================================
     match /oauth_states/{state} {
       allow read, write: if false;
