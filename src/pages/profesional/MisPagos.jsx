@@ -1,0 +1,393 @@
+import { useEffect, useMemo, useState } from 'react';
+
+import Avatar from '../../components/ui/Avatar.jsx';
+import Badge from '../../components/ui/Badge.jsx';
+import Button from '../../components/ui/Button.jsx';
+import Spinner from '../../components/ui/Spinner.jsx';
+
+import { useAuth } from '../../hooks/useAuth.js';
+import { useConsultorio } from '../../hooks/useConsultorio.js';
+import { ESTADOS_PAGO_SESION, formatoARS } from '../../lib/constants.js';
+import { suscribirPacientesProfesional } from '../../lib/pacientes.js';
+import {
+  iniciarPagoAlConsultorio,
+  labelEstadoPago,
+  suscribirPagosDelProfesional,
+  tonoEstadoPago,
+} from '../../lib/pagos.js';
+import { suscribirSesionesProfesional } from '../../lib/sesiones.js';
+
+import './MisPagos.css';
+
+/* ============================================================
+   Helpers
+   ============================================================ */
+function nombrePaciente(p) {
+  if (!p) return 'Paciente eliminado';
+  return `${p.apellido ?? ''}${p.apellido && p.nombre ? ', ' : ''}${p.nombre ?? ''}`;
+}
+function inicialesPaciente(p) {
+  if (!p) return '·';
+  return ((p.apellido?.[0] ?? '') + (p.nombre?.[0] ?? '')).toUpperCase() || '·';
+}
+function formatoFechaCorta(date) {
+  if (!date) return '—';
+  const d = date.toDate ? date.toDate() : new Date(date);
+  return d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+/* ============================================================
+   Pagina principal
+   ============================================================ */
+export default function MisPagos() {
+  const { user } = useAuth();
+  const { consultorio, loading: loadingConsultorio } = useConsultorio();
+
+  const [sesiones, setSesiones] = useState([]);
+  const [pacientes, setPacientes] = useState([]);
+  const [pagos, setPagos] = useState([]);
+  const [loadingSesiones, setLoadingSesiones] = useState(true);
+
+  // Set de sesionId que el profesional eligio pagar (puede ser
+  // todas las debidas o un subset).
+  const [seleccionadas, setSeleccionadas] = useState(new Set());
+  const [modoSeleccion, setModoSeleccion] = useState(false);
+
+  const [iniciando, setIniciando] = useState(false);
+  const [error, setError] = useState('');
+
+  /* ---- Suscripciones live ---- */
+
+  // Sesiones del profesional - traemos TODAS sin filtro de fecha,
+  // para tener el panorama completo de deuda historica.
+  useEffect(() => {
+    if (!user?.uid || !user?.consultorioId) return;
+    setLoadingSesiones(true);
+    const unsub = suscribirSesionesProfesional(
+      user.uid,
+      user.consultorioId,
+      (data) => {
+        setSesiones(data);
+        setLoadingSesiones(false);
+      },
+    );
+    return unsub;
+  }, [user?.uid, user?.consultorioId]);
+
+  useEffect(() => {
+    if (!user?.uid || !user?.consultorioId) return;
+    return suscribirPacientesProfesional(user.uid, user.consultorioId, setPacientes);
+  }, [user?.uid, user?.consultorioId]);
+
+  useEffect(() => {
+    if (!user?.uid || !user?.consultorioId) return;
+    return suscribirPagosDelProfesional(user.uid, user.consultorioId, setPagos);
+  }, [user?.uid, user?.consultorioId]);
+
+  const mapaPacientes = useMemo(() => {
+    const m = {};
+    for (const p of pacientes) m[p.id] = p;
+    return m;
+  }, [pacientes]);
+
+  /* ---- Calculos derivados ---- */
+
+  // Sesiones debidas: las que tienen estadoPago='debido' y no estan
+  // ya vinculadas a un pago aprobado.
+  const sesionesDebidas = useMemo(
+    () => sesiones.filter((s) => s.estadoPago === ESTADOS_PAGO_SESION.DEBIDO),
+    [sesiones],
+  );
+
+  const deudaTotal = useMemo(
+    () => sesionesDebidas.reduce((acc, s) => acc + (s.montoConsultorio || 0), 0),
+    [sesionesDebidas],
+  );
+
+  // Si hay seleccion activa, el subtotal cambia
+  const subtotalSeleccionado = useMemo(() => {
+    if (!modoSeleccion || seleccionadas.size === 0) return deudaTotal;
+    return sesionesDebidas
+      .filter((s) => seleccionadas.has(s.id))
+      .reduce((acc, s) => acc + (s.montoConsultorio || 0), 0);
+  }, [modoSeleccion, seleccionadas, sesionesDebidas, deudaTotal]);
+
+  const sesionesIdsParaPagar = useMemo(() => {
+    if (modoSeleccion && seleccionadas.size > 0) {
+      return sesionesDebidas
+        .filter((s) => seleccionadas.has(s.id))
+        .map((s) => s.id);
+    }
+    return sesionesDebidas.map((s) => s.id);
+  }, [modoSeleccion, seleccionadas, sesionesDebidas]);
+
+  const pagosFiltrados = useMemo(() => {
+    // No mostramos pagos rechazados con monto 0 (errores de creacion)
+    return pagos.filter((p) => p.estado !== 'rechazado' || p.mpPaymentId);
+  }, [pagos]);
+
+  /* ---- Handlers ---- */
+
+  function toggleSesion(id) {
+    setSeleccionadas((prev) => {
+      const nuevo = new Set(prev);
+      if (nuevo.has(id)) nuevo.delete(id);
+      else nuevo.add(id);
+      return nuevo;
+    });
+  }
+
+  function toggleSeleccionarTodas() {
+    if (seleccionadas.size === sesionesDebidas.length) {
+      setSeleccionadas(new Set());
+    } else {
+      setSeleccionadas(new Set(sesionesDebidas.map((s) => s.id)));
+    }
+  }
+
+  function entrarModoSeleccion() {
+    setModoSeleccion(true);
+    setSeleccionadas(new Set(sesionesDebidas.map((s) => s.id)));
+  }
+
+  function salirModoSeleccion() {
+    setModoSeleccion(false);
+    setSeleccionadas(new Set());
+  }
+
+  async function handlePagar() {
+    setError('');
+    if (sesionesIdsParaPagar.length === 0) {
+      setError('No tenés sesiones debidas para pagar.');
+      return;
+    }
+    if (!consultorio?.mpIntegrado) {
+      setError('El método de pago está deshabilitado. Contactá al dueño del consultorio.');
+      return;
+    }
+    setIniciando(true);
+    try {
+      await iniciarPagoAlConsultorio({
+        consultorioId: user.consultorioId,
+        sesionesIds: sesionesIdsParaPagar,
+      });
+      // Si llega acá sin redireccion fue raro
+    } catch (err) {
+      setIniciando(false);
+      const detalleMP = err.detalle?.detalleMP;
+      let mensaje = err.message || 'No se pudo iniciar el pago.';
+      if (detalleMP?.message) {
+        mensaje += ` (MP: ${detalleMP.message})`;
+      }
+      setError(mensaje);
+    }
+  }
+
+  /* ---- Renders ---- */
+
+  if (loadingConsultorio) {
+    return (
+      <div className="cp-mis-pagos">
+        <div style={{ padding: 60, display: 'flex', justifyContent: 'center' }}>
+          <Spinner size={24} />
+        </div>
+      </div>
+    );
+  }
+
+  const mpDeshabilitado = !consultorio?.mpIntegrado;
+
+  return (
+    <div className="cp-mis-pagos">
+      <header className="cp-page-header">
+        <div>
+          <h1 className="cp-page-title">Mis pagos al consultorio</h1>
+          <p className="cp-page-sub">
+            Saldá tu deuda con el consultorio cuando quieras. Los pagos se procesan
+            por Mercado Pago.
+          </p>
+        </div>
+      </header>
+
+      {error && (
+        <div className="cp-config-error" role="alert">{error}</div>
+      )}
+
+      {mpDeshabilitado && (
+        <div className="cp-mp-deshabilitado">
+          <strong>Pagos online deshabilitados.</strong>{' '}
+          El consultorio todavía no vinculó su cuenta de Mercado Pago.
+          {' '}Contactá al dueño del consultorio para que active los pagos.
+        </div>
+      )}
+
+      {/* Card de deuda actual + boton pagar */}
+      <section className="cp-deuda-card">
+        <div className="cp-deuda-card__main">
+          <div className="cp-deuda-card__label">Deuda actual con el consultorio</div>
+          <div className="cp-deuda-card__monto">
+            {formatoARS.format(modoSeleccion ? subtotalSeleccionado : deudaTotal)}
+          </div>
+          <div className="cp-deuda-card__hint">
+            {sesionesDebidas.length === 0
+              ? 'No tenés sesiones pendientes de pago. ¡Estás al día!'
+              : modoSeleccion && seleccionadas.size > 0
+                ? `${seleccionadas.size} de ${sesionesDebidas.length} sesión${seleccionadas.size === 1 ? '' : 'es'} seleccionada${seleccionadas.size === 1 ? '' : 's'}`
+                : `${sesionesDebidas.length} sesión${sesionesDebidas.length === 1 ? '' : 'es'} debida${sesionesDebidas.length === 1 ? '' : 's'}`}
+          </div>
+        </div>
+        {sesionesDebidas.length > 0 && (
+          <div className="cp-deuda-card__actions">
+            {!modoSeleccion ? (
+              <>
+                <Button
+                  variant="secondary"
+                  onClick={entrarModoSeleccion}
+                  disabled={mpDeshabilitado || iniciando}
+                >
+                  Elegir cuáles pagar
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={handlePagar}
+                  disabled={mpDeshabilitado || iniciando}
+                >
+                  {iniciando
+                    ? <><Spinner size={14} /> Redirigiendo a Mercado Pago…</>
+                    : `Pagar ${formatoARS.format(deudaTotal)}`}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="secondary" onClick={salirModoSeleccion} disabled={iniciando}>
+                  Cancelar selección
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={handlePagar}
+                  disabled={mpDeshabilitado || iniciando || seleccionadas.size === 0}
+                >
+                  {iniciando
+                    ? <><Spinner size={14} /> Redirigiendo…</>
+                    : `Pagar ${formatoARS.format(subtotalSeleccionado)}`}
+                </Button>
+              </>
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* Lista de sesiones debidas */}
+      {loadingSesiones ? (
+        <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}>
+          <Spinner size={20} label="Cargando sesiones…" />
+        </div>
+      ) : sesionesDebidas.length > 0 && (
+        <section className="cp-debe-section">
+          <div className="cp-debe-section__head">
+            <h2 className="cp-debe-section__title">Sesiones a pagar</h2>
+            {modoSeleccion && (
+              <button
+                type="button"
+                className="cp-debe-section__select-all"
+                onClick={toggleSeleccionarTodas}
+              >
+                {seleccionadas.size === sesionesDebidas.length
+                  ? 'Deseleccionar todas'
+                  : 'Seleccionar todas'}
+              </button>
+            )}
+          </div>
+          <div className="cp-table-wrap">
+            <table className="cp-table cp-debe-tabla">
+              <thead>
+                <tr>
+                  {modoSeleccion && <th aria-label="Seleccionar" style={{ width: 40 }} />}
+                  <th>Fecha</th>
+                  <th>Paciente</th>
+                  <th>Método</th>
+                  <th className="cp-num-col">Mi parte</th>
+                  <th className="cp-num-col">Al consultorio</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sesionesDebidas.map((s) => {
+                  const pac = mapaPacientes[s.pacienteId];
+                  const seleccionada = seleccionadas.has(s.id);
+                  return (
+                    <tr
+                      key={s.id}
+                      className={modoSeleccion && seleccionada ? 'cp-debe-tabla__row--selected' : ''}
+                      onClick={modoSeleccion ? () => toggleSesion(s.id) : undefined}
+                      style={modoSeleccion ? { cursor: 'pointer' } : undefined}
+                    >
+                      {modoSeleccion && (
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={seleccionada}
+                            onChange={() => toggleSesion(s.id)}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </td>
+                      )}
+                      <td>{formatoFechaCorta(s.fecha)}</td>
+                      <td>
+                        {pac ? (
+                          <div className="cp-prof-cell">
+                            <Avatar initials={inicialesPaciente(pac)} size={26} />
+                            <span style={{ fontSize: 13.5 }}>{nombrePaciente(pac)}</span>
+                          </div>
+                        ) : <span style={{ color: 'var(--cp-text-faint)' }}>Paciente eliminado</span>}
+                      </td>
+                      <td style={{ fontSize: 13 }}>{s.metodoPagoNombre}</td>
+                      <td className="cp-num" style={{ color: 'var(--cp-success)' }}>
+                        {formatoARS.format(s.montoProfesional)}
+                      </td>
+                      <td className="cp-num" style={{ color: 'var(--cp-accent)' }}>
+                        {formatoARS.format(s.montoConsultorio)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {/* Historial de pagos previos */}
+      {pagosFiltrados.length > 0 && (
+        <section className="cp-historial-section">
+          <h2 className="cp-historial-section__title">Historial de pagos</h2>
+          <div className="cp-table-wrap">
+            <table className="cp-table">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th className="cp-num-col">Monto pagado</th>
+                  <th className="cp-num-col">Sesiones</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pagosFiltrados.map((p) => (
+                  <tr key={p.id}>
+                    <td>{formatoFechaCorta(p.createdAt)}</td>
+                    <td className="cp-num">{formatoARS.format(p.montoTotal || 0)}</td>
+                    <td className="cp-num">{p.sesionesIds?.length || 0}</td>
+                    <td>
+                      <Badge tone={tonoEstadoPago(p.estado)}>
+                        {labelEstadoPago(p.estado)}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
