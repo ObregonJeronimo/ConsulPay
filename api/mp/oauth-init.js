@@ -15,23 +15,21 @@
  * El state previene CSRF y vincula el callback al admin/consultorio
  * que inicio el flow.
  *
- * IMPORTANTE - prelogin:
- * En lugar de mandar al user directo a /authorization (que falla con
- * "invalid session" si no hay sesion MP), lo mandamos a:
+ * NOTA sobre la pantalla "invalid session" de MP:
+ * Si el user llega al authorize sin sesion MP activa y le da
+ * "Autorizar", MP devuelve un opaco {"code":"unauthorized","message":
+ * "invalid session"}. Probamos varias vueltas:
  *
- *   auth.mercadopago.com.ar/login?go=/authorization?...
+ *   - www.mercadopago.com.ar/login?go=https://auth... → "Algo salio mal"
+ *     (MP no acepta cruzar subdominios en `go`)
+ *   - auth.mercadopago.com.ar/login?go=/authorization → 404 en ML
+ *     (cuando no hay sesion, MP delega a SSO de Mercado Libre, y ML no
+ *      tiene /authorization en sus rutas)
  *
- * Notas sobre el "go":
- * - DEBE ser relativo al mismo dominio (auth.mercadopago.com.ar). Si
- *   pasamos una URL absoluta a otro subdominio (ej www.mercadopago.com.ar),
- *   MP rompe con un genérico "Algo salió mal".
- * - El path en `go` se compone solamente del path + query del authorize,
- *   sin el dominio.
- *
- * Con esto:
- * - Si el user ya esta logueado en MP, MP salta el login automaticamente
- *   y va directo a authorize.
- * - Si no esta logueado, MP le pide loguearse y despues va al authorize.
+ * Conclusion: el wrapper `?go=` no es para apps OAuth de terceros.
+ * Volvemos al flujo estandar (link directo a /authorization). La
+ * prevencion de "invalid session" la maneja el frontend con un modal
+ * preventivo que avisa al user que se loguee en MP antes de continuar.
  *
  * Body:  { consultorioId: string }
  * Header: Authorization: Bearer <firebase_id_token>
@@ -45,7 +43,7 @@ import { asegurarAdminDeConsultorio, verificarAuthHeader } from '../_lib/auth.js
 import { initAdmin } from '../_lib/firebase-admin.js';
 import { jsonResponse, readJsonBody } from '../_lib/http.js';
 
-const MP_AUTH_BASE = 'https://auth.mercadopago.com.ar';
+const MP_AUTHORIZE_URL = 'https://auth.mercadopago.com.ar/authorization';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -108,21 +106,15 @@ export default async function handler(req, res) {
     used: false,
   });
 
-  // Construimos el path + query del authorize (sin el dominio, porque
-  // va a ir como `go` relativo al login del mismo subdominio).
-  const authorizeParams = new URLSearchParams({
+  // Construir URL de autorizacion estandar (sin wrapper)
+  const params = new URLSearchParams({
     client_id: clientId,
     response_type: 'code',
     platform_id: 'mp',
     redirect_uri: redirectUri,
     state,
   });
-  const goRelative = `/authorization?${authorizeParams.toString()}`;
-
-  // Envolverla en /login?go=<go_relativo> en el MISMO subdominio
-  // (auth.mercadopago.com.ar). MP no acepta cruzar subdominios en `go`.
-  const loginParams = new URLSearchParams({ go: goRelative });
-  const authorizeUrl = `${MP_AUTH_BASE}/login?${loginParams.toString()}`;
+  const authorizeUrl = `${MP_AUTHORIZE_URL}?${params.toString()}`;
 
   return jsonResponse(res, 200, { authorizeUrl });
 }
