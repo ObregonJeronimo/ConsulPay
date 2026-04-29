@@ -651,6 +651,33 @@
   margin-top: 4px;
 }
 
+/* Aviso preventivo en card de "Conectar MP" — explica al user que va
+   a ser redirigido y que tiene que loguearse en MP si no esta logueado. */
+.cp-mp-card__aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--cp-bg);
+  border: 1px solid var(--cp-border);
+  border-left: 3px solid var(--cp-accent);
+  border-radius: var(--cp-radius-md);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--cp-text-muted);
+  margin-bottom: 16px;
+}
+
+.cp-mp-card__aviso svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--cp-accent);
+}
+
+.cp-mp-card__aviso strong {
+  color: var(--cp-text);
+}
+
 @media (max-width: 600px) {
   .cp-mp-card {
     flex-direction: column;
