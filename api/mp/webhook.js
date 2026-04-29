@@ -1,33 +1,30 @@
 /**
  * /api/mp/webhook
  *
- * Receptor de notificaciones IPN/Webhooks de Mercado Pago.
+ * Receptor UNIFICADO de notificaciones IPN/Webhooks de Mercado Pago.
+ * MP solo permite UNA URL de webhook por aplicacion, asi que routeamos
+ * adentro segun el type del evento.
  *
- * MP nos manda un POST cada vez que un pago cambia de estado. Este
- * endpoint:
- *   1. Valida la firma HMAC del webhook con MP_WEBHOOK_SECRET.
- *   2. Identifica el pago (data.id viene en el body / query).
- *   3. Hace fetch fresco contra la API de MP para obtener el estado
- *      real del pago (no confiamos solo en el body del webhook).
- *   4. Busca el doc /pagos_consultorio por mpPreferenceId o
- *      external_reference (=pagoId).
- *   5. Actualiza el doc del pago con el estado nuevo.
- *   6. Si el pago fue aprobado, marca las sesiones asociadas como
- *      pagadas (estadoPago='pagado' + pagoConsultorioId=pagoId).
+ * Tipos manejados:
+ *   - payment: pago de profesional al consultorio (marketplace_fee)
+ *   - subscription_preapproval: estado de suscripcion del Plan Pro
+ *   - subscription_authorized_payment: cobro mensual del Plan Pro
+ *   - merchant_order, plan, etc.: ignorados (devolvemos 200)
  *
- * IDEMPOTENCIA: si MP nos manda el mismo webhook 2 veces (cosa que
- * pasa), no debe tener efectos secundarios. Antes de actualizar,
- * chequeamos el estado actual del doc.
+ * Para todos los tipos:
+ *   1. Validamos firma HMAC con MP_WEBHOOK_SECRET.
+ *   2. Hacemos fetch contra la API de MP para obtener el estado real
+ *      (no confiamos solo en el body del webhook).
+ *   3. Actualizamos los docs correspondientes en Firestore.
  *
- * VALIDACION DE FIRMA: MP firma cada webhook con HMAC-SHA256 usando
- * el secret que configuramos en su panel + el id del pago + un
- * timestamp. Si la firma no coincide, devolvemos 401 y NO procesamos.
- * Sin esta validacion, cualquiera podria simular pagos aprobados.
+ * IDEMPOTENCIA: si MP nos manda el mismo webhook 2 veces, no debe
+ * tener efectos secundarios. Cada handler chequea estado actual
+ * antes de actualizar.
  *
- * IMPORTANTE: este endpoint debe ser tolerante a errores y siempre
- * devolver 200 OK rapido a MP, sino MP reintenta indefinidamente y
- * podemos tener tormentas de webhooks. Si algo falla, logueamos pero
- * devolvemos 200.
+ * IMPORTANTE: este endpoint debe devolver 200 OK rapido a MP, sino
+ * MP reintenta indefinidamente. Si algo falla en el procesamiento,
+ * logueamos pero devolvemos 200. La unica excepcion es firma
+ * invalida (401) — no devolvemos 200 a un atacante.
  */
 
 import { createHmac } from 'crypto';
@@ -37,6 +34,10 @@ import { initAdmin } from '../_lib/firebase-admin.js';
 import { jsonResponse, readJsonBody } from '../_lib/http.js';
 import { decrypt } from '../_lib/encryption.js';
 import { getPagoMP } from '../_lib/mp-marketplace.js';
+import {
+  procesarAuthorizedPayment,
+  procesarPreapproval,
+} from '../_lib/handlers-suscripciones.js';
 
 /**
  * Valida la firma x-signature del webhook.
@@ -45,13 +46,7 @@ import { getPagoMP } from '../_lib/mp-marketplace.js';
  *   manifest = `id:${dataId};request-id:${requestId};ts:${ts};`
  *   signature_hex = HMAC-SHA256(manifest, MP_WEBHOOK_SECRET)
  *
- * El header viene como:
- *   x-signature: ts=1234567,v1=abcd1234...
- *
- * Devuelve true si la firma coincide, false si no.
- *
- * Si MP_WEBHOOK_SECRET no esta configurado, devuelve true SOLO en
- * desarrollo (NODE_ENV !== 'production'). En produccion, false.
+ * Header: x-signature: ts=1234567,v1=abcd1234...
  */
 function validarFirma(req, dataId) {
   const secret = process.env.MP_WEBHOOK_SECRET;
@@ -71,7 +66,6 @@ function validarFirma(req, dataId) {
     return false;
   }
 
-  // Parsear ts=...,v1=...
   const parts = String(xSignature).split(',').map((p) => p.trim());
   let ts = null;
   let hash = null;
@@ -86,7 +80,6 @@ function validarFirma(req, dataId) {
     return false;
   }
 
-  // Construir el manifest segun la doc de MP
   const manifest = `id:${dataId};request-id:${xRequestId};ts:${ts};`;
   const calculado = createHmac('sha256', secret).update(manifest).digest('hex');
 
@@ -103,21 +96,9 @@ function validarFirma(req, dataId) {
 
 /**
  * Extrae el desglose de fees del objeto Payment de MP.
- *
- * MP devuelve un array fee_details con todas las fees aplicadas:
- *   { type: 'mercadopago_fee', amount: 22.29, fee_payer: 'collector' }
- *   { type: 'application_fee', amount: 24.00, fee_payer: 'collector' }
- *   ...otros tipos posibles: financing_fee, financing_repayment_fee, ...
- *
- * Lo que nos interesa para mostrar al user:
- *  - feeMercadoPago: lo que cobra MP por procesar el pago
- *  - feeAplicacion: nuestra comisión (marketplace_fee). Aunque ya la
- *    tenemos en pagoData.comisionConsulpay, validamos que coincida.
- *  - netReceivedAmount: lo que efectivamente recibe el seller.
- *
- * Si fee_details no viene, devolvemos { feeMercadoPago: null, ... }
- * — es importante manejar el caso null en la UI para pagos viejos
- * que no tienen este desglose.
+ * fee_details viene como array con cada cargo. Nos interesa:
+ *  - mercadopago_fee: cargo de MP por procesar el pago
+ *  - application_fee: nuestra comision (marketplace_fee)
  */
 function extraerFeeDetails(pagoMP) {
   const details = Array.isArray(pagoMP.fee_details) ? pagoMP.fee_details : [];
@@ -136,12 +117,8 @@ function extraerFeeDetails(pagoMP) {
       feeAplicacion += amount;
       huboAppFee = true;
     }
-    // Otros tipos (financing_fee, etc) los ignoramos por ahora.
-    // Si aparecen para algun caso de cuotas, agregar.
   }
 
-  // El neto que recibe el seller. Lo sacamos directo de transaction_details
-  // (lo calcula MP), pero si no viene, lo calculamos nosotros.
   const netDeMP = pagoMP.transaction_details?.net_received_amount;
   const transactionAmount = Number(pagoMP.transaction_amount) || 0;
   const netCalculado = transactionAmount - feeMercadoPago - feeAplicacion;
@@ -151,8 +128,36 @@ function extraerFeeDetails(pagoMP) {
     feeAplicacion: huboAppFee ? feeAplicacion : null,
     netReceivedAmount: typeof netDeMP === 'number' ? netDeMP : netCalculado,
     transactionAmount,
-    feeDetailsRaw: details, // por si despues queremos mostrar todos
+    feeDetailsRaw: details,
   };
+}
+
+/**
+ * Normaliza el `type` que viene en el body del webhook.
+ *
+ * MP usa formatos distintos segun el tipo de evento:
+ *  - body.type='payment' (formato moderno)
+ *  - body.topic='payment' (formato IPN viejo)
+ *  - query string ?type=payment o ?topic=payment
+ *  - body.action='payment.updated' (notificaciones de tipo 'action')
+ *
+ * Devolvemos el tipo en lowercase normalizado:
+ *  - 'payment'
+ *  - 'subscription_preapproval'
+ *  - 'subscription_authorized_payment'
+ *  - 'merchant_order' (ignorado)
+ *  - cualquier otro: lo devolvemos como vino para loguear
+ */
+function normalizarTipoEvento(body, queryType) {
+  const raw = body?.type || body?.topic || queryType || '';
+  const action = body?.action || '';
+
+  // Si action es del tipo 'payment.updated', extraemos el tipo
+  if (action.startsWith('payment.')) return 'payment';
+  if (action.startsWith('subscription_preapproval.')) return 'subscription_preapproval';
+  if (action.startsWith('subscription_authorized_payment.')) return 'subscription_authorized_payment';
+
+  return String(raw).toLowerCase();
 }
 
 export default async function handler(req, res) {
@@ -167,25 +172,35 @@ export default async function handler(req, res) {
     body = {};
   }
 
-  // MP envia el id del pago de varias formas posibles:
-  //  - body.data.id (formato nuevo "webhooks v2")
-  //  - body.id + body.topic (formato IPN viejo)
-  //  - query string ?id=...&topic=payment
   const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
   const queryId = url.searchParams.get('id') || url.searchParams.get('data.id');
-  const queryTopic = url.searchParams.get('topic') || url.searchParams.get('type');
+  const queryType = url.searchParams.get('type') || url.searchParams.get('topic');
 
   const dataId = body?.data?.id || body?.id || queryId;
-  const topic = body?.type || body?.topic || queryTopic;
+  const tipo = normalizarTipoEvento(body, queryType);
 
-  // Solo procesamos pagos. Otros topics (ej "merchant_order") los ignoramos.
-  if (topic !== 'payment') {
-    return jsonResponse(res, 200, { ok: true, ignorado: 'topic_no_payment', topic });
+  // Sin id no podemos hacer nada
+  if (!dataId) {
+    console.warn('Webhook sin data.id ni id', { tipo, body, queryId });
+    return jsonResponse(res, 200, { ok: true, ignorado: 'sin_id' });
   }
 
-  if (!dataId) {
-    console.warn('Webhook sin data.id ni id ni query id', { body, queryId });
-    return jsonResponse(res, 200, { ok: true, ignorado: 'sin_id' });
+  // Filtrar tipos que NO procesamos. Devolvemos 200 para que MP no
+  // reintente, pero no hacemos nada.
+  const tiposManejados = new Set([
+    'payment',
+    'subscription_preapproval',
+    'subscription_authorized_payment',
+    'preapproval', // alias por las dudas
+    'authorized_payment', // alias por las dudas
+  ]);
+
+  if (!tiposManejados.has(tipo)) {
+    return jsonResponse(res, 200, {
+      ok: true,
+      ignorado: 'tipo_no_manejado',
+      tipo,
+    });
   }
 
   // Validar firma
@@ -202,21 +217,39 @@ export default async function handler(req, res) {
 
   const db = getFirestore();
 
+  // Routear segun tipo
   try {
-    await procesarPago(db, dataId);
+    if (tipo === 'payment') {
+      await procesarPagoConsultorio(db, dataId);
+    } else if (tipo === 'subscription_preapproval' || tipo === 'preapproval') {
+      const accessToken = process.env.CONSULPAY_MP_ACCESS_TOKEN;
+      if (!accessToken) {
+        console.error('CONSULPAY_MP_ACCESS_TOKEN no configurado');
+      } else {
+        await procesarPreapproval(db, accessToken, dataId);
+      }
+    } else if (tipo === 'subscription_authorized_payment' || tipo === 'authorized_payment') {
+      const accessToken = process.env.CONSULPAY_MP_ACCESS_TOKEN;
+      if (!accessToken) {
+        console.error('CONSULPAY_MP_ACCESS_TOKEN no configurado');
+      } else {
+        await procesarAuthorizedPayment(db, accessToken, dataId);
+      }
+    }
   } catch (err) {
-    console.error('Error procesando webhook MP:', err);
+    console.error(`Error procesando webhook MP (tipo=${tipo}):`, err);
   }
 
   return jsonResponse(res, 200, { ok: true });
 }
 
-/**
- * Procesa la notificacion de un pago.
- * Lee el pago de MP, lo matchea con un doc /pagos_consultorio,
- * y actualiza estados.
- */
-async function procesarPago(db, paymentId) {
+/* ============================================================
+   Handler de pagos (marketplace_fee / pagos_consultorio)
+   ----------------------------------------------------------------
+   Logica que ya tenia el endpoint antes de unificar. Sin cambios.
+   ============================================================ */
+
+async function procesarPagoConsultorio(db, paymentId) {
   // Buscamos directo en pagos_consultorio si ya tenemos este paymentId
   const existentePorPaymentId = await db.collection('pagos_consultorio')
     .where('mpPaymentId', '==', String(paymentId))
@@ -228,7 +261,7 @@ async function procesarPago(db, paymentId) {
     pagoDoc = existentePorPaymentId.docs[0];
   }
 
-  // Si no lo encontramos, iteramos consultorios y buscamos por external_reference.
+  // Si no lo encontramos, iteramos consultorios y buscamos por external_reference
   if (!pagoDoc) {
     const consultoriosSnap = await db.collection('consultorios')
       .where('mpIntegrado', '==', true)
@@ -261,7 +294,9 @@ async function procesarPago(db, paymentId) {
         }
         const pagoData = pagoSnap.data();
         if (pagoData.consultorioId !== consDoc.id) {
-          console.warn(`Mismatch consultorio en pago ${externalRef}: ${pagoData.consultorioId} vs ${consDoc.id}`);
+          console.warn(
+            `Mismatch consultorio en pago ${externalRef}: ${pagoData.consultorioId} vs ${consDoc.id}`,
+          );
           continue;
         }
         pagoDoc = pagoSnap;
@@ -279,8 +314,7 @@ async function procesarPago(db, paymentId) {
       return;
     }
   } else {
-    // Ya teniamos el pago, refrescamos el estado contra MP usando el
-    // access_token del consultorio asociado.
+    // Ya teniamos el pago, refrescamos contra MP usando el access_token del consultorio
     const pagoData = pagoDoc.data();
     const consSnap = await db.collection('consultorios').doc(pagoData.consultorioId).get();
     if (!consSnap.exists) {
@@ -308,25 +342,12 @@ async function procesarPago(db, paymentId) {
   }
 }
 
-/**
- * Mapea el status de MP al estado nuestro y actualiza el doc del pago.
- * Si el pago fue aprobado y todavia no procesamos, marca las sesiones
- * como pagadas.
- *
- * IDEMPOTENTE: si llaman 2 veces con el mismo pago aprobado, las
- * sesiones se actualizan una sola vez (chequeamos webhookRecibidoAt).
- *
- * NUEVO: ahora extraemos fee_details del payment para guardar el
- * desglose real de fees (lo que cobro MP, lo que cobro la app, y el
- * neto que recibe el seller). La UI lo muestra para que el admin
- * sepa exactamente que va a recibir en su cuenta.
- */
 async function actualizarPagoYDescuentoSesiones(db, pagoSnap, pagoMP) {
   const pagoData = pagoSnap.data();
   const pagoRef = pagoSnap.ref;
 
   // Mapeo de estados MP → nuestros
-  let estadoNuevo = pagoData.estado; // default no cambiar
+  let estadoNuevo = pagoData.estado;
   switch (pagoMP.status) {
     case 'approved':
       estadoNuevo = 'aprobado';
@@ -353,19 +374,8 @@ async function actualizarPagoYDescuentoSesiones(db, pagoSnap, pagoMP) {
   const yaProcesadoComoAprobado = pagoData.estado === 'aprobado'
     && pagoData.webhookRecibidoAt != null;
 
-  // Extraer desglose de fees
   const fees = extraerFeeDetails(pagoMP);
 
-  // Actualizar el doc del pago.
-  // Nuevos campos:
-  //  - feeMercadoPago: lo que cobra MP (a informar al user)
-  //  - montoNetoReal: lo que efectivamente recibe el seller (=
-  //    transaction_amount - feeMercadoPago - application_fee)
-  //  - feeDetailsRaw: array completo por si queremos analizar despues
-  //
-  // Mantenemos por compat:
-  //  - montoNeto: el campo viejo (= bruto - comisionConsulpay), pero
-  //    ahora la UI lee montoNetoReal con fallback a montoNeto.
   await pagoRef.update({
     estado: estadoNuevo,
     mpPaymentId: String(pagoMP.id),
@@ -386,8 +396,7 @@ async function actualizarPagoYDescuentoSesiones(db, pagoSnap, pagoMP) {
     updatedAt: FieldValue.serverTimestamp(),
   });
 
-  // Si el pago fue aprobado y NO lo procesamos antes, marcamos las
-  // sesiones como pagadas en una sola transaccion atomica.
+  // Si el pago fue aprobado y NO lo procesamos antes, marcamos sesiones
   if (estadoNuevo === 'aprobado' && !yaProcesadoComoAprobado) {
     const sesionesIds = pagoData.sesionesIds || [];
     if (sesionesIds.length > 0) {
@@ -402,9 +411,14 @@ async function actualizarPagoYDescuentoSesiones(db, pagoSnap, pagoMP) {
       }
       try {
         await batch.commit();
-        console.log(`Marcadas ${sesionesIds.length} sesiones como pagadas para pago ${pagoSnap.id}`);
+        console.log(
+          `Marcadas ${sesionesIds.length} sesiones como pagadas para pago ${pagoSnap.id}`,
+        );
       } catch (err) {
-        console.error(`Error marcando sesiones como pagadas para pago ${pagoSnap.id}:`, err);
+        console.error(
+          `Error marcando sesiones como pagadas para pago ${pagoSnap.id}:`,
+          err,
+        );
       }
     }
   }
