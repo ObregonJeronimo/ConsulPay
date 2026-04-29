@@ -1,0 +1,259 @@
+/* ============================================================
+   Mis pagos (profesional) + Retorno post-checkout
+   ============================================================ */
+
+.cp-mis-pagos {
+  max-width: 920px;
+}
+
+/* Mensaje cuando MP no esta vinculado */
+.cp-mp-deshabilitado {
+  background: var(--cp-warning-bg, #f5e9d8);
+  border: 1px solid var(--cp-warning, #c89b3c);
+  color: var(--cp-text);
+  padding: 14px 18px;
+  border-radius: var(--cp-radius-md);
+  font-size: 13.5px;
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+/* Card de deuda actual */
+.cp-deuda-card {
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-lg);
+  padding: 28px 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 24px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.cp-deuda-card__main {
+  flex: 1;
+  min-width: 240px;
+}
+
+.cp-deuda-card__label {
+  font-size: 12.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cp-text-muted);
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.cp-deuda-card__monto {
+  font-family: var(--cp-font-serif);
+  font-size: 44px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--cp-text);
+  line-height: 1;
+  margin-bottom: 10px;
+}
+
+.cp-deuda-card__hint {
+  font-size: 13px;
+  color: var(--cp-text-muted);
+}
+
+.cp-deuda-card__actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 600px) {
+  .cp-deuda-card {
+    padding: 20px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .cp-deuda-card__monto {
+    font-size: 36px;
+  }
+  .cp-deuda-card__actions {
+    width: 100%;
+  }
+  .cp-deuda-card__actions .cp-btn {
+    flex: 1;
+  }
+}
+
+/* Seccion de sesiones a pagar */
+.cp-debe-section {
+  margin-bottom: 24px;
+}
+
+.cp-debe-section__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  gap: 10px;
+}
+
+.cp-debe-section__title {
+  font-family: var(--cp-font-serif);
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin: 0;
+  color: var(--cp-text);
+}
+
+.cp-debe-section__select-all {
+  background: transparent;
+  border: 1px solid var(--cp-border-strong);
+  border-radius: var(--cp-radius-sm);
+  padding: 5px 12px;
+  font-family: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  color: var(--cp-text-muted);
+  transition: all var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-debe-section__select-all:hover {
+  background: var(--cp-surface-hover);
+  color: var(--cp-text);
+}
+
+.cp-debe-tabla__row--selected {
+  background: var(--cp-accent-bg, rgba(193, 95, 60, 0.08));
+}
+
+/* Historial de pagos */
+.cp-historial-section {
+  margin-top: 32px;
+}
+
+.cp-historial-section__title {
+  font-family: var(--cp-font-serif);
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin: 0 0 12px;
+  color: var(--cp-text);
+}
+
+/* ============================================================
+   Pagina de retorno post-checkout
+   ============================================================ */
+
+.cp-retorno-pago {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+}
+
+.cp-retorno-card {
+  max-width: 520px;
+  width: 100%;
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-lg);
+  padding: 40px 36px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.cp-retorno-card--pending {
+  /* Sin border-color especial: mantenemos neutro mientras espera */
+}
+
+.cp-retorno-card--ok {
+  border-color: var(--cp-success);
+  background: var(--cp-success-bg);
+}
+
+.cp-retorno-card--error {
+  border-color: var(--cp-danger);
+  background: var(--cp-danger-bg);
+}
+
+.cp-retorno-card h1 {
+  font-family: var(--cp-font-serif);
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  margin: 0;
+  color: var(--cp-text);
+}
+
+.cp-retorno-card p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--cp-text-muted);
+  margin: 0;
+}
+
+.cp-retorno-card__hint {
+  font-size: 12.5px !important;
+  color: var(--cp-text-faint) !important;
+}
+
+.cp-retorno-card__icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--cp-success);
+  color: var(--cp-text-on-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.cp-retorno-card__icon--error {
+  background: var(--cp-danger);
+}
+
+.cp-retorno-card__detalle {
+  width: 100%;
+  display: grid;
+  gap: 10px;
+  background: var(--cp-bg);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  padding: 14px 16px;
+  margin-top: 8px;
+}
+
+.cp-retorno-card__detalle > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+
+.cp-retorno-card__detalle span {
+  color: var(--cp-text-muted);
+}
+
+.cp-retorno-card__detalle strong {
+  color: var(--cp-text);
+  font-weight: 500;
+}
+
+.cp-retorno-card__actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  width: 100%;
+}
+
+@media (max-width: 600px) {
+  .cp-retorno-card {
+    padding: 28px 24px;
+  }
+}
