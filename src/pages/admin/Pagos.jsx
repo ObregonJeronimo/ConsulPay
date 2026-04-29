@@ -8,7 +8,9 @@ import { useAuth } from '../../hooks/useAuth.js';
 import { formatoARS } from '../../lib/constants.js';
 import {
   labelEstadoPago,
+  montoNetoEfectivo,
   suscribirPagosDelConsultorio,
+  tieneFeeDetails,
   tonoEstadoPago,
 } from '../../lib/pagos.js';
 import { suscribirProfesionales } from '../../lib/profesionales.js';
@@ -84,21 +86,31 @@ export default function PagosAdmin() {
     return pagos.filter((p) => p.estado === filtroEstado);
   }, [pagos, filtroEstado]);
 
+  // Total recibido = suma de los netos efectivos (incluye descuento de
+  // fee MP si esta disponible). Si no hay fee_details para algun pago,
+  // ese pago contribuye con el monto aproximado (bruto - comision).
   const stats = useMemo(() => {
     let aprobados = 0;
     let pendientes = 0;
     let totalRecibido = 0;
     let totalComision = 0;
+    let totalFeeMP = 0;
+    let pagosSinFeeDetails = 0;
     for (const p of pagos) {
       if (p.estado === 'aprobado') {
         aprobados += 1;
-        totalRecibido += p.montoConsultorio || 0;
+        totalRecibido += montoNetoEfectivo(p);
         totalComision += p.montoConsulpay || 0;
+        if (tieneFeeDetails(p)) {
+          totalFeeMP += p.feeMercadoPago || 0;
+        } else {
+          pagosSinFeeDetails += 1;
+        }
       } else if (p.estado === 'pendiente') {
         pendientes += 1;
       }
     }
-    return { aprobados, pendientes, totalRecibido, totalComision };
+    return { aprobados, pendientes, totalRecibido, totalComision, totalFeeMP, pagosSinFeeDetails };
   }, [pagos]);
 
   /* ---- Renders ---- */
@@ -129,12 +141,22 @@ export default function PagosAdmin() {
         <div className="cp-stat cp-stat--success">
           <div className="cp-stat__label">Total recibido</div>
           <div className="cp-stat__value">{formatoARS.format(stats.totalRecibido)}</div>
-          <div className="cp-stat__hint">{stats.aprobados} pago{stats.aprobados === 1 ? '' : 's'} aprobado{stats.aprobados === 1 ? '' : 's'}</div>
+          <div className="cp-stat__hint">
+            {stats.aprobados} pago{stats.aprobados === 1 ? '' : 's'} aprobado{stats.aprobados === 1 ? '' : 's'}
+            {stats.pagosSinFeeDetails > 0 && '*'}
+          </div>
         </div>
         <div className="cp-stat">
           <div className="cp-stat__label">Comisión ConsulPay</div>
           <div className="cp-stat__value">{formatoARS.format(stats.totalComision)}</div>
           <div className="cp-stat__hint">descontada antes de acreditar</div>
+        </div>
+        <div className="cp-stat">
+          <div className="cp-stat__label">Cargo Mercado Pago</div>
+          <div className="cp-stat__value">{formatoARS.format(stats.totalFeeMP)}</div>
+          <div className="cp-stat__hint">
+            tarifa que cobra MP por procesar
+          </div>
         </div>
         <div className="cp-stat cp-stat--debido">
           <div className="cp-stat__label">En proceso</div>
@@ -142,6 +164,14 @@ export default function PagosAdmin() {
           <div className="cp-stat__hint">pago{stats.pendientes === 1 ? '' : 's'} esperando confirmación</div>
         </div>
       </div>
+
+      {stats.pagosSinFeeDetails > 0 && (
+        <p className="cp-pagos-nota-asterisco">
+          * Hay {stats.pagosSinFeeDetails} pago{stats.pagosSinFeeDetails === 1 ? '' : 's'} sin desglose
+          completo de cargos de Mercado Pago (pagos creados antes de esta versión). El total recibido
+          de esos pagos es aproximado.
+        </p>
+      )}
 
       {/* Filtros */}
       <div className="cp-pagos-filtros">
@@ -169,8 +199,9 @@ export default function PagosAdmin() {
               <tr>
                 <th>Fecha</th>
                 <th>Profesional</th>
-                <th className="cp-num-col">Monto bruto</th>
+                <th className="cp-num-col">Bruto</th>
                 <th className="cp-num-col">Comisión</th>
+                <th className="cp-num-col">Cargo MP</th>
                 <th className="cp-num-col">Recibido</th>
                 <th className="cp-num-col">Sesiones</th>
                 <th>Estado</th>
@@ -179,6 +210,7 @@ export default function PagosAdmin() {
             <tbody>
               {pagosFiltrados.map((p) => {
                 const prof = mapaProfesionales[p.profesionalUid];
+                const tieneFee = tieneFeeDetails(p);
                 return (
                   <tr
                     key={p.id}
@@ -204,8 +236,13 @@ export default function PagosAdmin() {
                     <td className="cp-num" style={{ color: 'var(--cp-text-muted)' }}>
                       −{formatoARS.format(p.montoConsulpay || 0)}
                     </td>
+                    <td className="cp-num" style={{ color: 'var(--cp-text-muted)' }}>
+                      {tieneFee
+                        ? `−${formatoARS.format(p.feeMercadoPago || 0)}`
+                        : <span style={{ color: 'var(--cp-text-faint)' }}>—</span>}
+                    </td>
                     <td className="cp-num" style={{ color: 'var(--cp-success)', fontWeight: 500 }}>
-                      {formatoARS.format(p.montoConsultorio || 0)}
+                      {formatoARS.format(montoNetoEfectivo(p))}
                     </td>
                     <td className="cp-num">{p.sesionesIds?.length || 0}</td>
                     <td>
@@ -271,6 +308,9 @@ function FiltroEstado({ value, onChange, pagos }) {
    Modal de detalle del pago
    ============================================================ */
 function DetallePagoModal({ pago, profesional, onClose }) {
+  const tieneFee = tieneFeeDetails(pago);
+  const netoEfectivo = montoNetoEfectivo(pago);
+
   return (
     <div className="cp-modal-overlay" onClick={onClose}>
       <div className="cp-modal cp-modal--detalle-pago" onClick={(e) => e.stopPropagation()}>
@@ -304,6 +344,8 @@ function DetallePagoModal({ pago, profesional, onClose }) {
               )}
             </dd>
           </div>
+
+          {/* Desglose financiero */}
           <div>
             <dt>Monto bruto</dt>
             <dd>{formatoARS.format(pago.montoTotal || 0)}</dd>
@@ -314,10 +356,35 @@ function DetallePagoModal({ pago, profesional, onClose }) {
               −{formatoARS.format(pago.montoConsulpay || 0)}
             </dd>
           </div>
+          {tieneFee ? (
+            <div>
+              <dt>Cargo Mercado Pago</dt>
+              <dd style={{ color: 'var(--cp-text-muted)' }}>
+                −{formatoARS.format(pago.feeMercadoPago || 0)}
+                <span className="cp-detalle-pago__hint"> · tarifa de procesamiento de MP</span>
+              </dd>
+            </div>
+          ) : pago.estado === 'aprobado' && (
+            <div>
+              <dt>Cargo Mercado Pago</dt>
+              <dd style={{ color: 'var(--cp-text-faint)', fontSize: 13 }}>
+                No disponible (pago anterior a esta versión)
+              </dd>
+            </div>
+          )}
           <div className="cp-detalle-pago__total">
-            <dt>Recibido en tu cuenta MP</dt>
-            <dd>{formatoARS.format(pago.montoConsultorio || 0)}</dd>
+            <dt>{tieneFee ? 'Recibido en tu cuenta MP' : 'Estimado a recibir*'}</dt>
+            <dd>{formatoARS.format(netoEfectivo)}</dd>
           </div>
+          {!tieneFee && pago.estado === 'aprobado' && (
+            <div>
+              <dd style={{ color: 'var(--cp-text-faint)', fontSize: 12, fontStyle: 'italic' }}>
+                * Este monto no incluye el descuento del cargo de Mercado Pago. El monto real
+                que recibís puede ser un poco menor.
+              </dd>
+            </div>
+          )}
+
           {pago.mpPaymentId && (
             <div>
               <dt>ID de pago Mercado Pago</dt>
