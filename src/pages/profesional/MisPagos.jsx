@@ -58,8 +58,6 @@ export default function MisPagos() {
 
   /* ---- Suscripciones live ---- */
 
-  // Sesiones del profesional - traemos TODAS sin filtro de fecha,
-  // para tener el panorama completo de deuda historica.
   useEffect(() => {
     if (!user?.uid || !user?.consultorioId) return;
     setLoadingSesiones(true);
@@ -92,8 +90,6 @@ export default function MisPagos() {
 
   /* ---- Calculos derivados ---- */
 
-  // Sesiones debidas: las que tienen estadoPago='debido' y no estan
-  // ya vinculadas a un pago aprobado.
   const sesionesDebidas = useMemo(
     () => sesiones.filter((s) => s.estadoPago === ESTADOS_PAGO_SESION.DEBIDO),
     [sesiones],
@@ -104,16 +100,21 @@ export default function MisPagos() {
     [sesionesDebidas],
   );
 
-  // Si hay seleccion activa, el subtotal cambia
+  // Subtotal de las sesiones seleccionadas en modo selectivo.
+  // Si no hay seleccion, vale 0 (UX: muestra explicitamente que no hay
+  // nada elegido, en vez de mostrar la deuda total que confunde).
   const subtotalSeleccionado = useMemo(() => {
-    if (!modoSeleccion || seleccionadas.size === 0) return deudaTotal;
+    if (!modoSeleccion) return deudaTotal;
     return sesionesDebidas
       .filter((s) => seleccionadas.has(s.id))
       .reduce((acc, s) => acc + (s.montoConsultorio || 0), 0);
   }, [modoSeleccion, seleccionadas, sesionesDebidas, deudaTotal]);
 
+  // sesiones a pagar:
+  //  - modoSeleccion off: todas las debidas
+  //  - modoSeleccion on:  las elegidas (puede ser []  si nada esta marcado)
   const sesionesIdsParaPagar = useMemo(() => {
-    if (modoSeleccion && seleccionadas.size > 0) {
+    if (modoSeleccion) {
       return sesionesDebidas
         .filter((s) => seleccionadas.has(s.id))
         .map((s) => s.id);
@@ -122,7 +123,6 @@ export default function MisPagos() {
   }, [modoSeleccion, seleccionadas, sesionesDebidas]);
 
   const pagosFiltrados = useMemo(() => {
-    // No mostramos pagos rechazados con monto 0 (errores de creacion)
     return pagos.filter((p) => p.estado !== 'rechazado' || p.mpPaymentId);
   }, [pagos]);
 
@@ -145,9 +145,12 @@ export default function MisPagos() {
     }
   }
 
+  // UX: arrancamos con 0 sesiones marcadas para que el user elija
+  // explicitamente. Antes arrancabamos con todas marcadas, lo cual era
+  // raro (ya hay un boton "Pagar deuda total" para eso).
   function entrarModoSeleccion() {
     setModoSeleccion(true);
-    setSeleccionadas(new Set(sesionesDebidas.map((s) => s.id)));
+    setSeleccionadas(new Set());
   }
 
   function salirModoSeleccion() {
@@ -158,7 +161,9 @@ export default function MisPagos() {
   async function handlePagar() {
     setError('');
     if (sesionesIdsParaPagar.length === 0) {
-      setError('No tenés sesiones debidas para pagar.');
+      setError(modoSeleccion
+        ? 'Elegí al menos una sesión para pagar.'
+        : 'No tenés sesiones debidas para pagar.');
       return;
     }
     if (!consultorio?.mpIntegrado) {
@@ -224,15 +229,19 @@ export default function MisPagos() {
       {/* Card de deuda actual + boton pagar */}
       <section className="cp-deuda-card">
         <div className="cp-deuda-card__main">
-          <div className="cp-deuda-card__label">Deuda actual con el consultorio</div>
+          <div className="cp-deuda-card__label">
+            {modoSeleccion ? 'Total a pagar' : 'Deuda actual con el consultorio'}
+          </div>
           <div className="cp-deuda-card__monto">
             {formatoARS.format(modoSeleccion ? subtotalSeleccionado : deudaTotal)}
           </div>
           <div className="cp-deuda-card__hint">
             {sesionesDebidas.length === 0
               ? 'No tenés sesiones pendientes de pago. ¡Estás al día!'
-              : modoSeleccion && seleccionadas.size > 0
-                ? `${seleccionadas.size} de ${sesionesDebidas.length} sesión${seleccionadas.size === 1 ? '' : 'es'} seleccionada${seleccionadas.size === 1 ? '' : 's'}`
+              : modoSeleccion
+                ? seleccionadas.size === 0
+                  ? `Elegí cuáles de las ${sesionesDebidas.length} sesión${sesionesDebidas.length === 1 ? '' : 'es'} debida${sesionesDebidas.length === 1 ? '' : 's'} querés pagar`
+                  : `${seleccionadas.size} de ${sesionesDebidas.length} sesión${seleccionadas.size === 1 ? '' : 'es'} seleccionada${seleccionadas.size === 1 ? '' : 's'}`
                 : `${sesionesDebidas.length} sesión${sesionesDebidas.length === 1 ? '' : 'es'} debida${sesionesDebidas.length === 1 ? '' : 's'}`}
           </div>
         </div>
@@ -240,13 +249,15 @@ export default function MisPagos() {
           <div className="cp-deuda-card__actions">
             {!modoSeleccion ? (
               <>
-                <Button
-                  variant="secondary"
-                  onClick={entrarModoSeleccion}
-                  disabled={mpDeshabilitado || iniciando}
-                >
-                  Elegir cuáles pagar
-                </Button>
+                {sesionesDebidas.length > 1 && (
+                  <Button
+                    variant="secondary"
+                    onClick={entrarModoSeleccion}
+                    disabled={mpDeshabilitado || iniciando}
+                  >
+                    Elegir cuáles pagar
+                  </Button>
+                )}
                 <Button
                   variant="primary"
                   onClick={handlePagar}
@@ -260,7 +271,7 @@ export default function MisPagos() {
             ) : (
               <>
                 <Button variant="secondary" onClick={salirModoSeleccion} disabled={iniciando}>
-                  Cancelar selección
+                  Cancelar
                 </Button>
                 <Button
                   variant="primary"
@@ -269,7 +280,9 @@ export default function MisPagos() {
                 >
                   {iniciando
                     ? <><Spinner size={14} /> Redirigiendo…</>
-                    : `Pagar ${formatoARS.format(subtotalSeleccionado)}`}
+                    : seleccionadas.size === 0
+                      ? 'Elegí sesiones primero'
+                      : `Pagar ${formatoARS.format(subtotalSeleccionado)}`}
                 </Button>
               </>
             )}
