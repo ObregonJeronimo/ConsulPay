@@ -13,6 +13,7 @@
  *     - frecuencia mensual
  *     - external_reference = consultorioId
  *     - back_url = volver a /admin/configuracion?suscripcion=ok
+ *     - notification_url = /api/mp/webhook (UNIFICADO con pagos)
  *  4. Persistimos en /consultorios/{id}.subscription un estado
  *     'pendiente_autorizacion' con el preapprovalId.
  *  5. Devolvemos { initPointUrl } al frontend.
@@ -132,7 +133,9 @@ export default async function handler(req, res) {
   }
 
   // ---------- Crear preapproval en MP ----------
-  const notificationUrl = `${baseUrl}/api/mp/suscripcion-webhook`;
+  // notification_url unificado: tanto pagos como suscripciones
+  // notifican a /api/mp/webhook que rutea por type internamente.
+  const notificationUrl = `${baseUrl}/api/mp/webhook`;
   const backUrl = `${baseUrl}/admin/configuracion?suscripcion=autorizada`;
 
   let preapproval;
