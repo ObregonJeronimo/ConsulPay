@@ -32,6 +32,14 @@ import {
 } from '../../lib/mpIntegracion.js';
 import { suscribirMiembrosConsultorio } from '../../lib/profesionales.js';
 import {
+  cancelarSuscripcionPro,
+  iniciarSuscripcionPro,
+  labelEstadoSuscripcion,
+  puedeCancelarPro,
+  puedeContratarPro,
+  suscribirPagosMensualidad,
+} from '../../lib/suscripciones.js';
+import {
   formatearCUIT,
   soloDigitosCBU,
   LARGOS,
@@ -41,8 +49,6 @@ import './Configuracion.css';
 
 /* ============================================================
    Hook: advertencia de cambios sin guardar al cerrar / refrescar
-   la pestaña. No cubre navegación interna por React Router (eso lo
-   manejamos con un confirm() manual en los click de tabs/links).
    ============================================================ */
 function useUnsavedChangesWarning(dirty) {
   useEffect(() => {
@@ -71,18 +77,21 @@ export default function Configuracion() {
   const anyDirty = dirtyDatos || dirtyMetodos;
   useUnsavedChangesWarning(anyDirty);
 
-  // Si volvemos del callback OAuth de MP, abrimos la pestania Pagos
-  // automaticamente para que el admin vea el resultado.
+  // Si volvemos del callback OAuth de MP, abrimos la pestania Pagos.
+  // Si volvemos del flow de suscripcion, abrimos la pestania Plan.
   useEffect(() => {
     const mp = searchParams.get('mp');
+    const sus = searchParams.get('suscripcion');
     if (mp === 'connected' || mp === 'error') {
       setTab('pagos');
+    } else if (sus) {
+      setTab('plan');
     }
   }, [searchParams]);
 
   function intentarCambiarTab(nuevoTab) {
     if (nuevoTab === tab) return;
-    const dirtyDelTabActual = tab === 'datos' ? dirtyDatos : dirtyMetodos;
+    const dirtyDelTabActual = tab === 'datos' ? dirtyDatos : (tab === 'metodos' ? dirtyMetodos : false);
     if (dirtyDelTabActual) {
       const ok = confirm(
         'Tenés cambios sin guardar en esta sección. Si cambiás de pestaña, se van a perder.\n\n¿Querés continuar de todas formas?',
@@ -113,6 +122,11 @@ export default function Configuracion() {
       </div>
     );
   }
+
+  // El owner es el unico que ve la pestania "Plan". Los otros admins
+  // ven el plan actual reflejado en la comision de la pestania Pagos
+  // pero no pueden contratar/cancelar.
+  const esOwner = user.uid === consultorio.ownerUid;
 
   return (
     <div className="cp-config">
@@ -155,6 +169,17 @@ export default function Configuracion() {
           Pagos
           {consultorio.mpIntegrado && <span className="cp-tab__count cp-tab__count--ok">✓</span>}
         </button>
+        {esOwner && (
+          <button
+            className={`cp-tab ${tab === 'plan' ? 'cp-tab--active' : ''}`}
+            onClick={() => intentarCambiarTab('plan')}
+          >
+            Plan
+            {consultorio.plan === 'pro' && (
+              <span className="cp-tab__count cp-tab__count--ok">PRO</span>
+            )}
+          </button>
+        )}
       </div>
 
       {tab === 'datos' && (
@@ -182,6 +207,14 @@ export default function Configuracion() {
 
       {tab === 'pagos' && (
         <TabPagos
+          consultorio={consultorio}
+          searchParams={searchParams}
+          onLimpiarParams={() => setSearchParams({})}
+        />
+      )}
+
+      {tab === 'plan' && esOwner && (
+        <TabPlan
           consultorio={consultorio}
           searchParams={searchParams}
           onLimpiarParams={() => setSearchParams({})}
@@ -1068,15 +1101,6 @@ function ConfirmarAccionAdminModal({
 
 /* ============================================================
    Tab: Pagos (integracion Mercado Pago)
-   ----------------------------------------------------------------
-   Flow nuevo (post-bug "invalid session"):
-   1. User clickea "Conectar MP"
-   2. Abrimos un modal preventivo que le explica:
-      - Que va a ir a MP
-      - Que tiene que estar logueado en MP
-      - Que puede abrir MP en otra pestaña primero
-   3. En background pedimos al backend la authorize URL
-   4. Cuando el user clickea "Continuar a MP", redirigimos
    ============================================================ */
 
 const REASON_LABELS = {
@@ -1102,7 +1126,6 @@ function TabPagos({ consultorio, searchParams, onLimpiarParams }) {
   const [openDesconectar, setOpenDesconectar] = useState(false);
   const [openConectarModal, setOpenConectarModal] = useState(false);
 
-  // Procesar resultado del callback OAuth
   useEffect(() => {
     const mp = searchParams.get('mp');
     if (mp === 'connected') {
@@ -1208,19 +1231,6 @@ function MPDesconectadaCard({ onAbrirModal }) {
   );
 }
 
-/**
- * Modal preventivo que se abre al darle "Conectar Mercado Pago".
- *
- * Lo que hace:
- *  1. Apenas se abre, llama al backend en background para obtener la
- *     authorize URL (asi cuando el user clickea "Continuar a MP" la
- *     URL ya esta lista — sin esperas).
- *  2. Le explica al user QUE va a pasar: que va a ir a MP, que tiene
- *     que estar logueado, que puede abrir MP en otra pestaña primero.
- *  3. Le da dos botones:
- *       - "Abrir Mercado Pago primero" (target=_blank a www.mp...)
- *       - "Continuar a Mercado Pago" (redirige usando la URL ya cargada)
- */
 function ConectarMPModal({ consultorioId, onCancelar, onError }) {
   const [authorizeUrl, setAuthorizeUrl] = useState(null);
   const [loadingUrl, setLoadingUrl] = useState(true);
@@ -1242,8 +1252,6 @@ function ConectarMPModal({ consultorioId, onCancelar, onError }) {
   }, [consultorioId]);
 
   function handleAbrirMP() {
-    // Abre MP en una pestaña nueva. El user se loguea y vuelve a esta pestaña
-    // para clickear "Continuar".
     window.open('https://www.mercadopago.com.ar/', '_blank', 'noopener,noreferrer');
   }
 
@@ -1388,6 +1396,448 @@ function DesconectarMPModal({ onCancelar, onConfirmar, submitting }) {
           </Button>
           <Button variant="danger" type="button" onClick={onConfirmar} disabled={submitting}>
             {submitting ? <><Spinner size={14} /> Desconectando…</> : 'Desconectar'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   Tab: Plan (suscripcion al Plan Pro)
+   ----------------------------------------------------------------
+   Solo visible para el OWNER del consultorio. Permite:
+     - Ver plan actual (Free / Pro) + comision vigente
+     - Si Free: contratar Plan Pro (redirige a MP)
+     - Si Pro: ver detalles + cancelar (sigue activo hasta fin de periodo)
+     - Ver historial de pagos mensualidad
+
+   Maneja query params del retorno de MP:
+     ?suscripcion=autorizada  -> Pro fue activado (toast de exito)
+     ?suscripcion=pendiente   -> sigue en proceso de autorizacion
+     ?suscripcion=cancelada   -> el user cancelo en el flow MP
+
+   IMPORTANTE: el cambio de plan='pro' lo hace el WEBHOOK cuando MP
+   confirma la autorizacion. La pestaña suscribe live al consultorio
+   (via useConsultorio en el componente padre) asi que apenas el
+   webhook actualice Firestore, la UI se actualiza sola.
+   ============================================================ */
+
+function TabPlan({ consultorio, searchParams, onLimpiarParams }) {
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [okMsg, setOkMsg] = useState('');
+  const [openCancelar, setOpenCancelar] = useState(false);
+  const [openContratar, setOpenContratar] = useState(false);
+  const [pagosMensualidad, setPagosMensualidad] = useState([]);
+
+  // Suscripcion live al historial de pagos mensualidad
+  useEffect(() => {
+    if (!consultorio?.id) return;
+    return suscribirPagosMensualidad(consultorio.id, setPagosMensualidad);
+  }, [consultorio?.id]);
+
+  // Procesar resultado del callback del flow de suscripcion
+  useEffect(() => {
+    const sus = searchParams.get('suscripcion');
+    if (!sus) return;
+
+    if (sus === 'autorizada') {
+      setOkMsg(
+        'Suscripción autorizada. Mercado Pago va a confirmar el cobro en unos segundos. '
+        + 'La pantalla se actualiza sola cuando el plan esté activo.',
+      );
+    } else if (sus === 'pendiente') {
+      setOkMsg(
+        'Tu autorización está siendo procesada por Mercado Pago. '
+        + 'Vas a ver el plan activo en unos minutos.',
+      );
+    } else if (sus === 'cancelada') {
+      setError('Cancelaste el flujo de autorización. No se aplicó ningún cargo.');
+    }
+    onLimpiarParams();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function handleContratar() {
+    setError('');
+    setOkMsg('');
+    setSubmitting(true);
+    try {
+      // iniciarSuscripcionPro redirige a MP, no devuelve nada local
+      await iniciarSuscripcionPro(consultorio.id);
+    } catch (err) {
+      setSubmitting(false);
+      const detalleMP = err.detalle?.detalleMP;
+      let mensaje = err.message || 'No se pudo iniciar la suscripción.';
+      if (detalleMP?.message) {
+        mensaje += ` (MP: ${detalleMP.message})`;
+      }
+      setError(mensaje);
+      setOpenContratar(false);
+    }
+  }
+
+  async function handleCancelar() {
+    setError('');
+    setOkMsg('');
+    setSubmitting(true);
+    try {
+      const res = await cancelarSuscripcionPro(consultorio.id);
+      setOkMsg(res?.mensaje || 'Suscripción cancelada.');
+      setOpenCancelar(false);
+    } catch (err) {
+      setError(err.message || 'No se pudo cancelar la suscripción.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const esPro = consultorio.plan === 'pro';
+  const sub = consultorio.subscription;
+  const puedeContratar = puedeContratarPro(consultorio);
+  const puedeCancelar = puedeCancelarPro(consultorio);
+
+  return (
+    <section className="cp-config-section">
+      <header className="cp-config-section__head">
+        <h2 className="cp-config-section__title">Plan de tu consultorio</h2>
+        <p className="cp-config-section__sub">
+          Manejá tu suscripción a ConsulPay. Solo el dueño del consultorio puede contratar
+          o cancelar. La comisión que cobra ConsulPay sobre los pagos depende del plan activo.
+        </p>
+      </header>
+
+      {error && <div className="cp-config-error" role="alert">{error}</div>}
+      {okMsg && <div className="cp-config-ok" role="status">{okMsg}</div>}
+
+      {/* Card del plan actual */}
+      <PlanActualCard
+        consultorio={consultorio}
+        esPro={esPro}
+        sub={sub}
+        onContratar={() => { setError(''); setOpenContratar(true); }}
+        onCancelar={() => { setError(''); setOpenCancelar(true); }}
+        puedeContratar={puedeContratar}
+        puedeCancelar={puedeCancelar}
+        submitting={submitting}
+      />
+
+      {/* Comparativa Free vs Pro */}
+      {!esPro && <ComparativaPlanes consultorio={consultorio} />}
+
+      {/* Historial de cobros */}
+      {pagosMensualidad.length > 0 && (
+        <HistorialMensualidades pagos={pagosMensualidad} />
+      )}
+
+      {/* Modales */}
+      {openContratar && (
+        <ContratarProModal
+          precio={sub?.transactionAmount || 50000}
+          comisionFreeActual={consultorio.comisionConsulpay || 6}
+          onCancelar={() => setOpenContratar(false)}
+          onConfirmar={handleContratar}
+          submitting={submitting}
+        />
+      )}
+
+      {openCancelar && (
+        <CancelarProModal
+          currentPeriodEnd={sub?.currentPeriodEnd}
+          onCancelar={() => setOpenCancelar(false)}
+          onConfirmar={handleCancelar}
+          submitting={submitting}
+        />
+      )}
+    </section>
+  );
+}
+
+function PlanActualCard({
+  consultorio,
+  esPro,
+  sub,
+  onContratar,
+  onCancelar,
+  puedeContratar,
+  puedeCancelar,
+  submitting,
+}) {
+  const estadoLabel = labelEstadoSuscripcion(consultorio);
+  const fechaRenovacion = sub?.currentPeriodEnd?.toDate
+    ? sub.currentPeriodEnd.toDate()
+    : (sub?.currentPeriodEnd instanceof Date ? sub.currentPeriodEnd : null);
+
+  return (
+    <div className={`cp-plan-card ${esPro ? 'cp-plan-card--pro' : 'cp-plan-card--free'}`}>
+      <div className="cp-plan-card__head">
+        <div>
+          <div className="cp-plan-card__plan-label">Plan actual</div>
+          <h3 className="cp-plan-card__plan-name">
+            {esPro ? 'Pro' : 'Free'}
+            {esPro && <span className="cp-plan-card__badge">PRO</span>}
+          </h3>
+        </div>
+        <div className="cp-plan-card__comision">
+          <div className="cp-plan-card__comision-label">Comisión ConsulPay</div>
+          <div className="cp-plan-card__comision-value">
+            {consultorio.comisionConsulpay ?? '—'}%
+          </div>
+        </div>
+      </div>
+
+      {/* Detalles solo si hay suscripcion activa */}
+      {esPro && sub && (
+        <dl className="cp-plan-card__meta">
+          <div>
+            <dt>Estado</dt>
+            <dd>{estadoLabel}</dd>
+          </div>
+          {sub.transactionAmount && (
+            <div>
+              <dt>Monto mensual</dt>
+              <dd>{formatoARS.format(sub.transactionAmount)}</dd>
+            </div>
+          )}
+          {fechaRenovacion && (
+            <div>
+              <dt>{sub.cancelRequested ? 'Vence el' : 'Próxima renovación'}</dt>
+              <dd>
+                {fechaRenovacion.toLocaleDateString('es-AR', {
+                  day: 'numeric', month: 'long', year: 'numeric',
+                })}
+              </dd>
+            </div>
+          )}
+          {sub.lastChargedAt && (
+            <div>
+              <dt>Último cobro</dt>
+              <dd>
+                {(sub.lastChargedAt.toDate ? sub.lastChargedAt.toDate() : new Date(sub.lastChargedAt))
+                  .toLocaleDateString('es-AR', {
+                    day: 'numeric', month: 'long', year: 'numeric',
+                  })}
+              </dd>
+            </div>
+          )}
+        </dl>
+      )}
+
+      {/* Estado de pendiente de autorizacion */}
+      {!esPro && sub?.status === 'pending_authorization' && (
+        <div className="cp-plan-card__pending">
+          <Spinner size={14} />
+          <span>
+            Esperando que confirmes la autorización en Mercado Pago. Si ya lo hiciste,
+            puede demorar unos segundos en activarse.
+          </span>
+        </div>
+      )}
+
+      {/* Acciones */}
+      <div className="cp-plan-card__actions">
+        {puedeContratar && (
+          <Button variant="primary" onClick={onContratar} disabled={submitting}>
+            {submitting ? <><Spinner size={14} /> Iniciando…</> : 'Contratar Plan Pro'}
+          </Button>
+        )}
+        {puedeCancelar && (
+          <Button variant="secondary" onClick={onCancelar} disabled={submitting}>
+            Cancelar suscripción
+          </Button>
+        )}
+      </div>
+
+      {/* Aviso de cancelacion vigente */}
+      {esPro && sub?.cancelRequested && fechaRenovacion && (
+        <div className="cp-plan-card__cancel-notice">
+          Cancelaste la suscripción. Mantenés los beneficios del Plan Pro hasta el{' '}
+          <strong>
+            {fechaRenovacion.toLocaleDateString('es-AR', {
+              day: 'numeric', month: 'long', year: 'numeric',
+            })}
+          </strong>
+          . Después, el plan vuelve a Free automáticamente.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ComparativaPlanes({ consultorio }) {
+  const comisionFreeActual = consultorio.comisionConsulpay ?? 6;
+
+  return (
+    <div className="cp-plan-compare">
+      <h3 className="cp-plan-compare__title">¿Por qué subir a Pro?</h3>
+      <div className="cp-plan-compare__grid">
+        <div className="cp-plan-compare__card">
+          <div className="cp-plan-compare__card-name">Free</div>
+          <div className="cp-plan-compare__price">$0/mes</div>
+          <ul className="cp-plan-compare__list">
+            <li>Comisión {comisionFreeActual}% sobre cada pago recibido</li>
+            <li>Acceso completo al consultorio</li>
+            <li>Multi-admin y multi-profesional</li>
+          </ul>
+        </div>
+        <div className="cp-plan-compare__card cp-plan-compare__card--pro">
+          <div className="cp-plan-compare__card-name">
+            Pro <span className="cp-plan-card__badge">RECOMENDADO</span>
+          </div>
+          <div className="cp-plan-compare__price">{formatoARS.format(50000)}/mes</div>
+          <ul className="cp-plan-compare__list">
+            <li><strong>Comisión 2%</strong> sobre cada pago recibido</li>
+            <li>Acceso completo al consultorio</li>
+            <li>Multi-admin y multi-profesional</li>
+            <li>Prioridad en soporte</li>
+          </ul>
+        </div>
+      </div>
+      <p className="cp-plan-compare__hint">
+        Si tu consultorio factura más de {formatoARS.format(50000 / (comisionFreeActual - 2) * 100)} por mes
+        en pagos por ConsulPay, el Plan Pro ya te conviene.
+      </p>
+    </div>
+  );
+}
+
+function HistorialMensualidades({ pagos }) {
+  return (
+    <div className="cp-plan-historial">
+      <h3 className="cp-plan-historial__title">Historial de cobros</h3>
+      <div className="cp-table-wrap">
+        <table className="cp-table">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th className="cp-num-col">Monto</th>
+              <th>Estado</th>
+              <th>Detalle</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pagos.map((p) => {
+              const fecha = p.fechaCobro?.toDate
+                ? p.fechaCobro.toDate()
+                : (p.fechaCobro instanceof Date ? p.fechaCobro : null);
+              return (
+                <tr key={p.id}>
+                  <td>
+                    {fecha
+                      ? fecha.toLocaleDateString('es-AR', {
+                        day: '2-digit', month: 'short', year: 'numeric',
+                      })
+                      : '—'}
+                  </td>
+                  <td className="cp-num">{formatoARS.format(p.monto || 0)}</td>
+                  <td>
+                    <span className={`cp-plan-historial__status cp-plan-historial__status--${p.status}`}>
+                      {p.status === 'approved' ? 'Aprobado'
+                        : p.status === 'rejected' ? 'Rechazado'
+                          : p.status === 'pending' ? 'Pendiente'
+                            : (p.status || '—')}
+                    </span>
+                  </td>
+                  <td style={{ fontSize: 12, color: 'var(--cp-text-muted)' }}>
+                    {p.statusDetail || '—'}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function ContratarProModal({ precio, comisionFreeActual, onCancelar, onConfirmar, submitting }) {
+  return (
+    <div className="cp-modal-overlay" onClick={onCancelar}>
+      <div className="cp-modal cp-modal--conectar-mp" onClick={(e) => e.stopPropagation()}>
+        <button className="cp-modal__close" onClick={onCancelar} aria-label="Cerrar"
+          disabled={submitting}>×</button>
+
+        <h2 className="cp-modal__title">Contratar Plan Pro</h2>
+
+        <div className="cp-modal__sub">
+          <p style={{ margin: '0 0 14px' }}>
+            Te vamos a llevar a Mercado Pago para que autorices un débito mensual de{' '}
+            <strong>{formatoARS.format(precio)}</strong>. Va a debitarse desde tu tarjeta
+            de crédito todos los meses, en la fecha en que se efectúe el primer cobro.
+          </p>
+
+          <ul className="cp-modal-conectar__steps" style={{ paddingLeft: 20 }}>
+            <li>
+              <strong>Comisión actual (Free):</strong> {comisionFreeActual}% sobre cada pago.
+            </li>
+            <li>
+              <strong>Comisión nueva (Pro):</strong> 2% sobre cada pago.
+            </li>
+            <li>
+              Podés cancelar cuando quieras. Si cancelás, mantenés los beneficios hasta el
+              final del período que ya pagaste.
+            </li>
+            <li>
+              Solo vos (el dueño del consultorio) podés contratar y cancelar el plan.
+            </li>
+          </ul>
+        </div>
+
+        <div className="cp-modal__actions">
+          <Button variant="secondary" type="button" onClick={onCancelar} disabled={submitting}>
+            Cancelar
+          </Button>
+          <Button variant="primary" type="button" onClick={onConfirmar} disabled={submitting}>
+            {submitting
+              ? <><Spinner size={14} /> Redirigiendo…</>
+              : 'Continuar a Mercado Pago'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CancelarProModal({ currentPeriodEnd, onCancelar, onConfirmar, submitting }) {
+  const fechaFin = currentPeriodEnd?.toDate
+    ? currentPeriodEnd.toDate()
+    : (currentPeriodEnd instanceof Date ? currentPeriodEnd : null);
+
+  return (
+    <div className="cp-modal-overlay" onClick={onCancelar}>
+      <div className="cp-modal cp-modal--confirm-admin" onClick={(e) => e.stopPropagation()}>
+        <button className="cp-modal__close" onClick={onCancelar} aria-label="Cerrar"
+          disabled={submitting}>×</button>
+
+        <h2 className="cp-modal__title">¿Cancelar Plan Pro?</h2>
+
+        <div className="cp-modal__sub">
+          <p style={{ margin: '0 0 12px' }}>
+            Si cancelás ahora, <strong>mantenés los beneficios del Plan Pro</strong>{' '}
+            (comisión 2%) hasta
+            {fechaFin
+              ? <> el <strong>{fechaFin.toLocaleDateString('es-AR', {
+                day: 'numeric', month: 'long', year: 'numeric',
+              })}</strong></>
+              : ' el final del período actual'}
+            . Después, el plan vuelve automáticamente a Free (comisión 6%).
+          </p>
+          <p style={{ margin: 0, color: 'var(--cp-text-muted)', fontSize: 13 }}>
+            Mercado Pago no te va a cobrar la próxima renovación. Podés volver a contratar Pro
+            cuando quieras.
+          </p>
+        </div>
+
+        <div className="cp-modal__actions">
+          <Button variant="secondary" type="button" onClick={onCancelar} disabled={submitting}>
+            Mantener suscripción
+          </Button>
+          <Button variant="danger" type="button" onClick={onConfirmar} disabled={submitting}>
+            {submitting
+              ? <><Spinner size={14} /> Cancelando…</>
+              : 'Sí, cancelar'}
           </Button>
         </div>
       </div>
