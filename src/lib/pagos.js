@@ -81,11 +81,6 @@ async function getConIdToken(path) {
  *
  * Llama al backend, recibe la initPointUrl y redirige al checkout MP.
  * Cuando el usuario vuelva del checkout, MP lo manda a /mi-panel/pagos/retorno.
- *
- * @param {Object} params
- * @param {string} params.consultorioId
- * @param {string[]} params.sesionesIds - sesiones a saldar con este pago
- * @returns {Promise<void>} (no devuelve, navega a otra URL)
  */
 export async function iniciarPagoAlConsultorio({ consultorioId, sesionesIds }) {
   const data = await postConIdToken('/api/mp/crear-pago', {
@@ -97,8 +92,6 @@ export async function iniciarPagoAlConsultorio({ consultorioId, sesionesIds }) {
     throw new Error('El servidor no devolvió la URL del checkout.');
   }
 
-  // Redirigimos al checkout MP. El back_url va a traer al user a
-  // /mi-panel/pagos/retorno?pagoId=...&status=...
   window.location.assign(data.initPointUrl);
 }
 
@@ -115,9 +108,6 @@ export async function consultarEstadoPago(pagoId) {
    Suscripciones live a /pagos_consultorio
    ============================================================ */
 
-/**
- * Pagos hechos por un profesional (su historial).
- */
 export function suscribirPagosDelProfesional(profesionalUid, consultorioId, callback) {
   if (!profesionalUid || !consultorioId) {
     callback([]);
@@ -138,9 +128,6 @@ export function suscribirPagosDelProfesional(profesionalUid, consultorioId, call
   });
 }
 
-/**
- * Pagos recibidos por un consultorio (vista admin).
- */
 export function suscribirPagosDelConsultorio(consultorioId, callback) {
   if (!consultorioId) {
     callback([]);
@@ -192,4 +179,44 @@ export function tonoEstadoPago(estado) {
     case 'reembolsado': return 'neutral';
     default: return 'neutral';
   }
+}
+
+/* ============================================================
+   Helpers de fees y montos
+   ----------------------------------------------------------------
+   Estos helpers manejan el desglose de un pago:
+     - montoTotal:           lo que paga el profesional (bruto)
+     - montoConsulpay:       comision marketplace de ConsulPay
+     - feeMercadoPago:       cargo que cobra MP por procesar el pago
+     - montoNetoEfectivo:    lo que efectivamente recibe el consultorio
+
+   feeMercadoPago se popula recien cuando llega el webhook con el
+   payment de MP (parsea fee_details). Para pagos viejos o pendientes,
+   feeMercadoPago == null.
+
+   Para mostrar el monto neto:
+     - Si tenemos montoNetoReal (campo nuevo del webhook), usar ese.
+     - Si no, fallback a montoConsultorio (= bruto - comisionConsulpay).
+   ============================================================ */
+
+/**
+ * Devuelve el monto que efectivamente recibe el consultorio,
+ * considerando todas las fees disponibles.
+ *
+ * Para pagos nuevos (con webhook recibido): bruto - comision - feeMP
+ * Para pagos viejos (sin fee_details): bruto - comision (aproximado)
+ */
+export function montoNetoEfectivo(pago) {
+  if (!pago) return 0;
+  if (typeof pago.montoNetoReal === 'number') return pago.montoNetoReal;
+  return pago.montoConsultorio || 0;
+}
+
+/**
+ * Indica si el pago tiene desglose completo de fees (fee de MP incluido).
+ * Usar para condicionar el render de la linea "Cargo Mercado Pago" en
+ * el detalle.
+ */
+export function tieneFeeDetails(pago) {
+  return !!pago && typeof pago.feeMercadoPago === 'number';
 }
