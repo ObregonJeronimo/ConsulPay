@@ -37,23 +37,40 @@ async function postConIdToken(path, body) {
 }
 
 /**
- * Inicia el flow OAuth: pide al backend que genere el state y la URL
- * de autorizacion, luego redirige al user al panel de MP para que
- * autorize.
+ * Pide al backend que genere el state OAuth y devuelva la URL de
+ * autorizacion de MP. NO redirige — solo devuelve la URL.
+ *
+ * Lo usa la UI para mostrar la URL en un modal preventivo (que avisa
+ * al user que se loguee en MP antes de continuar).
  *
  * @param {string} consultorioId
- * @returns {Promise<void>} (no devuelve, navega a otra URL)
+ * @returns {Promise<string>} la authorizeUrl
  */
-export async function iniciarConexionMP(consultorioId) {
+export async function obtenerUrlConexionMP(consultorioId) {
   const { authorizeUrl } = await postConIdToken('/api/mp/oauth-init', {
     consultorioId,
   });
   if (!authorizeUrl) {
     throw new Error('El servidor no devolvió la URL de autorización.');
   }
-  // Redirigimos al panel de MP. El callback va a redirigir de vuelta
-  // a /admin/configuracion?mp=connected o ?mp=error.
-  window.location.assign(authorizeUrl);
+  return authorizeUrl;
+}
+
+/**
+ * Inicia el flow OAuth: pide al backend la URL y redirige inmediatamente.
+ *
+ * Mantengo esta funcion para compatibilidad (codigo que ya la usaba)
+ * pero el flujo recomendado es:
+ *   1. Llamar obtenerUrlConexionMP() para tener la URL
+ *   2. Mostrar al user un aviso de "asegurate de estar logueado en MP"
+ *   3. Cuando confirme, hacer window.location.assign(url) directo
+ *
+ * @param {string} consultorioId
+ * @returns {Promise<void>} (no devuelve, navega a otra URL)
+ */
+export async function iniciarConexionMP(consultorioId) {
+  const url = await obtenerUrlConexionMP(consultorioId);
+  window.location.assign(url);
 }
 
 /**
