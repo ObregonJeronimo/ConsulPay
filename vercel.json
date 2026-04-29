@@ -1,5 +1,11 @@
 {
   "rewrites": [
     { "source": "/(.*)", "destination": "/" }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/suscripciones-expiradas",
+      "schedule": "0 3 * * *"
+    }
   ]
 }
