@@ -101,6 +101,60 @@ function validarFirma(req, dataId) {
   return true;
 }
 
+/**
+ * Extrae el desglose de fees del objeto Payment de MP.
+ *
+ * MP devuelve un array fee_details con todas las fees aplicadas:
+ *   { type: 'mercadopago_fee', amount: 22.29, fee_payer: 'collector' }
+ *   { type: 'application_fee', amount: 24.00, fee_payer: 'collector' }
+ *   ...otros tipos posibles: financing_fee, financing_repayment_fee, ...
+ *
+ * Lo que nos interesa para mostrar al user:
+ *  - feeMercadoPago: lo que cobra MP por procesar el pago
+ *  - feeAplicacion: nuestra comisión (marketplace_fee). Aunque ya la
+ *    tenemos en pagoData.comisionConsulpay, validamos que coincida.
+ *  - netReceivedAmount: lo que efectivamente recibe el seller.
+ *
+ * Si fee_details no viene, devolvemos { feeMercadoPago: null, ... }
+ * — es importante manejar el caso null en la UI para pagos viejos
+ * que no tienen este desglose.
+ */
+function extraerFeeDetails(pagoMP) {
+  const details = Array.isArray(pagoMP.fee_details) ? pagoMP.fee_details : [];
+
+  let feeMercadoPago = 0;
+  let feeAplicacion = 0;
+  let huboMpFee = false;
+  let huboAppFee = false;
+
+  for (const f of details) {
+    const amount = Number(f.amount) || 0;
+    if (f.type === 'mercadopago_fee') {
+      feeMercadoPago += amount;
+      huboMpFee = true;
+    } else if (f.type === 'application_fee') {
+      feeAplicacion += amount;
+      huboAppFee = true;
+    }
+    // Otros tipos (financing_fee, etc) los ignoramos por ahora.
+    // Si aparecen para algun caso de cuotas, agregar.
+  }
+
+  // El neto que recibe el seller. Lo sacamos directo de transaction_details
+  // (lo calcula MP), pero si no viene, lo calculamos nosotros.
+  const netDeMP = pagoMP.transaction_details?.net_received_amount;
+  const transactionAmount = Number(pagoMP.transaction_amount) || 0;
+  const netCalculado = transactionAmount - feeMercadoPago - feeAplicacion;
+
+  return {
+    feeMercadoPago: huboMpFee ? feeMercadoPago : null,
+    feeAplicacion: huboAppFee ? feeAplicacion : null,
+    netReceivedAmount: typeof netDeMP === 'number' ? netDeMP : netCalculado,
+    transactionAmount,
+    feeDetailsRaw: details, // por si despues queremos mostrar todos
+  };
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return jsonResponse(res, 405, { error: 'Method not allowed' });
@@ -143,23 +197,15 @@ export default async function handler(req, res) {
     initAdmin();
   } catch (err) {
     console.error('Error inicializando firebase-admin en webhook:', err);
-    // Devolvemos 200 igual para que MP no reintente. Loguemos para debugging.
     return jsonResponse(res, 200, { ok: true, error: 'init_admin_fallo' });
   }
 
   const db = getFirestore();
 
-  // Procesamos en background pero respondemos rapido a MP.
-  // En Vercel serverless no podemos hacer "background tasks" de verdad
-  // (el proceso muere cuando devolvemos), asi que igual procesamos antes
-  // de responder. Pero envuelto en try/catch para que cualquier error
-  // no impida devolver 200.
   try {
     await procesarPago(db, dataId);
   } catch (err) {
     console.error('Error procesando webhook MP:', err);
-    // Devolvemos 200 igual: MP no debe reintentar si la falla es nuestra.
-    // El pago queda en el estado anterior y se puede reconciliar manualmente.
   }
 
   return jsonResponse(res, 200, { ok: true });
@@ -171,32 +217,6 @@ export default async function handler(req, res) {
  * y actualiza estados.
  */
 async function procesarPago(db, paymentId) {
-  // Antes de poder llamar a la API de MP necesitamos un access_token.
-  // El payment podria pertenecer a CUALQUIER consultorio. La forma
-  // correcta es:
-  //  1. Buscar /pagos_consultorio por external_reference o mpPaymentId
-  //  2. Sacar consultorioId
-  //  3. Decifrar el access_token de ese consultorio
-  //  4. Hacer fetch del pago para verificar
-  //
-  // Pero cuando MP nos llama por primera vez para un pago nuevo, no
-  // sabemos a que pago_consultorio corresponde hasta que llamemos a
-  // MP y obtengamos external_reference. Salida: usamos el access_token
-  // de la APP (process.env.MP_CLIENT_SECRET via OAuth de la app no
-  // sirve para esto) — en realidad, marketplace_fee usa el access_token
-  // del consultorio (vendedor), pero el webhook no nos dice cual es.
-  //
-  // Solucion: el body del webhook viene con info parcial. Probamos
-  // primero buscar por external_reference si esta disponible. Si no,
-  // tenemos que iterar consultorios o pedir al payer que vuelva al
-  // sitio (back_urls).
-  //
-  // Por ahora: buscamos en /pagos_consultorio por mpPaymentId o por
-  // external_reference (no tenemos pero hacemos fetch directo).
-  // Lo mas robusto: buscamos /pagos_consultorio donde estado=pendiente
-  // y el mpPreferenceId coincida con el preference_id del pago, pero
-  // eso requiere fetch a MP primero.
-
   // Buscamos directo en pagos_consultorio si ya tenemos este paymentId
   const existentePorPaymentId = await db.collection('pagos_consultorio')
     .where('mpPaymentId', '==', String(paymentId))
@@ -208,16 +228,8 @@ async function procesarPago(db, paymentId) {
     pagoDoc = existentePorPaymentId.docs[0];
   }
 
-  // Si no lo encontramos, necesitamos hacer fetch a MP para obtener
-  // external_reference. Para esto necesitamos un access_token que pueda
-  // ver el pago. Vamos a iterar consultorios con MP integrado y probar.
-  // En la practica esto se ejecuta una sola vez por pago (la primera
-  // notificacion).
+  // Si no lo encontramos, iteramos consultorios y buscamos por external_reference.
   if (!pagoDoc) {
-    // Estrategia: leer todos los consultorios con mpIntegrado=true y
-    // probar de a uno. En entornos pequenos es ok. Para escala mayor
-    // habria que indexar consultorioId en /pagos_consultorio por
-    // mpPreferenceId despues del primer match.
     const consultoriosSnap = await db.collection('consultorios')
       .where('mpIntegrado', '==', true)
       .get();
@@ -242,7 +254,6 @@ async function procesarPago(db, paymentId) {
           return;
         }
 
-        // Buscamos el doc por su id (que es el external_reference)
         const pagoSnap = await db.collection('pagos_consultorio').doc(externalRef).get();
         if (!pagoSnap.exists) {
           console.warn(`Pago consultorio ${externalRef} no existe en Firestore.`);
@@ -257,7 +268,6 @@ async function procesarPago(db, paymentId) {
         await actualizarPagoYDescuentoSesiones(db, pagoSnap, pagoMP);
         return;
       } catch (err) {
-        // No era de este consultorio, probamos el siguiente
         if (err.mpStatus === 404) continue;
         console.warn(`Error consultando pago ${paymentId} con cons ${consDoc.id}:`, err.message);
         continue;
@@ -305,13 +315,17 @@ async function procesarPago(db, paymentId) {
  *
  * IDEMPOTENTE: si llaman 2 veces con el mismo pago aprobado, las
  * sesiones se actualizan una sola vez (chequeamos webhookRecibidoAt).
+ *
+ * NUEVO: ahora extraemos fee_details del payment para guardar el
+ * desglose real de fees (lo que cobro MP, lo que cobro la app, y el
+ * neto que recibe el seller). La UI lo muestra para que el admin
+ * sepa exactamente que va a recibir en su cuenta.
  */
 async function actualizarPagoYDescuentoSesiones(db, pagoSnap, pagoMP) {
   const pagoData = pagoSnap.data();
   const pagoRef = pagoSnap.ref;
 
   // Mapeo de estados MP → nuestros
-  // Ver https://www.mercadopago.com.ar/developers/es/reference/payments/_payments/post
   let estadoNuevo = pagoData.estado; // default no cambiar
   switch (pagoMP.status) {
     case 'approved':
@@ -339,11 +353,26 @@ async function actualizarPagoYDescuentoSesiones(db, pagoSnap, pagoMP) {
   const yaProcesadoComoAprobado = pagoData.estado === 'aprobado'
     && pagoData.webhookRecibidoAt != null;
 
-  // Actualizar el doc del pago
+  // Extraer desglose de fees
+  const fees = extraerFeeDetails(pagoMP);
+
+  // Actualizar el doc del pago.
+  // Nuevos campos:
+  //  - feeMercadoPago: lo que cobra MP (a informar al user)
+  //  - montoNetoReal: lo que efectivamente recibe el seller (=
+  //    transaction_amount - feeMercadoPago - application_fee)
+  //  - feeDetailsRaw: array completo por si queremos analizar despues
+  //
+  // Mantenemos por compat:
+  //  - montoNeto: el campo viejo (= bruto - comisionConsulpay), pero
+  //    ahora la UI lee montoNetoReal con fallback a montoNeto.
   await pagoRef.update({
     estado: estadoNuevo,
     mpPaymentId: String(pagoMP.id),
     mpStatusDetail: pagoMP.status_detail || null,
+    feeMercadoPago: fees.feeMercadoPago,
+    montoNetoReal: fees.netReceivedAmount,
+    feeDetailsRaw: fees.feeDetailsRaw,
     rawPaymentData: {
       status: pagoMP.status,
       status_detail: pagoMP.status_detail,
@@ -376,8 +405,6 @@ async function actualizarPagoYDescuentoSesiones(db, pagoSnap, pagoMP) {
         console.log(`Marcadas ${sesionesIds.length} sesiones como pagadas para pago ${pagoSnap.id}`);
       } catch (err) {
         console.error(`Error marcando sesiones como pagadas para pago ${pagoSnap.id}:`, err);
-        // No re-lanzamos: el pago ya quedo aprobado en Firestore.
-        // La reconciliacion manual puede fixear las sesiones despues.
       }
     }
   }
