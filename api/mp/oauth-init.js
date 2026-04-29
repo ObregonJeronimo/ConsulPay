@@ -15,6 +15,18 @@
  * El state previene CSRF y vincula el callback al admin/consultorio
  * que inicio el flow.
  *
+ * IMPORTANTE - prelogin:
+ * En lugar de mandar al user directo a auth.mercadopago.com.ar/authorization,
+ * lo mandamos a www.mercadopago.com.ar/login?go=<authorize_url>. Esto fuerza
+ * a MP a verificar la sesion del user antes de mostrarle "Autorizar a
+ * consulpay". Sin este wrapper, MP a veces muestra la pantalla de autorizar
+ * sin tener sesion activa, y al darle "Autorizar" devuelve un opaco
+ * {"code":"unauthorized","message":"invalid session"} que confunde al user.
+ *
+ * Con el prelogin: si el user ya esta logueado en MP, MP salta el login
+ * automaticamente y va directo a authorize. Si no esta logueado, le pide
+ * loguearse primero. En ambos casos, sin error.
+ *
  * Body:  { consultorioId: string }
  * Header: Authorization: Bearer <firebase_id_token>
  * Devuelve: { authorizeUrl: string }
@@ -28,6 +40,7 @@ import { initAdmin } from '../_lib/firebase-admin.js';
 import { jsonResponse, readJsonBody } from '../_lib/http.js';
 
 const MP_AUTHORIZE_URL = 'https://auth.mercadopago.com.ar/authorization';
+const MP_LOGIN_URL = 'https://www.mercadopago.com.ar/login';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -90,15 +103,27 @@ export default async function handler(req, res) {
     used: false,
   });
 
-  // Construir URL de autorizacion
-  const params = new URLSearchParams({
+  // Construir URL de autorizacion (la "interna", a /authorization)
+  const authorizeParams = new URLSearchParams({
     client_id: clientId,
     response_type: 'code',
     platform_id: 'mp',
     redirect_uri: redirectUri,
     state,
   });
+  const innerAuthorizeUrl = `${MP_AUTHORIZE_URL}?${authorizeParams.toString()}`;
 
-  const authorizeUrl = `${MP_AUTHORIZE_URL}?${params.toString()}`;
+  // Envolverla en /login?go=<authorize_url> para forzar el prelogin.
+  // El "go" en MP es relativo al dominio, asi que solo pasamos el path
+  // + query (sin el https://auth.mercadopago.com.ar/).
+  //
+  // En la practica, MP soporta tanto un "go" relativo al dominio actual
+  // como una URL absoluta. Pasamos la URL absoluta para que MP siempre
+  // redirija al endpoint correcto sin importar de que dominio venga.
+  const loginParams = new URLSearchParams({
+    go: innerAuthorizeUrl,
+  });
+  const authorizeUrl = `${MP_LOGIN_URL}?${loginParams.toString()}`;
+
   return jsonResponse(res, 200, { authorizeUrl });
 }
