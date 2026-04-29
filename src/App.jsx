@@ -27,9 +27,12 @@ const Configuracion = lazy(() => import('./pages/admin/Configuracion.jsx'));
 const Pacientes = lazy(() => import('./pages/admin/Pacientes.jsx'));
 const Sesiones = lazy(() => import('./pages/admin/Sesiones.jsx'));
 const Solicitudes = lazy(() => import('./pages/admin/Solicitudes.jsx'));
+const PagosAdmin = lazy(() => import('./pages/admin/Pagos.jsx'));
 const MiPanel = lazy(() => import('./pages/profesional/MiPanel.jsx'));
 const MisPacientes = lazy(() => import('./pages/profesional/MisPacientes.jsx'));
 const MisSesiones = lazy(() => import('./pages/profesional/MisSesiones.jsx'));
+const MisPagos = lazy(() => import('./pages/profesional/MisPagos.jsx'));
+const RetornoPago = lazy(() => import('./pages/profesional/RetornoPago.jsx'));
 
 /**
  * Fallback que se muestra mientras un chunk lazy está descargándose.
@@ -84,6 +87,7 @@ export default function App() {
                 <Route path="/admin/pacientes" element={<Pacientes />} />
                 <Route path="/admin/sesiones" element={<Sesiones />} />
                 <Route path="/admin/solicitudes" element={<Solicitudes />} />
+                <Route path="/admin/pagos" element={<PagosAdmin />} />
                 <Route path="/admin/configuracion" element={<Configuracion />} />
               </Route>
             </Route>
@@ -94,6 +98,8 @@ export default function App() {
                 <Route path="/mi-panel" element={<MiPanel />} />
                 <Route path="/mi-panel/pacientes" element={<MisPacientes />} />
                 <Route path="/mi-panel/sesiones" element={<MisSesiones />} />
+                <Route path="/mi-panel/pagos" element={<MisPagos />} />
+                <Route path="/mi-panel/pagos/retorno" element={<RetornoPago />} />
               </Route>
             </Route>
 
