@@ -1,5 +1,19 @@
 /* ============================================================
    AppShell — layout wrapper (sidebar + main content)
+   ----------------------------------------------------------------
+   Tomamos decisiones deliberadas de espacio aca:
+   1. NO usamos max-width: 1200px en el main. En pantallas grandes
+      (24"+) el contenido se estira para aprovechar todo el ancho
+      disponible. Esto es importante para paginas con tablas anchas
+      como Sesiones (9 columnas), donde antes el max-width achicaba
+      el espacio util y forzaba scroll horizontal.
+   2. Padding lateral mas chico (28px en vez de 48px) para ganar
+      espacio horizontal. Compensamos visualmente con padding mas
+      generoso adentro de los componentes.
+   3. En pantallas anchas (>1600px), agregamos max-width muy alto
+      (1600px) para que el contenido no quede desproporcionadamente
+      ancho en monitores 4K — sigue dejando aprovechar mucho mas
+      ancho que antes.
    ============================================================ */
 
 .cp-shell {
@@ -9,9 +23,23 @@
 }
 
 .cp-shell__main {
-  padding: var(--cp-space-10) var(--cp-space-12) var(--cp-space-16);
-  max-width: var(--cp-content-max);
+  /* Padding lateral compacto: 28px en vez de los 48px de antes. Eso
+     nos da 40px mas de ancho horizontal para tablas anchas. */
+  padding: var(--cp-space-10) 28px var(--cp-space-16);
   width: 100%;
+  /* min-width: 0 hace que el grid child no se estire por su contenido
+     (importante con tablas que pueden tener overflow interno). */
+  min-width: 0;
+}
+
+/* En monitores muy grandes evitamos que el contenido se estire
+   demasiado a lo ancho — pero el limite es generoso (1600px) para
+   que las tablas anchas no queden cortadas. Antes era 1200px lo
+   cual era restrictivo en pantallas tipicas (1366px). */
+@media (min-width: 1700px) {
+  .cp-shell__main {
+    max-width: 1600px;
+  }
 }
 
 /* ---- Responsive: en mobile la sidebar se transforma en top bar ---- */
