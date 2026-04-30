@@ -34,6 +34,12 @@ const MisSesiones = lazy(() => import('./pages/profesional/MisSesiones.jsx'));
 const MisPagos = lazy(() => import('./pages/profesional/MisPagos.jsx'));
 const RetornoPago = lazy(() => import('./pages/profesional/RetornoPago.jsx'));
 
+// Paginas legales publicas (sin auth) — se incluyen como lazy igual
+// que el resto, asi no engordan el bundle inicial. Quien viene a leer
+// los terminos descarga solo ese chunk.
+const PoliticaPrivacidad = lazy(() => import('./pages/legal/PoliticaPrivacidad.jsx'));
+const TerminosCondiciones = lazy(() => import('./pages/legal/TerminosCondiciones.jsx'));
+
 /**
  * Fallback que se muestra mientras un chunk lazy está descargándose.
  * Con conexiones rápidas es imperceptible; con conexiones lentas
@@ -64,6 +70,12 @@ export default function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/crear-consultorio" element={<CrearConsultorio />} />
             <Route path="/aceptar-invitacion" element={<AceptarInvitacion />} />
+
+            {/* Paginas legales — accesibles sin login para que cualquier
+                visitante o cliente potencial pueda leerlas antes de
+                registrarse. */}
+            <Route path="/privacidad" element={<PoliticaPrivacidad />} />
+            <Route path="/terminos" element={<TerminosCondiciones />} />
 
             {/* ---------- Autenticadas sin shell ---------- */}
             <Route element={<ProtectedRoute requireActivo={false} />}>
