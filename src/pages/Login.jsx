@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 
 import Button from '../components/ui/Button.jsx';
 import Input from '../components/ui/Input.jsx';
@@ -30,6 +30,10 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  // Aceptacion de TOS — solo aplica en modo registro. Por seguridad,
+  // se resetea cada vez que el user cambia entre login/register para
+  // evitar que tildarlo en un modo se mantenga al cambiar al otro.
+  const [aceptoTOS, setAceptoTOS] = useState(false);
   const [loading, setLoading] = useState(null); // null | 'google' | 'email'
   const [error, setError] = useState('');
 
@@ -47,9 +51,21 @@ export default function Login() {
 
   async function onGoogle() {
     setError('');
+
+    // En modo registro, exigimos aceptacion de TOS antes de proceder.
+    // En modo login, no — el usuario ya acepto los TOS cuando se creo
+    // la cuenta originalmente.
+    if (isRegister && !aceptoTOS) {
+      setError('Tenés que aceptar los Términos y Condiciones y la Política de Privacidad para crear una cuenta.');
+      return;
+    }
+
     setLoading('google');
     try {
-      await loginWithGoogle();
+      // Si estamos en modo register, le decimos al backend que el user
+      // acepto los TOS — para que se guarde aceptoTOSAt + tosVersion en
+      // el doc nuevo. En login normal, no pasamos ese flag.
+      await loginWithGoogle(isRegister ? { aceptoTOS: true } : {});
       irAlDestino();
     } catch (err) {
       setError(traducirErrorAuth(err));
@@ -61,9 +77,19 @@ export default function Login() {
   async function onSubmitEmail(e) {
     e.preventDefault();
     setError('');
+
+    // Misma validacion que en Google: en registro, TOS es obligatorio.
+    if (isRegister && !aceptoTOS) {
+      setError('Tenés que aceptar los Términos y Condiciones y la Política de Privacidad para crear una cuenta.');
+      return;
+    }
+
     setLoading('email');
     try {
       if (isRegister) {
+        // registerWithEmail siempre marca aceptoTOS=true internamente
+        // porque por definicion es un registro nuevo. La validacion del
+        // checkbox la hicimos arriba.
         await registerWithEmail(email, password, displayName);
       } else {
         await loginWithEmail(email, password);
@@ -74,6 +100,12 @@ export default function Login() {
     } finally {
       setLoading(null);
     }
+  }
+
+  function cambiarModo() {
+    setMode(isRegister ? 'login' : 'register');
+    setError('');
+    setAceptoTOS(false);  // reset por seguridad al cambiar de modo
   }
 
   return (
@@ -152,6 +184,43 @@ export default function Login() {
               required
             />
 
+            {/*
+              Checkbox de aceptacion de TOS — visible solo en modo registro.
+              Aplica tanto al boton de email como al de Google (la
+              validacion se hace en ambos handlers).
+            */}
+            {isRegister && (
+              <label className="cp-login__tos">
+                <input
+                  type="checkbox"
+                  checked={aceptoTOS}
+                  onChange={(e) => setAceptoTOS(e.target.checked)}
+                  disabled={loading !== null}
+                />
+                <span>
+                  Acepto los{' '}
+                  <Link
+                    to="/terminos"
+                    className="cp-login__tos-link"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Términos y Condiciones
+                  </Link>
+                  {' '}y la{' '}
+                  <Link
+                    to="/privacidad"
+                    className="cp-login__tos-link"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Política de Privacidad
+                  </Link>
+                  {' '}de ConsulPay.
+                </span>
+              </label>
+            )}
+
             {error && <div className="cp-login__error">{error}</div>}
 
             <Button
@@ -172,14 +241,26 @@ export default function Login() {
             <button
               type="button"
               className="cp-login__switch-btn"
-              onClick={() => {
-                setMode(isRegister ? 'login' : 'register');
-                setError('');
-              }}
+              onClick={cambiarModo}
               disabled={loading !== null}
             >
               {isRegister ? 'Iniciar sesión' : 'Crear cuenta'}
             </button>
+          </div>
+
+          {/*
+            Footer minimo con links a las paginas legales — visibles
+            siempre, esten o no en modo registro. Permite que cualquier
+            visitante consulte los documentos legales antes de decidir.
+          */}
+          <div className="cp-login__legal-links">
+            <Link to="/terminos" className="cp-login__legal-link">
+              Términos
+            </Link>
+            <span className="cp-login__legal-sep">·</span>
+            <Link to="/privacidad" className="cp-login__legal-link">
+              Privacidad
+            </Link>
           </div>
         </div>
       </div>
