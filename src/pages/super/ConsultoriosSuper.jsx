@@ -17,6 +17,11 @@ import {
   actualizarConfigSuper,
 } from '../../lib/superadmin.js';
 import {
+  eliminarConsultorioSuper,
+  eliminarProfesionalSuper,
+  reautenticarConGoogle,
+} from '../../lib/superadminDelete.js';
+import {
   cargarPanoramaSuper,
   nombreVisible,
   reactivarUsuarioSuper,
@@ -25,49 +30,23 @@ import {
 
 import './ConsultoriosSuper.css';
 
-/**
- * Panel del superadmin: "Consultorios y usuarios".
- *
- * Estructura:
- *   1. CONSULTORIOS — paginados de a 5. Cada fila tiene:
- *        - Header del consultorio con nombre, plan, % comision actual,
- *          flag puedeVerPlanPro, y boton "Editar configuracion".
- *        - Al expandir: lista de miembros del consultorio + acciones
- *          (suspender/reactivar) sobre cada uno.
- *   2. SIN CONSULTORIO ASIGNADO — usuarios huerfanos (no paginado,
- *      se ven todos juntos abajo). Util para detectar problemas.
- *   3. SUPERADMINS — operadores (no paginado). Solo lectura.
- *
- * Decision: solo paginamos los CONSULTORIOS porque son los que pueden
- * crecer mucho (eventualmente cientos). Huerfanos y superadmins son
- * pocos por naturaleza, los mostramos todos.
- *
- * Por separacion de concerns:
- *   - lib/superadmin.js     -> paginacion + actualizar config
- *   - lib/usuariosSuper.js  -> panorama batch + acciones suspender/reactivar
- */
 export default function ConsultoriosSuper() {
-  // ---- Estado de paginacion de consultorios ----
-  const [paginaActual, setPaginaActual] = useState(0); // 0-indexed
-  const [paginas, setPaginas] = useState([]); // array de { items, lastDoc, hayMas }
+  const [paginaActual, setPaginaActual] = useState(0);
+  const [paginas, setPaginas] = useState([]);
   const [totalConsultorios, setTotalConsultorios] = useState(null);
   const [loadingPagina, setLoadingPagina] = useState(false);
   const [errorPagina, setErrorPagina] = useState('');
 
-  // ---- Estado del panorama de huerfanos + superadmins ----
-  // Los traemos UNA SOLA VEZ con cargarPanoramaSuper() y filtramos
-  // localmente. No paginamos.
   const [panorama, setPanorama] = useState(null);
   const [loadingPanorama, setLoadingPanorama] = useState(true);
 
-  // ---- Estado de modales y feedback ----
-  const [editando, setEditando] = useState(null); // consultorio que se esta editando
-  const [accionUsuario, setAccionUsuario] = useState(null); // {tipo, user}
+  const [editando, setEditando] = useState(null);
+  const [eliminandoConsultorio, setEliminandoConsultorio] = useState(null);
+  const [accionUsuario, setAccionUsuario] = useState(null);
+
   const [accionEnCurso, setAccionEnCurso] = useState(false);
   const [error, setError] = useState('');
   const [mensaje, setMensaje] = useState('');
-
-  /* ---------- Carga inicial: total + primera pagina + panorama ---------- */
 
   useEffect(() => {
     cargarTodo();
@@ -96,22 +75,16 @@ export default function ConsultoriosSuper() {
     }
   }
 
-  /* ---------- Navegacion entre paginas ---------- */
-
-  // Las paginas que ya cargamos quedan cacheadas en `paginas[]`. Si
-  // el user va y vuelve, no las pedimos de nuevo. Si avanza a una
-  // pagina nueva, la cargamos y agregamos al cache.
   async function irAPagina(idx) {
     if (idx < 0) return;
     if (idx < paginas.length) {
       setPaginaActual(idx);
       return;
     }
-    // idx === paginas.length: avanzar a la siguiente pagina nueva
-    if (idx !== paginas.length) return; // no podes saltear paginas
+    if (idx !== paginas.length) return;
 
     const lastDoc = paginas[paginas.length - 1]?.lastDoc;
-    if (!lastDoc) return; // no hay cursor -> no podemos avanzar
+    if (!lastDoc) return;
 
     setErrorPagina('');
     setLoadingPagina(true);
@@ -126,41 +99,11 @@ export default function ConsultoriosSuper() {
     }
   }
 
-  /* ---------- Refrescar todo (despues de editar) ---------- */
-
   async function refrescar() {
-    // Reseteamos paginas y empezamos de nuevo desde la primera. Hace
-    // que la edicion del consultorio se vea reflejada en la lista.
     setPaginas([]);
     await cargarTodo();
   }
 
-  /* ---------- Editar config de un consultorio ---------- */
-
-  async function ejecutarEdicion(cambios) {
-    if (!editando) return;
-    setAccionEnCurso(true);
-    setError('');
-    try {
-      await actualizarConfigSuper(editando.id, cambios);
-      setMensaje(`Configuración de ${editando.nombre} actualizada.`);
-      setEditando(null);
-      // Refrescamos solo la pagina actual para mostrar los cambios.
-      await refrescarPaginaActual();
-      setTimeout(() => setMensaje(''), 4000);
-    } catch (err) {
-      setError(err.message || 'No se pudo guardar la configuración.');
-    } finally {
-      setAccionEnCurso(false);
-    }
-  }
-
-  // Refresca SOLO la primera pagina (volvemos al inicio). Es mas
-  // simple que intentar refrescar la pagina N en el medio: si el
-  // user editaba un consultorio en la pagina 3, despues de guardar
-  // queda en la pagina 1 con los cambios visibles si caen ahi.
-  // Trade-off aceptable: editar es poco frecuente y es claro lo
-  // que pasa.
   async function refrescarPaginaActual() {
     setLoadingPagina(true);
     try {
@@ -176,7 +119,44 @@ export default function ConsultoriosSuper() {
     }
   }
 
-  /* ---------- Acciones sobre usuarios (suspender / reactivar) ---------- */
+  async function ejecutarEdicion(cambios) {
+    if (!editando) return;
+    setAccionEnCurso(true);
+    setError('');
+    try {
+      await actualizarConfigSuper(editando.id, cambios);
+      setMensaje(`Configuración de ${editando.nombre} actualizada.`);
+      setEditando(null);
+      await refrescarPaginaActual();
+      setTimeout(() => setMensaje(''), 4000);
+    } catch (err) {
+      setError(err.message || 'No se pudo guardar la configuración.');
+    } finally {
+      setAccionEnCurso(false);
+    }
+  }
+
+  async function ejecutarEliminacionConsultorio() {
+    if (!eliminandoConsultorio) return;
+    setAccionEnCurso(true);
+    setError('');
+    try {
+      const res = await eliminarConsultorioSuper(eliminandoConsultorio.id);
+      const d = res.deleted || {};
+      setMensaje(
+        `Consultorio "${eliminandoConsultorio.nombre}" eliminado. ` +
+        `Se borraron: ${d.usuarios || 0} usuarios, ${d.sesiones || 0} sesiones, ` +
+        `${d.pacientes || 0} pacientes, ${d.pagos_consultorio || 0} pagos.`,
+      );
+      setEliminandoConsultorio(null);
+      await refrescar();
+      setTimeout(() => setMensaje(''), 8000);
+    } catch (err) {
+      setError(err.detalle?.error || err.message || 'No se pudo eliminar el consultorio.');
+    } finally {
+      setAccionEnCurso(false);
+    }
+  }
 
   async function ejecutarAccionUsuario() {
     if (!accionUsuario) return;
@@ -189,24 +169,30 @@ export default function ConsultoriosSuper() {
       } else if (accionUsuario.tipo === 'reactivar') {
         await reactivarUsuarioSuper(accionUsuario.user.uid);
         setMensaje(`${nombreVisible(accionUsuario.user)} fue reactivado.`);
+      } else if (accionUsuario.tipo === 'retirar' || accionUsuario.tipo === 'eliminar') {
+        if (!accionUsuario.consultorioId) {
+          throw new Error('Falta consultorioId para esta acción.');
+        }
+        await eliminarProfesionalSuper({
+          uid: accionUsuario.user.uid,
+          consultorioId: accionUsuario.consultorioId,
+          modo: accionUsuario.tipo,
+        });
+        const verbo = accionUsuario.tipo === 'retirar' ? 'retirado' : 'eliminado';
+        setMensaje(`${nombreVisible(accionUsuario.user)} fue ${verbo}.`);
       }
       setAccionUsuario(null);
-      // Refrescamos el panorama (huerfanos/superadmins) que es donde
-      // viene el estado del user. Los miembros de un consultorio se
-      // recargan al re-expandir la fila (ver ConsultorioGrupo).
       const panoramaData = await cargarPanoramaSuper();
       setPanorama(panoramaData);
-      setTimeout(() => setMensaje(''), 4000);
+      await refrescarPaginaActual();
+      setTimeout(() => setMensaje(''), 5000);
     } catch (err) {
-      setError(err.message || 'No se pudo ejecutar la acción.');
+      setError(err.detalle?.error || err.message || 'No se pudo ejecutar la acción.');
     } finally {
       setAccionEnCurso(false);
     }
   }
 
-  /* ---------- Render ---------- */
-
-  // Datos derivados del panorama
   const huerfanos = useMemo(() => {
     if (!panorama) return [];
     return panorama.usuarios
@@ -246,7 +232,7 @@ export default function ConsultoriosSuper() {
             {totalConsultorios != null
               ? `${totalConsultorios} consultorio${totalConsultorios === 1 ? '' : 's'} en la plataforma.`
               : 'Cargando…'}
-            {' '}Editá comisiones y visibilidad del Plan Pro por consultorio.
+            {' '}Editá comisiones, eliminá consultorios y gestioná profesionales.
           </p>
         </div>
         <Button variant="secondary" onClick={refrescar} disabled={loadingPagina || loadingPanorama}>
@@ -260,7 +246,6 @@ export default function ConsultoriosSuper() {
       {mensaje && <div className="cp-config-ok">{mensaje}</div>}
       {errorPagina && <div className="cp-config-error">{errorPagina}</div>}
 
-      {/* ---------- LISTA PAGINADA DE CONSULTORIOS ---------- */}
       <section className="cp-super-section">
         <div className="cp-super-section__head">
           <h2 className="cp-super-section__title">Consultorios</h2>
@@ -283,11 +268,13 @@ export default function ConsultoriosSuper() {
             key={cons.id}
             consultorio={cons}
             onEditar={() => { setError(''); setEditando(cons); }}
-            onAccionUsuario={(tipo, user) => setAccionUsuario({ tipo, user })}
+            onEliminarConsultorio={() => { setError(''); setEliminandoConsultorio(cons); }}
+            onAccionUsuario={(tipo, user, consultorioId) =>
+              setAccionUsuario({ tipo, user, consultorioId })
+            }
           />
         ))}
 
-        {/* Paginador */}
         {(paginaActual > 0 || hayMasPaginas) && (
           <div className="cp-paginator">
             <Button
@@ -315,7 +302,6 @@ export default function ConsultoriosSuper() {
         )}
       </section>
 
-      {/* ---------- HUERFANOS (sin paginar) ---------- */}
       {huerfanos.length > 0 && (
         <section className="cp-super-section cp-super-section--warn">
           <div className="cp-super-section__head">
@@ -341,7 +327,6 @@ export default function ConsultoriosSuper() {
         </section>
       )}
 
-      {/* ---------- SUPERADMINS (sin paginar, solo lectura) ---------- */}
       {superadmins.length > 0 && (
         <section className="cp-super-section">
           <div className="cp-super-section__head">
@@ -367,7 +352,6 @@ export default function ConsultoriosSuper() {
         </section>
       )}
 
-      {/* ---------- MODALES ---------- */}
       {editando && (
         <EditarConsultorioModal
           consultorio={editando}
@@ -377,8 +361,17 @@ export default function ConsultoriosSuper() {
         />
       )}
 
+      {eliminandoConsultorio && (
+        <EliminarConsultorioModal
+          consultorio={eliminandoConsultorio}
+          submitting={accionEnCurso}
+          onCancelar={() => !accionEnCurso && setEliminandoConsultorio(null)}
+          onConfirmar={ejecutarEliminacionConsultorio}
+        />
+      )}
+
       {accionUsuario && (
-        <ConfirmarAccionSuperModal
+        <AccionUsuarioModal
           accion={accionUsuario}
           submitting={accionEnCurso}
           onCancelar={() => !accionEnCurso && setAccionUsuario(null)}
@@ -389,23 +382,11 @@ export default function ConsultoriosSuper() {
   );
 }
 
-/* ============================================================
-   ConsultorioCard — fila expandible con info + acciones
-   ----------------------------------------------------------------
-   Muestra el header SIEMPRE visible (con boton Editar) y el body
-   con miembros se carga al expandir (lazy). Esto es importante para
-   no traer miembros de los 5 consultorios todos juntos al cargar
-   la pagina — solo se traen cuando el user expande.
-   ============================================================ */
-function ConsultorioCard({ consultorio, onEditar, onAccionUsuario }) {
+function ConsultorioCard({ consultorio, onEditar, onEliminarConsultorio, onAccionUsuario }) {
   const [expandido, setExpandido] = useState(false);
   const [miembros, setMiembros] = useState(null);
   const [loadingMiembros, setLoadingMiembros] = useState(false);
 
-  // Cargar miembros la primera vez que se expande, NO live.
-  // Si el user contrae y vuelve a expandir, no recargamos (los datos
-  // ya estan en memoria). Para forzar refresh, usar el boton
-  // "Refrescar" del header de la pagina.
   async function toggle() {
     const nuevoExpandido = !expandido;
     setExpandido(nuevoExpandido);
@@ -427,7 +408,13 @@ function ConsultorioCard({ consultorio, onEditar, onAccionUsuario }) {
   const planLabel = consultorio.plan === 'pro' ? 'Pro' : 'Free';
   const planProDeshabilitado = consultorio.puedeVerPlanPro === false;
 
-  // Enriquecer miembros con esOwner / esAdmin para el badge
+  const tieneSuscripcionActiva = consultorio.subscription && (
+    consultorio.subscription.status === 'authorized'
+    || consultorio.subscription.status === 'pending_authorization'
+    || consultorio.subscription.status === 'in_grace'
+  );
+  const puedeEliminar = consultorio.plan === 'free' && !tieneSuscripcionActiva;
+
   const miembrosOrdenados = useMemo(() => {
     if (!miembros) return [];
     const adminUids = new Set(consultorio.adminUids || []);
@@ -436,7 +423,6 @@ function ConsultorioCard({ consultorio, onEditar, onAccionUsuario }) {
       esAdminDelConsultorio: adminUids.has(m.uid),
       esOwner: m.uid === consultorio.ownerUid,
     })).sort((a, b) => {
-      // owner primero, luego admins, luego activos, luego resto
       const peso = (m) => {
         if (m.esOwner) return 0;
         if (m.esAdminDelConsultorio) return 1;
@@ -459,7 +445,7 @@ function ConsultorioCard({ consultorio, onEditar, onAccionUsuario }) {
           className="cp-cons-card__toggle"
           onClick={toggle}
           aria-expanded={expandido}
-          aria-label={expandido ? 'Contraer' : 'Expandir'}
+          aria-label={expandido ? 'Contraer miembros' : 'Ver miembros del consultorio'}
         >
           <span className="cp-cons-card__toggle-icon" aria-hidden="true">
             {expandido ? '▾' : '▸'}
@@ -486,7 +472,7 @@ function ConsultorioCard({ consultorio, onEditar, onAccionUsuario }) {
                 {Number.isFinite(comision.pct) ? `${comision.pct}%` : '—'}
               </strong>
               {comision.etiqueta === 'Legacy' && (
-                <span className="cp-cons-card__meta-hint" title="El consultorio no tiene los campos nuevos comisionFree/Pro definidos. Esta usando el campo viejo comisionConsulpay como fallback. Editalo desde aca para migrar a los campos nuevos.">
+                <span className="cp-cons-card__meta-hint" title="Configuración legacy. Editá para migrar a comisiones por plan.">
                   {' '}(legacy)
                 </span>
               )}
@@ -495,6 +481,14 @@ function ConsultorioCard({ consultorio, onEditar, onAccionUsuario }) {
             <span>
               ID: <code>{consultorio.id.slice(0, 8)}…</code>
             </span>
+            <span className="cp-cons-card__meta-sep">·</span>
+            <button
+              type="button"
+              className="cp-cons-card__expand-link"
+              onClick={toggle}
+            >
+              {expandido ? 'Ocultar miembros' : 'Ver miembros'}
+            </button>
           </div>
         </div>
         <div className="cp-cons-card__actions">
@@ -522,20 +516,86 @@ function ConsultorioCard({ consultorio, onEditar, onAccionUsuario }) {
                   user={u}
                   mostrarBadgeAdmin
                   mostrarBadgeOwner
+                  consultorioId={consultorio.id}
+                  permitirRetirarEliminar
                   onAccion={onAccionUsuario}
                 />
               ))}
             </ul>
           )}
+
+          <DangerZone
+            consultorio={consultorio}
+            puedeEliminar={puedeEliminar}
+            tieneSuscripcionActiva={tieneSuscripcionActiva}
+            onEliminar={onEliminarConsultorio}
+          />
         </div>
       )}
     </div>
   );
 }
 
-/* ============================================================
-   UserRow — fila de un usuario con acciones
-   ============================================================ */
+function DangerZone({ consultorio, puedeEliminar, tieneSuscripcionActiva, onEliminar }) {
+  const [abierto, setAbierto] = useState(false);
+
+  let razonNoEliminar = null;
+  if (!puedeEliminar) {
+    if (consultorio.plan === 'pro') {
+      razonNoEliminar = 'Este consultorio tiene Plan Pro activo. Pediile al dueño que cancele la suscripción primero.';
+    } else if (tieneSuscripcionActiva) {
+      razonNoEliminar = 'Este consultorio tiene una suscripción pendiente o en período de gracia. Pediile al dueño que la cancele primero.';
+    }
+  }
+
+  return (
+    <div className="cp-danger-zone">
+      <button
+        type="button"
+        className="cp-danger-zone__head"
+        onClick={() => setAbierto((p) => !p)}
+        aria-expanded={abierto}
+      >
+        <span className="cp-danger-zone__icon" aria-hidden="true">⚠️</span>
+        <span className="cp-danger-zone__title">Zona peligrosa</span>
+        <span className="cp-danger-zone__toggle" aria-hidden="true">
+          {abierto ? '▾' : '▸'}
+        </span>
+      </button>
+
+      {abierto && (
+        <div className="cp-danger-zone__body">
+          <div className="cp-danger-zone__row">
+            <div className="cp-danger-zone__info">
+              <div className="cp-danger-zone__row-title">
+                Eliminar consultorio
+              </div>
+              <div className="cp-danger-zone__row-desc">
+                Borra el consultorio, todos sus pacientes, sesiones, pagos
+                y profesionales asociados.{' '}
+                <strong>Esta acción es irreversible.</strong>
+              </div>
+              {razonNoEliminar && (
+                <div className="cp-danger-zone__warning">
+                  {razonNoEliminar}
+                </div>
+              )}
+            </div>
+            <Button
+              variant="danger"
+              type="button"
+              onClick={onEliminar}
+              disabled={!puedeEliminar}
+            >
+              Eliminar consultorio
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function iniciales(nombre) {
   if (!nombre) return '·';
   const partes = nombre.trim().split(/\s+/);
@@ -550,6 +610,8 @@ function UserRow({
   mostrarBadgeOwner = false,
   mostrarBadgeRol = false,
   soloLectura = false,
+  consultorioId = null,
+  permitirRetirarEliminar = false,
   onAccion,
 }) {
   const nombre = nombreVisible(user);
@@ -558,6 +620,10 @@ function UserRow({
     user.estado === ESTADOS_USUARIO.SUSPENDIDO
     || user.estado === ESTADOS_USUARIO.RETIRADO
   );
+  const puedeRetirarEliminar = permitirRetirarEliminar
+    && consultorioId
+    && !user.esOwner
+    && !soloLectura;
 
   return (
     <li className="cp-super-tree__user">
@@ -591,8 +657,8 @@ function UserRow({
         {puedeSuspender && (
           <button
             type="button"
-            className="cp-prof-action cp-prof-action--danger"
-            onClick={() => onAccion('suspender', user)}
+            className="cp-prof-action"
+            onClick={() => onAccion('suspender', user, consultorioId)}
           >
             Suspender
           </button>
@@ -601,9 +667,29 @@ function UserRow({
           <button
             type="button"
             className="cp-prof-action"
-            onClick={() => onAccion('reactivar', user)}
+            onClick={() => onAccion('reactivar', user, consultorioId)}
           >
             Reactivar
+          </button>
+        )}
+        {puedeRetirarEliminar && user.estado !== ESTADOS_USUARIO.RETIRADO && (
+          <button
+            type="button"
+            className="cp-prof-action cp-prof-action--warn"
+            onClick={() => onAccion('retirar', user, consultorioId)}
+            title="Retirar del consultorio (soft delete - mantiene registros)"
+          >
+            Retirar
+          </button>
+        )}
+        {puedeRetirarEliminar && (
+          <button
+            type="button"
+            className="cp-prof-action cp-prof-action--danger"
+            onClick={() => onAccion('eliminar', user, consultorioId)}
+            title="Eliminar definitivamente (hard delete)"
+          >
+            Eliminar
           </button>
         )}
       </div>
@@ -626,21 +712,7 @@ function BadgeEstado({ estado }) {
   }
 }
 
-/* ============================================================
-   EditarConsultorioModal
-   ----------------------------------------------------------------
-   3 campos editables: comisionFree, comisionPro, puedeVerPlanPro.
-   - Validacion de los % en el cliente (0-100, valido) ademas de
-     la del backend en lib/superadmin.js.
-   - Si el consultorio no tiene comisionFree/Pro definidos
-     (consultorios viejos), pre-rellenamos con los defaults
-     (6% / 2%) para que el super sepa que valores se aplicarian.
-   - Muestra info contextual: plan actual, % comision en uso, etc.
-   ============================================================ */
 function EditarConsultorioModal({ consultorio, submitting, onCancelar, onConfirmar }) {
-  // Defaults: si el consultorio ya tiene los campos nuevos, usarlos.
-  // Si no, fallback a los defaults del modulo + (si hay comisionConsulpay
-  // legacy y el plan coincide, usar ese como hint razonable).
   const valoresIniciales = useMemo(() => {
     const tieneNuevos = (
       Number.isFinite(Number(consultorio.comisionFree))
@@ -653,8 +725,6 @@ function EditarConsultorioModal({ consultorio, submitting, onCancelar, onConfirm
         puedeVerPlanPro: consultorio.puedeVerPlanPro !== false,
       };
     }
-    // Fallback a defaults. Si tiene comisionConsulpay legacy, lo usamos
-    // para el campo del plan que esta activo, y el otro queda en default.
     const legacy = Number(consultorio.comisionConsulpay);
     const tieneLegacy = Number.isFinite(legacy) && legacy >= 0 && legacy <= 100;
     return {
@@ -700,8 +770,6 @@ function EditarConsultorioModal({ consultorio, submitting, onCancelar, onConfirm
     });
   }
 
-  // Indica si los valores cambiaron respecto al original. Si todavia
-  // no cambio nada el "Guardar" queda deshabilitado.
   const huboCambios = useMemo(() => {
     return (
       Number(comisionFree) !== valoresIniciales.comisionFree
@@ -718,9 +786,7 @@ function EditarConsultorioModal({ consultorio, submitting, onCancelar, onConfirm
           onClick={onCancelar}
           aria-label="Cerrar"
           disabled={submitting}
-        >
-          ×
-        </button>
+        >×</button>
 
         <h2 className="cp-modal__title">Editar configuración</h2>
         <div className="cp-modal__sub">
@@ -775,8 +841,7 @@ function EditarConsultorioModal({ consultorio, submitting, onCancelar, onConfirm
                 <>
                   {' '}
                   <strong>Atención:</strong> este consultorio ya está en Pro con suscripción activa.
-                  Si lo deshabilitás, su suscripción actual sigue funcionando hasta el próximo
-                  vencimiento natural — pero no va a poder renovar ni recontratar después.
+                  Su suscripción actual sigue funcionando hasta el próximo vencimiento natural.
                 </>
               )}
             </p>
@@ -824,46 +889,197 @@ function EditarConsultorioModal({ consultorio, submitting, onCancelar, onConfirm
   );
 }
 
-/* ============================================================
-   ConfirmarAccionSuperModal — para suspender/reactivar usuarios
-   ============================================================ */
-function ConfirmarAccionSuperModal({ accion, submitting, onCancelar, onConfirmar }) {
-  const nombre = nombreVisible(accion.user);
-  const titulo = accion.tipo === 'suspender'
-    ? `¿Suspender a ${nombre}?`
-    : `¿Reactivar a ${nombre}?`;
-  const desc = accion.tipo === 'suspender'
-    ? 'El usuario va a perder el acceso al panel hasta que lo reactives. Sus datos se preservan.'
-    : 'El usuario va a recuperar el acceso al panel con su rol y consultorio actuales.';
-  const textoBoton = accion.tipo === 'suspender' ? 'Suspender' : 'Reactivar';
+function EliminarConsultorioModal({ consultorio, submitting, onCancelar, onConfirmar }) {
+  const [textoConfirmacion, setTextoConfirmacion] = useState('');
+  const [reautenticando, setReautenticando] = useState(false);
+  const [errorLocal, setErrorLocal] = useState('');
+
+  const nombreEsperado = (consultorio.nombre || '').trim();
+  const nombreCoincide = textoConfirmacion.trim() === nombreEsperado;
+
+  async function handleConfirmar() {
+    if (!nombreCoincide || submitting || reautenticando) return;
+    setErrorLocal('');
+    setReautenticando(true);
+    try {
+      await reautenticarConGoogle();
+      setReautenticando(false);
+      onConfirmar();
+    } catch (err) {
+      setReautenticando(false);
+      if (err.codigo === 'CANCELADO') return;
+      setErrorLocal(err.message || 'No se pudo confirmar tu identidad.');
+    }
+  }
+
+  const procesando = submitting || reautenticando;
 
   return (
     <div className="cp-modal-overlay" onClick={onCancelar}>
-      <div
-        className="cp-modal cp-modal--confirm-admin"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="cp-modal cp-modal--danger" onClick={(e) => e.stopPropagation()}>
         <button
           className="cp-modal__close"
           onClick={onCancelar}
           aria-label="Cerrar"
-          disabled={submitting}
+          disabled={procesando}
         >×</button>
 
-        <h2 className="cp-modal__title">{titulo}</h2>
-        <div className="cp-modal__sub">{desc}</div>
+        <h2 className="cp-modal__title">⚠️ Eliminar consultorio</h2>
+
+        <div className="cp-modal__sub">
+          <p style={{ margin: '0 0 12px' }}>
+            Vas a eliminar <strong>{consultorio.nombre || '(sin nombre)'}</strong> y todos sus datos
+            asociados:
+          </p>
+          <ul style={{ margin: '0 0 12px 20px', fontSize: 13.5, color: 'var(--cp-text-muted)' }}>
+            <li>Todos los profesionales y administradores</li>
+            <li>Todos los pacientes</li>
+            <li>Todas las sesiones y pagos del histórico</li>
+            <li>Configuración del consultorio (Mercado Pago, métodos de pago, etc.)</li>
+          </ul>
+          <p style={{ margin: '0 0 12px', color: 'var(--cp-danger)', fontWeight: 500 }}>
+            Esta acción es irreversible.
+          </p>
+          <p style={{ margin: 0, fontSize: 13.5 }}>
+            Las cuentas de Firebase Auth de los usuarios <strong>no</strong> se eliminan —
+            siguen pudiendo loguearse, pero quedarán como huérfanas hasta ser invitadas a
+            otro consultorio.
+          </p>
+        </div>
+
+        <div className="cp-modal-danger__confirm">
+          <label className="cp-modal-danger__label">
+            Para confirmar, escribí el nombre del consultorio:{' '}
+            <strong>{nombreEsperado}</strong>
+          </label>
+          <Input
+            name="confirm"
+            value={textoConfirmacion}
+            onChange={(e) => setTextoConfirmacion(e.target.value)}
+            placeholder={nombreEsperado}
+            disabled={procesando}
+            autoFocus
+          />
+        </div>
+
+        {errorLocal && <div className="cp-modal__error">{errorLocal}</div>}
 
         <div className="cp-modal__actions">
-          <Button variant="secondary" type="button" onClick={onCancelar} disabled={submitting}>
+          <Button variant="secondary" type="button" onClick={onCancelar} disabled={procesando}>
             Cancelar
           </Button>
           <Button
-            variant={accion.tipo === 'suspender' ? 'danger' : 'primary'}
+            variant="danger"
             type="button"
-            onClick={onConfirmar}
-            disabled={submitting}
+            onClick={handleConfirmar}
+            disabled={!nombreCoincide || procesando}
           >
-            {submitting ? <><Spinner size={14} /> Procesando…</> : textoBoton}
+            {reautenticando
+              ? <><Spinner size={14} /> Confirmando con Google…</>
+              : submitting
+                ? <><Spinner size={14} /> Eliminando…</>
+                : 'Confirmar identidad y eliminar'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AccionUsuarioModal({ accion, submitting, onCancelar, onConfirmar }) {
+  const [reautenticando, setReautenticando] = useState(false);
+  const [errorLocal, setErrorLocal] = useState('');
+
+  const nombre = nombreVisible(accion.user);
+  const requiereReauth = accion.tipo === 'retirar' || accion.tipo === 'eliminar';
+
+  let titulo, desc, textoBoton, variante;
+  switch (accion.tipo) {
+    case 'suspender':
+      titulo = `¿Suspender a ${nombre}?`;
+      desc = 'El usuario va a perder el acceso al panel hasta que lo reactives. Sus datos se preservan y la acción es totalmente reversible.';
+      textoBoton = 'Suspender';
+      variante = 'danger';
+      break;
+    case 'reactivar':
+      titulo = `¿Reactivar a ${nombre}?`;
+      desc = 'El usuario va a recuperar el acceso al panel con su rol y consultorio actuales.';
+      textoBoton = 'Reactivar';
+      variante = 'primary';
+      break;
+    case 'retirar':
+      titulo = `¿Retirar a ${nombre} del consultorio?`;
+      desc = 'El usuario pasa a estado "retirado" y pierde el acceso. Sus sesiones y registros históricos se mantienen. Esta acción es reversible (podés reactivarlo después).';
+      textoBoton = 'Retirar del consultorio';
+      variante = 'danger';
+      break;
+    case 'eliminar':
+      titulo = `⚠️ ¿Eliminar definitivamente a ${nombre}?`;
+      desc = 'Se borra el doc del usuario completamente. Sus sesiones históricas se mantienen pero quedarán sin doc asociado (la UI mostrará "Profesional eliminado"). La cuenta de Firebase Auth NO se elimina — el usuario podría volver a loguearse pero quedaría como huérfano sin consultorio.';
+      textoBoton = 'Eliminar definitivamente';
+      variante = 'danger';
+      break;
+    default:
+      titulo = '';
+      desc = '';
+      textoBoton = 'Confirmar';
+      variante = 'primary';
+  }
+
+  async function handleConfirmar() {
+    if (submitting || reautenticando) return;
+    setErrorLocal('');
+
+    if (requiereReauth) {
+      setReautenticando(true);
+      try {
+        await reautenticarConGoogle();
+        setReautenticando(false);
+        onConfirmar();
+      } catch (err) {
+        setReautenticando(false);
+        if (err.codigo === 'CANCELADO') return;
+        setErrorLocal(err.message || 'No se pudo confirmar tu identidad.');
+      }
+    } else {
+      onConfirmar();
+    }
+  }
+
+  const procesando = submitting || reautenticando;
+
+  return (
+    <div className="cp-modal-overlay" onClick={onCancelar}>
+      <div className={`cp-modal ${accion.tipo === 'eliminar' ? 'cp-modal--danger' : 'cp-modal--confirm-admin'}`}
+        onClick={(e) => e.stopPropagation()}>
+        <button
+          className="cp-modal__close"
+          onClick={onCancelar}
+          aria-label="Cerrar"
+          disabled={procesando}
+        >×</button>
+
+        <h2 className="cp-modal__title">{titulo}</h2>
+        <div className="cp-modal__sub">
+          {desc}
+          {' '}
+          <span style={{ display: 'block', marginTop: 8, fontSize: 13, color: 'var(--cp-text-muted)' }}>
+            Email: <strong>{accion.user.email || '(sin email)'}</strong>
+          </span>
+        </div>
+
+        {errorLocal && <div className="cp-modal__error">{errorLocal}</div>}
+
+        <div className="cp-modal__actions">
+          <Button variant="secondary" type="button" onClick={onCancelar} disabled={procesando}>
+            Cancelar
+          </Button>
+          <Button variant={variante} type="button" onClick={handleConfirmar} disabled={procesando}>
+            {reautenticando
+              ? <><Spinner size={14} /> Confirmando con Google…</>
+              : submitting
+                ? <><Spinner size={14} /> Procesando…</>
+                : textoBoton}
           </Button>
         </div>
       </div>
