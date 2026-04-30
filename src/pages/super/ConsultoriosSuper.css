@@ -4,25 +4,14 @@
    Estructura nueva con paginacion. Las clases que ya existian
    (.cp-super-tree__user, etc.) se mantienen porque las usa la nueva
    estructura tambien para las filas de usuarios.
-
-   Nuevas:
-     - .cp-super-section          -> contenedor de seccion con header
-     - .cp-cons-card              -> card de un consultorio paginado
-     - .cp-paginator              -> botones anterior/siguiente al pie
-     - .cp-modal-edit-cons        -> variante del modal para editar
-     - .cc-toggle                 -> reutilizado del Configuracion
    ============================================================ */
 
 .cp-super-tree {
-  /* No max-width fijo: aprovecha todo el ancho de la pagina */
   display: flex;
   flex-direction: column;
   gap: var(--cp-space-6);
 }
 
-/* ============================================================
-   Seccion: header + lista de items
-   ============================================================ */
 .cp-super-section {
   display: flex;
   flex-direction: column;
@@ -57,10 +46,6 @@
   color: var(--cp-text-muted);
   margin: -6px 0 4px;
   line-height: 1.5;
-}
-
-.cp-super-section--warn {
-  /* Tono visual para huerfanos: borde sutil del color warning */
 }
 
 .cp-super-section--warn .cp-super-section__title {
@@ -167,6 +152,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  align-items: center;
   font-size: 12.5px;
   color: var(--cp-text-muted);
   margin-top: 4px;
@@ -194,6 +180,22 @@
   background: var(--cp-surface-sunken);
   padding: 1px 6px;
   border-radius: 3px;
+}
+
+/* Link "Ver miembros / Ocultar miembros" en la metadata */
+.cp-cons-card__expand-link {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--cp-accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.cp-cons-card__expand-link:hover {
+  color: var(--cp-accent-dark);
 }
 
 .cp-cons-card__actions {
@@ -326,11 +328,6 @@
 
 /* ============================================================
    .cc-toggle — toggle re-usado de Configuracion.css
-   ----------------------------------------------------------------
-   Lo redeclaramos aca en lugar de depender de Configuracion.css
-   porque /super/consultorios no importa esa pagina. Si lo cambias
-   en uno, deberias cambiarlo en el otro (idealmente movemos a
-   shared-ui en el futuro).
    ============================================================ */
 .cc-toggle {
   width: 38px;
@@ -370,6 +367,160 @@
 
 .cc-toggle--on .cc-toggle__thumb {
   transform: translateX(16px);
+}
+
+/* ============================================================
+   Danger zone — boton de eliminacion del consultorio
+   ----------------------------------------------------------------
+   Vive al pie del cp-cons-card__body cuando el consultorio esta
+   expandido. Por defecto colapsado. Al hacer click se despliega
+   con un fondo rojo suave para que sea visualmente diferenciable
+   del resto.
+   ============================================================ */
+.cp-danger-zone {
+  margin: 0 18px 18px;
+  border: 1px solid var(--cp-danger);
+  border-radius: var(--cp-radius-md);
+  background: var(--cp-danger-bg);
+  overflow: hidden;
+}
+
+.cp-danger-zone__head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  color: var(--cp-danger);
+  transition: background var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-danger-zone__head:hover {
+  background: rgba(160, 68, 54, 0.08);
+}
+
+.cp-danger-zone__icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.cp-danger-zone__title {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.cp-danger-zone__toggle {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.cp-danger-zone__body {
+  border-top: 1px solid var(--cp-danger);
+  padding: 14px;
+  background: var(--cp-surface);
+}
+
+.cp-danger-zone__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.cp-danger-zone__info {
+  flex: 1;
+  min-width: 240px;
+}
+
+.cp-danger-zone__row-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--cp-text);
+}
+
+.cp-danger-zone__row-desc {
+  font-size: 12.5px;
+  color: var(--cp-text-muted);
+  line-height: 1.5;
+  margin-top: 4px;
+}
+
+.cp-danger-zone__row-desc strong {
+  color: var(--cp-danger);
+}
+
+/* Hint de "no se puede eliminar" cuando el consultorio tiene
+   plan pro o suscripcion activa. Tono warning. */
+.cp-danger-zone__warning {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: var(--cp-warning-bg, #f5ebd3);
+  border: 1px solid var(--cp-warning, #c89b3c);
+  border-radius: var(--cp-radius-sm);
+  font-size: 12.5px;
+  color: var(--cp-text);
+  line-height: 1.45;
+}
+
+@media (max-width: 600px) {
+  .cp-danger-zone__row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .cp-danger-zone__row .cp-btn {
+    width: 100%;
+  }
+}
+
+/* ============================================================
+   Modal --danger (variante destructiva)
+   ----------------------------------------------------------------
+   Header con tono rojo, footer con boton de confirmacion en danger.
+   Para los modales de eliminar consultorio / eliminar profesional
+   (hard delete).
+   ============================================================ */
+.cp-modal--danger {
+  max-width: 540px;
+  border-top: 4px solid var(--cp-danger);
+}
+
+.cp-modal--danger .cp-modal__title {
+  color: var(--cp-danger);
+}
+
+/* Bloque de confirmacion con input "tipear nombre" */
+.cp-modal-danger__confirm {
+  margin: 14px 0 4px;
+  padding: 12px 14px;
+  background: var(--cp-bg);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+}
+
+.cp-modal-danger__label {
+  display: block;
+  font-size: 13px;
+  color: var(--cp-text);
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.cp-modal-danger__label strong {
+  color: var(--cp-danger);
+  font-family: var(--cp-font-mono);
+  font-size: 13px;
+  background: var(--cp-danger-bg);
+  padding: 1px 6px;
+  border-radius: 3px;
 }
 
 /* ============================================================
@@ -438,13 +589,12 @@
 
 .cp-super-tree__user-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
-/* En huerfanos / superadmins (que no tienen contenedor expandible),
-   las filas viven en la seccion directamente. Le damos un wrapper
-   visual con background y border. */
 .cp-super-section .cp-super-tree__users {
   background: var(--cp-surface);
   border: 1px solid var(--cp-border);
@@ -452,12 +602,39 @@
   overflow: hidden;
 }
 
-/* En cambio adentro de cp-cons-card__body (donde ya hay un wrapper
-   con background) NO ponemos otro background. */
 .cp-cons-card__body .cp-super-tree__users {
   background: transparent;
   border: none;
   border-radius: 0;
+}
+
+/* ============================================================
+   Variantes de cp-prof-action
+   ----------------------------------------------------------------
+   La clase base .cp-prof-action vive en shared-ui.css. Aca solo
+   las variantes nuevas/extendidas que usa el panel super:
+     - --warn (naranja, para Retirar)
+     - --danger ya existia en shared-ui pero la dejo explicita por
+       si el shared no tiene la version correcta
+   ============================================================ */
+.cp-prof-action--warn {
+  color: var(--cp-warning, #b07d1f);
+  border-color: var(--cp-warning, #c89b3c);
+}
+
+.cp-prof-action--warn:hover:not(:disabled) {
+  background: var(--cp-warning-bg, #f5ebd3);
+  color: var(--cp-warning, #b07d1f);
+}
+
+.cp-prof-action--danger {
+  color: var(--cp-danger);
+  border-color: var(--cp-danger);
+}
+
+.cp-prof-action--danger:hover:not(:disabled) {
+  background: var(--cp-danger-bg);
+  color: var(--cp-danger);
 }
 
 @media (max-width: 640px) {
