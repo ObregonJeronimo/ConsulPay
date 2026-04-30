@@ -1,0 +1,298 @@
+/* ============================================================
+   Legal.css
+   ----------------------------------------------------------------
+   Estilos compartidos entre PoliticaPrivacidad.jsx y
+   TerminosCondiciones.jsx.
+
+   Diseño: layout de "documento legible" con tipografia generosa
+   y max-width acotado para que la linea de texto no exceda los
+   ~70 caracteres (sweet spot de legibilidad). El ancho controlado
+   tambien evita la sensacion de "pared de texto" intimidante en
+   pantallas grandes.
+
+   Header: simple con logo a la izquierda y back link a la derecha.
+   Footer: links cruzados entre ambas paginas legales + atribucion.
+   ============================================================ */
+
+.cp-legal {
+  min-height: 100vh;
+  background: var(--cp-bg);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ============================================================
+   Header
+   ============================================================ */
+.cp-legal__header {
+  background: var(--cp-surface);
+  border-bottom: 1px solid var(--cp-border);
+  padding: 16px 0;
+}
+
+.cp-legal__header-inner {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.cp-legal__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--cp-text);
+  transition: opacity var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-legal__brand:hover {
+  opacity: 0.75;
+}
+
+.cp-legal__brand-mark {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--cp-radius-sm);
+  background: var(--cp-accent);
+  color: var(--cp-text-on-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--cp-font-serif);
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.cp-legal__brand-name {
+  font-family: var(--cp-font-serif);
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.cp-legal__back {
+  font-size: 13.5px;
+  color: var(--cp-text-muted);
+  text-decoration: none;
+  transition: color var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-legal__back:hover {
+  color: var(--cp-accent);
+}
+
+/* ============================================================
+   Main content area
+   ============================================================ */
+.cp-legal__main {
+  flex: 1;
+  max-width: 760px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 48px 24px;
+}
+
+.cp-legal__article {
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-lg);
+  padding: 48px 56px;
+  margin-bottom: 32px;
+}
+
+@media (max-width: 640px) {
+  .cp-legal__main {
+    padding: 24px 16px;
+  }
+  .cp-legal__article {
+    padding: 32px 24px;
+  }
+}
+
+/* ============================================================
+   Intro (titulo + fecha de vigencia)
+   ============================================================ */
+.cp-legal__intro {
+  padding-bottom: 32px;
+  margin-bottom: 32px;
+  border-bottom: 1px solid var(--cp-border);
+}
+
+.cp-legal__title {
+  font-family: var(--cp-font-serif);
+  font-size: 36px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin: 0 0 12px;
+  color: var(--cp-text);
+}
+
+.cp-legal__meta {
+  font-size: 13.5px;
+  color: var(--cp-text-muted);
+  margin: 0;
+  font-style: italic;
+}
+
+@media (max-width: 640px) {
+  .cp-legal__title {
+    font-size: 28px;
+  }
+}
+
+/* ============================================================
+   Secciones (cada h2 con su contenido)
+   ============================================================ */
+.cp-legal__section {
+  margin-bottom: 36px;
+}
+
+.cp-legal__section:last-child {
+  margin-bottom: 0;
+}
+
+.cp-legal__section-title {
+  font-family: var(--cp-font-serif);
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+  margin: 0 0 16px;
+  color: var(--cp-text);
+  scroll-margin-top: 80px;  /* para anchors limpios si se agregan despues */
+}
+
+.cp-legal__subsection-title {
+  font-family: var(--cp-font-serif);
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin: 24px 0 10px;
+  color: var(--cp-text);
+}
+
+/* ============================================================
+   Cuerpo del texto: parrafos y listas
+   ----------------------------------------------------------------
+   line-height generoso (1.65) para legibilidad de textos largos.
+   Color de texto principal con buen contraste, pero no negro puro
+   (mas suave en pantalla).
+   ============================================================ */
+.cp-legal__article p {
+  margin: 0 0 14px;
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: var(--cp-text);
+}
+
+.cp-legal__article p:last-child {
+  margin-bottom: 0;
+}
+
+.cp-legal__article strong {
+  font-weight: 600;
+  color: var(--cp-text);
+}
+
+.cp-legal__list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 14px;
+}
+
+.cp-legal__list li {
+  position: relative;
+  padding: 6px 0 6px 22px;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--cp-text);
+}
+
+.cp-legal__list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 14px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--cp-accent);
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   Highlight: paragrafo con fondo destacado (info importante)
+   ----------------------------------------------------------------
+   Usado para resaltar partes que el usuario debe leer con cuidado,
+   como la aclaracion de que NO almacenamos datos clinicos.
+   ============================================================ */
+.cp-legal__highlight {
+  background: var(--cp-accent-bg);
+  border-left: 3px solid var(--cp-accent);
+  padding: 14px 18px !important;
+  border-radius: var(--cp-radius-sm);
+  margin: 20px 0 !important;
+}
+
+/* ============================================================
+   Links inline (a un email, otra pagina legal, etc)
+   ============================================================ */
+.cp-legal__link {
+  color: var(--cp-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  font-weight: 500;
+  transition: color var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-legal__link:hover {
+  color: var(--cp-accent-dark);
+}
+
+/* ============================================================
+   Footer del articulo legal
+   ----------------------------------------------------------------
+   Links cruzados entre las dos paginas legales + atribucion.
+   Outside del .cp-legal__article para que se vea separado.
+   ============================================================ */
+.cp-legal__footer {
+  text-align: center;
+  padding: 0 0 24px;
+}
+
+.cp-legal__footer-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.cp-legal__footer-link {
+  color: var(--cp-text-muted);
+  font-size: 13.5px;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-legal__footer-link:hover {
+  color: var(--cp-accent);
+}
+
+.cp-legal__footer-sep {
+  color: var(--cp-text-faint);
+}
+
+.cp-legal__footer-meta {
+  font-size: 12.5px;
+  color: var(--cp-text-faint);
+  margin-top: 4px;
+}
