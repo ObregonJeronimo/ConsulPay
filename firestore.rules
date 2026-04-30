@@ -31,20 +31,6 @@ service cloud.firestore {
       return tengoDoc() && miUsuario().rol == 'profesional';
     }
 
-    /**
-     * esAdminDe(): chequea que el caller sea admin Y que efectivamente
-     * pertenezca al consultorio (esté en adminUids[] del doc del consultorio).
-     *
-     * Defensa en profundidad para multi-admin: no alcanza con que el doc
-     * de usuario diga consultorioId=X y rol=admin. Tambien tiene que
-     * estar listado en /consultorios/X/adminUids. Si algun dia los
-     * datos quedan inconsistentes (ej: alguien edita /usuarios/{uid}.consultorioId
-     * a mano sin invitarlo al consultorio), no se le da acceso.
-     *
-     * El acceso al doc del consultorio cuesta una read extra por cada
-     * validacion, pero es aceptable: las rules cachean reads dentro de
-     * la misma evaluacion, y los docs de consultorios son chicos.
-     */
     function esAdminDe(consultorioIdDelRecurso) {
       return esAdmin()
         && miUsuario().consultorioId == consultorioIdDelRecurso
@@ -62,6 +48,26 @@ service cloud.firestore {
     function intentaEscalarPrivilegios() {
       return request.resource.data.rol != resource.data.rol
         || request.resource.data.consultorioId != resource.data.consultorioId;
+    }
+
+    /**
+     * Compara un campo del recurso request vs resource. Si el campo NO existe
+     * en el resource, considera que el request tampoco debe definirlo (o que
+     * sea null). Este helper sirve para campos opcionales nuevos como
+     * comisionFree, comisionPro, puedeVerPlanPro — que pueden no estar en
+     * docs viejos.
+     *
+     * Uso: campoNoCambia('comisionFree')  ->  el admin no puede modificarlo
+     */
+    function campoNoCambia(name) {
+      // Si NINGUNO de los dos lo tiene, OK.
+      // Si AMBOS lo tienen, deben ser iguales.
+      // Si solo uno lo tiene, NO permitir el cambio (cambio implicito).
+      return (
+        (!(name in request.resource.data) && !(name in resource.data))
+        || (name in request.resource.data && name in resource.data
+            && request.resource.data[name] == resource.data[name])
+      );
     }
 
     // ============================================================
@@ -86,14 +92,6 @@ service cloud.firestore {
         || (esDueno(uid)
             && !intentaEscalarPrivilegios()
             && request.resource.data.estado == resource.data.estado)
-        // Auto-retiro: el dueño del doc puede cambiar su estado de
-        // 'activo' a 'retirado' (sin tocar rol ni consultorioId).
-        // La validacion de "no tener deuda" la hace el codigo cliente
-        // antes de llamar a updateDoc — las rules no la pueden hacer
-        // porque requeriria una query que las rules no soportan.
-        // El riesgo es que un user bypassee el cliente, pero la deuda
-        // queda registrada igual en /sesiones, asi que no hay perdida
-        // de informacion contable.
         || (esDueno(uid)
             && !intentaEscalarPrivilegios()
             && resource.data.estado == 'activo'
@@ -141,22 +139,21 @@ service cloud.firestore {
               remover existentes), siempre que:
               - El ownerUid se mantenga sin cambios (transferencia
                 de ownership es un caso separado).
-              - El nuevo adminUids siga conteniendo al ownerUid (no
-                podes "destronar" al owner removiendolo de admins).
-              - El nuevo adminUids no quede vacio (defensa basica).
+              - El nuevo adminUids siga conteniendo al ownerUid.
+              - El nuevo adminUids no quede vacio.
 
         3. OWNER del consultorio (ownerUid actual) — ademas de lo anterior,
            puede transferir ownership cambiando ownerUid, siempre que el
            nuevo owner este en el adminUids resultante.
 
         Campos siempre blindados (solo superadmin / backend los toca):
-           plan, planVenceEn, comisionConsulpay,
-           mpIntegrado, mpConfig, ualaIntegrado, ualaConfig, estado.
-
-        Los campos de mpConfig y ualaConfig los escribe el backend
-        via firebase-admin (que saltea las rules) cuando el admin
-        completa el OAuth o desconecta. La rule no permite que el
-        frontend los modifique directamente.
+           - plan, planVenceEn
+           - comisionConsulpay (legacy, mantener para backwards compat)
+           - comisionFree, comisionPro (nuevos, controlados por superadmin)
+           - puedeVerPlanPro (controla si pueden contratar Plan Pro)
+           - mpIntegrado, mpConfig, ualaIntegrado, ualaConfig
+           - estado
+           - subscription (escrito por backend cuando se contrata/cancela Pro)
       */
       allow update: if esSuperadmin()
         || (esAdminDe(consultorioId)
@@ -164,6 +161,12 @@ service cloud.firestore {
             && request.resource.data.plan == resource.data.plan
             && request.resource.data.planVenceEn == resource.data.planVenceEn
             && request.resource.data.comisionConsulpay == resource.data.comisionConsulpay
+            // Campos opcionales nuevos: usar campoNoCambia para soportar
+            // docs viejos que pueden no tenerlos definidos
+            && campoNoCambia('comisionFree')
+            && campoNoCambia('comisionPro')
+            && campoNoCambia('puedeVerPlanPro')
+            && campoNoCambia('subscription')
             && request.resource.data.mpIntegrado == resource.data.mpIntegrado
             && request.resource.data.mpConfig == resource.data.mpConfig
             && request.resource.data.ualaIntegrado == resource.data.ualaIntegrado
@@ -171,13 +174,10 @@ service cloud.firestore {
             && request.resource.data.estado == resource.data.estado
             // Reglas sobre owner y admins:
             && (
-              // Caso a + b: cualquier admin puede tocar adminUids,
-              // pero ownerUid se mantiene
               (request.resource.data.ownerUid == resource.data.ownerUid
                 && request.resource.data.ownerUid in request.resource.data.adminUids
                 && request.resource.data.adminUids.size() >= 1)
               ||
-              // Caso c: solo el owner actual puede transferir ownership
               (resource.data.ownerUid == request.auth.uid
                 && request.resource.data.ownerUid in request.resource.data.adminUids
                 && request.resource.data.adminUids.size() >= 1)
@@ -206,23 +206,6 @@ service cloud.firestore {
 
     // ============================================================
     //  /pacientes/{pacienteId}
-    //  ----------------------------------------------------------------
-    //  MODELO N:N entre profesionales y pacientes.
-    //  Cada paciente tiene un array `profesionalesUids` (string[]) con
-    //  los UIDs de los profesionales que lo atienden. La relacion la
-    //  manejan los admins del consultorio.
-    //
-    //  Migracion: hasta 2026-04 el campo era `profesionalUid: string`
-    //  (singular). Migrado a `profesionalesUids: string[]` (plural).
-    //
-    //  Lectura:
-    //    - superadmin
-    //    - admin del consultorio
-    //    - profesional asignado: el array contiene su UID
-    //
-    //  Las queries del cliente DEBEN usar `array-contains` sobre
-    //  profesionalesUids combinado con consultorioId (mismo patron
-    //  que antes pero con array). Ver lib/pacientes.js.
     // ============================================================
     match /pacientes/{pacienteId} {
       allow read: if esSuperadmin()
@@ -241,11 +224,6 @@ service cloud.firestore {
 
     // ============================================================
     //  /sesiones/{sesionId}
-    //  ----------------------------------------------------------------
-    //  IMPORTANTE: la sesion sigue siendo 1:1 con un profesional
-    //  (cada sesion la atiende UN profesional, no varios). Por eso
-    //  el campo `profesionalUid` (singular) NO cambia. Solo el modelo
-    //  paciente↔profesional pasa a N:N; sesion↔profesional sigue 1:1.
     // ============================================================
     function sesionSplitEsCoherente(data) {
       let calculado = data.valorTotal * data.porcentajeConsultorio / 100;
@@ -268,13 +246,6 @@ service cloud.firestore {
           && data.montoProfesional is number;
     }
 
-    /**
-     * En Fase B agregamos: el profesional puede crear/modificar/eliminar
-     * sesiones DIRECTAMENTE solo si su doc de usuario tiene
-     * permitirEdicionSesiones=true. Si es false o no existe el campo,
-     * el frontend tiene que crear una solicitud en lugar de tocar
-     * /sesiones/ directamente.
-     */
     function profesionalTieneConfianza() {
       return esProfesional()
         && miUsuario().permitirEdicionSesiones == true;
@@ -362,21 +333,6 @@ service cloud.firestore {
 
     // ============================================================
     //  /pagos_consultorio/{pagoId}
-    //  ----------------------------------------------------------------
-    //  Pagos de profesionales al consultorio (saldar deuda de sesiones).
-    //  Los crea y modifica EXCLUSIVAMENTE el backend serverless
-    //  (firebase-admin saltea las rules) en /api/mp/crear-pago y
-    //  /api/mp/webhook. El frontend NUNCA escribe directamente.
-    //
-    //  Razon: la creacion de un pago dispara una llamada externa a MP
-    //  que requiere validar autenticacion, monto, sesiones, integrar
-    //  con MP API, encriptar tokens, etc. Todo eso vive en el backend.
-    //  El frontend ni tiene acceso al access_token de MP del consultorio.
-    //
-    //  Lectura abierta a:
-    //    - superadmin
-    //    - admin del consultorio (ve los pagos recibidos)
-    //    - profesional dueño del pago (ve sus propios pagos)
     // ============================================================
     match /pagos_consultorio/{pagoId} {
       allow read: if esSuperadmin()
@@ -391,9 +347,6 @@ service cloud.firestore {
 
     // ============================================================
     //  /pagos_mensualidad/{pagoId}
-    //  ----------------------------------------------------------------
-    //  Pagos de mensualidad del Plan Pro (consultorios → ConsulPay).
-    //  Misma logica: solo backend escribe.
     // ============================================================
     match /pagos_mensualidad/{pagoId} {
       allow read: if esSuperadmin()
