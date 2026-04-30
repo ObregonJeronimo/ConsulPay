@@ -124,6 +124,43 @@
   line-height: 1.4;
 }
 
+/* ---------- Checkbox de aceptacion TOS (solo modo registro) ----------
+   ----------------------------------------------------------------
+   Layout: checkbox a la izquierda alineado al primer renglon de
+   texto, con texto multinea que envuelve. Tipo etiqueta clickeable
+   completa para que tildar sea facil. */
+.cp-login__tos {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--cp-text-muted);
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.cp-login__tos input[type="checkbox"] {
+  margin: 2px 0 0 0;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--cp-accent);
+}
+
+.cp-login__tos-link {
+  color: var(--cp-accent);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-login__tos-link:hover {
+  color: var(--cp-accent-hover);
+  text-decoration: underline;
+}
+
 /* ---------- Switch login/registro ---------- */
 .cp-login__switch {
   text-align: center;
@@ -150,6 +187,32 @@
 .cp-login__switch-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* ---------- Footer con links a paginas legales ----------
+   Pequeno y discreto, debajo del switch. Visible siempre. */
+.cp-login__legal-links {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.cp-login__legal-link {
+  color: var(--cp-text-faint);
+  text-decoration: none;
+  transition: color var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-login__legal-link:hover {
+  color: var(--cp-accent);
+}
+
+.cp-login__legal-sep {
+  color: var(--cp-text-faint);
+  opacity: 0.6;
 }
 
 /* ---------- Panel derecho: hero editorial ---------- */
