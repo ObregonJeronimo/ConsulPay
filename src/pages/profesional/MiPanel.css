@@ -1,0 +1,274 @@
+/* ============================================================
+   MiPanel.css — Resumen del profesional
+   ----------------------------------------------------------------
+   Layout: header arriba, cards en grid de 4 columnas, atajos
+   abajo en grid de 3.
+
+   En mobile las cards pasan a 2 columnas (max-width: 900px) y
+   despues a 1 columna (max-width: 600px).
+   ============================================================ */
+
+.cp-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cp-space-6);
+}
+
+/* ---- Header ---- */
+.cp-panel__header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cp-panel__title {
+  font-family: var(--cp-font-serif);
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin: 0;
+}
+
+.cp-panel__sub {
+  color: var(--cp-text-muted);
+  font-size: 14px;
+  margin: 0;
+}
+
+/* ============================================================
+   Grid de cards (4 columnas en desktop)
+   ============================================================ */
+.cp-panel__cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+@media (max-width: 1100px) {
+  .cp-panel__cards { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 600px) {
+  .cp-panel__cards { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
+   Card individual
+   ----------------------------------------------------------------
+   Layout vertical:
+     [icon] LABEL (uppercase chico)
+     VALUE BIG
+     hint chiquito gris
+     [opcional] cta linkeado
+   ============================================================ */
+
+/* Wrapper Link cuando la card es clickeable */
+.cp-card-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  border-radius: var(--cp-radius-lg);
+  transition: transform var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-card-link:hover {
+  transform: translateY(-1px);
+}
+
+.cp-card-link:hover .cp-card {
+  border-color: var(--cp-text-muted);
+  box-shadow: 0 4px 16px -8px rgba(0, 0, 0, 0.08);
+}
+
+.cp-card {
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-lg);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: border-color var(--cp-dur-fast) var(--cp-ease),
+              box-shadow var(--cp-dur-fast) var(--cp-ease);
+  height: 100%;
+}
+
+.cp-card__top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.cp-card__icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--cp-radius-sm);
+  background: var(--cp-accent-bg);
+  color: var(--cp-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.cp-card--success .cp-card__icon {
+  background: var(--cp-success-bg);
+  color: var(--cp-success);
+}
+
+.cp-card--debido .cp-card__icon {
+  background: var(--cp-danger-bg);
+  color: var(--cp-danger);
+}
+
+.cp-card__label {
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--cp-text-muted);
+  font-weight: 500;
+  flex: 1;
+  min-width: 0;
+  /* Si el label es largo (ej "Sesiones de noviembre"), permite que se
+     corte con ellipsis en lugar de empujar el icono. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cp-card__value {
+  font-family: var(--cp-font-serif);
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  line-height: 1.1;
+  color: var(--cp-text);
+}
+
+/* Variante con fuente mono para valores monetarios — mejor
+   alineacion vertical y mas legible para numeros. */
+.cp-card__value--mono {
+  font-family: var(--cp-font-mono);
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.005em;
+}
+
+.cp-card--success .cp-card__value {
+  color: var(--cp-success);
+}
+
+.cp-card--debido .cp-card__value {
+  color: var(--cp-danger);
+}
+
+.cp-card__hint {
+  font-size: 12.5px;
+  color: var(--cp-text-faint);
+  line-height: 1.45;
+}
+
+/* Footer linkeado de las cards clickeables */
+.cp-card__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--cp-accent);
+  margin-top: 4px;
+  transition: color var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-card-link:hover .cp-card__cta {
+  color: var(--cp-accent-dark);
+}
+
+/* ============================================================
+   Atajos al pie del resumen
+   ----------------------------------------------------------------
+   3 cards horizontales con icono + texto + flecha. Mas compactos
+   que las cards de stats (ahorra scroll), y dan acceso rapido a
+   las paginas detalladas.
+   ============================================================ */
+.cp-panel__shortcuts {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.cp-panel__shortcuts-title {
+  font-family: var(--cp-font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cp-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0;
+}
+
+.cp-panel__shortcut-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 900px) {
+  .cp-panel__shortcut-grid { grid-template-columns: 1fr; }
+}
+
+.cp-panel__shortcut {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  text-decoration: none;
+  color: var(--cp-text);
+  transition: all var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-panel__shortcut:hover {
+  border-color: var(--cp-accent);
+  background: var(--cp-accent-bg);
+}
+
+.cp-panel__shortcut > svg:first-child {
+  color: var(--cp-accent);
+  flex-shrink: 0;
+}
+
+.cp-panel__shortcut > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.cp-panel__shortcut > svg:last-child {
+  color: var(--cp-text-faint);
+  flex-shrink: 0;
+  transition: transform var(--cp-dur-fast) var(--cp-ease),
+              color var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-panel__shortcut:hover > svg:last-child {
+  color: var(--cp-accent);
+  transform: translateX(2px);
+}
+
+.cp-panel__shortcut-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--cp-text);
+  line-height: 1.2;
+}
+
+.cp-panel__shortcut-meta {
+  font-size: 12.5px;
+  color: var(--cp-text-muted);
+  margin-top: 3px;
+}
