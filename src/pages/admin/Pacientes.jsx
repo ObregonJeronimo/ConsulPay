@@ -18,6 +18,7 @@ import {
   archivarPaciente,
   crearPaciente,
   actualizarPaciente,
+  getProfesionalesUids,
   reactivarPaciente,
   suscribirPacientesConsultorio,
 } from '../../lib/pacientes.js';
@@ -80,6 +81,51 @@ function iniciales(nombre, apellido) {
 
 function nombreCompleto(p) {
   return `${p.apellido ?? ''}${p.apellido && p.nombre ? ', ' : ''}${p.nombre ?? ''}`;
+}
+
+function nombreVisibleProf(prof) {
+  if (!prof) return null;
+  return prof.displayName || prof.email || `Usuario ${prof.uid?.slice(0, 6) ?? ''}`;
+}
+
+/**
+ * Renderiza el listado de profesionales asignados a un paciente.
+ * Si son 1 o 2: muestra los nombres separados por coma.
+ * Si son 3+: muestra el primero y "+N más" con tooltip que lista el resto.
+ */
+function ProfesionalesCelda({ pacienteUids, mapaProfesionales }) {
+  const profs = pacienteUids
+    .map((uid) => mapaProfesionales[uid])
+    .filter(Boolean);
+
+  if (profs.length === 0) {
+    return <span style={{ color: 'var(--cp-text-faint)' }}>—</span>;
+  }
+  if (profs.length === 1) {
+    return <span>{nombreVisibleProf(profs[0])}</span>;
+  }
+  if (profs.length === 2) {
+    return (
+      <span>
+        {nombreVisibleProf(profs[0])}
+        <span style={{ color: 'var(--cp-text-muted)' }}>{' · '}</span>
+        {nombreVisibleProf(profs[1])}
+      </span>
+    );
+  }
+  // 3 o más: primero + tooltip con el resto
+  const otros = profs.slice(1).map(nombreVisibleProf).join(', ');
+  return (
+    <span>
+      {nombreVisibleProf(profs[0])}
+      <span
+        className="cp-pac-prof-mas"
+        title={otros}
+      >
+        {' '}+{profs.length - 1} más
+      </span>
+    </span>
+  );
 }
 
 /* ============================================================
@@ -158,8 +204,10 @@ export default function Pacientes() {
   const pacientesFiltrados = useMemo(() => {
     let list = pacientesActivos;
 
+    // Filtro por profesional: ahora chequea si el UID del filtro esta
+    // en el array profesionalesUids del paciente (paciente N:N).
     if (filtroProfesional !== 'todos') {
-      list = list.filter((p) => p.profesionalUid === filtroProfesional);
+      list = list.filter((p) => getProfesionalesUids(p).includes(filtroProfesional));
     }
 
     if (filtroMetodo !== 'todos') {
@@ -396,7 +444,7 @@ function EmptyState({ onAgregar }) {
       </div>
       <h2 className="cp-empty-pac__title">Todavía no hay pacientes</h2>
       <p className="cp-empty-pac__desc">
-        Cargá el primer paciente. Vas a asignarle un profesional y un método de pago.
+        Cargá el primer paciente. Vas a poder asignarle uno o varios profesionales y un método de pago.
         Después, al registrar sesiones, el sistema calcula el split automáticamente.
       </p>
       <Button variant="primary" icon={<PlusIcon />} onClick={onAgregar}>
@@ -408,10 +456,6 @@ function EmptyState({ onAgregar }) {
 
 /* ============================================================
    Barra de filtros
-   ----------------------------------------------------------------
-   Antes tenia un checkbox "Mostrar archivados". Ahora es un boton
-   que abre/cierra el PanelArchivados. Si no hay archivados, el
-   boton no se renderiza.
    ============================================================ */
 function FiltrosBar({
   busqueda, setBusqueda,
@@ -471,13 +515,6 @@ function FiltrosBar({
 
 /* ============================================================
    Panel de archivados (desplegable)
-   ----------------------------------------------------------------
-   Aparece arriba de la tabla principal cuando el admin clickea
-   "Ver pacientes archivados". Lista cada paciente archivado con
-   sus datos basicos y un boton "Reactivar". Es independiente de
-   la tabla principal: filtros y busqueda no afectan a este panel
-   (intencional, asi el admin siempre ve la lista completa de
-   archivados sin tener que limpiar filtros).
    ============================================================ */
 function PanelArchivados({ pacientes, mapaProfesionales, mapaMetodos, onReactivar, onCerrar }) {
   return (
@@ -506,8 +543,13 @@ function PanelArchivados({ pacientes, mapaProfesionales, mapaMetodos, onReactiva
 
       <ul className="cp-archivados-panel__list">
         {pacientes.map((p) => {
-          const prof = mapaProfesionales[p.profesionalUid];
+          const profUids = getProfesionalesUids(p);
           const metodo = mapaMetodos[p.metodoPagoId];
+          const profsResumen = profUids.length === 0
+            ? 'Sin profesional'
+            : profUids.length === 1
+              ? (nombreVisibleProf(mapaProfesionales[profUids[0]]) || 'Profesional eliminado')
+              : `${profUids.length} profesionales`;
           return (
             <li key={p.id} className="cp-archivado-row">
               <div className="cp-archivado-row__main">
@@ -519,7 +561,7 @@ function PanelArchivados({ pacientes, mapaProfesionales, mapaMetodos, onReactiva
                   <div className="cp-archivado-row__meta">
                     {p.dni ? `DNI ${p.dni}` : 'Sin DNI'}
                     {' · '}
-                    {prof ? (prof.displayName || prof.email) : 'Sin profesional'}
+                    {profsResumen}
                     {metodo && ` · ${metodo.nombre}`}
                   </div>
                 </div>
@@ -542,7 +584,7 @@ function PanelArchivados({ pacientes, mapaProfesionales, mapaMetodos, onReactiva
 }
 
 /* ============================================================
-   Tabla de pacientes (solo activos ahora)
+   Tabla de pacientes (solo activos)
    ============================================================ */
 function PacientesTabla({
   pacientes,
@@ -557,7 +599,7 @@ function PacientesTabla({
         <thead>
           <tr>
             <th>Paciente</th>
-            <th>Profesional</th>
+            <th>Profesional/es</th>
             <th>Método</th>
             <th className="cp-num-col">Valor sesión</th>
             <th>Obra social Nº</th>
@@ -566,7 +608,7 @@ function PacientesTabla({
         </thead>
         <tbody>
           {pacientes.map((p) => {
-            const prof = mapaProfesionales[p.profesionalUid];
+            const profUids = getProfesionalesUids(p);
             const metodo = mapaMetodos[p.metodoPagoId];
             const valor = metodo?.valorSesionDefault ?? 0;
 
@@ -588,7 +630,10 @@ function PacientesTabla({
                   </div>
                 </td>
                 <td style={{ fontSize: 13.5 }}>
-                  {prof ? (prof.displayName || prof.email) : <span style={{ color: 'var(--cp-text-faint)' }}>—</span>}
+                  <ProfesionalesCelda
+                    pacienteUids={profUids}
+                    mapaProfesionales={mapaProfesionales}
+                  />
                 </td>
                 <td style={{ fontSize: 13.5 }}>
                   {metodo ? metodo.nombre : <span style={{ color: 'var(--cp-danger)' }}>Método eliminado</span>}
@@ -625,11 +670,6 @@ function PacientesTabla({
 
 /* ============================================================
    Modal de confirmacion de archivado
-   ----------------------------------------------------------------
-   Reemplaza al confirm() nativo. Sigue el patron visual del resto
-   de modales del sistema (cp-modal-overlay + cp-modal). Sin
-   eliminacion ni timer — solo confirmacion clara con copy explicando
-   que el paciente queda archivado y se puede reactivar despues.
    ============================================================ */
 function ConfirmarArchivadoModal({ paciente, onCancelar, onConfirmar }) {
   const [submitting, setSubmitting] = useState(false);
@@ -695,9 +735,23 @@ function ConfirmarArchivadoModal({ paciente, onCancelar, onConfirmar }) {
 
 /* ============================================================
    Modal crear/editar paciente
+   ----------------------------------------------------------------
+   Cambio importante: ahora el campo "profesional" pasa a ser un
+   multi-select (checkboxes en una lista). Se requiere AL MENOS UNO.
    ============================================================ */
 function PacienteModal({ paciente, profesionales, metodos, onClose, onGuardar }) {
   const esNuevo = !paciente;
+
+  // UIDs ya asignados al paciente (o el primer profesional si es nuevo)
+  const uidsIniciales = useMemo(() => {
+    if (paciente) {
+      return getProfesionalesUids(paciente);
+    }
+    // Default para nuevo: primer profesional preseleccionado, asi al
+    // crear rapido un paciente no hay que abrir el dropdown
+    return profesionales[0]?.uid ? [profesionales[0].uid] : [];
+  }, [paciente, profesionales]);
+
   const [form, setForm] = useState(() => ({
     nombre: paciente?.nombre ?? '',
     apellido: paciente?.apellido ?? '',
@@ -705,7 +759,7 @@ function PacienteModal({ paciente, profesionales, metodos, onClose, onGuardar })
     telefono: paciente?.telefono ?? '',
     email: paciente?.email ?? '',
     obraSocialNumero: paciente?.obraSocialNumero ?? '',
-    profesionalUid: paciente?.profesionalUid ?? (profesionales[0]?.uid ?? ''),
+    profesionalesUids: uidsIniciales,
     metodoPagoId: paciente?.metodoPagoId ?? (metodos.find((m) => m.activo !== false)?.id ?? metodos[0]?.id ?? ''),
     notas: paciente?.notas ?? '',
   }));
@@ -719,9 +773,27 @@ function PacienteModal({ paciente, profesionales, metodos, onClose, onGuardar })
     setForm((prev) => ({ ...prev, [k]: v }));
   }
 
+  function toggleProfesional(uid) {
+    setForm((prev) => {
+      const ya = prev.profesionalesUids.includes(uid);
+      return {
+        ...prev,
+        profesionalesUids: ya
+          ? prev.profesionalesUids.filter((x) => x !== uid)
+          : [...prev.profesionalesUids, uid],
+      };
+    });
+  }
+
   async function onSubmit(e) {
     e.preventDefault();
     setError('');
+
+    if (form.profesionalesUids.length === 0) {
+      setError('Tenés que asignar al menos un profesional');
+      return;
+    }
+
     setSubmitting(true);
     try {
       await onGuardar({
@@ -731,7 +803,7 @@ function PacienteModal({ paciente, profesionales, metodos, onClose, onGuardar })
         telefono: form.telefono,
         email: form.email,
         obraSocialNumero: form.obraSocialNumero,
-        profesionalUid: form.profesionalUid,
+        profesionalesUids: form.profesionalesUids,
         metodoPagoId: form.metodoPagoId,
         valorSesionCustom: null,
         notas: form.notas,
@@ -798,42 +870,69 @@ function PacienteModal({ paciente, profesionales, metodos, onClose, onGuardar })
             onChange={(e) => setField('email', e.target.value)}
           />
 
-          <div className="cp-config-row">
-            <div>
-              <label className="cp-field__label" style={{ display: 'block', marginBottom: 6 }}>
-                Profesional asignado
-              </label>
-              <select
-                className="cp-select"
-                value={form.profesionalUid}
-                onChange={(e) => setField('profesionalUid', e.target.value)}
-                required
-              >
-                {profesionales.map((p) => (
-                  <option key={p.uid} value={p.uid}>
-                    {p.displayName || p.email}
-                  </option>
-                ))}
-              </select>
+          {/* Profesionales asignados (multi-select) */}
+          <div>
+            <label className="cp-field__label" style={{ display: 'block', marginBottom: 6 }}>
+              Profesionales asignados
+              <span className="cp-pac-multi__hint">
+                {' '}· {form.profesionalesUids.length} de {profesionales.length} seleccionado{form.profesionalesUids.length === 1 ? '' : 's'}
+              </span>
+            </label>
+            <div className="cp-pac-multi">
+              {profesionales.length === 0 ? (
+                <div className="cp-pac-multi__empty">
+                  No hay profesionales activos en el consultorio.
+                </div>
+              ) : (
+                profesionales.map((p) => {
+                  const checked = form.profesionalesUids.includes(p.uid);
+                  return (
+                    <label
+                      key={p.uid}
+                      className={`cp-pac-multi__option ${checked ? 'cp-pac-multi__option--checked' : ''}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleProfesional(p.uid)}
+                      />
+                      <Avatar
+                        initials={
+                          ((p.displayName?.[0] ?? p.email?.[0]) ?? '·').toUpperCase()
+                        }
+                        size={26}
+                      />
+                      <div className="cp-pac-multi__info">
+                        <div className="cp-pac-multi__name">
+                          {p.displayName || p.email}
+                        </div>
+                        {p.email && p.displayName && (
+                          <div className="cp-pac-multi__email">{p.email}</div>
+                        )}
+                      </div>
+                    </label>
+                  );
+                })
+              )}
             </div>
+          </div>
 
-            <div>
-              <label className="cp-field__label" style={{ display: 'block', marginBottom: 6 }}>
-                Método de pago
-              </label>
-              <select
-                className="cp-select"
-                value={form.metodoPagoId}
-                onChange={(e) => setField('metodoPagoId', e.target.value)}
-                required
-              >
-                {metodos.map((m) => (
-                  <option key={m.id} value={m.id} disabled={m.activo === false}>
-                    {m.nombre}{m.activo === false ? ' (inactivo)' : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div>
+            <label className="cp-field__label" style={{ display: 'block', marginBottom: 6 }}>
+              Método de pago
+            </label>
+            <select
+              className="cp-select"
+              value={form.metodoPagoId}
+              onChange={(e) => setField('metodoPagoId', e.target.value)}
+              required
+            >
+              {metodos.map((m) => (
+                <option key={m.id} value={m.id} disabled={m.activo === false}>
+                  {m.nombre}{m.activo === false ? ' (inactivo)' : ''}
+                </option>
+              ))}
+            </select>
           </div>
 
           {metodoSeleccionado?.tipo === 'diferido' && (
