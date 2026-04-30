@@ -6,17 +6,18 @@
  *
  * Flujo:
  *  1. Validamos auth + que el caller sea el OWNER del consultorio.
- *  2. Validamos que el consultorio NO tenga ya una suscripcion activa.
- *  3. Creamos preapproval en MP con:
+ *  2. Validamos que el consultorio tenga puedeVerPlanPro habilitado.
+ *  3. Validamos que el consultorio NO tenga ya una suscripcion activa.
+ *  4. Creamos preapproval en MP con:
  *     - access_token de la cuenta MP de ConsulPay (env CONSULPAY_MP_ACCESS_TOKEN)
  *     - monto del Plan Pro (env CONSULPAY_PRECIO_PRO_ARS)
  *     - frecuencia mensual
  *     - external_reference = consultorioId
  *     - back_url = volver a /admin/configuracion?suscripcion=ok
  *     - notification_url = /api/mp/webhook (UNIFICADO con pagos)
- *  4. Persistimos en /consultorios/{id}.subscription un estado
+ *  5. Persistimos en /consultorios/{id}.subscription un estado
  *     'pendiente_autorizacion' con el preapprovalId.
- *  5. Devolvemos { initPointUrl } al frontend.
+ *  6. Devolvemos { initPointUrl } al frontend.
  *
  * El user va al init_point, autoriza con tarjeta, MP nos manda webhook
  * cuando el preapproval pasa a 'authorized', y ahi marcamos plan='pro'.
@@ -103,6 +104,24 @@ export default async function handler(req, res) {
   if (consData.estado !== 'activo') {
     return jsonResponse(res, 400, {
       error: 'El consultorio no esta activo.',
+    });
+  }
+
+  // ---------- Validar que el consultorio tenga acceso al Plan Pro ----------
+  // El campo puedeVerPlanPro lo controla el superadmin desde
+  // /super/consultorios. Si esta en false, el consultorio NO ve la
+  // pestaña "Plan" en el frontend, asi que llegar aca seria un caso
+  // borde — alguien que llama directo al endpoint salteando la UI.
+  // Validamos defensivamente.
+  //
+  // Backwards compat: si el campo NO esta definido (consultorios viejos),
+  // permitimos. Solo bloqueamos si existe explicitamente y vale false.
+  // Esto es importante porque NO queremos romper consultorios existentes
+  // — el campo solo se setea cuando el superadmin lo toca explicitamente.
+  if (consData.puedeVerPlanPro === false) {
+    return jsonResponse(res, 403, {
+      error: 'El Plan Pro está deshabilitado para tu consultorio. Contactá a soporte.',
+      codigo: 'PLAN_PRO_DESHABILITADO',
     });
   }
 
