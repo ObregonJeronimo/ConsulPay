@@ -15,6 +15,7 @@ import {
   suscribirPagosDelProfesional,
   tonoEstadoPago,
 } from '../../lib/pagos.js';
+import { calcularDeudaProfesional, retirarProfesional } from '../../lib/profesionales.js';
 import { suscribirSesionesProfesional } from '../../lib/sesiones.js';
 
 import './MisPagos.css';
@@ -40,7 +41,7 @@ function formatoFechaCorta(date) {
    Pagina principal
    ============================================================ */
 export default function MisPagos() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const { consultorio, loading: loadingConsultorio } = useConsultorio();
 
   const [sesiones, setSesiones] = useState([]);
@@ -55,6 +56,11 @@ export default function MisPagos() {
 
   const [iniciando, setIniciando] = useState(false);
   const [error, setError] = useState('');
+
+  // Modal de salir del consultorio. Vive aca (movido desde MiPanel)
+  // porque tiene sentido mantenerlo cerca de la pagina donde se ve
+  // la deuda — el modal valida que no haya deuda antes de dejar salir.
+  const [openSalir, setOpenSalir] = useState(false);
 
   /* ---- Suscripciones live ---- */
 
@@ -401,6 +407,183 @@ export default function MisPagos() {
           </div>
         </section>
       )}
+
+      {/*
+        ---- Seccion "Cuenta" al pie ----
+        Discreta, separada del flujo principal. Incluye el boton de
+        salir del consultorio, que antes vivia en el Resumen.
+        Lo movimos aca porque:
+        1. Tiene sentido cerca de la deuda (el modal valida deuda
+           antes de dejar salir).
+        2. Mantiene el Resumen limpio enfocado solo en datos del
+           trabajo del profesional.
+        3. Es una accion destructiva poco frecuente, asi que va
+           al final con visualmente menos peso.
+      */}
+      <section className="cp-cuenta-section">
+        <div className="cp-cuenta-section__head">
+          <h2 className="cp-cuenta-section__title">Cuenta</h2>
+          <p className="cp-cuenta-section__sub">
+            Acciones relacionadas con tu vínculo al consultorio.
+          </p>
+        </div>
+        <div className="cp-cuenta-section__row">
+          <div className="cp-cuenta-section__info">
+            <div className="cp-cuenta-section__info-title">
+              Salir del consultorio
+            </div>
+            <div className="cp-cuenta-section__info-meta">
+              {consultorio?.nombre
+                ? `Te desvinculás de ${consultorio.nombre}.`
+                : 'Te desvinculás del consultorio.'}
+              {' '}Tus registros se mantienen guardados y para volver, el
+              admin tendrá que invitarte de nuevo.
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            type="button"
+            onClick={() => setOpenSalir(true)}
+          >
+            Salir del consultorio
+          </Button>
+        </div>
+      </section>
+
+      {openSalir && (
+        <SalirConsultorioModal
+          consultorioId={user.consultorioId}
+          consultorioNombre={consultorio?.nombre || 'el consultorio'}
+          uid={user.uid}
+          onCancelar={() => setOpenSalir(false)}
+          onCompletado={async () => {
+            // Despues de retirarse, cerramos sesion para que la guardia
+            // no muestre el panel "fantasma" mientras el AuthContext
+            // detecta el cambio.
+            await signOut();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   Modal de auto-retiro
+   ----------------------------------------------------------------
+   Movido aca desde MiPanel.jsx. Logica identica a la version
+   anterior:
+   1. Al abrir, calcula la deuda del profesional con el consultorio.
+   2. Si tiene deuda > 0: muestra aviso bloqueante con cantidad y total
+      formateado, y desactiva el boton de salir. El profesional debe
+      saldar primero (o pedir al admin que lo retire por su lado).
+   3. Si no tiene deuda: muestra mensaje OK y boton 'Salir del consultorio'.
+   4. Al confirmar: llama a retirarProfesional con esAutoRetiro=true.
+   ============================================================ */
+function SalirConsultorioModal({ consultorioId, consultorioNombre, uid, onCancelar, onCompletado }) {
+  const [deuda, setDeuda] = useState(null);
+  const [cargandoDeuda, setCargandoDeuda] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelado = false;
+    (async () => {
+      try {
+        const d = await calcularDeudaProfesional(consultorioId, uid);
+        if (!cancelado) {
+          setDeuda(d);
+          setCargandoDeuda(false);
+        }
+      } catch (err) {
+        if (!cancelado) {
+          console.error('Error calculando deuda:', err);
+          // Si no podemos leer la deuda, no la usamos como bloqueo —
+          // el caller maneja el error. Pero el boton queda habilitado.
+          setDeuda({ cantidad: 0, total: 0 });
+          setCargandoDeuda(false);
+        }
+      }
+    })();
+    return () => { cancelado = true; };
+  }, [consultorioId, uid]);
+
+  async function handleSalir() {
+    setError('');
+    setSubmitting(true);
+    try {
+      await retirarProfesional({
+        uid,
+        consultorioId,
+        esAutoRetiro: true,
+      });
+      onCompletado();
+    } catch (err) {
+      // Si la deuda volvio a aparecer entre el render del modal y el
+      // submit (race condition rara), el error trae codigoDeuda.
+      setError(err.message || 'No se pudo salir del consultorio.');
+      setSubmitting(false);
+    }
+  }
+
+  const tieneDeuda = deuda && deuda.cantidad > 0;
+
+  return (
+    <div className="cp-modal-overlay" onClick={onCancelar}>
+      <div className="cp-modal cp-modal--confirm-archive" onClick={(e) => e.stopPropagation()}>
+        <button
+          className="cp-modal__close"
+          onClick={onCancelar}
+          aria-label="Cerrar"
+          disabled={submitting}
+        >
+          ×
+        </button>
+
+        <h2 className="cp-modal__title">¿Salir de {consultorioNombre}?</h2>
+        <div className="cp-modal__sub">
+          Vas a perder el acceso al panel del consultorio. Tus sesiones, pacientes
+          y registros se mantienen guardados, pero no vas a poder iniciar sesión
+          ni crear nuevas sesiones desde acá.
+          {' '}Si querés volver más adelante, el administrador del consultorio
+          tendrá que invitarte de nuevo.
+
+          {cargandoDeuda ? (
+            <div style={{ marginTop: 16, color: 'var(--cp-text-faint)', fontSize: 13 }}>
+              Calculando deuda…
+            </div>
+          ) : tieneDeuda ? (
+            <div className="cp-retiro-deuda-aviso">
+              <strong>No podés salir mientras tengas deuda pendiente.</strong>
+              {' '}Tenés <strong>{deuda.cantidad} sesión{deuda.cantidad === 1 ? '' : 'es'}</strong>{' '}
+              sin pagar al consultorio por un total de{' '}
+              <strong>${deuda.total.toLocaleString('es-AR')}</strong>.
+              {' '}Saldá la deuda con el administrador y volvé a intentar, o
+              pedile al admin que te retire desde su lado.
+            </div>
+          ) : (
+            <div className="cp-retiro-deuda-ok">
+              ✓ No tenés deuda pendiente con el consultorio. Podés salir tranquilo.
+            </div>
+          )}
+        </div>
+
+        {error && <div className="cp-modal__error">{error}</div>}
+
+        <div className="cp-modal__actions">
+          <Button variant="secondary" type="button" onClick={onCancelar} disabled={submitting}>
+            Cancelar
+          </Button>
+          <Button
+            variant="danger"
+            type="button"
+            onClick={handleSalir}
+            disabled={submitting || cargandoDeuda || tieneDeuda}
+          >
+            {submitting ? <><Spinner size={14} /> Saliendo…</> : 'Salir del consultorio'}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
