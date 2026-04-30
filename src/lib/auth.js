@@ -12,6 +12,15 @@
  * - Para promover a alguien a admin, editar el doc manualmente en Firestore Console.
  * - Las Security Rules de Firestore garantizan que un usuario no pueda
  *   modificar su propio rol ni estado.
+ *
+ * ACEPTACION DE TOS:
+ * - Cuando un usuario se registra por primera vez (registerWithEmail o
+ *   loginWithGoogle siendo nuevo), se guarda en su doc:
+ *     aceptoTOSAt: serverTimestamp()
+ *     tosVersion:  string identificador (VERSION_TOS_ACTUAL)
+ * - Si el usuario YA tenia doc, no tocamos esos campos. Para versiones
+ *   futuras de TOS, podemos agregar logica que pida re-aceptacion
+ *   comparando contra VERSION_TOS_ACTUAL en lib/legal.js.
  */
 
 import {
@@ -25,6 +34,7 @@ import { doc, getDoc, onSnapshot, serverTimestamp, setDoc } from 'firebase/fires
 
 import { auth, db, googleProvider } from './firebase.js';
 import { ESTADOS_USUARIO, ROLES } from './constants.js';
+import { VERSION_TOS_ACTUAL } from './legal.js';
 
 /* ============================================================
    Helpers internos
@@ -34,16 +44,26 @@ import { ESTADOS_USUARIO, ROLES } from './constants.js';
  * Asegura que exista un documento en usuarios/{uid}. Si no existe, lo crea
  * con rol=profesional y estado=pendiente. Si existe, lo devuelve intacto.
  *
+ * @param {object} firebaseUser - el credential.user de Firebase Auth
+ * @param {object} [opts] - opciones adicionales
+ * @param {boolean} [opts.aceptoTOS=false] - si es true y se esta CREANDO
+ *   el doc por primera vez, guarda los campos aceptoTOSAt + tosVersion.
+ *   Si el doc ya existe, no se tocan esos campos (no podemos forzar
+ *   re-aceptacion implicitamente desde aca).
+ *
  * Retorna siempre el doc actualizado.
  */
-async function ensureUserDoc(firebaseUser) {
+async function ensureUserDoc(firebaseUser, opts = {}) {
   const userRef = doc(db, 'usuarios', firebaseUser.uid);
   const snap = await getDoc(userRef);
 
   if (snap.exists()) {
+    // El doc ya existe — no tocamos campos sensibles. La aceptacion
+    // de TOS se asume hecha al momento del registro original.
     return { uid: firebaseUser.uid, ...snap.data() };
   }
 
+  // Doc nuevo: lo creamos con los defaults + posiblemente aceptacion de TOS.
   const newUser = {
     email: firebaseUser.email ?? null,
     displayName: firebaseUser.displayName ?? null,
@@ -54,6 +74,11 @@ async function ensureUserDoc(firebaseUser) {
     createdAt: serverTimestamp(),
   };
 
+  if (opts.aceptoTOS) {
+    newUser.aceptoTOSAt = serverTimestamp();
+    newUser.tosVersion = VERSION_TOS_ACTUAL;
+  }
+
   await setDoc(userRef, newUser);
   return { uid: firebaseUser.uid, ...newUser };
 }
@@ -62,9 +87,17 @@ async function ensureUserDoc(firebaseUser) {
    API pública
    ============================================================ */
 
-export async function loginWithGoogle() {
+/**
+ * Login con Google.
+ *
+ * @param {object} [opts] - opciones
+ * @param {boolean} [opts.aceptoTOS=false] - solo relevante para usuarios
+ *   nuevos. Si el user ya tenia cuenta, este flag se ignora porque la
+ *   aceptacion ya fue registrada en su momento.
+ */
+export async function loginWithGoogle(opts = {}) {
   const credential = await signInWithPopup(auth, googleProvider);
-  return await ensureUserDoc(credential.user);
+  return await ensureUserDoc(credential.user, opts);
 }
 
 export async function loginWithEmail(email, password) {
@@ -72,6 +105,14 @@ export async function loginWithEmail(email, password) {
   return await ensureUserDoc(credential.user);
 }
 
+/**
+ * Registro con email/password. Como es un registro nuevo, REQUIERE haber
+ * aceptado los TOS — el caller debe haber validado el checkbox antes.
+ *
+ * Pasamos aceptoTOS=true porque por definicion estamos creando una cuenta
+ * nueva y el flow de registro siempre incluye la aceptacion (gateada en
+ * el form del Login).
+ */
 export async function registerWithEmail(email, password, displayName) {
   const credential = await createUserWithEmailAndPassword(auth, email, password);
 
@@ -79,7 +120,7 @@ export async function registerWithEmail(email, password, displayName) {
     await updateProfile(credential.user, { displayName });
   }
 
-  return await ensureUserDoc(credential.user);
+  return await ensureUserDoc(credential.user, { aceptoTOS: true });
 }
 
 export async function signOut() {
