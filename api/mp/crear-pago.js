@@ -7,7 +7,9 @@
  *  2. Lee las sesiones a saldar y verifica que sean del profesional,
  *     del consultorio, y esten en estadoPago='debido'.
  *  3. Calcula montoTotal = suma de montoConsultorio.
- *  4. Calcula marketplaceFee = montoTotal * (consultorio.comisionConsulpay / 100).
+ *  4. Calcula marketplaceFee usando la comision correcta segun el plan
+ *     actual del consultorio (comisionPro si plan='pro', comisionFree
+ *     si plan='free'). Backwards compat con comisionConsulpay viejo.
  *  5. Refresca el access_token del consultorio si esta proximo a vencer.
  *  6. Crea preferencia en MP con marketplace_fee.
  *  7. Crea doc /pagos_consultorio/{pagoId} con estado='pendiente'.
@@ -25,6 +27,52 @@ import { initAdmin } from '../_lib/firebase-admin.js';
 import { jsonResponse, readJsonBody } from '../_lib/http.js';
 import { crearPreferencia } from '../_lib/mp-marketplace.js';
 import { asegurarAccessTokenVigente } from '../_lib/mp-token.js';
+
+/**
+ * Resuelve el porcentaje de comision a aplicar para un consultorio.
+ *
+ * Logica:
+ *   1. Si el consultorio es plan='pro' y tiene comisionPro definido (>=0)
+ *      -> usa comisionPro
+ *   2. Si el consultorio es plan='free' y tiene comisionFree definido (>=0)
+ *      -> usa comisionFree
+ *   3. Backwards compat: si el campo nuevo (Pro o Free) NO esta definido,
+ *      cae al campo viejo `comisionConsulpay` (numero unico que se usaba
+ *      antes del split por plan)
+ *   4. Si nada esta definido -> error
+ *
+ * @param {object} consData - data del doc /consultorios/{id}
+ * @returns {{ comisionPct: number, plan: string, fuente: string }}
+ *   fuente es 'comisionPro' | 'comisionFree' | 'comisionConsulpay' (para logs)
+ */
+function resolverComision(consData) {
+  const plan = consData.plan || 'free';
+
+  // Helper: chequear que un valor sea un numero valido (>=0, <=100)
+  const esValido = (v) => Number.isFinite(v) && v >= 0 && v <= 100;
+
+  // Intentar campo nuevo segun el plan
+  if (plan === 'pro') {
+    const c = Number(consData.comisionPro);
+    if (esValido(c)) {
+      return { comisionPct: c, plan, fuente: 'comisionPro' };
+    }
+  } else {
+    const c = Number(consData.comisionFree);
+    if (esValido(c)) {
+      return { comisionPct: c, plan, fuente: 'comisionFree' };
+    }
+  }
+
+  // Backwards compat: cae al campo viejo
+  const cLegacy = Number(consData.comisionConsulpay);
+  if (esValido(cLegacy)) {
+    return { comisionPct: cLegacy, plan, fuente: 'comisionConsulpay' };
+  }
+
+  // Nada definido -> error
+  return null;
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -54,7 +102,6 @@ export default async function handler(req, res) {
     return jsonResponse(res, 400, { error: 'sesionesIds debe ser un array no vacio.' });
   }
   if (sesionesIds.length > 100) {
-    // Limite arbitrario para evitar pagos gigantes que se rompen en MP
     return jsonResponse(res, 400, { error: 'No se pueden pagar mas de 100 sesiones a la vez.' });
   }
 
@@ -90,8 +137,6 @@ export default async function handler(req, res) {
   }
 
   // ---------- 3. Cargar sesiones y validar ----------
-  // Firestore tiene limite de 30 IDs en una query 'in', asi que leemos una a una.
-  // Es mas lento pero mas simple y correcto.
   const sesionesRefs = sesionesIds.map((id) => db.collection('sesiones').doc(id));
   const sesionesSnaps = await db.getAll(...sesionesRefs);
 
@@ -136,12 +181,26 @@ export default async function handler(req, res) {
   }
 
   // ---------- 4. Calcular marketplace fee ----------
-  const comisionPct = Number(consData.comisionConsulpay);
-  if (!Number.isFinite(comisionPct) || comisionPct < 0 || comisionPct > 100) {
-    return jsonResponse(res, 500, { error: 'Configuración de comisión inválida en el consultorio.' });
+  // Resolver comision segun plan del consultorio (con backwards compat
+  // a comisionConsulpay viejo). El helper devuelve null si no encuentra
+  // un valor valido en ningun lado.
+  const comisionResolved = resolverComision(consData);
+  if (!comisionResolved) {
+    console.error(
+      `[crear-pago] Consultorio ${consultorioId} sin comision configurada. ` +
+      `plan=${consData.plan}, comisionPro=${consData.comisionPro}, ` +
+      `comisionFree=${consData.comisionFree}, comisionConsulpay=${consData.comisionConsulpay}`,
+    );
+    return jsonResponse(res, 500, {
+      error: 'Configuración de comisión inválida en el consultorio. Contactá a soporte.',
+      codigo: 'COMISION_INVALIDA',
+    });
   }
-  // Redondeamos a 2 decimales (centavos)
-  const marketplaceFee = Math.round(montoTotal * comisionPct) / 100 * 1; // monto*pct/100
+  const { comisionPct, fuente: fuenteComision } = comisionResolved;
+
+  // Caso especial: comision = 0% (consultorios de cortesia, partners, etc.)
+  // En MP el marketplace_fee debe ser >= 0 — 0 es valido, no hay que tratar
+  // como error. Simplemente no se cobra comision a consulpay.
   const fee = Math.round((montoTotal * comisionPct / 100) * 100) / 100;
   const montoConsultorio = Math.round((montoTotal - fee) * 100) / 100;
 
@@ -162,9 +221,6 @@ export default async function handler(req, res) {
     });
   }
 
-  // Si refresco el token, persistimos el mpConfig nuevo ANTES de crear el pago.
-  // Si crear el pago falla despues, perdemos un par de minutos pero el token
-  // refrescado queda salvado.
   if (mpConfigActualizado) {
     try {
       await db.collection('consultorios').doc(consultorioId).update({
@@ -176,8 +232,6 @@ export default async function handler(req, res) {
   }
 
   // ---------- 6. Crear el doc /pagos_consultorio ----------
-  // Lo creamos ANTES de llamar a MP para tener un externalReference.
-  // Si MP falla despues, marcamos el doc como rechazado y queda como log.
   const pagoRef = db.collection('pagos_consultorio').doc();
   const pagoId = pagoRef.id;
 
@@ -211,7 +265,6 @@ export default async function handler(req, res) {
     });
   } catch (err) {
     console.error('Error creando preferencia MP:', err, err.mpResponse);
-    // Guardamos el pago como rechazado para tener registro
     await pagoRef.set({
       consultorioId,
       profesionalUid: uid,
@@ -220,6 +273,8 @@ export default async function handler(req, res) {
       montoConsultorio,
       montoConsulpay: fee,
       comisionPctAplicada: comisionPct,
+      planAplicado: consData.plan || 'free',
+      fuenteComision,
       estado: 'rechazado',
       mpPreferenceId: null,
       mpPaymentId: null,
@@ -237,6 +292,8 @@ export default async function handler(req, res) {
   }
 
   // ---------- 8. Persistir doc /pagos_consultorio ----------
+  // Guardamos planAplicado y fuenteComision para tener trazabilidad de
+  // que comision se aplico al momento del pago, util para auditoria.
   await pagoRef.set({
     consultorioId,
     profesionalUid: uid,
@@ -245,6 +302,8 @@ export default async function handler(req, res) {
     montoConsultorio,
     montoConsulpay: fee,
     comisionPctAplicada: comisionPct,
+    planAplicado: consData.plan || 'free',
+    fuenteComision,
     estado: 'pendiente',
     mpPreferenceId: preferencia.id,
     mpPaymentId: null,
