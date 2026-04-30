@@ -142,6 +142,81 @@
 }
 
 /* ============================================================
+   Seccion "Cuenta" al pie
+   ----------------------------------------------------------------
+   Incluye acciones relacionadas al vinculo del profesional con el
+   consultorio. Por ahora solo "Salir del consultorio" pero podriamos
+   agregar mas (cambiar email, cambiar password, etc) en el futuro.
+
+   Tono visual: discreto, separado del flujo principal por un margen
+   superior grande y un border-top sutil. Header chico (h2 pequeno),
+   row con info izquierda y boton derecho. En mobile pasa a layout
+   vertical.
+   ============================================================ */
+.cp-cuenta-section {
+  margin-top: 48px;
+  padding-top: 24px;
+  border-top: 1px solid var(--cp-border);
+}
+
+.cp-cuenta-section__head {
+  margin-bottom: 14px;
+}
+
+.cp-cuenta-section__title {
+  font-family: var(--cp-font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cp-text-muted);
+  margin: 0 0 4px;
+}
+
+.cp-cuenta-section__sub {
+  font-size: 13px;
+  color: var(--cp-text-faint);
+  margin: 0;
+}
+
+.cp-cuenta-section__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 18px;
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+}
+
+.cp-cuenta-section__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.cp-cuenta-section__info-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--cp-text);
+  line-height: 1.3;
+}
+
+.cp-cuenta-section__info-meta {
+  font-size: 12.5px;
+  color: var(--cp-text-muted);
+  margin-top: 4px;
+  line-height: 1.5;
+}
+
+@media (max-width: 600px) {
+  .cp-cuenta-section__row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* ============================================================
    Pagina de retorno post-checkout
    ============================================================ */
 
