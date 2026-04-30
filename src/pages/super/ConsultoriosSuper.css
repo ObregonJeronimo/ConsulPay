@@ -1,85 +1,380 @@
 /* ============================================================
-   Arbol de consultorios y usuarios (super-admin)
+   Panel super-admin: Consultorios y usuarios
+   ----------------------------------------------------------------
+   Estructura nueva con paginacion. Las clases que ya existian
+   (.cp-super-tree__user, etc.) se mantienen porque las usa la nueva
+   estructura tambien para las filas de usuarios.
+
+   Nuevas:
+     - .cp-super-section          -> contenedor de seccion con header
+     - .cp-cons-card              -> card de un consultorio paginado
+     - .cp-paginator              -> botones anterior/siguiente al pie
+     - .cp-modal-edit-cons        -> variante del modal para editar
+     - .cc-toggle                 -> reutilizado del Configuracion
    ============================================================ */
 
 .cp-super-tree {
-  max-width: 920px;
+  /* No max-width fijo: aprovecha todo el ancho de la pagina */
+  display: flex;
+  flex-direction: column;
+  gap: var(--cp-space-6);
 }
 
-.cp-super-tree__content {
+/* ============================================================
+   Seccion: header + lista de items
+   ============================================================ */
+.cp-super-section {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-top: 16px;
 }
 
-.cp-super-tree__group {
+.cp-super-section__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 4px;
+}
+
+.cp-super-section__title {
+  font-family: var(--cp-font-serif);
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin: 0;
+  color: var(--cp-text);
+}
+
+.cp-super-section__meta {
+  font-size: 12.5px;
+  color: var(--cp-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.cp-super-section__hint {
+  font-size: 13px;
+  color: var(--cp-text-muted);
+  margin: -6px 0 4px;
+  line-height: 1.5;
+}
+
+.cp-super-section--warn {
+  /* Tono visual para huerfanos: borde sutil del color warning */
+}
+
+.cp-super-section--warn .cp-super-section__title {
+  color: var(--cp-warning, #b07d1f);
+}
+
+/* ============================================================
+   Card de un consultorio (paginado)
+   ============================================================ */
+.cp-cons-card {
   background: var(--cp-surface);
   border: 1px solid var(--cp-border);
   border-radius: var(--cp-radius-lg);
   overflow: hidden;
+  transition: border-color var(--cp-dur-fast) var(--cp-ease);
 }
 
-.cp-super-tree__group--warn {
-  border-color: var(--cp-warning, #c89b3c);
+.cp-cons-card:hover {
+  border-color: var(--cp-border-strong);
 }
 
-.cp-super-tree__group-head {
+.cp-cons-card__head {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   padding: 14px 18px;
+}
+
+.cp-cons-card__toggle {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--cp-radius-sm);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--cp-text-muted);
   cursor: pointer;
-  list-style: none;
-  user-select: none;
-  transition: background var(--cp-dur-fast) var(--cp-ease);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--cp-dur-fast) var(--cp-ease);
+  flex-shrink: 0;
 }
 
-.cp-super-tree__group-head:hover {
+.cp-cons-card__toggle:hover {
   background: var(--cp-surface-hover);
+  color: var(--cp-text);
 }
 
-.cp-super-tree__group-head::-webkit-details-marker { display: none; }
-.cp-super-tree__group-head::marker { content: ''; }
+.cp-cons-card__toggle-icon {
+  font-size: 12px;
+  line-height: 1;
+}
 
-.cp-super-tree__group-icon {
-  font-size: 18px;
+.cp-cons-card__icon {
+  font-size: 20px;
   line-height: 1;
   flex-shrink: 0;
 }
 
-.cp-super-tree__group-title {
+.cp-cons-card__info {
   flex: 1;
   min-width: 0;
 }
 
-.cp-super-tree__group-title strong {
+.cp-cons-card__title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
   font-size: 15px;
   font-weight: 500;
   color: var(--cp-text);
+  line-height: 1.3;
 }
 
-.cp-super-tree__group-meta {
+.cp-cons-card__plan-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--cp-radius-pill);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.cp-cons-card__plan-badge--free {
+  background: var(--cp-surface-hover);
+  color: var(--cp-text-muted);
+}
+
+.cp-cons-card__plan-badge--pro {
+  background: var(--cp-accent-bg);
+  color: var(--cp-accent-dark);
+  font-weight: 600;
+}
+
+.cp-cons-card__plan-badge--off {
+  background: var(--cp-danger-bg);
+  color: var(--cp-danger);
+}
+
+.cp-cons-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   font-size: 12.5px;
   color: var(--cp-text-muted);
-  margin-top: 2px;
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
 }
 
-.cp-super-tree__group-toggle {
-  font-size: 14px;
-  color: var(--cp-text-muted);
-  transition: transform var(--cp-dur-fast) var(--cp-ease);
+.cp-cons-card__meta strong {
+  color: var(--cp-text);
+  font-weight: 500;
+}
+
+.cp-cons-card__meta-sep {
+  color: var(--cp-text-faint);
+}
+
+.cp-cons-card__meta-hint {
+  color: var(--cp-warning, #b07d1f);
+  font-size: 11.5px;
+  cursor: help;
+}
+
+.cp-cons-card__meta code {
+  font-family: var(--cp-font-mono);
+  font-size: 11.5px;
+  background: var(--cp-surface-sunken);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.cp-cons-card__actions {
   flex-shrink: 0;
 }
 
-.cp-super-tree__group:not([open]) .cp-super-tree__group-toggle {
-  transform: rotate(-90deg);
-}
-
-.cp-super-tree__group-body {
+.cp-cons-card__body {
   border-top: 1px solid var(--cp-border);
   background: var(--cp-bg);
 }
+
+@media (max-width: 720px) {
+  .cp-cons-card__head {
+    flex-wrap: wrap;
+  }
+  .cp-cons-card__actions {
+    width: 100%;
+    margin-top: 8px;
+  }
+  .cp-cons-card__actions .cp-btn {
+    width: 100%;
+  }
+}
+
+/* ============================================================
+   Paginador
+   ============================================================ */
+.cp-paginator {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 4px;
+  margin-top: 8px;
+}
+
+.cp-paginator__label {
+  font-size: 13px;
+  color: var(--cp-text-muted);
+  font-variant-numeric: tabular-nums;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 480px) {
+  .cp-paginator {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .cp-paginator > .cp-btn {
+    width: 100%;
+  }
+}
+
+/* ============================================================
+   Modal de edicion de configuracion
+   ============================================================ */
+.cp-modal-edit-cons {
+  max-width: 540px;
+}
+
+.cp-modal-edit-cons__section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 0;
+  border-top: 1px solid var(--cp-border);
+}
+
+.cp-modal-edit-cons__section:first-of-type {
+  border-top: none;
+  padding-top: 4px;
+}
+
+.cp-modal-edit-cons__section-title {
+  font-family: var(--cp-font-sans);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--cp-text-muted);
+  margin: 0;
+}
+
+.cp-modal-edit-cons__section-hint {
+  font-size: 13px;
+  color: var(--cp-text-muted);
+  line-height: 1.5;
+  margin: 0 0 4px;
+}
+
+.cp-modal-edit-cons__section-hint strong {
+  color: var(--cp-text);
+}
+
+/* ============================================================
+   Toggle row reutilizable (toggle + label inline)
+   ============================================================ */
+.cp-toggle-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 12px 14px;
+  background: var(--cp-bg);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  cursor: pointer;
+}
+
+.cp-toggle-row__label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.cp-toggle-row__label strong {
+  font-size: 14px;
+  color: var(--cp-text);
+  font-weight: 500;
+}
+
+.cp-toggle-row__label span {
+  font-size: 12.5px;
+  color: var(--cp-text-muted);
+  line-height: 1.45;
+}
+
+/* ============================================================
+   .cc-toggle — toggle re-usado de Configuracion.css
+   ----------------------------------------------------------------
+   Lo redeclaramos aca en lugar de depender de Configuracion.css
+   porque /super/consultorios no importa esa pagina. Si lo cambias
+   en uno, deberias cambiarlo en el otro (idealmente movemos a
+   shared-ui en el futuro).
+   ============================================================ */
+.cc-toggle {
+  width: 38px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--cp-surface-sunken);
+  border: 1px solid var(--cp-border-strong);
+  cursor: pointer;
+  position: relative;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background var(--cp-dur-fast) var(--cp-ease),
+              border-color var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cc-toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cc-toggle--on {
+  background: var(--cp-accent);
+  border-color: var(--cp-accent);
+}
+
+.cc-toggle__thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--cp-surface);
+  transition: transform var(--cp-dur-fast) var(--cp-ease);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.cc-toggle--on .cc-toggle__thumb {
+  transform: translateX(16px);
+}
+
+/* ============================================================
+   ===== CLASES VIEJAS — siguen usandose en filas de usuarios =====
+   ============================================================ */
 
 .cp-super-tree__empty {
   padding: 18px;
@@ -145,6 +440,24 @@
   display: flex;
   gap: 8px;
   flex-shrink: 0;
+}
+
+/* En huerfanos / superadmins (que no tienen contenedor expandible),
+   las filas viven en la seccion directamente. Le damos un wrapper
+   visual con background y border. */
+.cp-super-section .cp-super-tree__users {
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-lg);
+  overflow: hidden;
+}
+
+/* En cambio adentro de cp-cons-card__body (donde ya hay un wrapper
+   con background) NO ponemos otro background. */
+.cp-cons-card__body .cp-super-tree__users {
+  background: transparent;
+  border: none;
+  border-radius: 0;
 }
 
 @media (max-width: 640px) {
