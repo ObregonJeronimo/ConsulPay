@@ -206,12 +206,29 @@ service cloud.firestore {
 
     // ============================================================
     //  /pacientes/{pacienteId}
+    //  ----------------------------------------------------------------
+    //  MODELO N:N entre profesionales y pacientes.
+    //  Cada paciente tiene un array `profesionalesUids` (string[]) con
+    //  los UIDs de los profesionales que lo atienden. La relacion la
+    //  manejan los admins del consultorio.
+    //
+    //  Migracion: hasta 2026-04 el campo era `profesionalUid: string`
+    //  (singular). Migrado a `profesionalesUids: string[]` (plural).
+    //
+    //  Lectura:
+    //    - superadmin
+    //    - admin del consultorio
+    //    - profesional asignado: el array contiene su UID
+    //
+    //  Las queries del cliente DEBEN usar `array-contains` sobre
+    //  profesionalesUids combinado con consultorioId (mismo patron
+    //  que antes pero con array). Ver lib/pacientes.js.
     // ============================================================
     match /pacientes/{pacienteId} {
       allow read: if esSuperadmin()
         || esAdminDe(resource.data.consultorioId)
         || (esProfesionalDe(resource.data.consultorioId)
-            && resource.data.profesionalUid == request.auth.uid);
+            && request.auth.uid in resource.data.profesionalesUids);
 
       allow create: if esSuperadmin()
         || esAdminDe(request.resource.data.consultorioId);
@@ -224,6 +241,11 @@ service cloud.firestore {
 
     // ============================================================
     //  /sesiones/{sesionId}
+    //  ----------------------------------------------------------------
+    //  IMPORTANTE: la sesion sigue siendo 1:1 con un profesional
+    //  (cada sesion la atiende UN profesional, no varios). Por eso
+    //  el campo `profesionalUid` (singular) NO cambia. Solo el modelo
+    //  paciente↔profesional pasa a N:N; sesion↔profesional sigue 1:1.
     // ============================================================
     function sesionSplitEsCoherente(data) {
       let calculado = data.valorTotal * data.porcentajeConsultorio / 100;
