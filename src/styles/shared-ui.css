@@ -57,16 +57,47 @@
 
 /* ============================================================
    Tabla genérica
+   ----------------------------------------------------------------
+   .cp-table-wrap es el container de la tabla — provee el fondo,
+   borde y border-radius. Si la tabla es mas ancha que el wrap,
+   se habilita scroll horizontal automaticamente (overflow-x:auto)
+   en lugar de cortarla silenciosamente. Esto es importante en
+   tablas con muchas columnas o contenido largo (ej: Sesiones con
+   9 columnas + emails de profesionales que pueden ser largos).
    ============================================================ */
 .cp-table-wrap {
   background: var(--cp-surface);
   border: 1px solid var(--cp-border);
   border-radius: var(--cp-radius-lg);
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+
+  /* Scrollbar mas discreta (Firefox + Webkit). Solo aparece cuando
+     hace falta scroll. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--cp-border-strong) transparent;
+}
+
+.cp-table-wrap::-webkit-scrollbar {
+  height: 8px;
+}
+
+.cp-table-wrap::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.cp-table-wrap::-webkit-scrollbar-thumb {
+  background: var(--cp-border-strong);
+  border-radius: 4px;
+}
+
+.cp-table-wrap::-webkit-scrollbar-thumb:hover {
+  background: var(--cp-text-faint);
 }
 
 .cp-table {
   width: 100%;
+  min-width: max-content;
   border-collapse: collapse;
 }
 
@@ -79,6 +110,7 @@
   letter-spacing: 0.06em;
   padding: 14px var(--cp-space-5);
   border-bottom: 1px solid var(--cp-border);
+  white-space: nowrap;
 }
 
 .cp-table tbody td {
@@ -97,6 +129,7 @@
   font-size: 13px;
   font-variant-numeric: tabular-nums;
   text-align: right;
+  white-space: nowrap;
 }
 
 /* ============================================================
