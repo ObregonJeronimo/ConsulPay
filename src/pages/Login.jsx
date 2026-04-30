@@ -7,7 +7,6 @@ import Spinner from '../components/ui/Spinner.jsx';
 import {
   loginWithEmail,
   loginWithGoogle,
-  registerWithEmail,
   traducirErrorAuth,
 } from '../lib/auth.js';
 import './Login.css';
@@ -21,23 +20,36 @@ const GoogleIcon = () => (
   </svg>
 );
 
+/**
+ * Login.jsx
+ * ----------------------------------------------------------------
+ * Pagina de inicio de sesion. Solo permite LOGIN — no permite crear
+ * cuenta libremente.
+ *
+ * Las cuentas en ConsulPay se crean SOLAMENTE de dos formas:
+ *   1. Como dueño de un consultorio nuevo, via /crear-consultorio
+ *      (esa pagina maneja su propio flow de registro + creacion del
+ *      consultorio en una unica transaccion).
+ *   2. Como profesional invitado, via /aceptar-invitacion?token=...
+ *      (link enviado por email por el admin del consultorio).
+ *
+ * No existe registro publico autoservicio. Por eso este componente
+ * no incluye ya el switcher login/register que tenia antes.
+ *
+ * Si alguien aterriza aca sin cuenta, abajo del form le mostramos un
+ * link a /crear-consultorio para los que quieren empezar un consultorio
+ * propio. Quien recibio una invitacion va a llegar directo a
+ * /aceptar-invitacion via el link del email, no por aca.
+ */
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from ?? null;
 
-  const [mode, setMode] = useState('login'); // 'login' | 'register'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
-  // Aceptacion de TOS — solo aplica en modo registro. Por seguridad,
-  // se resetea cada vez que el user cambia entre login/register para
-  // evitar que tildarlo en un modo se mantenga al cambiar al otro.
-  const [aceptoTOS, setAceptoTOS] = useState(false);
   const [loading, setLoading] = useState(null); // null | 'google' | 'email'
   const [error, setError] = useState('');
-
-  const isRegister = mode === 'register';
 
   function irAlDestino() {
     if (from) {
@@ -51,21 +63,15 @@ export default function Login() {
 
   async function onGoogle() {
     setError('');
-
-    // En modo registro, exigimos aceptacion de TOS antes de proceder.
-    // En modo login, no — el usuario ya acepto los TOS cuando se creo
-    // la cuenta originalmente.
-    if (isRegister && !aceptoTOS) {
-      setError('Tenés que aceptar los Términos y Condiciones y la Política de Privacidad para crear una cuenta.');
-      return;
-    }
-
     setLoading('google');
     try {
-      // Si estamos en modo register, le decimos al backend que el user
-      // acepto los TOS — para que se guarde aceptoTOSAt + tosVersion en
-      // el doc nuevo. En login normal, no pasamos ese flag.
-      await loginWithGoogle(isRegister ? { aceptoTOS: true } : {});
+      // Login con Google sin opts: si la cuenta ya existe en Firebase
+      // pero no en /usuarios/{uid}, ensureUserDoc lo crea con rol
+      // profesional + estado pendiente. NO se guarda aceptoTOSAt
+      // porque no hay UI de aceptacion en login (no es registro).
+      // Para que un user nuevo se registre, debe pasar por
+      // /crear-consultorio o /aceptar-invitacion.
+      await loginWithGoogle();
       irAlDestino();
     } catch (err) {
       setError(traducirErrorAuth(err));
@@ -77,35 +83,15 @@ export default function Login() {
   async function onSubmitEmail(e) {
     e.preventDefault();
     setError('');
-
-    // Misma validacion que en Google: en registro, TOS es obligatorio.
-    if (isRegister && !aceptoTOS) {
-      setError('Tenés que aceptar los Términos y Condiciones y la Política de Privacidad para crear una cuenta.');
-      return;
-    }
-
     setLoading('email');
     try {
-      if (isRegister) {
-        // registerWithEmail siempre marca aceptoTOS=true internamente
-        // porque por definicion es un registro nuevo. La validacion del
-        // checkbox la hicimos arriba.
-        await registerWithEmail(email, password, displayName);
-      } else {
-        await loginWithEmail(email, password);
-      }
+      await loginWithEmail(email, password);
       irAlDestino();
     } catch (err) {
       setError(traducirErrorAuth(err));
     } finally {
       setLoading(null);
     }
-  }
-
-  function cambiarModo() {
-    setMode(isRegister ? 'login' : 'register');
-    setError('');
-    setAceptoTOS(false);  // reset por seguridad al cambiar de modo
   }
 
   return (
@@ -119,13 +105,9 @@ export default function Login() {
           </div>
 
           <div className="cp-login__heading">
-            <h1 className="cp-login__title">
-              {isRegister ? 'Crear cuenta' : 'Bienvenido'}
-            </h1>
+            <h1 className="cp-login__title">Bienvenido</h1>
             <p className="cp-login__sub">
-              {isRegister
-                ? 'Registrate como profesional. Un admin debe aprobar tu cuenta antes de acceder.'
-                : 'Ingresá a tu panel de ConsulPay.'}
+              Ingresá a tu panel de ConsulPay.
             </p>
           </div>
 
@@ -146,25 +128,12 @@ export default function Login() {
 
           {/* Form email/password */}
           <form onSubmit={onSubmitEmail} className="cp-login__form" noValidate>
-            {isRegister && (
-              <Input
-                name="displayName"
-                label="Nombre completo"
-                placeholder="María Rodríguez"
-                autoComplete="name"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                disabled={loading !== null}
-                required
-              />
-            )}
-
             <Input
               name="email"
               type="email"
               label="Email"
               placeholder="tu@email.com"
-              autoComplete={isRegister ? 'email' : 'username'}
+              autoComplete="username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={loading !== null}
@@ -175,51 +144,14 @@ export default function Login() {
               name="password"
               type="password"
               label="Contraseña"
-              placeholder={isRegister ? 'Mínimo 6 caracteres' : '••••••••'}
-              autoComplete={isRegister ? 'new-password' : 'current-password'}
+              placeholder="••••••••"
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={loading !== null}
               minLength={6}
               required
             />
-
-            {/*
-              Checkbox de aceptacion de TOS — visible solo en modo registro.
-              Aplica tanto al boton de email como al de Google (la
-              validacion se hace en ambos handlers).
-            */}
-            {isRegister && (
-              <label className="cp-login__tos">
-                <input
-                  type="checkbox"
-                  checked={aceptoTOS}
-                  onChange={(e) => setAceptoTOS(e.target.checked)}
-                  disabled={loading !== null}
-                />
-                <span>
-                  Acepto los{' '}
-                  <Link
-                    to="/terminos"
-                    className="cp-login__tos-link"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Términos y Condiciones
-                  </Link>
-                  {' '}y la{' '}
-                  <Link
-                    to="/privacidad"
-                    className="cp-login__tos-link"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Política de Privacidad
-                  </Link>
-                  {' '}de ConsulPay.
-                </span>
-              </label>
-            )}
 
             {error && <div className="cp-login__error">{error}</div>}
 
@@ -229,29 +161,25 @@ export default function Login() {
               disabled={loading !== null}
               className="cp-login__submit"
             >
-              {loading === 'email'
-                ? (isRegister ? 'Creando cuenta…' : 'Ingresando…')
-                : (isRegister ? 'Crear cuenta' : 'Ingresar')}
+              {loading === 'email' ? 'Ingresando…' : 'Ingresar'}
             </Button>
           </form>
 
-          <div className="cp-login__switch">
-            {isRegister ? '¿Ya tenés cuenta?' : '¿Nuevo en ConsulPay?'}
-            {' '}
-            <button
-              type="button"
-              className="cp-login__switch-btn"
-              onClick={cambiarModo}
-              disabled={loading !== null}
-            >
-              {isRegister ? 'Iniciar sesión' : 'Crear cuenta'}
-            </button>
+          {/*
+            Aclaracion sobre como crear cuenta. Distinguimos dos casos:
+            - Quien quiera crear un consultorio nuevo va a /crear-consultorio
+            - Quien fue invitado por un admin recibio un link por email
+              y va a aterrizar directo en /aceptar-invitacion
+          */}
+          <div className="cp-login__hint">
+            ¿Querés empezar un consultorio nuevo?{' '}
+            <Link to="/crear-consultorio" className="cp-login__hint-link">
+              Crear consultorio
+            </Link>
           </div>
 
           {/*
-            Footer minimo con links a las paginas legales — visibles
-            siempre, esten o no en modo registro. Permite que cualquier
-            visitante consulte los documentos legales antes de decidir.
+            Footer minimo con links a las paginas legales.
           */}
           <div className="cp-login__legal-links">
             <Link to="/terminos" className="cp-login__legal-link">
