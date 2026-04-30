@@ -78,16 +78,19 @@ export default function Configuracion() {
   useUnsavedChangesWarning(anyDirty);
 
   // Si volvemos del callback OAuth de MP, abrimos la pestania Pagos.
-  // Si volvemos del flow de suscripcion, abrimos la pestania Plan.
+  // Si volvemos del flow de suscripcion, abrimos la pestania Plan
+  // (siempre que el consultorio aun pueda verla — si el superadmin
+  // deshabilito Plan Pro entre que se inicio el flow y volvio, no
+  // forzamos la pestania a abrirse).
   useEffect(() => {
     const mp = searchParams.get('mp');
     const sus = searchParams.get('suscripcion');
     if (mp === 'connected' || mp === 'error') {
       setTab('pagos');
-    } else if (sus) {
+    } else if (sus && consultorio?.puedeVerPlanPro !== false) {
       setTab('plan');
     }
-  }, [searchParams]);
+  }, [searchParams, consultorio?.puedeVerPlanPro]);
 
   function intentarCambiarTab(nuevoTab) {
     if (nuevoTab === tab) return;
@@ -127,6 +130,14 @@ export default function Configuracion() {
   // ven el plan actual reflejado en la comision de la pestania Pagos
   // pero no pueden contratar/cancelar.
   const esOwner = user.uid === consultorio.ownerUid;
+
+  // Adicional: el superadmin puede deshabilitar el Plan Pro para un
+  // consultorio especifico via /super/consultorios. Si esta deshabilitado
+  // (puedeVerPlanPro === false), la pestania "Plan" NO se renderiza
+  // aunque el caller sea owner. Si el campo no existe (consultorios
+  // viejos), permite por backwards compat — solo se bloquea si esta
+  // explicitamente en false.
+  const puedeVerTabPlan = esOwner && consultorio.puedeVerPlanPro !== false;
 
   return (
     <div className="cp-config">
@@ -169,7 +180,7 @@ export default function Configuracion() {
           Pagos
           {consultorio.mpIntegrado && <span className="cp-tab__count cp-tab__count--ok">✓</span>}
         </button>
-        {esOwner && (
+        {puedeVerTabPlan && (
           <button
             className={`cp-tab ${tab === 'plan' ? 'cp-tab--active' : ''}`}
             onClick={() => intentarCambiarTab('plan')}
@@ -213,7 +224,7 @@ export default function Configuracion() {
         />
       )}
 
-      {tab === 'plan' && esOwner && (
+      {tab === 'plan' && puedeVerTabPlan && (
         <TabPlan
           consultorio={consultorio}
           searchParams={searchParams}
@@ -1406,7 +1417,10 @@ function DesconectarMPModal({ onCancelar, onConfirmar, submitting }) {
 /* ============================================================
    Tab: Plan (suscripcion al Plan Pro)
    ----------------------------------------------------------------
-   Solo visible para el OWNER del consultorio. Permite:
+   Solo visible para el OWNER del consultorio Y si el superadmin no
+   deshabilito explicitamente puedeVerPlanPro.
+
+   Permite:
      - Ver plan actual (Free / Pro) + comision vigente
      - Si Free: contratar Plan Pro (redirige a MP)
      - Si Pro: ver detalles + cancelar (sigue activo hasta fin de periodo)
