@@ -17,7 +17,7 @@
  * - DNI se muestra siempre formateado con puntos en los resultados
  *
  * Props:
- *   pacientes:        array completo de pacientes (con id, nombre, apellido, dni, profesionalUid, ...)
+ *   pacientes:        array completo de pacientes (con id, nombre, apellido, dni, profesionalesUids, ...)
  *   value:            id del paciente seleccionado (o '')
  *   onChange:         (pacienteId) => void
  *   profesionalUid:   uid del profesional actual, para priorizar sus asignados
@@ -27,6 +27,8 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+
+import { getProfesionalesUids } from '../../lib/pacientes.js';
 
 import './PacienteAutocomplete.css';
 
@@ -100,6 +102,19 @@ function nombreCompleto(p) {
   return ap || no || '(sin nombre)';
 }
 
+/**
+ * Devuelve true si el profesional con `uid` esta asignado al paciente.
+ * Compatible con ambos formatos:
+ *  - profesionalesUids: string[] (formato actual N:N)
+ *  - profesionalUid:    string  (formato legacy 1:N, por si quedo algun
+ *                                doc sin migrar)
+ */
+function pacienteEsAsignadoA(paciente, profesionalUid) {
+  if (!profesionalUid || !paciente) return false;
+  const uids = getProfesionalesUids(paciente);
+  return uids.includes(profesionalUid);
+}
+
 /* ============================================================
    Algoritmo de busqueda
    ============================================================ */
@@ -154,8 +169,10 @@ function buscarPacientes(query, pacientes, profesionalUid, limite = 5) {
     }
 
     if (score > 0) {
-      // Bonus si esta asignado al profesional actual
-      if (profesionalUid && p.profesionalUid === profesionalUid) {
+      // Bonus si esta asignado al profesional actual.
+      // Modelo N:N: el paciente puede tener varios profesionales, asi
+      // que chequeamos si profesionalUid esta en el array.
+      if (pacienteEsAsignadoA(p, profesionalUid)) {
         score += 5;
       }
       resultados.push({ paciente: p, score, matchExacto });
@@ -376,7 +393,9 @@ export default function PacienteAutocomplete({
         <ul className="cp-pac-ac__panel cp-pac-ac__list" role="listbox">
           {resultados.map((r, idx) => {
             const p = r.paciente;
-            const esAsignado = profesionalUid && p.profesionalUid === profesionalUid;
+            // Modelo N:N: el paciente puede tener varios profesionales,
+            // chequeamos array-contains via helper.
+            const esAsignado = pacienteEsAsignadoA(p, profesionalUid);
             return (
               <li
                 key={p.id}
