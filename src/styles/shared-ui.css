@@ -151,6 +151,25 @@
 
 /* ============================================================
    Modal genérico
+   ----------------------------------------------------------------
+   Implementacion con scroll interno cuando el contenido excede la
+   viewport, en vez de desbordar hacia abajo de la pantalla. Esto
+   mantiene siempre visibles:
+     - el header (titulo + subtitulo + boton cerrar arriba a la dcha)
+     - los botones de accion (Cancelar/Guardar) abajo
+   y el cuerpo del form scrollea solo cuando hace falta.
+
+   Como funciona:
+     .cp-modal usa flex-column con max-height = viewport - padding,
+     manteniendo title/sub estaticos arriba.
+     .cp-modal__form se vuelve flex:1 + overflow-y:auto, scrolleando
+     solo el contenido del form.
+     .cp-modal__actions queda sticky (bottom: 0) dentro del form, asi
+     siempre se ve aunque haya scroll. Tiene background y border-top
+     para distinguirse visualmente del contenido scrolleable.
+
+   Para modales sin form (ej confirmacion simple), .cp-modal-actions
+   afuera del form sigue funcionando como antes.
    ============================================================ */
 .cp-modal-overlay {
   position: fixed;
@@ -164,17 +183,42 @@
   padding: 20px;
   z-index: 100;
   animation: cp-fade 180ms var(--cp-ease) both;
+
+  /* Permitir scroll del overlay como ultimo recurso si el contenido
+     todavia excede la viewport (ej pantallas muy chicas). En la
+     mayoria de los casos no se va a usar porque el modal mismo
+     limita su altura. */
+  overflow-y: auto;
 }
 
 .cp-modal {
   background: var(--cp-surface);
   border-radius: var(--cp-radius-lg);
-  padding: 32px;
   max-width: 460px;
   width: 100%;
   position: relative;
   box-shadow: 0 24px 80px -20px rgba(0, 0, 0, 0.3);
   animation: cp-modal-in 240ms var(--cp-ease) both;
+
+  /* Layout: header arriba (estatico), cuerpo en el medio (scrolleable
+     via .cp-modal__form), botones abajo (sticky dentro del form).
+     Sin padding aca — el padding lo manejan el header y el form para
+     poder hacer sticky correctamente. */
+  display: flex;
+  flex-direction: column;
+
+  /* Limita la altura del modal a la viewport menos el padding del
+     overlay (20px arriba + 20px abajo = 40px). Si el contenido es
+     mas chico, el modal toma su altura natural. */
+  max-height: calc(100vh - 40px);
+  overflow: hidden;
+}
+
+/* Variante "wide" para modales con muchos campos (ej crear paciente).
+   Sin esta variante, el modal queda angosto y rompe el layout de los
+   campos del form. */
+.cp-modal--wide {
+  max-width: 640px;
 }
 
 .cp-modal__close {
@@ -191,6 +235,10 @@
   line-height: 1;
   cursor: pointer;
   transition: background var(--cp-dur-fast) var(--cp-ease);
+
+  /* Lo subimos por encima del contenido del form para que aunque
+     el form scrollee debajo, el boton de cerrar quede siempre visible. */
+  z-index: 2;
 }
 
 .cp-modal__close:hover {
@@ -198,25 +246,41 @@
   color: var(--cp-text);
 }
 
+/* El titulo y subtitulo van en su propio container para poder
+   separarlos del cuerpo scrolleable. Padding solo arriba+lados, asi
+   no hay un gap raro con el form. */
 .cp-modal__title {
   font-family: var(--cp-font-serif);
   font-size: 22px;
   font-weight: 500;
   letter-spacing: -0.015em;
-  margin-bottom: 8px;
+  padding: 32px 32px 0;
+  margin: 0 0 8px;
+
+  /* Reservamos espacio para el boton X arriba a la derecha */
+  padding-right: 56px;
 }
 
 .cp-modal__sub {
   color: var(--cp-text-muted);
   font-size: 14px;
   line-height: 1.5;
-  margin-bottom: 24px;
+  padding: 0 32px;
+  margin: 0 0 20px;
 }
 
+/* El form scrollea internamente cuando el contenido excede el
+   espacio disponible. Padding lateral mantiene el ritmo visual y
+   bottom padding evita que el ultimo campo toque el borde de las
+   acciones sticky. */
 .cp-modal__form {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  padding: 0 32px 32px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;  /* requerido para que flex-child con overflow funcione */
 }
 
 .cp-modal__error {
@@ -227,10 +291,57 @@
   font-size: 13px;
 }
 
+/* Los botones de accion quedan fijos al fondo del form scrolleable.
+   - position:sticky con bottom:-32px compensa el padding bottom del
+     form para que se peguen al borde real del modal.
+   - background con borde superior para crear separacion visual del
+     contenido que pasa scrolleando atras.
+   - margin-top:auto los empuja al fondo cuando hay poco contenido. */
 .cp-modal__actions {
   display: flex;
   gap: 10px;
   justify-content: flex-end;
+  position: sticky;
+  bottom: -32px;
+  margin-top: auto;
+  margin-bottom: -32px;
+  padding: 16px 0;
+  background: var(--cp-surface);
+  border-top: 1px solid var(--cp-border);
+  z-index: 1;
+}
+
+/* Variante para modales chicos sin form scrolleable (confirmaciones,
+   alerts, etc): ahi NO queremos sticky porque el modal entero es
+   chico y se ve mejor con los botones flotando como antes. Si una
+   subclase como .cp-modal--confirm-archive pone padding interno
+   directamente en .cp-modal, las reglas de arriba con padding en
+   __title / __form / __sub se sobrescriben. */
+.cp-modal--confirm-archive,
+.cp-modal--confirm-admin {
+  padding: 32px;
+}
+
+.cp-modal--confirm-archive .cp-modal__title,
+.cp-modal--confirm-archive .cp-modal__sub,
+.cp-modal--confirm-admin .cp-modal__title,
+.cp-modal--confirm-admin .cp-modal__sub {
+  padding: 0;
+  margin-bottom: 12px;
+}
+
+.cp-modal--confirm-archive .cp-modal__sub,
+.cp-modal--confirm-admin .cp-modal__sub {
+  margin-bottom: 24px;
+}
+
+.cp-modal--confirm-archive .cp-modal__actions,
+.cp-modal--confirm-admin .cp-modal__actions {
+  position: static;
+  margin: 0;
+  padding: 0;
+  border-top: none;
+  background: transparent;
   margin-top: 20px;
 }
 
@@ -269,6 +380,32 @@
 @keyframes cp-modal-in {
   from { opacity: 0; transform: translateY(10px) scale(0.98); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* En pantallas chicas (mobile), el modal toma practicamente toda la
+   pantalla y el padding del overlay se reduce. */
+@media (max-width: 640px) {
+  .cp-modal-overlay {
+    padding: 10px;
+  }
+  .cp-modal {
+    max-height: calc(100vh - 20px);
+  }
+  .cp-modal__title {
+    padding: 24px 24px 0;
+    padding-right: 56px;
+    font-size: 19px;
+  }
+  .cp-modal__sub {
+    padding: 0 24px;
+  }
+  .cp-modal__form {
+    padding: 0 24px 24px;
+  }
+  .cp-modal__actions {
+    bottom: -24px;
+    margin-bottom: -24px;
+  }
 }
 
 /* ============================================================
