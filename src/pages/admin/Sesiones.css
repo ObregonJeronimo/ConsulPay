@@ -189,8 +189,36 @@
 }
 
 /* ============================================================
-   Tabla de sesiones (extiende cp-table de shared-ui)
+   Tabla de sesiones — version compacta
+   ----------------------------------------------------------------
+   La tabla generica de shared-ui.css tiene padding 16px var(--cp-space-5)
+   (=20px) en celdas, lo cual con 9 columnas come mucho espacio
+   horizontal. Para la tabla de Sesiones especificamente reducimos
+   los paddings asi entra todo sin scroll en pantallas tipicas
+   (1366px+). Otras tablas (Pacientes, Profesionales) mantienen el
+   padding original.
+
+   Cambios:
+   - Padding horizontal celdas: 20px → 12px
+   - Padding vertical celdas: 16px → 12px
+   - Header padding: 14px → 11px
+   - Fuente del numero: 13px → 12.5px
+
+   Total ahorrado: ~144px por 9 columnas.
    ============================================================ */
+.cp-sesiones-tabla thead th {
+  padding: 11px 12px;
+}
+
+.cp-sesiones-tabla tbody td {
+  padding: 12px;
+  font-size: 13.5px;
+}
+
+.cp-sesiones-tabla .cp-num {
+  font-size: 12.5px;
+}
+
 .cp-sesiones-tabla .cp-fecha-cell {
   white-space: nowrap;
 }
@@ -230,6 +258,7 @@
   font-size: 11.5px;
   font-weight: 500;
   font-family: inherit;
+  white-space: nowrap;
 }
 
 .cp-badge__dot {
@@ -274,8 +303,8 @@
 }
 
 .cp-icon-btn {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   border-radius: var(--cp-radius-sm);
   background: transparent;
   border: 1px solid transparent;
