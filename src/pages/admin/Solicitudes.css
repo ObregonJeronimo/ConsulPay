@@ -121,18 +121,103 @@
    6. Form de motivo de rechazo (cuando se hace click en Rechazar)
    7. Historial de auditoria (timeline)
    8. Botonera (Cerrar, Rechazar, Aprobar)
+
+   IMPORTANTE: el modal usa max-height:90vh + flex column para que
+   nunca se salga del viewport. El contenido del medio scrollea
+   internamente; el header (titulo) y el footer (botonera) quedan
+   siempre visibles. Esto evita que con 8+ filas en el diff los
+   botones queden por fuera de la pantalla.
    ============================================================ */
 .cp-modal--detalle {
   max-width: 760px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  /* Sobrescribimos el padding del .cp-modal genérico para poder
+     aplicarlo manualmente en cada zona y que el scroll funcione bien.
+     El padding lateral lo damos en title/header/body/actions. */
+  padding: 0;
+  overflow: hidden; /* el contenido interno scrollea, no el modal */
 }
 
 /* Titulo del modal: queremos que el GroupBadge ×N quede inline con
-   el resto y no rompa el flujo */
+   el resto y no rompa el flujo. Le damos padding propio porque
+   sobrescribimos el del .cp-modal. */
 .cp-modal--detalle .cp-modal__title {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  padding: var(--cp-space-5) var(--cp-space-5) var(--cp-space-3);
+  margin: 0;
+  flex-shrink: 0;
+}
+
+/* El boton X de cerrar — ya tenia position absolute en .cp-modal,
+   con el cambio de padding del modal hay que reposicionarlo */
+.cp-modal--detalle .cp-modal__close {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  z-index: 2;
+}
+
+/* Wrapper del contenido scrolleable (todo lo que va entre el
+   titulo y la botonera). Usamos un selector que envuelve el grueso
+   del contenido. Como el JSX no cambia, le damos overflow al primer
+   elemento despues del titulo (que es el <p> del modal__sub o el
+   propio detalle-aviso/header). Para no tocar el JSX, hacemos que
+   TODO lo que esta dentro del modal sea un flex con un area
+   scrolleable definida via clases existentes. */
+
+/* Contenido scrolleable: detalle-header + diff + avisos + historial */
+.cp-modal--detalle .cp-modal__sub,
+.cp-modal--detalle .cp-detalle-aviso,
+.cp-modal--detalle .cp-detalle-header,
+.cp-modal--detalle .cp-diff,
+.cp-modal--detalle .cp-rechazo-form,
+.cp-modal--detalle .cp-historial,
+.cp-modal--detalle .cp-modal__error {
+  margin-left: var(--cp-space-5);
+  margin-right: var(--cp-space-5);
+}
+
+/* Botonera: queda fija al pie del modal con un borde superior. */
+.cp-modal--detalle .cp-modal__actions {
+  flex-shrink: 0;
+  padding: var(--cp-space-4) var(--cp-space-5);
+  margin: 0;
+  border-top: 1px solid var(--cp-border);
+  background: var(--cp-surface);
+}
+
+/* Para que todo lo que esta entre el titulo y la botonera scrollee
+   internamente, usamos un truco: hacemos que el content sea un
+   contenedor scrolleable. Como no podemos agregar un wrapper sin
+   tocar el JSX, usamos display:contents y aplicamos el scroll a un
+   area flexible. La forma mas robusta es aplicar overflow-y al
+   propio modal y dejar que el contenido fluya, pero entonces los
+   botones se van con el scroll.
+
+   Solucion practica: aplicamos overflow-y:auto al modal y mantenemos
+   los botones via position:sticky bottom:0. Asi siempre se ven sin
+   importar cuanto scroll haya. */
+.cp-modal--detalle {
+  overflow-y: auto;
+}
+
+.cp-modal--detalle .cp-modal__actions {
+  position: sticky;
+  bottom: 0;
+  /* Sombra suave hacia arriba para que se note la separacion cuando
+     hay contenido scrolleado debajo */
+  box-shadow: 0 -4px 12px -8px rgba(0, 0, 0, 0.15);
+}
+
+/* Padding superior reducido del primer elemento dentro del modal
+   despues del titulo, ya que el titulo ya tiene padding bottom */
+.cp-modal--detalle > *:first-child {
+  margin-top: 0;
 }
 
 /* ============================================================
@@ -240,7 +325,7 @@
   display: grid;
   grid-template-columns: 180px 1fr 1fr;
   border-bottom: 1px solid var(--cp-border);
-  min-height: 0; /* permite que las celdas tengan altura natural */
+  min-height: 0;
 }
 
 .cp-diff__row--single {
@@ -335,9 +420,6 @@
   margin-top: 2px;
 }
 
-/* El contenedor del texto (div directo despues del svg) controla el
-   layout del titulo + texto. Hacemos que el strong y el resto fluyan
-   naturalmente sin saltos de linea raros. */
 .cp-detalle-aviso > div {
   flex: 1;
   min-width: 0;
@@ -513,10 +595,13 @@
    Mobile responsive
    ----------------------------------------------------------------
    En pantallas chicas, el diff de doble columna se vuelve muy
-   apretado. Pasamos a un layout vertical donde "antes" y "despues"
-   se apilan, y reducimos la columna de "campo" a auto.
+   apretado. Reducimos la columna de "campo" y ajustamos paddings.
    ============================================================ */
 @media (max-width: 640px) {
+  .cp-modal--detalle {
+    max-height: 95vh;
+  }
+
   .cp-detalle-header {
     flex-direction: column;
     align-items: flex-start;
