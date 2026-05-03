@@ -203,7 +203,9 @@ export default function PagosAdmin() {
                 <th className="cp-num-col">Comisión</th>
                 <th className="cp-num-col">Cargo MP</th>
                 <th className="cp-num-col">Recibido</th>
-                <th className="cp-num-col">Sesiones</th>
+                <th className="cp-num-col" title="Cantidad de registros de sesiones incluidos. Cada registro puede representar 1 o varias sesiones agrupadas.">
+                  Registros
+                </th>
                 <th>Estado</th>
               </tr>
             </thead>
@@ -406,8 +408,13 @@ function DetallePagoModal({ pago, profesional, onClose }) {
             </div>
           )}
           <div>
-            <dt>Sesiones incluidas</dt>
-            <dd>{pago.sesionesIds?.length || 0} sesión{pago.sesionesIds?.length === 1 ? '' : 'es'}</dd>
+            <dt>Registros de sesiones incluidos</dt>
+            <dd>
+              {pago.sesionesIds?.length || 0} registro{pago.sesionesIds?.length === 1 ? '' : 's'}
+              <span className="cp-detalle-pago__hint" style={{ display: 'block', marginTop: 2 }}>
+                Cada registro puede representar 1 o varias sesiones agrupadas.
+              </span>
+            </dd>
           </div>
           {pago.rawPaymentData?.payment_method_id && (
             <div>
