@@ -294,6 +294,30 @@
   color: var(--cp-text-muted);
 }
 
+/* ============================================================
+   GroupBadge — indicador "×N" para sesiones agrupadas
+   ----------------------------------------------------------------
+   Aparece al lado del nombre del paciente o del titulo cuando un
+   registro representa multiples encuentros (cantidadSesiones > 1).
+   Visualmente discreto: pill chico, color accent.
+   ============================================================ */
+.cp-group-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 1px 7px;
+  background: var(--cp-accent-bg);
+  color: var(--cp-accent-dark);
+  font-size: 10.5px;
+  font-weight: 600;
+  font-family: var(--cp-font-mono);
+  border-radius: var(--cp-radius-pill);
+  letter-spacing: -0.01em;
+  vertical-align: middle;
+  white-space: nowrap;
+  cursor: help;
+}
+
 /* Acciones en fila (editar / eliminar / toggle pago) */
 .cp-sesiones-tabla__actions {
   display: flex;
@@ -484,6 +508,15 @@
 .cp-select:focus {
   outline: none;
   border-color: var(--cp-accent);
+}
+
+/* Select deshabilitado (caso: profesional viendo metodo de pago, lo
+   configura el admin desde la ficha del paciente) */
+.cp-select:disabled {
+  cursor: not-allowed;
+  background: var(--cp-bg);
+  color: var(--cp-text-muted);
+  opacity: 0.85;
 }
 
 /* ============================================================
