@@ -6,6 +6,9 @@
  * ejecutan directamente sino que crean una solicitud que el admin
  * debe resolver.
  *
+ * SOPORTA SESIONES AGRUPADAS: el payloadPropuesto y payloadAnterior
+ * incluyen cantidadSesiones y valorSesion (ver lib/sesiones.js).
+ *
  * Modelo:
  *   solicitudes_sesion/{solicitudId}
  *     consultorioId, profesionalUid (quien la pidio),
@@ -60,14 +63,22 @@ function descPaciente(pacienteNombre) {
   return pacienteNombre || 'el paciente';
 }
 
-function describirSolicitudCreada(solicitud, pacienteNombre) {
+function descCantidad(cantidad) {
+  // Si es 1 o undefined, no agregamos nada (es el caso "normal")
+  const c = Number(cantidad);
+  if (!Number.isFinite(c) || c <= 1) return '';
+  return ` (${c} sesiones agrupadas)`;
+}
+
+function describirSolicitudCreada(solicitud, pacienteNombre, cantidadSesiones) {
+  const sufijo = descCantidad(cantidadSesiones);
   switch (solicitud.tipo) {
     case TIPOS_SOLICITUD_SESION.CREAR:
-      return `Solicitó crear una sesión con ${descPaciente(pacienteNombre)}`;
+      return `Solicitó crear una sesión con ${descPaciente(pacienteNombre)}${sufijo}`;
     case TIPOS_SOLICITUD_SESION.MODIFICAR:
-      return `Solicitó modificar la sesión con ${descPaciente(pacienteNombre)}`;
+      return `Solicitó modificar la sesión con ${descPaciente(pacienteNombre)}${sufijo}`;
     case TIPOS_SOLICITUD_SESION.ELIMINAR:
-      return `Solicitó eliminar la sesión con ${descPaciente(pacienteNombre)}`;
+      return `Solicitó eliminar la sesión con ${descPaciente(pacienteNombre)}${sufijo}`;
     default:
       return 'Creó una solicitud';
   }
@@ -142,7 +153,11 @@ export async function solicitarCrearSesion({
     actorUid: profesionalUid,
     actorRol: 'profesional',
     actorNombre: profesionalNombre || null,
-    descripcion: describirSolicitudCreada({ tipo: TIPOS_SOLICITUD_SESION.CREAR }, pacienteNombre),
+    descripcion: describirSolicitudCreada(
+      { tipo: TIPOS_SOLICITUD_SESION.CREAR },
+      pacienteNombre,
+      payloadPropuesto?.cantidadSesiones,
+    ),
     payloadAnterior: null,
     payloadNuevo: payloadPropuesto,
   });
@@ -197,7 +212,11 @@ export async function solicitarModificarSesion({
     actorUid: profesionalUid,
     actorRol: 'profesional',
     actorNombre: profesionalNombre || null,
-    descripcion: describirSolicitudCreada({ tipo: TIPOS_SOLICITUD_SESION.MODIFICAR }, pacienteNombre),
+    descripcion: describirSolicitudCreada(
+      { tipo: TIPOS_SOLICITUD_SESION.MODIFICAR },
+      pacienteNombre,
+      payloadPropuesto?.cantidadSesiones,
+    ),
     payloadAnterior,
     payloadNuevo: payloadPropuesto,
   });
@@ -247,7 +266,11 @@ export async function solicitarEliminarSesion({
     actorUid: profesionalUid,
     actorRol: 'profesional',
     actorNombre: profesionalNombre || null,
-    descripcion: describirSolicitudCreada({ tipo: TIPOS_SOLICITUD_SESION.ELIMINAR }, pacienteNombre),
+    descripcion: describirSolicitudCreada(
+      { tipo: TIPOS_SOLICITUD_SESION.ELIMINAR },
+      pacienteNombre,
+      payloadAnterior?.cantidadSesiones,
+    ),
     payloadAnterior,
     payloadNuevo: null,
   });
@@ -431,6 +454,9 @@ export async function aprobarSolicitud({
  * solicitud al momento de pedirse. Comparamos los campos significativos
  * (los economicos y los de identidad). Cambios cosmeticos como notas
  * o updatedAt no cuentan.
+ *
+ * Incluye cantidadSesiones y valorSesion porque cambios en estos
+ * tambien hacen que la solicitud quede obsoleta.
  */
 function haySesionDivergente(snapshot, actual) {
   if (!snapshot || !actual) return true;
@@ -447,6 +473,10 @@ function haySesionDivergente(snapshot, actual) {
   for (const k of camposClave) {
     if (snapshot[k] !== actual[k]) return true;
   }
+  // cantidadSesiones y valorSesion: comparar con backwards compat (1 / 0)
+  const cant1 = Number(snapshot.cantidadSesiones) || 1;
+  const cant2 = Number(actual.cantidadSesiones) || 1;
+  if (cant1 !== cant2) return true;
   // Fecha viene como Timestamp; comparamos en ms
   const f1 = snapshot.fecha?.toMillis ? snapshot.fecha.toMillis() : snapshot.fecha?.seconds;
   const f2 = actual.fecha?.toMillis ? actual.fecha.toMillis() : actual.fecha?.seconds;
@@ -643,6 +673,11 @@ export function suscribirSolicitudesDelProfesional(consultorioId, profesionalUid
    Las solicitudes guardan el mismo formato que las sesiones (con
    split calculado y todo) para que aprobar sea solo un updateDoc o
    addDoc directo, sin recalcular nada en el momento de aprobar.
+
+   Acepta:
+   - valorSesion + cantidadSesiones (recomendado): valor unitario *
+     cantidad = total
+   - valorTotal directo (legacy): se usa tal cual, cantidadSesiones=1
    ============================================================ */
 export function armarPayloadParaSolicitud({
   consultorioId,
@@ -650,10 +685,22 @@ export function armarPayloadParaSolicitud({
   pacienteId,
   fecha,
   metodo,
-  valorTotal,
+  valorSesion,
+  cantidadSesiones = 1,
+  valorTotal: valorTotalIn,
   notas,
 }) {
-  const total = Number(valorTotal) || 0;
+  const cantidad = Number(cantidadSesiones) || 1;
+
+  let unitario, total;
+  if (valorSesion !== undefined && valorSesion !== null && valorSesion !== '') {
+    unitario = Number(valorSesion) || 0;
+    total = unitario * cantidad;
+  } else {
+    total = Number(valorTotalIn) || 0;
+    unitario = cantidad > 0 ? Math.round(total / cantidad) : total;
+  }
+
   const porcentaje = Number(metodo?.porcentajeConsultorio) || 0;
   const { montoConsultorio, montoProfesional } = calcularSplit(total, porcentaje);
 
@@ -665,6 +712,8 @@ export function armarPayloadParaSolicitud({
     metodoPagoId: metodo.id,
     metodoPagoNombre: metodo.nombre || '',
     metodoPagoTipo: metodo.tipo || 'inmediato',
+    cantidadSesiones: cantidad,
+    valorSesion: unitario,
     valorTotal: total,
     porcentajeConsultorio: porcentaje,
     montoConsultorio,
