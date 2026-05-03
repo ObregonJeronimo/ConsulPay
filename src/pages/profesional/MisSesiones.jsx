@@ -20,6 +20,7 @@ import {
   crearSesion,
   eliminarSesion,
   finDeMes,
+  getCantidadSesiones,
   inicioDeMes,
   nombreDelMes,
   suscribirSesionesProfesional,
@@ -33,7 +34,7 @@ import {
   suscribirSolicitudesDelProfesional,
 } from '../../lib/solicitudes.js';
 
-import { SesionModal } from '../admin/Sesiones.jsx';
+import { GroupBadge, SesionModal } from '../admin/Sesiones.jsx';
 import '../admin/Sesiones.css';
 
 /* ============================================================
@@ -211,7 +212,6 @@ export default function MisSesiones() {
 
   /* ---- Handlers: ramifican segun tieneConfianza ---- */
 
-  // Buscamos el paciente para ponerlo en la descripcion de la solicitud/log.
   function nombrePacienteDeInput(input) {
     const pac = mapaPacientes[input.pacienteId];
     return pac ? nombrePaciente(pac) : null;
@@ -255,10 +255,12 @@ export default function MisSesiones() {
   async function handleEliminar(sesion) {
     const pac = mapaPacientes[sesion.pacienteId];
     const nombrePac = pac ? nombrePaciente(pac) : 'el paciente';
+    const cantidad = getCantidadSesiones(sesion);
+    const sufijoCantidad = cantidad > 1 ? ` (registro de ${cantidad} sesiones agrupadas)` : '';
 
     const mensaje = tieneConfianza
-      ? `¿Eliminar la sesión del ${formatoFechaHoraCorta(sesion.fecha).dia} con ${nombrePac}?\n\nEsta acción no se puede deshacer.`
-      : `¿Solicitar eliminación de la sesión del ${formatoFechaHoraCorta(sesion.fecha).dia} con ${nombrePac}?\n\nLa eliminación quedará pendiente hasta que el administrador la apruebe.`;
+      ? `¿Eliminar la sesión del ${formatoFechaHoraCorta(sesion.fecha).dia} con ${nombrePac}${sufijoCantidad}?\n\nEsta acción no se puede deshacer.`
+      : `¿Solicitar eliminación de la sesión del ${formatoFechaHoraCorta(sesion.fecha).dia} con ${nombrePac}${sufijoCantidad}?\n\nLa eliminación quedará pendiente hasta que el administrador la apruebe.`;
 
     const ok = confirm(mensaje);
     if (!ok) return;
@@ -301,7 +303,7 @@ export default function MisSesiones() {
           <p className="cp-page-sub">
             {stats.cantidad === 0
               ? `Sin sesiones registradas en ${nombreDelMes(mes)}.`
-              : `${stats.cantidad} sesione${stats.cantidad === 1 ? '' : 's'} en ${nombreDelMes(mes)}.`}
+              : `${stats.cantidad} sesione${stats.cantidad === 1 ? '' : 's'} en ${nombreDelMes(mes)}${stats.cantidad !== stats.cantidadRegistros ? ` (${stats.cantidadRegistros} registro${stats.cantidadRegistros === 1 ? '' : 's'})` : ''}.`}
           </p>
           <SelectorMes mes={mes} setMes={setMes} />
         </div>
@@ -324,7 +326,8 @@ export default function MisSesiones() {
             <span>
               Tus acciones sobre sesiones (crear, modificar, eliminar) requieren la aprobación
               del administrador del consultorio. Cada solicitud queda registrada y vas a poder
-              ver su estado acá.
+              ver su estado acá. <strong>Tip:</strong> si tenés varias sesiones del mes con un mismo paciente,
+              cargalas en un solo registro indicando la cantidad — así el administrador aprueba el grupo entero de una.
             </span>
           </div>
         </div>
@@ -400,6 +403,7 @@ export default function MisSesiones() {
           pacientes={pacientesActivos}
           metodos={metodos}
           esAdmin={false}
+          consultorio={consultorio}
           consultorioId={user.consultorioId}
           profesionalUidFijo={user.uid}
           // Pasamos el flag para que el modal pueda ajustar el copy del boton
@@ -433,6 +437,11 @@ function SolicitudesPanel({ solicitudes, mapaPacientes, totalPendientes }) {
             : (s.payloadAnterior?.pacienteId ? mapaPacientes[s.payloadAnterior.pacienteId] : null);
           const nombrePac = pac ? nombrePaciente(pac) : 'paciente desconocido';
 
+          // Cantidad agrupada (si aplica) para mostrar en el titulo
+          const cantidad = s.payloadPropuesto?.cantidadSesiones
+            ?? s.payloadAnterior?.cantidadSesiones
+            ?? 1;
+
           let icon, badgeClass, badgeText;
           switch (s.estado) {
             case ESTADOS_SOLICITUD_SESION.PENDIENTE:
@@ -462,6 +471,7 @@ function SolicitudesPanel({ solicitudes, mapaPacientes, totalPendientes }) {
               <div className="cp-solicitud-row__main">
                 <div className="cp-solicitud-row__title">
                   {LABELS_TIPO_SOLICITUD[s.tipo]} — {nombrePac}
+                  <GroupBadge cantidad={cantidad} />
                 </div>
                 {s.estado === ESTADOS_SOLICITUD_SESION.RECHAZADA && s.motivoRechazo && (
                   <div className="cp-solicitud-row__motivo">
@@ -495,7 +505,10 @@ function StatsProfesional({ stats, yaPagado }) {
       <div className="cp-stat">
         <div className="cp-stat__label">Sesiones</div>
         <div className="cp-stat__value">{stats.cantidad}</div>
-        <div className="cp-stat__hint">en el mes seleccionado</div>
+        <div className="cp-stat__hint">
+          en el mes seleccionado
+          {stats.cantidad !== stats.cantidadRegistros && ` · ${stats.cantidadRegistros} registro${stats.cantidadRegistros === 1 ? '' : 's'}`}
+        </div>
       </div>
       <div className="cp-stat cp-stat--success">
         <div className="cp-stat__label">Lo que cobré</div>
@@ -519,10 +532,9 @@ function StatsProfesional({ stats, yaPagado }) {
 /* ============================================================
    Tabla de sesiones del profesional
    ----------------------------------------------------------------
-   Ahora marcamos las sesiones que tienen una solicitud pendiente:
-   los botones de editar/eliminar quedan deshabilitados con tooltip
-   explicativo, para evitar que el profesional intente otra accion
-   sobre una sesion ya cuestionada.
+   Muestra badge ×N para sesiones agrupadas. Las acciones quedan
+   deshabilitadas si la sesion ya fue pagada o si tiene una solicitud
+   pendiente.
    ============================================================ */
 function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, onEditar, onEliminar }) {
   return (
@@ -547,6 +559,7 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, onEdi
             const pagada = s.estadoPago === ESTADOS_PAGO_SESION.PAGADO;
             const tienePendiente = sesionesConPendiente.has(s.id);
             const accionesDisabled = pagada || tienePendiente;
+            const cantidad = getCantidadSesiones(s);
 
             return (
               <tr
@@ -565,7 +578,10 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, onEdi
                     <div className="cp-prof-cell">
                       <Avatar initials={inicialesPaciente(pac)} size={28} />
                       <div>
-                        <div className="cp-prof-name" style={{ fontSize: 13.5 }}>{nombrePaciente(pac)}</div>
+                        <div className="cp-prof-name" style={{ fontSize: 13.5 }}>
+                          {nombrePaciente(pac)}
+                          <GroupBadge cantidad={cantidad} />
+                        </div>
                       </div>
                     </div>
                   ) : <span style={{ color: 'var(--cp-text-faint)' }}>Paciente eliminado</span>}
@@ -576,7 +592,14 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, onEdi
                     <span className="cp-badge cp-badge--diferido" style={{ marginLeft: 6 }}>diferido</span>
                   )}
                 </td>
-                <td className="cp-num">{formatoARS.format(s.valorTotal)}</td>
+                <td className="cp-num">
+                  {formatoARS.format(s.valorTotal)}
+                  {cantidad > 1 && s.valorSesion ? (
+                    <div style={{ fontSize: 11, color: 'var(--cp-text-muted)', marginTop: 2 }}>
+                      {formatoARS.format(s.valorSesion)} c/u
+                    </div>
+                  ) : null}
+                </td>
                 <td className="cp-num" style={{ color: 'var(--cp-success)' }}>
                   {formatoARS.format(s.montoProfesional)}
                 </td>
