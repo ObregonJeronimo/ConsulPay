@@ -22,6 +22,7 @@ import {
   suscribirTodasSolicitudes,
 } from '../../lib/solicitudes.js';
 
+import { GroupBadge } from './Sesiones.jsx';
 import './Solicitudes.css';
 import './Sesiones.css';
 
@@ -98,6 +99,15 @@ function formatoRelativo(date) {
   const diffD = Math.floor(diffH / 24);
   if (diffD < 7) return `hace ${diffD} día${diffD === 1 ? '' : 's'}`;
   return d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
+}
+
+/**
+ * Devuelve la cantidad de sesiones agrupadas que indica un payload
+ * (con backwards compat: sin cantidadSesiones se interpreta como 1).
+ */
+function cantidadDePayload(payload) {
+  const c = Number(payload?.cantidadSesiones);
+  return Number.isFinite(c) && c >= 1 ? Math.floor(c) : 1;
 }
 
 function iconoTipo(tipo) {
@@ -286,6 +296,9 @@ function EmptyState({ tab }) {
 
 /* ============================================================
    Tabla
+   ----------------------------------------------------------------
+   Muestra el badge ×N al lado del paciente cuando la solicitud
+   representa un grupo de sesiones (ej: 8 sesiones del mes).
    ============================================================ */
 function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSeleccionar }) {
   return (
@@ -307,6 +320,8 @@ function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSel
             const pacienteId = s.payloadPropuesto?.pacienteId || s.payloadAnterior?.pacienteId;
             const pac = pacienteId ? mapaPacientes[pacienteId] : null;
             const resuelta = s.estado !== ESTADOS_SOLICITUD_SESION.PENDIENTE;
+            // Cantidad: la del propuesto si existe, sino la del anterior, sino 1
+            const cantidad = cantidadDePayload(s.payloadPropuesto || s.payloadAnterior);
 
             return (
               <tr
@@ -329,6 +344,7 @@ function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSel
                       <Avatar initials={inicialesPaciente(pac)} size={28} />
                       <div className="cp-prof-name" style={{ fontSize: 13.5 }}>
                         {nombrePaciente(pac)}
+                        <GroupBadge cantidad={cantidad} />
                       </div>
                     </div>
                   ) : (
@@ -358,7 +374,10 @@ function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSel
 }
 
 /* ============================================================
-   Modal de detalle con diff antes/despues + historial (Fase C.2)
+   Modal de detalle con diff antes/despues + historial
+   ----------------------------------------------------------------
+   Muestra prominentemente el badge ×N en el titulo cuando aplica
+   para que el admin vea claramente que esta aprobando un grupo.
    ============================================================ */
 function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, adminUid, adminNombre, consultorioId, onClose }) {
   const [submitting, setSubmitting] = useState(false);
@@ -372,6 +391,9 @@ function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, adminUid, a
   const pacienteId = solicitud.payloadPropuesto?.pacienteId || solicitud.payloadAnterior?.pacienteId;
   const pac = pacienteId ? mapaPacientes[pacienteId] : null;
   const nombrePac = nombrePaciente(pac) || 'paciente';
+
+  // Cantidad para el titulo
+  const cantidad = cantidadDePayload(solicitud.payloadPropuesto || solicitud.payloadAnterior);
 
   async function handleAprobar() {
     setError('');
@@ -421,7 +443,20 @@ function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, adminUid, a
           </span>
           {' '}
           {LABELS_TIPO_SOLICITUD[solicitud.tipo]} · {nombrePac}
+          <GroupBadge cantidad={cantidad} />
         </h2>
+
+        {/* Aviso prominente cuando es agrupacion */}
+        {cantidad > 1 && esPendiente && (
+          <div className="cp-detalle-aviso" style={{ background: 'var(--cp-accent-bg)', color: 'var(--cp-accent-dark)', marginBottom: 14 }}>
+            <InfoIcon />
+            <div>
+              <strong>Sesiones agrupadas: {cantidad}</strong>
+              Este registro representa <strong>{cantidad} encuentros</strong> con el paciente,
+              cargados juntos. Aprobar o rechazar afecta al grupo entero.
+            </div>
+          </div>
+        )}
 
         <div className="cp-detalle-header">
           <div className="cp-detalle-header__autor">
@@ -517,7 +552,7 @@ function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, adminUid, a
               <Button variant="primary" type="button" onClick={handleAprobar} disabled={submitting || mostrandoMotivo}>
                 {submitting && !mostrandoMotivo
                   ? <><Spinner size={14} /> Aprobando…</>
-                  : 'Aprobar'}
+                  : (cantidad > 1 ? `Aprobar (${cantidad} sesiones)` : 'Aprobar')}
               </Button>
             </>
           ) : (
@@ -533,10 +568,6 @@ function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, adminUid, a
 
 /* ============================================================
    HistorialPanel — muestra los logs de auditoria de la solicitud
-   ----------------------------------------------------------------
-   Se suscribe en vivo a /logs_sesion/ filtrado por solicitudId.
-   Para cada log mostramos: icono segun tipo, descripcion, autor,
-   fecha relativa.
    ============================================================ */
 function HistorialPanel({ consultorioId, solicitudId }) {
   const [logs, setLogs] = useState([]);
@@ -564,7 +595,6 @@ function HistorialPanel({ consultorioId, solicitudId }) {
   }
 
   if (logs.length === 0) {
-    // No deberia pasar (siempre hay al menos el log de creacion) pero por las dudas
     return null;
   }
 
@@ -603,6 +633,9 @@ function tipoColor(tipo) {
 
 /* ============================================================
    Diff
+   ----------------------------------------------------------------
+   Agregamos cantidadSesiones y valorSesion a CAMPOS_DIFF para que
+   el admin vea esos datos al revisar.
    ============================================================ */
 function Diff({ solicitud, pac }) {
   const { tipo, payloadPropuesto, payloadAnterior } = solicitud;
@@ -620,7 +653,9 @@ function Diff({ solicitud, pac }) {
 
 const CAMPOS_DIFF = [
   { key: 'fecha',                label: 'Fecha y hora' },
+  { key: 'cantidadSesiones',     label: 'Cantidad de sesiones' },
   { key: 'metodoPagoNombre',     label: 'Método de pago' },
+  { key: 'valorSesion',          label: 'Valor por sesión' },
   { key: 'valorTotal',           label: 'Valor total' },
   { key: 'porcentajeConsultorio', label: '% consultorio' },
   { key: 'montoConsultorio',     label: 'Al consultorio' },
@@ -631,7 +666,11 @@ const CAMPOS_DIFF = [
 function valorFormateado(payload, key) {
   if (!payload) return null;
   const v = payload[key];
-  if (v == null || v === '') return null;
+  if (v == null || v === '') {
+    // Para cantidadSesiones: si no esta definido, mostramos "1" (default)
+    if (key === 'cantidadSesiones') return '1';
+    return null;
+  }
   switch (key) {
     case 'fecha': {
       const d = v.toDate ? v.toDate() : new Date(v);
@@ -639,11 +678,14 @@ function valorFormateado(payload, key) {
         + ' · ' + d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
     }
     case 'valorTotal':
+    case 'valorSesion':
     case 'montoConsultorio':
     case 'montoProfesional':
       return formatoARS.format(v);
     case 'porcentajeConsultorio':
       return `${v}%`;
+    case 'cantidadSesiones':
+      return String(v);
     case 'metodoPagoNombre':
       return (
         <>
@@ -663,6 +705,12 @@ function compararValor(a, b, key) {
     const ma = a?.toMillis ? a.toMillis() : (a ? new Date(a).getTime() : null);
     const mb = b?.toMillis ? b.toMillis() : (b ? new Date(b).getTime() : null);
     return ma === mb;
+  }
+  if (key === 'cantidadSesiones') {
+    // Backwards compat: undefined o null se trata como 1
+    const na = Number(a) || 1;
+    const nb = Number(b) || 1;
+    return na === nb;
   }
   return (a ?? null) === (b ?? null);
 }
