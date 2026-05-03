@@ -23,12 +23,14 @@ import {
   actualizarSesion,
   eliminarSesion,
   finDeMes,
+  getCantidadSesiones,
   inicioDeMes,
   marcarSesionDebida,
   marcarSesionPagada,
   nombreDelMes,
   suscribirSesionesConsultorio,
   totalesGlobales,
+  validarFechaContraConsultorio,
 } from '../../lib/sesiones.js';
 import { marcarPendientesComoObsoletas } from '../../lib/solicitudes.js';
 
@@ -81,6 +83,12 @@ const RevertIcon = () => (
     <path d="M3.51 15a9 9 0 102.13-9.36L1 10" />
   </svg>
 );
+const LockIcon = () => (
+  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="11" width="18" height="11" rx="2" />
+    <path d="M7 11V7a5 5 0 0110 0v4" />
+  </svg>
+);
 
 /* ============================================================
    Helpers
@@ -108,6 +116,22 @@ function dateAInputValue(d) {
   const date = d instanceof Date ? d : new Date(d);
   const pad = (n) => String(n).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+/**
+ * Devuelve la fecha minima ISO (YYYY-MM-DDTHH:MM) para el input
+ * datetime-local, basada en la fecha de creacion del consultorio.
+ * Sirve para que el navegador bloquee fechas anteriores al picker.
+ */
+function fechaMinimaParaInput(consultorio) {
+  if (!consultorio?.createdAt) return undefined;
+  const d = consultorio.createdAt?.toDate
+    ? consultorio.createdAt.toDate()
+    : (consultorio.createdAt instanceof Date ? consultorio.createdAt : null);
+  if (!d) return undefined;
+  // Hora 00:00 del dia de creacion para permitir el dia entero
+  const minimo = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+  return dateAInputValue(minimo);
 }
 
 /* ============================================================
@@ -214,19 +238,13 @@ export default function Sesiones() {
   const stats = useMemo(() => totalesGlobales(sesiones), [sesiones]);
   const cobrado = stats.totalConsultorio - stats.debido;
 
-  /* ---- Handlers ----
-     IMPORTANTE Fase B: cuando el admin modifica/elimina directamente una
-     sesion, si hay solicitudes pendientes para esa misma sesion las
-     marcamos como obsoletas. Asi el profesional que solicito ve que su
-     pedido quedo invalidado y puede volver a solicitar si quiere.
-   */
+  /* ---- Handlers ---- */
 
   async function handleGuardar(input) {
     if (editando === 'nueva') {
       await crearSesion(input, user.uid);
     } else {
       await actualizarSesion(editando.id, input, user.uid);
-      // Si habia solicitudes pendientes para esta sesion, ahora son obsoletas
       try {
         await marcarPendientesComoObsoletas({
           consultorioId: user.consultorioId,
@@ -237,7 +255,6 @@ export default function Sesiones() {
         });
       } catch (err) {
         console.error('Error marcando solicitudes como obsoletas:', err);
-        // No bloqueamos el flow principal si falla
       }
     }
     setEditando(null);
@@ -250,8 +267,6 @@ export default function Sesiones() {
     );
     if (!ok) return;
     try {
-      // Marcar pendientes como obsoletas ANTES de eliminar la sesion,
-      // porque despues no vamos a poder leer el sesionId si la sesion ya no existe.
       try {
         await marcarPendientesComoObsoletas({
           consultorioId: user.consultorioId,
@@ -303,7 +318,7 @@ export default function Sesiones() {
           <p className="cp-page-sub">
             Registro de sesiones del consultorio. {stats.cantidad === 0
               ? 'Sin sesiones este mes.'
-              : `${stats.cantidad} sesione${stats.cantidad === 1 ? '' : 's'} en ${nombreDelMes(mes)}.`
+              : `${stats.cantidad} sesione${stats.cantidad === 1 ? '' : 's'} en ${nombreDelMes(mes)}${stats.cantidad !== stats.cantidadRegistros ? ` (${stats.cantidadRegistros} registro${stats.cantidadRegistros === 1 ? '' : 's'})` : ''}.`
             }
           </p>
           <SelectorMes mes={mes} setMes={setMes} />
@@ -426,6 +441,7 @@ export default function Sesiones() {
           pacientes={pacientesActivos}
           metodos={metodos}
           esAdmin
+          consultorio={consultorio}
           consultorioId={user.consultorioId}
           onClose={() => setEditando(null)}
           onGuardar={handleGuardar}
@@ -476,7 +492,10 @@ function StatsCards({ stats, cobrado }) {
       <div className="cp-stat">
         <div className="cp-stat__label">Sesiones</div>
         <div className="cp-stat__value">{stats.cantidad}</div>
-        <div className="cp-stat__hint">en el mes seleccionado</div>
+        <div className="cp-stat__hint">
+          en el mes seleccionado
+          {stats.cantidad !== stats.cantidadRegistros && ` · ${stats.cantidadRegistros} registro${stats.cantidadRegistros === 1 ? '' : 's'}`}
+        </div>
       </div>
       <div className="cp-stat">
         <div className="cp-stat__label">Facturación total</div>
@@ -494,6 +513,25 @@ function StatsCards({ stats, cobrado }) {
         <div className="cp-stat__hint">ya recibido por el consultorio</div>
       </div>
     </div>
+  );
+}
+
+/* ============================================================
+   Badge "×N" para sesiones agrupadas
+   ----------------------------------------------------------------
+   Se muestra al lado del nombre del paciente o de la fecha cuando
+   el doc representa mas de 1 encuentro. Visualmente discreto.
+   ============================================================ */
+export function GroupBadge({ cantidad }) {
+  const c = Number(cantidad) || 1;
+  if (c <= 1) return null;
+  return (
+    <span
+      className="cp-group-badge"
+      title={`Este registro representa ${c} sesiones agrupadas`}
+    >
+      ×{c}
+    </span>
   );
 }
 
@@ -523,6 +561,7 @@ function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, onEditar, o
             const prof = mapaProfesionales[s.profesionalUid];
             const f = formatoFechaHoraCorta(s.fecha);
             const pagada = s.estadoPago === ESTADOS_PAGO_SESION.PAGADO;
+            const cantidad = getCantidadSesiones(s);
 
             return (
               <tr
@@ -544,7 +583,10 @@ function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, onEditar, o
                     <div className="cp-prof-cell">
                       <Avatar initials={inicialesPaciente(pac)} size={28} />
                       <div>
-                        <div className="cp-prof-name" style={{ fontSize: 13.5 }}>{nombrePaciente(pac)}</div>
+                        <div className="cp-prof-name" style={{ fontSize: 13.5 }}>
+                          {nombrePaciente(pac)}
+                          <GroupBadge cantidad={cantidad} />
+                        </div>
                       </div>
                     </div>
                   ) : <span style={{ color: 'var(--cp-text-faint)' }}>Paciente eliminado</span>}
@@ -555,7 +597,14 @@ function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, onEditar, o
                     <span className="cp-badge cp-badge--diferido" style={{ marginLeft: 6 }}>diferido</span>
                   )}
                 </td>
-                <td className="cp-num">{formatoARS.format(s.valorTotal)}</td>
+                <td className="cp-num">
+                  {formatoARS.format(s.valorTotal)}
+                  {cantidad > 1 && s.valorSesion ? (
+                    <div style={{ fontSize: 11, color: 'var(--cp-text-muted)', marginTop: 2 }}>
+                      {formatoARS.format(s.valorSesion)} c/u
+                    </div>
+                  ) : null}
+                </td>
                 <td className="cp-num" style={{ color: 'var(--cp-accent)' }}>
                   {formatoARS.format(s.montoConsultorio)}
                 </td>
@@ -611,9 +660,14 @@ function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, onEditar, o
    Reutilizable entre admin y profesional.
    - Admin ve dropdown de profesional al inicio
    - Profesional NO ve ese dropdown
-   - modoSolicitud=true: ajustamos copy del titulo, subtitulo y boton
-     para reflejar que la accion va a generar una solicitud, no a
-     ejecutar el cambio directamente.
+   - Profesional NO puede editar el método de pago (lo configura el admin
+     en la ficha del paciente). Se muestra como solo lectura con candado.
+   - Campo nuevo "Cantidad de sesiones" debajo de la hora (default 1).
+     Si cantidad > 1 el doc representa N encuentros agrupados.
+   - El campo de valor pasa de "valor total" a "valor por sesión",
+     con el total mostrado debajo (valor × cantidad).
+   - Validacion fecha mínima vs consultorio.createdAt.
+   - modoSolicitud=true: ajusta copy de titulo/subtitulo/boton.
    ============================================================ */
 export function SesionModal({
   sesion,
@@ -621,6 +675,7 @@ export function SesionModal({
   pacientes,
   metodos,
   esAdmin,
+  consultorio,
   consultorioId,
   profesionalUidFijo,
   modoSolicitud = false,
@@ -641,11 +696,31 @@ export function SesionModal({
     return dateAInputValue(new Date());
   });
   const [metodoId, setMetodoId] = useState(sesion?.metodoPagoId ?? '');
-  const [valor, setValor] = useState(sesion?.valorTotal ?? '');
+
+  // Cantidad de sesiones — default 1, mínimo 1
+  const [cantidad, setCantidad] = useState(() => {
+    if (sesion?.cantidadSesiones) return String(sesion.cantidadSesiones);
+    return '1';
+  });
+
+  // Valor por sesión (unitario). Si la sesion existente tiene valorSesion,
+  // lo usamos; si no, derivamos de valorTotal/cantidadSesiones.
+  const [valorSesion, setValorSesion] = useState(() => {
+    if (sesion?.valorSesion !== undefined && sesion?.valorSesion !== null) {
+      return String(sesion.valorSesion);
+    }
+    if (sesion?.valorTotal !== undefined && sesion?.valorTotal !== null) {
+      const c = sesion.cantidadSesiones || 1;
+      return String(c > 0 ? Math.round(sesion.valorTotal / c) : sesion.valorTotal);
+    }
+    return '';
+  });
+
   const [notas, setNotas] = useState(sesion?.notas ?? '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  // Auto-cargar metodo del paciente al elegirlo (solo en alta nueva)
   useEffect(() => {
     if (!pacienteId || !esNueva) return;
     const pac = pacientes.find((p) => p.id === pacienteId);
@@ -655,18 +730,27 @@ export function SesionModal({
     }
   }, [pacienteId, esNueva]);   // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Auto-cargar valor default del metodo (solo en alta nueva, solo si vacio)
   useEffect(() => {
     if (!metodoId || !esNueva) return;
     const m = metodos.find((x) => x.id === metodoId);
-    if (m && !valor) {
-      setValor(m.valorSesionDefault ?? '');
+    if (m && !valorSesion) {
+      setValorSesion(String(m.valorSesionDefault ?? ''));
     }
   }, [metodoId, esNueva]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const metodoSeleccionado = metodos.find((m) => m.id === metodoId);
   const porcentaje = Number(metodoSeleccionado?.porcentajeConsultorio ?? 0);
-  const valorNum = Number(valor) || 0;
-  const split = calcularSplit(valorNum, porcentaje);
+  const cantidadNum = Math.max(1, Math.floor(Number(cantidad) || 1));
+  const valorSesionNum = Number(valorSesion) || 0;
+  const valorTotal = valorSesionNum * cantidadNum;
+  const split = calcularSplit(valorTotal, porcentaje);
+
+  const fechaMinIso = useMemo(() => fechaMinimaParaInput(consultorio), [consultorio]);
+
+  // El profesional NO puede editar el método de pago. Lo configura el
+  // admin en la ficha del paciente. Lo mostramos como solo lectura.
+  const metodoBloqueado = !esAdmin;
 
   /* ---- Copy dinamico segun modo ---- */
   const titulo = esNueva
@@ -698,6 +782,17 @@ export function SesionModal({
     if (!metodoSeleccionado) { setError('Tenés que elegir un método de pago'); return; }
     if (!fecha || isNaN(fecha.getTime())) { setError('Fecha y hora inválidas'); return; }
 
+    // Validación de fecha mínima contra creación del consultorio
+    try {
+      validarFechaContraConsultorio(fecha, consultorio);
+    } catch (err) {
+      setError(err.message);
+      return;
+    }
+
+    if (cantidadNum < 1) { setError('La cantidad de sesiones debe ser al menos 1'); return; }
+    if (valorSesionNum < 0) { setError('El valor por sesión no puede ser negativo'); return; }
+
     setSubmitting(true);
     try {
       await onGuardar({
@@ -706,7 +801,8 @@ export function SesionModal({
         pacienteId,
         fecha,
         metodo: metodoSeleccionado,
-        valorTotal: valorNum,
+        valorSesion: valorSesionNum,
+        cantidadSesiones: cantidadNum,
         notas,
       });
     } catch (err) {
@@ -743,12 +839,6 @@ export function SesionModal({
             </div>
           )}
 
-          {/*
-            PacienteAutocomplete reemplaza al <select>. Permite buscar
-            por DNI o nombre/apellido en un mismo input. Pasamos el
-            profesionalUid actual para que sus pacientes asignados
-            aparezcan primero con badge "Tu paciente".
-          */}
           <div>
             <label className="cp-field__label" style={{ display: 'block', marginBottom: 6 }}>
               Paciente
@@ -770,51 +860,82 @@ export function SesionModal({
               label="Fecha y hora"
               value={fechaInput}
               onChange={(e) => setFechaInput(e.target.value)}
+              min={fechaMinIso}
               required
+              hint={fechaMinIso ? 'No puede ser anterior a la creación del consultorio.' : undefined}
             />
 
-            <div>
-              <label className="cp-field__label" style={{ display: 'block', marginBottom: 6 }}>
-                Método de pago
-              </label>
-              <select
-                className="cp-select"
-                value={metodoId}
-                onChange={(e) => setMetodoId(e.target.value)}
-                required
-              >
-                <option value="" disabled>Elegir método…</option>
-                {metodos.map((m) => (
-                  <option key={m.id} value={m.id} disabled={m.activo === false}>
-                    {m.nombre}{m.activo === false ? ' (inactivo)' : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <Input
+              name="cantidad"
+              type="number"
+              label="Cantidad de sesiones"
+              value={cantidad}
+              onChange={(e) => setCantidad(e.target.value)}
+              min="1"
+              step="1"
+              required
+              hint={cantidadNum > 1
+                ? `Este registro representa ${cantidadNum} encuentros agrupados.`
+                : 'Si cargás un grupo (ej: 8 sesiones del mes), aumentá este valor.'}
+            />
           </div>
 
-          {/*
-            Input de valor: step="any" permite cualquier monto entero o
-            decimal. Antes era step="500" (heredado de Fase A donde se
-            asumio que los montos serian multiplos redondos), pero eso
-            disparaba la validacion nativa del navegador con valores
-            como 19222 (copagos, ajustes, sesiones especiales).
-          */}
+          <div>
+            <label className="cp-field__label" style={{ display: 'block', marginBottom: 6 }}>
+              Método de pago
+              {metodoBloqueado && (
+                <span style={{
+                  marginLeft: 8,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  fontSize: 11,
+                  color: 'var(--cp-text-muted)',
+                  fontWeight: 'normal',
+                }}>
+                  <LockIcon />
+                  Configurado por el administrador
+                </span>
+              )}
+            </label>
+            <select
+              className="cp-select"
+              value={metodoId}
+              onChange={(e) => setMetodoId(e.target.value)}
+              required
+              disabled={metodoBloqueado}
+            >
+              <option value="" disabled>Elegir método…</option>
+              {metodos.map((m) => (
+                <option key={m.id} value={m.id} disabled={m.activo === false}>
+                  {m.nombre}{m.activo === false ? ' (inactivo)' : ''}
+                </option>
+              ))}
+            </select>
+            {metodoBloqueado && (
+              <div style={{ fontSize: 12, color: 'var(--cp-text-muted)', marginTop: 4 }}>
+                El método de pago se configura desde la ficha del paciente. Si necesitás cambiarlo, hablá con el administrador del consultorio.
+              </div>
+            )}
+          </div>
+
           <Input
-            name="valor"
+            name="valorSesion"
             type="number"
-            label="Valor total de la sesión"
-            value={valor}
-            onChange={(e) => setValor(e.target.value)}
+            label="Valor por sesión"
+            value={valorSesion}
+            onChange={(e) => setValorSesion(e.target.value)}
             min="0"
             step="any"
             required
             hint={metodoSeleccionado
-              ? `Default del método: ${formatoARS.format(metodoSeleccionado.valorSesionDefault ?? 0)} — podés cargar cualquier monto si esta sesión fue distinta.`
+              ? cantidadNum > 1
+                ? `Total: ${formatoARS.format(valorTotal)} (${cantidadNum} × ${formatoARS.format(valorSesionNum)})`
+                : `Default del método: ${formatoARS.format(metodoSeleccionado.valorSesionDefault ?? 0)} — podés cargar cualquier monto si esta sesión fue distinta.`
               : 'Elegí un método primero para ver el valor sugerido.'}
           />
 
-          {metodoSeleccionado && valorNum > 0 && (
+          {metodoSeleccionado && valorTotal > 0 && (
             <div className="cp-split-preview">
               <div className="cp-split-preview__col cp-split-preview__col--profesional">
                 <span className="cp-split-preview__label">Para el profesional</span>
