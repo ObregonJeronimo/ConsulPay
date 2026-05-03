@@ -9,9 +9,11 @@ import { ESTADOS_PAGO_SESION, formatoARS } from '../../lib/constants.js';
 import { suscribirPacientesProfesional } from '../../lib/pacientes.js';
 import {
   finDeMes,
+  getCantidadSesiones,
   inicioDeMes,
   nombreDelMes,
   suscribirSesionesProfesional,
+  totalesGlobales,
 } from '../../lib/sesiones.js';
 
 import './MiPanel.css';
@@ -57,10 +59,14 @@ const IconArrowRight = () => (
    ----------------------------------------------------------------
    Resumen rapido con 4 cards:
      1. Pacientes activos
-     2. Sesiones del mes en curso
-     3. Lo que debe al consultorio (con cantidad de sesiones impagas)
+     2. Sesiones del mes en curso (encuentros, no registros)
+     3. Lo que debe al consultorio (con cantidad de encuentros impagos)
      4. Lo que cobro del mes (su parte)
-   + atajos a las paginas detalladas (Mis pacientes / Sesiones / Pagos)
+
+   IMPORTANTE: ahora con sesiones agrupadas, "cantidad de sesiones"
+   significa cantidad de ENCUENTROS (suma de cantidadSesiones), no
+   cantidad de docs en Firestore. Si el profesional carga 8 sesiones
+   en 1 registro agrupado, la card muestra 8 (no 1).
 
    La opcion de "Salir del consultorio" se movio a /mi-panel/pagos
    (en una seccion de "Cuenta" al pie). Aca queremos que el resumen
@@ -122,44 +128,28 @@ export default function MiPanel() {
   }, [user?.uid, user?.consultorioId]);
 
   /* ---- Calculos derivados ----
-     Las sesiones del mes en curso ya vienen filtradas por la query
-     (con desde/hasta). Los demas calculos son sobre ese set:
-     - cantidad: total de sesiones del mes
-     - ingresoMes: suma de montoProfesional (lo que cobro el prof)
-       de todas las sesiones del mes, INDEPENDIENTEMENTE del estado
-       de pago al consultorio (porque la parte del prof la cobro
-       directamente del paciente, no depende de que haya saldado
-       la deuda). Asi el card refleja ingresos brutos del mes.
-
-     La deuda al consultorio se calcula sobre TODAS las sesiones
-     debidas, no solo las del mes en curso, porque podes deber sesiones
-     viejas. Para eso necesitamos una query separada... pero como ya
-     trajimos solo las del mes, hacemos un calculo aproximado: la
-     deuda del MES en curso. Si quisieramos la deuda historica completa,
-     habria que hacer otra suscripcion sin filtro de fecha.
-
-     Decision: por ahora mostramos "deuda del mes" — es lo mas
-     comun y mas relevante. Si el user quiere la deuda total, la ve
-     en /mi-panel/pagos (que ya tiene esa logica completa).
-     Tambien le agregamos un hint en el card que dice
-     "Ver detalle →" para que sepa que hay mas info.
+     Usamos totalesGlobales() que ya distingue entre cantidadSesiones
+     (encuentros sumando cantidadSesiones) y cantidadRegistros (docs).
+     La card "Sesiones del mes" muestra ENCUENTROS para que un profesional
+     que cargo 8 sesiones en un solo registro agrupado vea "8" y no "1".
   */
 
-  const cantidadSesionesMes = sesiones.length;
+  const stats = useMemo(() => totalesGlobales(sesiones), [sesiones]);
 
-  const ingresoMes = useMemo(
-    () => sesiones.reduce((acc, s) => acc + (s.montoProfesional || 0), 0),
-    [sesiones],
-  );
-
-  const sesionesDebidasMes = useMemo(
+  const sesionesDebidas = useMemo(
     () => sesiones.filter((s) => s.estadoPago === ESTADOS_PAGO_SESION.DEBIDO),
     [sesiones],
   );
 
+  // Cantidad de encuentros debidos (no de docs)
+  const cantidadEncuentrosDebidos = useMemo(
+    () => sesionesDebidas.reduce((acc, s) => acc + getCantidadSesiones(s), 0),
+    [sesionesDebidas],
+  );
+
   const deudaMes = useMemo(
-    () => sesionesDebidasMes.reduce((acc, s) => acc + (s.montoConsultorio || 0), 0),
-    [sesionesDebidasMes],
+    () => sesionesDebidas.reduce((acc, s) => acc + (s.montoConsultorio || 0), 0),
+    [sesionesDebidas],
   );
 
   const cantidadPacientesActivos = pacientes.length;
@@ -209,10 +199,12 @@ export default function MiPanel() {
         <Card
           icon={<IconSesiones />}
           label={`Sesiones de ${nombreDelMes(mesActual)}`}
-          value={cantidadSesionesMes}
-          hint={cantidadSesionesMes === 0
+          value={stats.cantidad}
+          hint={stats.cantidad === 0
             ? 'Sin sesiones registradas este mes'
-            : 'Sesiones del mes en curso'
+            : stats.cantidad !== stats.cantidadRegistros
+              ? `${stats.cantidadRegistros} registro${stats.cantidadRegistros === 1 ? '' : 's'} (algunos agrupados)`
+              : 'Sesiones del mes en curso'
           }
           to="/mi-panel/sesiones"
           ctaLabel="Ver sesiones"
@@ -223,9 +215,9 @@ export default function MiPanel() {
           label="Le debés al consultorio"
           value={formatoARS.format(deudaMes)}
           tone={deudaMes > 0 ? 'debido' : 'success'}
-          hint={sesionesDebidasMes.length === 0
+          hint={cantidadEncuentrosDebidos === 0
             ? 'Estás al día este mes'
-            : `${sesionesDebidasMes.length} sesión${sesionesDebidasMes.length === 1 ? '' : 'es'} sin pagar`
+            : `${cantidadEncuentrosDebidos} sesión${cantidadEncuentrosDebidos === 1 ? '' : 'es'} sin pagar`
           }
           to="/mi-panel/pagos"
           ctaLabel="Pagar al consultorio"
@@ -235,9 +227,9 @@ export default function MiPanel() {
         <Card
           icon={<IconIngresos />}
           label={`Tus ingresos de ${nombreDelMes(mesActual)}`}
-          value={formatoARS.format(ingresoMes)}
+          value={formatoARS.format(stats.totalProfesional)}
           tone="success"
-          hint={cantidadSesionesMes === 0
+          hint={stats.cantidad === 0
             ? 'Sin movimientos este mes'
             : 'Tu parte de las sesiones del mes'
           }
