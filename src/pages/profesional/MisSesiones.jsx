@@ -532,9 +532,13 @@ function StatsProfesional({ stats, yaPagado }) {
 /* ============================================================
    Tabla de sesiones del profesional
    ----------------------------------------------------------------
-   Muestra badge ×N para sesiones agrupadas. Las acciones quedan
-   deshabilitadas si la sesion ya fue pagada o si tiene una solicitud
-   pendiente.
+   Columna "Sesiones" dedicada que muestra la cantidad de encuentros
+   agrupados en el registro. Si es 1, se ve como "1" normal; si es
+   N>1, se ve como "N" en color accent destacado para que el ojo
+   lo capte facil.
+
+   Las acciones quedan deshabilitadas si la sesion ya fue pagada o
+   si tiene una solicitud pendiente.
    ============================================================ */
 function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, onEditar, onEliminar }) {
   return (
@@ -544,6 +548,7 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, onEdi
           <tr>
             <th>Fecha</th>
             <th>Paciente</th>
+            <th className="cp-num-col" title="Cantidad de sesiones agrupadas en este registro">Sesiones</th>
             <th>Método</th>
             <th className="cp-num-col">Valor</th>
             <th className="cp-num-col">Mi parte</th>
@@ -560,6 +565,7 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, onEdi
             const tienePendiente = sesionesConPendiente.has(s.id);
             const accionesDisabled = pagada || tienePendiente;
             const cantidad = getCantidadSesiones(s);
+            const esAgrupada = cantidad > 1;
 
             return (
               <tr
@@ -580,11 +586,18 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, onEdi
                       <div>
                         <div className="cp-prof-name" style={{ fontSize: 13.5 }}>
                           {nombrePaciente(pac)}
-                          <GroupBadge cantidad={cantidad} />
                         </div>
                       </div>
                     </div>
                   ) : <span style={{ color: 'var(--cp-text-faint)' }}>Paciente eliminado</span>}
+                </td>
+                <td className="cp-num">
+                  <span
+                    className={esAgrupada ? 'cp-cantidad-cell cp-cantidad-cell--grupo' : 'cp-cantidad-cell'}
+                    title={esAgrupada ? `Este registro representa ${cantidad} sesiones agrupadas` : '1 sesión'}
+                  >
+                    {cantidad}
+                  </span>
                 </td>
                 <td style={{ fontSize: 13 }}>
                   {s.metodoPagoNombre}
@@ -594,7 +607,7 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, onEdi
                 </td>
                 <td className="cp-num">
                   {formatoARS.format(s.valorTotal)}
-                  {cantidad > 1 && s.valorSesion ? (
+                  {esAgrupada && s.valorSesion ? (
                     <div style={{ fontSize: 11, color: 'var(--cp-text-muted)', marginTop: 2 }}>
                       {formatoARS.format(s.valorSesion)} c/u
                     </div>
