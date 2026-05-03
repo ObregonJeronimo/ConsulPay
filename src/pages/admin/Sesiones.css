@@ -300,6 +300,12 @@
    Aparece al lado del nombre del paciente o del titulo cuando un
    registro representa multiples encuentros (cantidadSesiones > 1).
    Visualmente discreto: pill chico, color accent.
+
+   IMPORTANTE: en /mi-panel/sesiones (vista del profesional) se usa
+   una columna dedicada con .cp-cantidad-cell en vez de este badge,
+   porque al lado del nombre era facil pasarlo por alto. El badge
+   se sigue usando en el admin (Sesiones.jsx, Solicitudes.jsx) donde
+   no hay tantas filas de datos numericos juntos y queda mas limpio.
    ============================================================ */
 .cp-group-badge {
   display: inline-flex;
@@ -316,6 +322,42 @@
   vertical-align: middle;
   white-space: nowrap;
   cursor: help;
+}
+
+/* ============================================================
+   Cantidad cell — columna dedicada de "Sesiones"
+   ----------------------------------------------------------------
+   Se usa en la tabla de /mi-panel/sesiones (vista del profesional).
+   Es una alternativa al GroupBadge cuando queremos que la cantidad
+   sea muy clara y dificil de pasar por alto.
+
+   Variantes:
+   - .cp-cantidad-cell (sin modifier): cantidad === 1, estilo normal,
+     numero discreto en color de texto base
+   - .cp-cantidad-cell--grupo: cantidad > 1, destacado en color
+     accent + bold + un fondo sutil para que el ojo lo capte de una.
+     Ideal para casos como "este registro son 8 sesiones del mes".
+   ============================================================ */
+.cp-cantidad-cell {
+  display: inline-block;
+  font-family: var(--cp-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  color: var(--cp-text);
+  font-weight: 500;
+}
+
+.cp-cantidad-cell--grupo {
+  padding: 3px 10px;
+  background: var(--cp-accent-bg);
+  color: var(--cp-accent-dark);
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: var(--cp-radius-pill);
+  letter-spacing: -0.01em;
+  cursor: help;
+  /* Borde sutil para reforzar el destaque sin ser invasivo */
+  box-shadow: inset 0 0 0 1px var(--cp-accent-bg);
 }
 
 /* Acciones en fila (editar / eliminar / toggle pago) */
