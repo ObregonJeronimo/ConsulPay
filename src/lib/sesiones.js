@@ -6,11 +6,22 @@
  * de registrarla, para que cambios futuros en el metodo de pago no
  * afecten retroactivamente sesiones ya cargadas.
  *
+ * SESIONES AGRUPADAS (cantidadSesiones >= 1):
+ *   Un mismo doc puede representar N encuentros con el mismo paciente,
+ *   cargados juntos. La fecha+hora son representativas (suelen ser de
+ *   cuando se registra el grupo o del primer encuentro). Los montos
+ *   son los TOTALES del grupo (valorTotal = valorSesion * cantidadSesiones).
+ *   Al pagarse, se paga el grupo entero.
+ *
+ *   Sesiones viejas sin cantidadSesiones se interpretan como cantidadSesiones=1.
+ *
  * Modelo de doc en Firestore:
  *   sesiones/{sesionId}
  *     consultorioId, profesionalUid, pacienteId,
  *     fecha (Timestamp con dia + hora),
  *     metodoPagoId, metodoPagoNombre, metodoPagoTipo,
+ *     cantidadSesiones (number, >=1, default 1),  ← NUEVO
+ *     valorSesion (number, valor unitario),       ← NUEVO
  *     valorTotal, porcentajeConsultorio,
  *     montoConsultorio, montoProfesional,
  *     estadoPago: 'debido' | 'pagado',
@@ -59,12 +70,31 @@ export function calcularSplit(valorTotal, porcentaje) {
 }
 
 /* ============================================================
+   Helpers de cantidad
+   ============================================================ */
+
+/**
+ * Devuelve la cantidad efectiva de encuentros de una sesion. Soporta
+ * sesiones viejas (sin cantidadSesiones) interpretandolas como 1.
+ */
+export function getCantidadSesiones(sesion) {
+  const c = Number(sesion?.cantidadSesiones);
+  return Number.isFinite(c) && c >= 1 ? Math.floor(c) : 1;
+}
+
+/* ============================================================
    Helpers internos
    ============================================================ */
 
 /**
  * Valida y arma el payload listo para Firestore. Recibe un objeto
  * "humano" del form y devuelve el doc con el split ya calculado.
+ *
+ * INPUT:
+ *   - valorSesion (recomendado): valor unitario por encuentro
+ *   - cantidadSesiones (default 1)
+ *   - O bien valorTotal directo (legacy/admin): se asume cantidadSesiones=1
+ *     y valorSesion=valorTotal si no se pasa cantidad
  *
  * @throws Error si faltan datos minimos.
  */
@@ -74,7 +104,9 @@ function armarPayload({
   pacienteId,
   fecha,                    // Date de JS
   metodo,                   // objeto del array consultorio.metodosPagoPaciente
-  valorTotal,
+  valorSesion,              // valor unitario (NUEVO, recomendado)
+  cantidadSesiones = 1,     // default 1
+  valorTotal: valorTotalIn, // legacy: si llega esto y no valorSesion
   notas,
 }) {
   if (!consultorioId) throw new Error('consultorioId requerido');
@@ -84,9 +116,29 @@ function armarPayload({
   if (!(fecha instanceof Date) || isNaN(fecha.getTime())) {
     throw new Error('La fecha y hora de la sesión es obligatoria');
   }
-  const total = Number(valorTotal);
-  if (!Number.isFinite(total) || total < 0) {
-    throw new Error('El valor total debe ser un número válido');
+
+  const cantidad = Number(cantidadSesiones);
+  if (!Number.isFinite(cantidad) || cantidad < 1 || !Number.isInteger(cantidad)) {
+    throw new Error('La cantidad de sesiones debe ser un número entero mayor o igual a 1');
+  }
+
+  // Calcular valorSesion y valorTotal segun lo que llegue.
+  let unitario, total;
+  if (valorSesion !== undefined && valorSesion !== null && valorSesion !== '') {
+    unitario = Number(valorSesion);
+    if (!Number.isFinite(unitario) || unitario < 0) {
+      throw new Error('El valor por sesión debe ser un número válido');
+    }
+    total = unitario * cantidad;
+  } else if (valorTotalIn !== undefined && valorTotalIn !== null && valorTotalIn !== '') {
+    // Legacy: nos pasaron el total ya calculado. Derivamos unitario.
+    total = Number(valorTotalIn);
+    if (!Number.isFinite(total) || total < 0) {
+      throw new Error('El valor total debe ser un número válido');
+    }
+    unitario = cantidad > 0 ? Math.round(total / cantidad) : total;
+  } else {
+    throw new Error('Falta el valor de la sesión');
   }
 
   const porcentaje = Number(metodo.porcentajeConsultorio) || 0;
@@ -104,6 +156,10 @@ function armarPayload({
     metodoPagoNombre: metodo.nombre || '',
     metodoPagoTipo: metodo.tipo || 'inmediato',
 
+    // Datos de agrupacion
+    cantidadSesiones: cantidad,
+    valorSesion: unitario,
+
     valorTotal: total,
     porcentajeConsultorio: porcentaje,
     montoConsultorio,
@@ -112,6 +168,34 @@ function armarPayload({
     estadoPago: ESTADOS_PAGO_SESION.DEBIDO,
     notas: notas?.trim() || null,
   };
+}
+
+/* ============================================================
+   Validacion: fecha mínima del consultorio
+   ============================================================ */
+
+/**
+ * Lanza error si la fecha es anterior a la fecha de creacion del
+ * consultorio. Esta validacion vive en cliente (no en rules) porque
+ * agregar un get() del consultorio en rules tiene costo de lecturas
+ * extra. Si un usuario maliciosamente burla esto, no hay riesgo de
+ * seguridad — solo de coherencia historica.
+ */
+export function validarFechaContraConsultorio(fecha, consultorio) {
+  if (!consultorio?.createdAt) return; // sin fecha, no podemos validar
+  const creacion = consultorio.createdAt?.toDate
+    ? consultorio.createdAt.toDate()
+    : (consultorio.createdAt instanceof Date ? consultorio.createdAt : null);
+  if (!creacion) return;
+  // Comparamos solo dia (hora 00:00 del dia de creacion). Asi permitimos
+  // cargar sesiones del mismo dia que se creo el consultorio.
+  const minimo = new Date(creacion.getFullYear(), creacion.getMonth(), creacion.getDate(), 0, 0, 0, 0);
+  if (fecha.getTime() < minimo.getTime()) {
+    const fmt = creacion.toLocaleDateString('es-AR', {
+      day: 'numeric', month: 'long', year: 'numeric',
+    });
+    throw new Error(`La fecha de la sesión no puede ser anterior a la creación del consultorio (${fmt}).`);
+  }
 }
 
 /* ============================================================
@@ -235,11 +319,15 @@ export function suscribirSesionesProfesional(profesionalUid, consultorioId, call
    queries adicionales). Para datasets de hasta unas miles de sesiones
    por mes esto es instantaneo. Si crece, se mueven a Cloud Functions
    o a documentos agregados precalculados.
+
+   IMPORTANTE: los contadores de "cantidadSesiones" usan el campo del
+   doc (con backwards compat a 1 si no existe). Asi un doc con
+   cantidadSesiones=8 cuenta como 8 encuentros, no como 1.
    ============================================================ */
 
 /**
  * Totales por profesional dentro de una lista de sesiones.
- * Devuelve un mapa: { [profesionalUid]: { sesiones, totalConsultorio, totalProfesional, debido } }
+ * Devuelve un mapa: { [profesionalUid]: { cantidadSesiones (encuentros), cantidadRegistros (docs), totalConsultorio, totalProfesional, debido } }
  */
 export function agregarPorProfesional(sesiones) {
   const resultado = {};
@@ -248,14 +336,16 @@ export function agregarPorProfesional(sesiones) {
     if (!resultado[uid]) {
       resultado[uid] = {
         profesionalUid: uid,
-        cantidadSesiones: 0,
+        cantidadSesiones: 0,   // total de encuentros (sumando cantidadSesiones)
+        cantidadRegistros: 0,  // cantidad de docs (cuantas filas)
         totalConsultorio: 0,
         totalProfesional: 0,
         debido: 0, // monto que el profesional aun debe al consultorio
       };
     }
     const r = resultado[uid];
-    r.cantidadSesiones += 1;
+    r.cantidadSesiones += getCantidadSesiones(s);
+    r.cantidadRegistros += 1;
     r.totalConsultorio += s.montoConsultorio || 0;
     r.totalProfesional += s.montoProfesional || 0;
     if (s.estadoPago === ESTADOS_PAGO_SESION.DEBIDO) {
@@ -267,15 +357,23 @@ export function agregarPorProfesional(sesiones) {
 
 /**
  * Totales globales de una lista de sesiones.
+ *
+ * @returns {{
+ *   cantidad: number,        // total de encuentros (con cantidadSesiones)
+ *   cantidadRegistros: number, // cantidad de docs
+ *   valorTotal, totalConsultorio, totalProfesional, debido
+ * }}
  */
 export function totalesGlobales(sesiones) {
   let cantidad = 0;
+  let cantidadRegistros = 0;
   let valorTotal = 0;
   let totalConsultorio = 0;
   let totalProfesional = 0;
   let debido = 0;
   for (const s of sesiones) {
-    cantidad += 1;
+    cantidad += getCantidadSesiones(s);
+    cantidadRegistros += 1;
     valorTotal += s.valorTotal || 0;
     totalConsultorio += s.montoConsultorio || 0;
     totalProfesional += s.montoProfesional || 0;
@@ -283,7 +381,7 @@ export function totalesGlobales(sesiones) {
       debido += s.montoConsultorio || 0;
     }
   }
-  return { cantidad, valorTotal, totalConsultorio, totalProfesional, debido };
+  return { cantidad, cantidadRegistros, valorTotal, totalConsultorio, totalProfesional, debido };
 }
 
 /* ============================================================
