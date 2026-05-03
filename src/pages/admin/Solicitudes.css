@@ -109,21 +109,56 @@
 
 /* ============================================================
    Modal de detalle (diff antes / despues)
+   ----------------------------------------------------------------
+   El modal lo abre el admin para revisar y aprobar/rechazar una
+   solicitud. Tiene varias secciones bien definidas:
+
+   1. Titulo (cp-modal__title) con tipo + nombre del paciente + ×N
+   2. Aviso de sesiones agrupadas (si aplica)
+   3. Header con autor + fecha + estado actual
+   4. Diff (componente DiffSingle o DiffDoble)
+   5. Avisos de estado (obsoleta/rechazada/aprobada) si no es pendiente
+   6. Form de motivo de rechazo (cuando se hace click en Rechazar)
+   7. Historial de auditoria (timeline)
+   8. Botonera (Cerrar, Rechazar, Aprobar)
    ============================================================ */
 .cp-modal--detalle {
   max-width: 760px;
 }
 
+/* Titulo del modal: queremos que el GroupBadge ×N quede inline con
+   el resto y no rompa el flujo */
+.cp-modal--detalle .cp-modal__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ============================================================
+   Header con autor + fecha + estado
+   ----------------------------------------------------------------
+   Antes era flex column todo apilado. Ahora va en una fila clara:
+   metadata a la izquierda, badge de estado a la derecha. En mobile
+   se apila como antes.
+   ============================================================ */
 .cp-detalle-header {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--cp-space-3);
+  flex-wrap: wrap;
+  padding: 10px 0;
+  border-top: 1px solid var(--cp-border);
+  border-bottom: 1px solid var(--cp-border);
   margin-bottom: var(--cp-space-4);
 }
 
 .cp-detalle-header__autor {
   font-size: 13px;
   color: var(--cp-text-muted);
+  flex: 1;
+  min-width: 0;
 }
 
 .cp-detalle-header__autor strong {
@@ -134,10 +169,16 @@
 .cp-detalle-header__fecha {
   font-size: 12.5px;
   color: var(--cp-text-faint);
+  white-space: nowrap;
 }
 
 /* ============================================================
    Diff de campos
+   ----------------------------------------------------------------
+   Layout grid de 3 columnas (campo, antes, despues) o 2 columnas
+   (campo, valor) para diff single. La columna de campo tiene un
+   ancho cómodo (180px) para que labels largos como "Cantidad de
+   sesiones" no se rompan en 2 lineas.
    ============================================================ */
 .cp-diff {
   border: 1px solid var(--cp-border);
@@ -147,18 +188,31 @@
 
 .cp-diff__head {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 180px 1fr 1fr;
   background: var(--cp-bg);
   border-bottom: 1px solid var(--cp-border);
 }
 
 .cp-diff__head--single {
-  grid-template-columns: 1fr;
+  grid-template-columns: 180px 1fr;
+}
+
+/* La primera celda del head queda vacia (alineada con la columna
+   de "campo" del cuerpo). Le ponemos color de fondo distinto para
+   que se vea como "label column". */
+.cp-diff__head::before {
+  content: '';
+  background: var(--cp-bg);
+  border-right: 1px solid var(--cp-border);
+}
+
+.cp-diff__head--single::before {
+  display: none;
 }
 
 .cp-diff__head-cell {
-  padding: 10px 14px;
-  font-size: 11.5px;
+  padding: 9px 14px;
+  font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -184,12 +238,13 @@
 
 .cp-diff__row {
   display: grid;
-  grid-template-columns: 140px 1fr 1fr;
+  grid-template-columns: 180px 1fr 1fr;
   border-bottom: 1px solid var(--cp-border);
+  min-height: 0; /* permite que las celdas tengan altura natural */
 }
 
 .cp-diff__row--single {
-  grid-template-columns: 140px 1fr;
+  grid-template-columns: 180px 1fr;
 }
 
 .cp-diff__row:last-child {
@@ -205,23 +260,29 @@
 }
 
 .cp-diff__campo {
-  padding: 10px 14px;
-  font-size: 12px;
+  padding: 9px 14px;
+  font-size: 11px;
   color: var(--cp-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   font-weight: 500;
   border-right: 1px solid var(--cp-border);
   background: var(--cp-bg);
+  display: flex;
+  align-items: center;
+  line-height: 1.3;
 }
 
 .cp-diff__valor {
-  padding: 10px 14px;
-  font-size: 13.5px;
+  padding: 9px 14px;
+  font-size: 13px;
   color: var(--cp-text);
   font-variant-numeric: tabular-nums;
   border-right: 1px solid var(--cp-border);
   word-break: break-word;
+  display: flex;
+  align-items: center;
+  line-height: 1.4;
 }
 
 .cp-diff__valor:last-child {
@@ -245,7 +306,11 @@
 }
 
 /* ============================================================
-   Aviso "Solicitud obsoleta" en el modal
+   Aviso "Solicitud obsoleta" / "Rechazada" / "Aprobada" / "Agrupadas"
+   ----------------------------------------------------------------
+   Bloque informativo arriba/abajo del diff con icono + texto. El
+   <strong> es el titulo del aviso y queda en su propia linea.
+   El texto que sigue va inline (no se quiebra raro).
    ============================================================ */
 .cp-detalle-aviso {
   display: flex;
@@ -268,6 +333,14 @@
 .cp-detalle-aviso svg {
   flex-shrink: 0;
   margin-top: 2px;
+}
+
+/* El contenedor del texto (div directo despues del svg) controla el
+   layout del titulo + texto. Hacemos que el strong y el resto fluyan
+   naturalmente sin saltos de linea raros. */
+.cp-detalle-aviso > div {
+  flex: 1;
+  min-width: 0;
 }
 
 .cp-detalle-aviso strong {
@@ -434,4 +507,39 @@
   margin-top: 2px;
   font-size: 12px;
   color: var(--cp-text-faint);
+}
+
+/* ============================================================
+   Mobile responsive
+   ----------------------------------------------------------------
+   En pantallas chicas, el diff de doble columna se vuelve muy
+   apretado. Pasamos a un layout vertical donde "antes" y "despues"
+   se apilan, y reducimos la columna de "campo" a auto.
+   ============================================================ */
+@media (max-width: 640px) {
+  .cp-detalle-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .cp-diff__head,
+  .cp-diff__row {
+    grid-template-columns: 130px 1fr 1fr;
+  }
+
+  .cp-diff__head--single,
+  .cp-diff__row--single {
+    grid-template-columns: 130px 1fr;
+  }
+
+  .cp-diff__campo {
+    font-size: 10.5px;
+    padding: 8px 10px;
+  }
+
+  .cp-diff__valor {
+    font-size: 12.5px;
+    padding: 8px 10px;
+  }
 }
