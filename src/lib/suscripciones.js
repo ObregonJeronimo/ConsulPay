@@ -61,7 +61,8 @@ async function postConIdToken(path, body) {
  * @returns {Promise<void>} (no devuelve, navega a otra URL)
  */
 export async function iniciarSuscripcionPro(consultorioId) {
-  const data = await postConIdToken('/api/mp/suscripcion-crear', {
+  const data = await postConIdToken('/api/mp/suscripcion', {
+    accion: 'crear',
     consultorioId,
   });
 
@@ -81,7 +82,10 @@ export async function iniciarSuscripcionPro(consultorioId) {
  * del periodo que ya pago.
  */
 export async function cancelarSuscripcionPro(consultorioId) {
-  return postConIdToken('/api/mp/suscripcion-cancelar', { consultorioId });
+  return postConIdToken('/api/mp/suscripcion', {
+    accion: 'cancelar',
+    consultorioId,
+  });
 }
 
 /* ============================================================
