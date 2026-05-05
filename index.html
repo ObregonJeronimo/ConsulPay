@@ -9,12 +9,26 @@
     <title>ConsulPay</title>
 
     <!-- Fonts -->
+    <!-- preconnect: ahorra ~100ms abriendo TCP+TLS antes de pedir el CSS -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Carga no-bloqueante de Google Fonts:
+         media=print hace que el browser baje el CSS pero NO lo aplique
+         hasta que termina. onload lo cambia a 'all' una vez listo. Asi
+         el render no se bloquea esperando la fuente. La <noscript> es
+         para clientes con JS desactivado (raro pero correcto). -->
     <link
-      href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
       rel="stylesheet"
+      media="print"
+      onload="this.media='all'"
+      href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
     />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+      />
+    </noscript>
   </head>
   <body>
     <div id="root"></div>

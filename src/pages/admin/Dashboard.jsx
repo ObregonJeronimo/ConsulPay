@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 
 import Metric from '../../components/ui/Metric.jsx';
 import Button from '../../components/ui/Button.jsx';
-import Spinner from '../../components/ui/Spinner.jsx';
+import { SkeletonBox } from '../../components/ui/Skeleton.jsx';
 
 import { useAuth } from '../../hooks/useAuth.js';
 import { useConsultorio } from '../../hooks/useConsultorio.js';
@@ -46,11 +46,28 @@ export default function Dashboard() {
   }, [user?.consultorioId]);
 
   if (loadingConsultorio || loading) {
+    // Skeleton que reserva el espacio del dashboard real para evitar CLS.
+    // Los anchos/altos coinciden con los componentes que se van a renderizar
+    // despues, asi cuando los datos llegan no hay shift visible.
     return (
       <div className="cp-dashboard">
-        <div style={{ padding: 60, display: 'flex', justifyContent: 'center' }}>
-          <Spinner size={24} label="Cargando…" />
-        </div>
+        <header className="cp-page-header">
+          <div style={{ flex: 1 }}>
+            <SkeletonBox width="240px" height="35px" style={{ marginBottom: 12 }} />
+            <SkeletonBox width="180px" height="16px" />
+          </div>
+          <SkeletonBox width="151px" height="38px" radius="8px" />
+        </header>
+        <section className="cp-metrics-grid">
+          <SkeletonBox height="100px" radius="12px" />
+          <SkeletonBox height="100px" radius="12px" />
+          <SkeletonBox height="100px" radius="12px" />
+          <SkeletonBox height="100px" radius="12px" />
+        </section>
+        <section className="cp-section" style={{ marginTop: 32 }}>
+          <SkeletonBox width="240px" height="22px" style={{ marginBottom: 16 }} />
+          <SkeletonBox height="120px" radius="12px" />
+        </section>
       </div>
     );
   }

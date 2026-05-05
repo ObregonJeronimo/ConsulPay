@@ -1,0 +1,37 @@
+/* ============================================================
+   Skeleton — placeholder mientras cargan los datos
+   ----------------------------------------------------------------
+   Tecnica:
+   - Background gris muy sutil que combina con la paleta crema.
+   - Animacion de shimmer izquierda->derecha para indicar carga.
+   - prefers-reduced-motion respetado: si el usuario tiene esa
+     preferencia desactivada, no animamos (solo color solido).
+   ============================================================ */
+
+.cp-skel {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.04) 0%,
+    rgba(0, 0, 0, 0.07) 50%,
+    rgba(0, 0, 0, 0.04) 100%
+  );
+  background-size: 200% 100%;
+  animation: cp-skel-shimmer 1.4s ease-in-out infinite;
+  display: block;
+}
+
+@keyframes cp-skel-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cp-skel {
+    animation: none;
+    background: rgba(0, 0, 0, 0.05);
+  }
+}
