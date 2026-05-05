@@ -10,10 +10,25 @@
  *  4. Calcula marketplaceFee usando la comision correcta segun el plan
  *     actual del consultorio (comisionPro si plan='pro', comisionFree
  *     si plan='free'). Backwards compat con comisionConsulpay viejo.
- *  5. Refresca el access_token del consultorio si esta proximo a vencer.
- *  6. Crea preferencia en MP con marketplace_fee.
- *  7. Crea doc /pagos_consultorio/{pagoId} con estado='pendiente'.
+ *  5. Decide a que slot MP le toca cobrar (rotacion 15-15 si hay 2
+ *     admins con MP conectada y reparto activo) y refresca el access
+ *     token de ese slot si esta proximo a vencer.
+ *  6. Crea preferencia en MP con marketplace_fee. El dinero cae directo
+ *     en la cuenta MP del slot que cobra.
+ *  7. Crea doc /pagos_consultorio/{pagoId} con estado='pendiente' +
+ *     trazabilidad del slot/usuario MP que recibe.
  *  8. Devuelve { initPointUrl, pagoId } al frontend.
+ *
+ * SOPORTE MULTI-ADMIN
+ * ----------------------------------------------------------------
+ * Si el consultorio tiene 2 admins con MP conectada y el reparto
+ * esta activo, los pagos rotan entre primary y secondary segun la
+ * fecha. Esto es transparente para el profesional que paga: ve el
+ * mismo flow de siempre, solo que el dinero cae en la cuenta MP del
+ * admin que le toca cobrar este ciclo.
+ *
+ * Si solo hay 1 admin con MP (caso comun), todo va a primary y
+ * funciona exactamente como antes (compat total).
  *
  * Body: { consultorioId, sesionesIds: string[] }
  * Header: Authorization: Bearer <firebase_id_token>
@@ -26,7 +41,11 @@ import { verificarAuthHeader } from '../_lib/auth.js';
 import { initAdmin } from '../_lib/firebase-admin.js';
 import { jsonResponse, readJsonBody } from '../_lib/http.js';
 import { crearPreferencia } from '../_lib/mp-marketplace.js';
-import { asegurarAccessTokenVigente } from '../_lib/mp-token.js';
+import {
+  buildUpdateParaGuardarSlot,
+  obtenerAccessTokenParaCobro,
+  tieneAlgunMpConectado,
+} from '../_lib/mp-config-helpers.js';
 
 /**
  * Resuelve el porcentaje de comision a aplicar para un consultorio.
@@ -129,7 +148,10 @@ export default async function handler(req, res) {
     return jsonResponse(res, 404, { error: 'El consultorio no existe.' });
   }
   const consData = consSnap.data();
-  if (!consData.mpIntegrado || !consData.mpConfig) {
+
+  // Soporta tanto el modelo viejo (mpConfig + mpIntegrado) como el nuevo
+  // (mpConfigs.{primary,secondary}). tieneAlgunMpConectado revisa los dos.
+  if (!tieneAlgunMpConectado(consData)) {
     return jsonResponse(res, 400, {
       error: 'El consultorio no tiene Mercado Pago vinculado. Contactá al administrador.',
       codigo: 'MP_NO_VINCULADO',
@@ -204,28 +226,45 @@ export default async function handler(req, res) {
   const fee = Math.round((montoTotal * comisionPct / 100) * 100) / 100;
   const montoConsultorio = Math.round((montoTotal - fee) * 100) / 100;
 
-  // ---------- 5. Asegurar access token vigente (refresh lazy) ----------
+  // ---------- 5. Asegurar access token vigente del slot que toca cobrar ----------
+  // obtenerAccessTokenParaCobro elige el slot segun la rotacion:
+  //   - Si solo hay 1 slot conectado → ese
+  //   - Si hay 2 slots y el reparto no esta activado → primary
+  //   - Si hay 2 slots y el reparto esta activo → alterna primary/secondary
+  //     segun el ciclo del 15 al 14 de cada mes
+  //
+  // El helper ademas refresca el token si esta proximo a vencer y devuelve
+  // mpConfigActualizado para que persistamos los nuevos tokens.
   let accessToken;
+  let slotCobrador;
+  let razonSlot;
+  let userIdMPReceptor;
+  let livemodeReceptor;
   let mpConfigActualizado = null;
   try {
-    const r = await asegurarAccessTokenVigente(consData.mpConfig);
+    const r = await obtenerAccessTokenParaCobro(consData, new Date());
     accessToken = r.accessToken;
+    slotCobrador = r.slot;
+    razonSlot = r.razon;
+    userIdMPReceptor = r.userIdMP;
+    livemodeReceptor = r.livemode;
     if (r.mpConfigActualizado) {
       mpConfigActualizado = r.mpConfigActualizado;
     }
   } catch (err) {
-    console.error('Error asegurando access token:', err);
+    console.error('Error obteniendo access token para cobro:', err);
     return jsonResponse(res, 500, {
       error: 'No se pudo validar la conexión de Mercado Pago. Pedile al administrador que reconecte.',
       codigo: 'MP_TOKEN_INVALIDO',
     });
   }
 
+  // Si el token se refresco, persistimos los nuevos en el slot correcto
+  // (tanto en mpConfigs.{slot} como, si es primary, en el legacy mpConfig)
   if (mpConfigActualizado) {
     try {
-      await db.collection('consultorios').doc(consultorioId).update({
-        mpConfig: mpConfigActualizado,
-      });
+      const update = buildUpdateParaGuardarSlot(slotCobrador, mpConfigActualizado);
+      await db.collection('consultorios').doc(consultorioId).update(update);
     } catch (err) {
       console.warn('No se pudo persistir el mpConfig refrescado, sigo igual:', err);
     }
@@ -275,6 +314,10 @@ export default async function handler(req, res) {
       comisionPctAplicada: comisionPct,
       planAplicado: consData.plan || 'free',
       fuenteComision,
+      // Trazabilidad del slot que cobro (para auditoria del reparto)
+      slotCobrador,
+      razonSlot,
+      mpUserIdReceptor: userIdMPReceptor,
       estado: 'rechazado',
       mpPreferenceId: null,
       mpPaymentId: null,
@@ -294,6 +337,9 @@ export default async function handler(req, res) {
   // ---------- 8. Persistir doc /pagos_consultorio ----------
   // Guardamos planAplicado y fuenteComision para tener trazabilidad de
   // que comision se aplico al momento del pago, util para auditoria.
+  // Tambien guardamos slotCobrador y mpUserIdReceptor para rastrear a
+  // quien le cayo este pago (clave para el panel de reparto entre
+  // socias y para conciliacion con MP).
   await pagoRef.set({
     consultorioId,
     profesionalUid: uid,
@@ -304,12 +350,16 @@ export default async function handler(req, res) {
     comisionPctAplicada: comisionPct,
     planAplicado: consData.plan || 'free',
     fuenteComision,
+    // Trazabilidad del slot que cobro (clave para el panel de reparto)
+    slotCobrador,                  // 'primary' | 'secondary'
+    razonSlot,                     // 'unico-slot' | 'reparto-no-iniciado' | 'reparto-rotacion'
+    mpUserIdReceptor: userIdMPReceptor,  // user_id de MP de la cuenta que cobra
     estado: 'pendiente',
     mpPreferenceId: preferencia.id,
     mpPaymentId: null,
     initPointUrl: preferencia.init_point,
     sandboxInitPointUrl: preferencia.sandbox_init_point || null,
-    livemode: !!consData.mpConfig.livemode,
+    livemode: !!livemodeReceptor,
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
     createdByUid: uid,
