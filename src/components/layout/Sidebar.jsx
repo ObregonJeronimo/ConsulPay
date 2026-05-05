@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 
 import { useAuth } from '../../hooks/useAuth.js';
+import { useConsultorio } from '../../hooks/useConsultorio.js';
 import { ROLES } from '../../lib/constants.js';
 import { suscribirSolicitudesPendientes } from '../../lib/solicitudes.js';
 import Avatar from '../ui/Avatar.jsx';
@@ -56,6 +57,18 @@ const Icon = {
       <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
     </svg>
   ),
+  /*
+    Split: dos flechas que se separan, simbolizando el "reparto" entre
+    dos personas. Usado solo en el item de menu "Reparto" cuando hay
+    2 administradoras en el consultorio.
+  */
+  Split: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 3v4a4 4 0 004 4h6a4 4 0 014 4v6" />
+      <path d="M5 3l-3 3M5 3l3 3" />
+      <path d="M19 21l-3-3M19 21l3-3" />
+    </svg>
+  ),
   LogOut: () => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
       <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
@@ -94,9 +107,15 @@ function iniciales(nombre, email) {
 
 export default function Sidebar() {
   const { user, signOut } = useAuth();
+  const { consultorio } = useConsultorio();
 
   const esSuperadmin = user?.rol === ROLES.SUPERADMIN;
   const esAdmin = user?.rol === ROLES.ADMIN;
+
+  // El item "Reparto" solo aparece cuando hay 2 admins en el consultorio
+  // (que es la condicion para que aplique el flow multi-admin con doble
+  // cuenta MP). Si solo hay 1, esa pagina no tiene contenido para mostrar.
+  const mostrarReparto = esAdmin && (consultorio?.adminUids?.length || 0) >= 2;
 
   // Conteo live de solicitudes pendientes (solo para admin).
   // Suscribimos siempre que sea admin con consultorioId; el unsub es seguro
@@ -152,6 +171,9 @@ export default function Sidebar() {
 
           <nav className="cp-sidebar__section">
             <div className="cp-sidebar__label">Gestión</div>
+            {mostrarReparto && (
+              <NavItem to="/admin/reparto" icon={<Icon.Split />}>Reparto</NavItem>
+            )}
             <NavItem to="/admin/configuracion" icon={<Icon.Settings />}>Configuración</NavItem>
           </nav>
         </>

@@ -28,6 +28,7 @@ const Pacientes = lazy(() => import('./pages/admin/Pacientes.jsx'));
 const Sesiones = lazy(() => import('./pages/admin/Sesiones.jsx'));
 const Solicitudes = lazy(() => import('./pages/admin/Solicitudes.jsx'));
 const PagosAdmin = lazy(() => import('./pages/admin/Pagos.jsx'));
+const Reparto = lazy(() => import('./pages/admin/Reparto.jsx'));
 const MiPanel = lazy(() => import('./pages/profesional/MiPanel.jsx'));
 const MisPacientes = lazy(() => import('./pages/profesional/MisPacientes.jsx'));
 const MisSesiones = lazy(() => import('./pages/profesional/MisSesiones.jsx'));
@@ -100,6 +101,7 @@ export default function App() {
                 <Route path="/admin/sesiones" element={<Sesiones />} />
                 <Route path="/admin/solicitudes" element={<Solicitudes />} />
                 <Route path="/admin/pagos" element={<PagosAdmin />} />
+                <Route path="/admin/reparto" element={<Reparto />} />
                 <Route path="/admin/configuracion" element={<Configuracion />} />
               </Route>
             </Route>

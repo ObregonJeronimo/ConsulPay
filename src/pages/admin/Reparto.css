@@ -1,0 +1,459 @@
+/* ============================================================
+   Reparto entre socias
+   ----------------------------------------------------------------
+   Pagina del flow multi-admin donde se ven los ciclos de cobros
+   y se gestionan las compensaciones (transferencias entre socias).
+
+   Aestetica: alineada al design system existente (crema calido +
+   acento terracota). Tarjetas con bordes sutiles, jerarquia clara
+   con tipografia serif para titulos y sans para datos.
+   ============================================================ */
+
+.cp-reparto {
+  max-width: 1100px;
+}
+
+.cp-reparto__loading {
+  display: flex;
+  justify-content: center;
+  padding: 60px 0;
+}
+
+.cp-reparto__empty {
+  padding: var(--cp-space-10);
+  text-align: center;
+  color: var(--cp-text-muted);
+  background: var(--cp-surface);
+  border: 1px dashed var(--cp-border);
+  border-radius: var(--cp-radius-lg);
+}
+
+/* ============================================================
+   Avisos: estados especiales (sin reparto, esperando inicio)
+   ============================================================ */
+
+.cp-reparto__aviso {
+  padding: var(--cp-space-6);
+  border-radius: var(--cp-radius-lg);
+  margin-bottom: var(--cp-space-8);
+  font-size: var(--cp-text-base);
+  line-height: 1.55;
+}
+
+.cp-reparto__aviso strong {
+  display: block;
+  margin-bottom: var(--cp-space-2);
+  font-family: var(--cp-font-serif);
+  font-size: var(--cp-text-lg);
+  font-weight: 600;
+}
+
+.cp-reparto__aviso p {
+  margin: 0;
+  color: var(--cp-text-muted);
+}
+
+.cp-reparto__aviso--info {
+  background: var(--cp-info-bg);
+  color: var(--cp-info);
+  border: 1px solid color-mix(in srgb, var(--cp-info) 18%, transparent);
+}
+.cp-reparto__aviso--info strong { color: var(--cp-info); }
+.cp-reparto__aviso--info p { color: color-mix(in srgb, var(--cp-info) 80%, var(--cp-text)); }
+
+.cp-reparto__aviso--neutral {
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+}
+
+/* ============================================================
+   Secciones (head + sub)
+   ============================================================ */
+
+.cp-reparto__section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--cp-space-4);
+  margin-bottom: var(--cp-space-5);
+}
+
+.cp-reparto__section-title {
+  font-family: var(--cp-font-serif);
+  font-size: var(--cp-text-2xl);
+  font-weight: 600;
+  color: var(--cp-text);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.cp-reparto__section-sub {
+  font-size: var(--cp-text-sm);
+  color: var(--cp-text-muted);
+  margin: var(--cp-space-2) 0 0;
+  max-width: 70ch;
+  line-height: 1.5;
+}
+
+.cp-reparto__eyebrow {
+  font-size: var(--cp-text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cp-text-faint);
+  margin-bottom: var(--cp-space-1);
+  font-weight: 500;
+}
+
+.cp-reparto__chip {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 var(--cp-space-3);
+  border-radius: var(--cp-radius-pill);
+  background: var(--cp-surface-sunken);
+  font-family: var(--cp-font-mono);
+  font-size: var(--cp-text-xs);
+  color: var(--cp-text-muted);
+  letter-spacing: 0.02em;
+}
+
+.cp-reparto__nota {
+  font-size: var(--cp-text-sm);
+  color: var(--cp-text-muted);
+  font-style: italic;
+  margin: var(--cp-space-4) 0 0;
+}
+
+/* ============================================================
+   Ciclo actual
+   ============================================================ */
+
+.cp-reparto__ciclo-actual {
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-lg);
+  padding: var(--cp-space-8);
+  margin-bottom: var(--cp-space-12);
+}
+
+.cp-reparto__cerrar-card {
+  background: var(--cp-accent-bg);
+  border: 1px solid color-mix(in srgb, var(--cp-accent) 25%, transparent);
+  border-radius: var(--cp-radius-md);
+  padding: var(--cp-space-5);
+  margin: var(--cp-space-5) 0 var(--cp-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--cp-space-3);
+}
+
+.cp-reparto__cerrar-card p {
+  margin: 0;
+  font-size: var(--cp-text-sm);
+  color: var(--cp-text);
+  line-height: 1.5;
+}
+
+.cp-reparto__error {
+  background: var(--cp-danger-bg);
+  color: var(--cp-danger);
+  padding: var(--cp-space-3) var(--cp-space-4);
+  border-radius: var(--cp-radius-sm);
+  font-size: var(--cp-text-sm);
+  margin: var(--cp-space-2) 0;
+}
+
+/* ============================================================
+   Lista de compensaciones (historial)
+   ============================================================ */
+
+.cp-reparto__historial {
+  margin-top: var(--cp-space-8);
+}
+
+.cp-reparto__lista {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--cp-space-5);
+}
+
+/* ============================================================
+   Card de compensacion individual
+   ============================================================ */
+
+.cp-comp-card {
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-lg);
+  padding: var(--cp-space-6);
+  transition: box-shadow var(--cp-dur) var(--cp-ease),
+              border-color var(--cp-dur) var(--cp-ease);
+}
+
+.cp-comp-card--accion {
+  border-color: var(--cp-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--cp-accent) 25%, transparent),
+              0 4px 16px color-mix(in srgb, var(--cp-accent) 12%, transparent);
+}
+
+.cp-comp-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--cp-space-3);
+  margin-bottom: var(--cp-space-5);
+}
+
+.cp-comp-card__period {
+  font-family: var(--cp-font-serif);
+  font-size: var(--cp-text-lg);
+  font-weight: 600;
+  color: var(--cp-text);
+  line-height: 1.3;
+}
+
+.cp-comp-card__id {
+  font-family: var(--cp-font-mono);
+  font-size: var(--cp-text-xs);
+  color: var(--cp-text-faint);
+  margin-top: 2px;
+}
+
+.cp-comp-card__emparejado {
+  padding: var(--cp-space-4);
+  background: var(--cp-success-bg);
+  color: var(--cp-success);
+  border-radius: var(--cp-radius-md);
+  font-size: var(--cp-text-sm);
+}
+
+/* Badges de estado */
+.cp-comp-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 var(--cp-space-3);
+  border-radius: var(--cp-radius-pill);
+  font-size: var(--cp-text-xs);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  white-space: nowrap;
+}
+.cp-comp-badge--pendiente {
+  background: var(--cp-warning-bg);
+  color: var(--cp-warning);
+}
+.cp-comp-badge--transferido {
+  background: var(--cp-info-bg);
+  color: var(--cp-info);
+}
+.cp-comp-badge--saldado {
+  background: var(--cp-success-bg);
+  color: var(--cp-success);
+}
+
+/* ============================================================
+   Comparativa de slots (las 2 columnas)
+   ============================================================ */
+
+.cp-comp-comparativa {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--cp-space-4);
+  margin-bottom: var(--cp-space-5);
+}
+
+@media (max-width: 720px) {
+  .cp-comp-comparativa {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cp-slot-col {
+  background: var(--cp-bg);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  padding: var(--cp-space-5);
+  display: flex;
+  flex-direction: column;
+}
+
+.cp-slot-col--pagante {
+  border-color: color-mix(in srgb, var(--cp-accent) 35%, transparent);
+  background: var(--cp-accent-bg);
+}
+
+.cp-slot-col__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--cp-space-4);
+}
+
+.cp-slot-col__nombre {
+  font-family: var(--cp-font-serif);
+  font-size: var(--cp-text-md);
+  font-weight: 600;
+  color: var(--cp-text);
+}
+
+.cp-slot-col__tag {
+  font-size: var(--cp-text-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--cp-accent-dark);
+  font-weight: 600;
+}
+
+.cp-slot-col__lineas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cp-space-2);
+  flex: 1;
+}
+
+.cp-slot-linea {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--cp-text-sm);
+}
+
+.cp-slot-linea--subtle {
+  color: var(--cp-text-muted);
+}
+
+.cp-slot-col__divider {
+  height: 1px;
+  background: var(--cp-border);
+  margin: var(--cp-space-3) 0;
+}
+
+.cp-slot-col__neto {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.cp-slot-col__neto-label {
+  font-size: var(--cp-text-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cp-text-muted);
+  font-weight: 500;
+}
+
+.cp-slot-col__neto-amount {
+  font-family: var(--cp-font-serif);
+  font-size: var(--cp-text-xl);
+  font-weight: 600;
+  color: var(--cp-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================
+   Resumen + accion (la sección con el "→ transferir")
+   ============================================================ */
+
+.cp-comp-card__resumen {
+  background: var(--cp-surface-sunken);
+  border-radius: var(--cp-radius-md);
+  padding: var(--cp-space-4) var(--cp-space-5);
+  margin-bottom: var(--cp-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--cp-space-3);
+}
+
+.cp-comp-card__diferencia {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: var(--cp-space-3);
+  border-bottom: 1px solid var(--cp-border);
+}
+
+.cp-comp-card__diferencia-label {
+  font-size: var(--cp-text-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cp-text-muted);
+  font-weight: 500;
+}
+
+.cp-comp-card__diferencia-amount {
+  font-family: var(--cp-font-serif);
+  font-size: var(--cp-text-lg);
+  font-weight: 600;
+  color: var(--cp-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.cp-comp-card__transfer {
+  display: flex;
+  gap: var(--cp-space-3);
+  align-items: center;
+  font-size: var(--cp-text-sm);
+  color: var(--cp-text);
+  line-height: 1.5;
+}
+
+.cp-comp-card__transfer-arrow {
+  font-size: var(--cp-text-lg);
+  color: var(--cp-accent);
+  flex-shrink: 0;
+}
+
+.cp-comp-card__transfer strong {
+  font-weight: 600;
+}
+
+/* ============================================================
+   Acciones (botones)
+   ============================================================ */
+
+.cp-comp-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--cp-space-3);
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.cp-comp-card__esperando {
+  flex: 1;
+  font-size: var(--cp-text-sm);
+  color: var(--cp-text-muted);
+  font-style: italic;
+}
+
+.cp-comp-card__saldado {
+  flex: 1;
+  font-size: var(--cp-text-sm);
+  color: var(--cp-success);
+  font-weight: 500;
+}
+
+.cp-comp-card__recalcular {
+  background: none;
+  border: none;
+  color: var(--cp-text-faint);
+  font-size: var(--cp-text-xs);
+  cursor: pointer;
+  padding: var(--cp-space-2) var(--cp-space-3);
+  border-radius: var(--cp-radius-sm);
+  transition: color var(--cp-dur) var(--cp-ease);
+}
+
+.cp-comp-card__recalcular:hover:not(:disabled) {
+  color: var(--cp-text-muted);
+  background: var(--cp-surface-hover);
+}
+
+.cp-comp-card__recalcular:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
