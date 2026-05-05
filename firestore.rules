@@ -202,6 +202,24 @@ service cloud.firestore {
             ));
 
       allow delete: if esSuperadmin();
+
+      // ============================================================
+      //  /consultorios/{consultorioId}/compensaciones/{idCiclo}
+      //  ----------------------------------------------------------------
+      //  Documentos de compensacion del flow "reparto entre socias"
+      //  (multi-admin). Cada doc representa el calculo de un ciclo
+      //  (15 al 14 del mes siguiente) con la diferencia entre lo que
+      //  cobro cada admin.
+      //
+      //  - Lectura: admins del consultorio + superadmin
+      //  - Escritura (create/update/delete): SOLO backend (Admin SDK
+      //    bypassea rules). Las acciones de marcar transferida /
+      //    confirmar recibida pasan por /api/mp/compensaciones.
+      // ============================================================
+      match /compensaciones/{idCiclo} {
+        allow read: if esSuperadmin() || esAdminDe(consultorioId);
+        allow write: if false;  // solo backend
+      }
     }
 
     // ============================================================
