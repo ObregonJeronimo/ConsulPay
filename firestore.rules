@@ -152,6 +152,9 @@ service cloud.firestore {
            - comisionFree, comisionPro (nuevos, controlados por superadmin)
            - puedeVerPlanPro (controla si pueden contratar Plan Pro)
            - mpIntegrado, mpConfig, ualaIntegrado, ualaConfig
+           - mpConfigs (NUEVO: slots primary/secondary, escrito por backend)
+           - repartoActivado, repartoIniciaEn, repartoActivadoEn
+             (NUEVO: estado del reparto multi-admin, controlado por backend)
            - estado
            - subscription (escrito por backend cuando se contrata/cancela Pro)
       */
@@ -167,6 +170,12 @@ service cloud.firestore {
             && campoNoCambia('comisionPro')
             && campoNoCambia('puedeVerPlanPro')
             && campoNoCambia('subscription')
+            // Campos del nuevo modelo de reparto multi-admin
+            // (escritos solo por backend via Admin SDK, que bypassea rules)
+            && campoNoCambia('mpConfigs')
+            && campoNoCambia('repartoActivado')
+            && campoNoCambia('repartoIniciaEn')
+            && campoNoCambia('repartoActivadoEn')
             && request.resource.data.mpIntegrado == resource.data.mpIntegrado
             && request.resource.data.mpConfig == resource.data.mpConfig
             && request.resource.data.ualaIntegrado == resource.data.ualaIntegrado
