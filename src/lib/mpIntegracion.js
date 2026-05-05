@@ -44,16 +44,19 @@ async function postConIdToken(path, body) {
  * al user que se loguee en MP antes de continuar).
  *
  * @param {string} consultorioId
- * @returns {Promise<string>} la authorizeUrl
+ * @param {('primary'|'secondary')} [slot] - opcional. Si no se pasa,
+ *   el backend asigna automaticamente al primer slot libre.
+ * @returns {Promise<{authorizeUrl: string, slot: string}>}
  */
-export async function obtenerUrlConexionMP(consultorioId) {
-  const { authorizeUrl } = await postConIdToken('/api/mp/oauth-init', {
-    consultorioId,
-  });
-  if (!authorizeUrl) {
+export async function obtenerUrlConexionMP(consultorioId, slot) {
+  const body = { consultorioId };
+  if (slot) body.slot = slot;
+
+  const data = await postConIdToken('/api/mp/oauth-init', body);
+  if (!data?.authorizeUrl) {
     throw new Error('El servidor no devolvió la URL de autorización.');
   }
-  return authorizeUrl;
+  return { authorizeUrl: data.authorizeUrl, slot: data.slot };
 }
 
 /**
@@ -66,19 +69,27 @@ export async function obtenerUrlConexionMP(consultorioId) {
  *   3. Cuando confirme, hacer window.location.assign(url) directo
  *
  * @param {string} consultorioId
+ * @param {('primary'|'secondary')} [slot] - opcional, slot al que conectar.
  * @returns {Promise<void>} (no devuelve, navega a otra URL)
  */
-export async function iniciarConexionMP(consultorioId) {
-  const url = await obtenerUrlConexionMP(consultorioId);
-  window.location.assign(url);
+export async function iniciarConexionMP(consultorioId, slot) {
+  const { authorizeUrl } = await obtenerUrlConexionMP(consultorioId, slot);
+  window.location.assign(authorizeUrl);
 }
 
 /**
  * Desconecta MP del consultorio. Usa el endpoint backend para limpiar
  * mpConfig (que solo el backend puede modificar por las rules).
+ *
+ * @param {string} consultorioId
+ * @param {('primary'|'secondary')} [slot] - opcional. Si no se pasa,
+ *   el backend desconecta el unico slot conectado. Si hay 2 slots
+ *   conectados y no se pasa slot, el backend devuelve error 400.
  */
-export async function desconectarMP(consultorioId) {
-  await postConIdToken('/api/mp/oauth-disconnect', { consultorioId });
+export async function desconectarMP(consultorioId, slot) {
+  const body = { consultorioId };
+  if (slot) body.slot = slot;
+  await postConIdToken('/api/mp/oauth-disconnect', body);
 }
 
 /* ============================================================

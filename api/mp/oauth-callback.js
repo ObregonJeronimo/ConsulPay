@@ -12,11 +12,18 @@
  * Flujo:
  *   1. Validamos state contra /oauth_states/{state}
  *      - existe, no expiro, no fue usado
+ *      - leemos el SLOT que se decidio en oauth-init
  *   2. Lo marcamos used=true
  *   3. Intercambiamos code por tokens contra MP
  *   4. Encriptamos access_token + refresh_token
- *   5. Guardamos en /consultorios/{id}.mpConfig + mpIntegrado=true
- *   6. Redirigimos al admin a /admin/configuracion?mp=connected
+ *   5. Guardamos en /consultorios/{id} en el SLOT correspondiente:
+ *        - mpConfigs.{slot} = {...tokens, ownerAdminUid: callerUid}
+ *        - Si es primary: tambien sincronizamos mpConfig + mpIntegrado
+ *          legacy (compat con codigo viejo)
+ *   6. Si se acaba de conectar el SECONDARY (y primary ya estaba),
+ *      activamos el reparto: repartoActivado=true,
+ *      repartoIniciaEn = el dia 15 del mes siguiente.
+ *   7. Redirigimos al admin a /admin/configuracion?mp=connected&slot=...
  *
  * Si algo falla, redirigimos con ?mp=error&reason=xxx para que la UI
  * muestre el problema.
@@ -32,6 +39,11 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { initAdmin } from '../_lib/firebase-admin.js';
 import { redirectResponse } from '../_lib/http.js';
 import { buildMpConfig, intercambiarCodePorTokens } from '../_lib/mp-token.js';
+import {
+  buildUpdateParaActivarReparto,
+  buildUpdateParaGuardarSlot,
+  leerMpConfigDelSlot,
+} from '../_lib/mp-config-helpers.js';
 
 function urlConError(reason) {
   const base = process.env.APP_BASE_URL || '';
@@ -39,9 +51,11 @@ function urlConError(reason) {
   return `${base}/admin/configuracion?${params.toString()}`;
 }
 
-function urlConExito() {
+function urlConExito(slot) {
   const base = process.env.APP_BASE_URL || '';
-  return `${base}/admin/configuracion?mp=connected`;
+  const params = new URLSearchParams({ mp: 'connected' });
+  if (slot) params.set('slot', slot);
+  return `${base}/admin/configuracion?${params.toString()}`;
 }
 
 export default async function handler(req, res) {
@@ -96,10 +110,15 @@ export default async function handler(req, res) {
     return redirectResponse(res, urlConError('state_proveedor_invalido'));
   }
 
-  const { consultorioId, callerUid } = stateData;
+  const { consultorioId, callerUid, slot: slotState } = stateData;
   if (!consultorioId || !callerUid) {
     return redirectResponse(res, urlConError('state_corrupto'));
   }
+
+  // Si el state no tiene slot (states viejos antes del feature), default
+  // a primary para compat. Los states viejos tienen TTL 10min asi que
+  // este caso es raro pero posible si alguien reabre un tab viejo.
+  const slot = slotState === 'secondary' ? 'secondary' : 'primary';
 
   // Marcar state como usado (para que no se reutilice si hay race)
   await stateRef.update({ used: true, usedAt: new Date() });
@@ -109,6 +128,14 @@ export default async function handler(req, res) {
   const consSnap = await consRef.get();
   if (!consSnap.exists) {
     return redirectResponse(res, urlConError('consultorio_no_existe'));
+  }
+  const consDataAntes = consSnap.data();
+
+  // Re-validar que el slot todavia este libre. Por las dudas (race
+  // condition) o si alguien abrio el flow desde la UI vieja sin
+  // updates entre tabs.
+  if (leerMpConfigDelSlot(consDataAntes, slot)) {
+    return redirectResponse(res, urlConError('slot_ya_ocupado'));
   }
 
   // Intercambiar code por tokens
@@ -123,25 +150,43 @@ export default async function handler(req, res) {
     return redirectResponse(res, urlConError('intercambio_fallido'));
   }
 
-  // Construir mpConfig encriptado
-  let mpConfig;
+  // Construir mpConfig encriptado, agregando ownerAdminUid (necesario
+  // para saber a quien pertenece este slot)
+  let mpConfigData;
   try {
-    mpConfig = buildMpConfig({ tokens, connectedByUid: callerUid });
+    const base = buildMpConfig({ tokens, connectedByUid: callerUid });
+    mpConfigData = {
+      ...base,
+      ownerAdminUid: callerUid,  // este slot le pertenece al admin que lo conecto
+      slot,
+    };
   } catch (err) {
     console.error('Error encriptando tokens:', err);
     return redirectResponse(res, urlConError('encriptacion_fallida'));
   }
 
-  // Guardar en el consultorio
+  // Construir el update completo:
+  //   - guardar el mpConfig en el slot correspondiente
+  //   - si es primary, sincronizar legacy mpConfig + mpIntegrado
+  //   - si se acaba de conectar el secondary y el primary ya estaba,
+  //     activar el reparto
+  const update = buildUpdateParaGuardarSlot(slot, mpConfigData);
+
+  if (slot === 'secondary') {
+    const primaryYaEstaba = !!leerMpConfigDelSlot(consDataAntes, 'primary');
+    if (primaryYaEstaba) {
+      const repartoUpdate = buildUpdateParaActivarReparto(new Date());
+      Object.assign(update, repartoUpdate);
+    }
+  }
+
+  // Guardar
   try {
-    await consRef.update({
-      mpIntegrado: true,
-      mpConfig,
-    });
+    await consRef.update(update);
   } catch (err) {
     console.error('Error guardando mpConfig:', err);
     return redirectResponse(res, urlConError('guardado_fallido'));
   }
 
-  return redirectResponse(res, urlConExito());
+  return redirectResponse(res, urlConExito(slot));
 }

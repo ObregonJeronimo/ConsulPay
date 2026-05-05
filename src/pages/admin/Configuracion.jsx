@@ -1257,9 +1257,9 @@ function ConectarMPModal({ consultorioId, onCancelar, onError }) {
   useEffect(() => {
     let cancelado = false;
     obtenerUrlConexionMP(consultorioId)
-      .then((url) => {
+      .then(({ authorizeUrl }) => {
         if (cancelado) return;
-        setAuthorizeUrl(url);
+        setAuthorizeUrl(authorizeUrl);
         setLoadingUrl(false);
       })
       .catch((err) => {
