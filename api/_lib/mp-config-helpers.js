@@ -238,6 +238,51 @@ export async function obtenerAccessTokenParaCobro(consData, fecha = new Date()) 
   };
 }
 
+/**
+ * Devuelve el access_token vigente del slot indicado explicitamente.
+ * Util para webhooks donde ya sabemos a que slot le pertenece el pago
+ * (porque guardamos slotCobrador en el doc /pagos_consultorio).
+ *
+ * Tambien refresca el token si esta proximo a vencer.
+ *
+ * @param {Object} consData
+ * @param {'primary'|'secondary'} slot
+ * @returns {Promise<{
+ *   accessToken: string,
+ *   mpConfigActualizado?: Object,
+ *   userIdMP: string,
+ *   livemode: boolean
+ * } | null>}  null si el slot no tiene cuenta conectada.
+ */
+export async function obtenerAccessTokenDeSlot(consData, slot) {
+  const mpConfig = leerMpConfigDelSlot(consData, slot);
+  if (!mpConfig) return null;
+
+  const { accessToken, mpConfigActualizado } = await asegurarAccessTokenVigente(mpConfig);
+
+  return {
+    accessToken,
+    mpConfigActualizado,
+    userIdMP: mpConfig.userIdMP,
+    livemode: !!mpConfig.livemode,
+    ownerAdminUid: mpConfig.ownerAdminUid || mpConfig.connectedByUid,
+  };
+}
+
+/**
+ * Devuelve los slots que tienen cuenta conectada en un consultorio.
+ * Util para iterar sobre las cuentas MP en webhooks (donde no sabemos
+ * a priori a que slot le pertenece un pago).
+ *
+ * @returns {Array<'primary'|'secondary'>}
+ */
+export function listarSlotsConectados(consData) {
+  const slots = [];
+  if (leerMpConfigDelSlot(consData, 'primary')) slots.push('primary');
+  if (leerMpConfigDelSlot(consData, 'secondary')) slots.push('secondary');
+  return slots;
+}
+
 /* ============================================================
    Construir el path de update en Firestore
    ============================================================ */

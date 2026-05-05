@@ -32,8 +32,14 @@ import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 
 import { initAdmin } from '../_lib/firebase-admin.js';
 import { jsonResponse, readJsonBody } from '../_lib/http.js';
-import { decrypt } from '../_lib/encryption.js';
 import { getPagoMP } from '../_lib/mp-marketplace.js';
+import {
+  buildUpdateParaGuardarSlot,
+  leerMpConfigDelSlot,
+  listarSlotsConectados,
+  obtenerAccessTokenDeSlot,
+  tieneAlgunMpConectado,
+} from '../_lib/mp-config-helpers.js';
 import {
   procesarAuthorizedPayment,
   procesarPreapproval,
@@ -261,52 +267,84 @@ async function procesarPagoConsultorio(db, paymentId) {
     pagoDoc = existentePorPaymentId.docs[0];
   }
 
-  // Si no lo encontramos, iteramos consultorios y buscamos por external_reference
+  // Si no lo encontramos, iteramos consultorios y buscamos por external_reference.
+  // Cada consultorio puede tener 1 o 2 slots MP conectados, y el pago puede
+  // pertenecer a cualquiera de los dos. Iteramos todos los slots de cada
+  // consultorio hasta encontrar el pago.
   if (!pagoDoc) {
+    // Traer consultorios con MP integrado (campo legacy o slots nuevos).
+    // Para simplificar, traemos los que tengan mpIntegrado=true (que se
+    // sigue manteniendo en true mientras haya algun slot con primary).
+    // Los consultorios que solo tengan secondary (sin primary) NO los
+    // cubre este query — pero ese caso no deberia darse porque
+    // buildUpdateParaDesconectarSlot promueve secondary a primary cuando
+    // se desconecta primary. Asi que mpIntegrado=true cubre el 100% de
+    // consultorios que tienen al menos un slot conectado.
     const consultoriosSnap = await db.collection('consultorios')
       .where('mpIntegrado', '==', true)
       .get();
 
     for (const consDoc of consultoriosSnap.docs) {
       const consData = consDoc.data();
-      if (!consData.mpConfig?.accessTokenEnc) continue;
+      if (!tieneAlgunMpConectado(consData)) continue;
 
-      let accessToken;
-      try {
-        accessToken = decrypt(consData.mpConfig.accessTokenEnc);
-      } catch (err) {
-        console.warn(`No se pudo decifrar accessToken de ${consDoc.id}:`, err.message);
-        continue;
-      }
+      const slots = listarSlotsConectados(consData);
 
-      try {
-        const pagoMP = await getPagoMP({ accessToken, paymentId });
-        const externalRef = pagoMP.external_reference;
-        if (!externalRef) {
-          console.warn(`Pago ${paymentId} sin external_reference, no se puede matchear.`);
-          return;
+      // Iterar cada slot del consultorio buscando el pago
+      let pagoEncontradoParaEsteCons = false;
+
+      for (const slot of slots) {
+        const tokenInfo = await obtenerAccessTokenDeSlot(consData, slot).catch((err) => {
+          console.warn(`No se pudo obtener token de ${consDoc.id}/${slot}:`, err.message);
+          return null;
+        });
+        if (!tokenInfo) continue;
+
+        // Si el token se refresco durante esta consulta, lo persistimos.
+        // Hacemos fire-and-forget porque no es bloqueante.
+        if (tokenInfo.mpConfigActualizado) {
+          db.collection('consultorios').doc(consDoc.id).update(
+            buildUpdateParaGuardarSlot(slot, tokenInfo.mpConfigActualizado),
+          ).catch((err) => {
+            console.warn(`Refresh persistencia ${consDoc.id}/${slot} fallo:`, err.message);
+          });
         }
 
-        const pagoSnap = await db.collection('pagos_consultorio').doc(externalRef).get();
-        if (!pagoSnap.exists) {
-          console.warn(`Pago consultorio ${externalRef} no existe en Firestore.`);
-          return;
-        }
-        const pagoData = pagoSnap.data();
-        if (pagoData.consultorioId !== consDoc.id) {
+        try {
+          const pagoMP = await getPagoMP({ accessToken: tokenInfo.accessToken, paymentId });
+          const externalRef = pagoMP.external_reference;
+          if (!externalRef) {
+            console.warn(`Pago ${paymentId} sin external_reference, no se puede matchear.`);
+            return;
+          }
+
+          const pagoSnap = await db.collection('pagos_consultorio').doc(externalRef).get();
+          if (!pagoSnap.exists) {
+            console.warn(`Pago consultorio ${externalRef} no existe en Firestore.`);
+            return;
+          }
+          const pagoData = pagoSnap.data();
+          if (pagoData.consultorioId !== consDoc.id) {
+            console.warn(
+              `Mismatch consultorio en pago ${externalRef}: ${pagoData.consultorioId} vs ${consDoc.id}`,
+            );
+            continue;
+          }
+          pagoDoc = pagoSnap;
+          await actualizarPagoYDescuentoSesiones(db, pagoSnap, pagoMP);
+          pagoEncontradoParaEsteCons = true;
+          break;  // ya encontre el pago, no sigo iterando slots de este cons
+        } catch (err) {
+          if (err.mpStatus === 404) continue;  // este slot no es; probar siguiente
           console.warn(
-            `Mismatch consultorio en pago ${externalRef}: ${pagoData.consultorioId} vs ${consDoc.id}`,
+            `Error consultando pago ${paymentId} con cons ${consDoc.id} slot ${slot}:`,
+            err.message,
           );
           continue;
         }
-        pagoDoc = pagoSnap;
-        await actualizarPagoYDescuentoSesiones(db, pagoSnap, pagoMP);
-        return;
-      } catch (err) {
-        if (err.mpStatus === 404) continue;
-        console.warn(`Error consultando pago ${paymentId} con cons ${consDoc.id}:`, err.message);
-        continue;
       }
+
+      if (pagoEncontradoParaEsteCons) return;
     }
 
     if (!pagoDoc) {
@@ -314,7 +352,14 @@ async function procesarPagoConsultorio(db, paymentId) {
       return;
     }
   } else {
-    // Ya teniamos el pago, refrescamos contra MP usando el access_token del consultorio
+    // Camino feliz: ya teniamos el pago. Refrescamos contra MP usando el
+    // access_token del SLOT CORRECTO (el que cobro). Esto lo sabemos
+    // porque crear-pago.js guarda slotCobrador en el doc desde el commit
+    // que agrega multi-slot.
+    //
+    // Para pagos viejos creados antes de ese commit, slotCobrador no
+    // existe — fallback a 'primary' (que via mpConfig legacy sigue
+    // apuntando a la misma cuenta de siempre).
     const pagoData = pagoDoc.data();
     const consSnap = await db.collection('consultorios').doc(pagoData.consultorioId).get();
     if (!consSnap.exists) {
@@ -322,19 +367,34 @@ async function procesarPagoConsultorio(db, paymentId) {
       return;
     }
     const consData = consSnap.data();
-    if (!consData.mpConfig?.accessTokenEnc) {
-      console.warn(`Consultorio ${pagoData.consultorioId} sin mpConfig.`);
+
+    const slot = pagoData.slotCobrador || 'primary';
+
+    if (!leerMpConfigDelSlot(consData, slot)) {
+      console.warn(
+        `Consultorio ${pagoData.consultorioId} no tiene slot ${slot} conectado. ` +
+        `(El slot puede haberse desconectado despues del pago.)`
+      );
       return;
     }
-    let accessToken;
-    try {
-      accessToken = decrypt(consData.mpConfig.accessTokenEnc);
-    } catch (err) {
-      console.error('No se pudo decifrar accessToken:', err);
-      return;
+
+    const tokenInfo = await obtenerAccessTokenDeSlot(consData, slot).catch((err) => {
+      console.error(`No se pudo obtener token de ${pagoData.consultorioId}/${slot}:`, err);
+      return null;
+    });
+    if (!tokenInfo) return;
+
+    // Persistir refresh si hubo
+    if (tokenInfo.mpConfigActualizado) {
+      db.collection('consultorios').doc(pagoData.consultorioId).update(
+        buildUpdateParaGuardarSlot(slot, tokenInfo.mpConfigActualizado),
+      ).catch((err) => {
+        console.warn(`Refresh persistencia fallo:`, err.message);
+      });
     }
+
     try {
-      const pagoMP = await getPagoMP({ accessToken, paymentId });
+      const pagoMP = await getPagoMP({ accessToken: tokenInfo.accessToken, paymentId });
       await actualizarPagoYDescuentoSesiones(db, pagoDoc, pagoMP);
     } catch (err) {
       console.error('Error consultando pago en MP:', err);
