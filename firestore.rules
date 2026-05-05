@@ -173,14 +173,23 @@ service cloud.firestore {
             && request.resource.data.ualaConfig == resource.data.ualaConfig
             && request.resource.data.estado == resource.data.estado
             // Reglas sobre owner y admins:
+            //   - ownerUid siempre debe estar en adminUids
+            //   - adminUids no puede quedar vacio (>= 1)
+            //   - adminUids no puede tener mas de 2 admins (limite duro
+            //     del flow de "reparto entre socias" — ver src/lib/admins.js
+            //     constante MAX_ADMINS_POR_CONSULTORIO)
+            //   - El owner actual puede ser cambiado solo si el caller
+            //     es el owner viejo (transferencia de ownership)
             && (
               (request.resource.data.ownerUid == resource.data.ownerUid
                 && request.resource.data.ownerUid in request.resource.data.adminUids
-                && request.resource.data.adminUids.size() >= 1)
+                && request.resource.data.adminUids.size() >= 1
+                && request.resource.data.adminUids.size() <= 2)
               ||
               (resource.data.ownerUid == request.auth.uid
                 && request.resource.data.ownerUid in request.resource.data.adminUids
-                && request.resource.data.adminUids.size() >= 1)
+                && request.resource.data.adminUids.size() >= 1
+                && request.resource.data.adminUids.size() <= 2)
             ));
 
       allow delete: if esSuperadmin();

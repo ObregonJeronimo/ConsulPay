@@ -1,14 +1,27 @@
 /**
  * Servicio de gestión de admins de un consultorio (Multi-Admin)
  *
- * Permite que un consultorio tenga MAS DE UN admin (todos administradores
- * iguales), preservando la distincion del Owner original (dueño legal).
+ * Permite que un consultorio tenga HASTA 2 admins (no más), todos iguales
+ * en permisos pero preservando la distincion del Owner original (dueño
+ * legal).
+ *
+ * LIMITE DE 2 ADMINS
+ * ----------------------------------------------------------------
+ * El sistema permite hasta 2 admins por consultorio. La razon es que
+ * cuando hay 2 admins, ConsulPay habilita el flow de "reparto entre
+ * socias" con doble cuenta MP conectada y rotacion del 15 al 15 de
+ * cada mes. Esa logica solo funciona limpia con exactamente 2 admins.
+ *
+ * Si en el futuro se quiere soportar 3+ admins, hay que repensar la
+ * estrategia de reparto (split 1:N de MP, etc.). Por ahora, 2 es el
+ * limite duro tanto en cliente como en firestore.rules.
  *
  * MODELO DE DATOS
  * ----------------------------------------------------------------
  *   /consultorios/{consultorioId}
  *     ownerUid:  string         <- dueño legal, original/transferido
  *     adminUids: string[]       <- TODOS los admins (incluido el owner)
+ *                                  HARD LIMIT: maximo 2 elementos
  *
  *   /usuarios/{uid}
  *     rol: 'admin' | 'profesional' | 'superadmin'
@@ -19,7 +32,8 @@
  * INVARIANTES (las rules tambien las enforcen):
  *   1. ownerUid SIEMPRE esta en adminUids
  *   2. adminUids nunca queda vacio
- *   3. Solo el owner puede transferir ownership
+ *   3. adminUids.length <= 2 (NUEVO)
+ *   4. Solo el owner puede transferir ownership
  *
  * Todas las operaciones son atomicas (Firestore transactions).
  */
@@ -28,6 +42,16 @@ import { arrayRemove, arrayUnion, doc, runTransaction, serverTimestamp } from 'f
 
 import { db } from './firebase.js';
 import { ESTADOS_USUARIO, ROLES } from './constants.js';
+
+/**
+ * Maximo de admins permitidos por consultorio.
+ *
+ * Cambiar este valor requiere ademas:
+ *  - Actualizar firestore.rules con el mismo limite
+ *  - Repensar la logica de reparto en /admin/reparto (hoy asume 2 fijos)
+ *  - Repensar slots primary/secondary de mpConfigs
+ */
+export const MAX_ADMINS_POR_CONSULTORIO = 2;
 
 /* ============================================================
    Helper interno: validar que el caller tenga permisos
@@ -73,8 +97,10 @@ function validarCallerEsOwner(consData, callerUid) {
  *   2. Valida permisos del caller (debe ser admin del consultorio)
  *   3. Valida que el destino exista y sea elegible (rol profesional o admin
  *      del MISMO consultorio; no se pueden traer admins de otros consultorios)
- *   4. Agrega uid al adminUids del consultorio
- *   5. Actualiza /usuarios/{uid} para reflejar rol=admin (si era profesional)
+ *   4. Valida que el consultorio tenga menos de MAX_ADMINS_POR_CONSULTORIO
+ *      admins (limite duro: 2). Si ya tiene 2, lanza error claro.
+ *   5. Agrega uid al adminUids del consultorio
+ *   6. Actualiza /usuarios/{uid} para reflejar rol=admin (si era profesional)
  *
  * El destino tiene que tener consultorioId del consultorio (fue invitado y
  * acepto antes). Si no, no se puede promover — el flujo de invitacion sigue
@@ -84,6 +110,9 @@ function validarCallerEsOwner(consData, callerUid) {
  * @param {string} params.consultorioId
  * @param {string} params.callerUid     - quien hace la operacion (debe ser admin)
  * @param {string} params.nuevoUid      - uid del usuario a promover
+ *
+ * @throws Error si ya hay 2 admins, si el usuario no pertenece al consultorio,
+ *               si no esta activo, o si ya es admin.
  */
 export async function promoverAAdmin({ consultorioId, callerUid, nuevoUid }) {
   if (!consultorioId) throw new Error('consultorioId requerido');
@@ -124,6 +153,17 @@ export async function promoverAAdmin({ consultorioId, callerUid, nuevoUid }) {
       throw new Error('Este usuario ya es administrador del consultorio.');
     }
 
+    // Limite de 2 admins por consultorio. Esta validacion existe en
+    // 3 lugares: aqui (UX inmediato), en firestore.rules (seguridad),
+    // y en la UI (deshabilitar boton). Los 3 son necesarios porque las
+    // rules no dan mensajes de error amigables al usuario.
+    if (adminUids.length >= MAX_ADMINS_POR_CONSULTORIO) {
+      throw new Error(
+        `El consultorio ya tiene el máximo de ${MAX_ADMINS_POR_CONSULTORIO} administradores. ` +
+        'Si querés promover a otro usuario, primero tenés que remover a uno de los actuales.'
+      );
+    }
+
     // 1. Agregar al array de admins del consultorio
     tx.update(consRef, {
       adminUids: arrayUnion(nuevoUid),
@@ -156,6 +196,11 @@ export async function promoverAAdmin({ consultorioId, callerUid, nuevoUid }) {
  * consultorio (rol=profesional, consultorioId sin cambios). Si el caller
  * quiere expulsarlo del consultorio completamente, eso es otra operacion
  * (M4: estado=retirado).
+ *
+ * NOTA sobre el reparto: si el consultorio tenia 2 admins y se baja a 1,
+ * el flow de "reparto entre socias" se desactiva automaticamente. Los
+ * registros historicos de compensaciones se preservan (ver
+ * /consultorios/{id}/compensaciones — esos docs no se borran nunca).
  *
  * @param {Object} params
  * @param {string} params.consultorioId
