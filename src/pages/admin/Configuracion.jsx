@@ -1142,13 +1142,34 @@ function TabPagos({ consultorio, searchParams, onLimpiarParams }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [okMsg, setOkMsg] = useState('');
-  const [openDesconectar, setOpenDesconectar] = useState(false);
-  const [openConectarModal, setOpenConectarModal] = useState(false);
+  const [desconectarSlot, setDesconectarSlot] = useState(null);  // 'primary' | 'secondary' | null
+  const [conectarSlot, setConectarSlot] = useState(null);  // 'primary' | 'secondary' | null
+
+  const { user } = useAuth();
+  const callerUid = user?.uid;
+
+  // Cargar miembros del consultorio para resolver nombres de admins
+  // (cada slot tiene un ownerAdminUid; queremos mostrar a quien pertenece)
+  const [miembros, setMiembros] = useState([]);
+  useEffect(() => {
+    if (!consultorio?.id) return;
+    return suscribirMiembrosConsultorio(consultorio.id, (lista) => {
+      setMiembros(lista);
+    });
+  }, [consultorio?.id]);
+
+  const mapMiembros = useMemo(() => {
+    const m = {};
+    for (const mb of miembros) m[mb.uid] = mb;
+    return m;
+  }, [miembros]);
 
   useEffect(() => {
     const mp = searchParams.get('mp');
     if (mp === 'connected') {
-      setOkMsg('Cuenta de Mercado Pago vinculada correctamente.');
+      const slot = searchParams.get('slot');
+      const slotLabel = slot === 'secondary' ? 'segunda cuenta' : 'cuenta principal';
+      setOkMsg(`Mercado Pago conectado correctamente (${slotLabel}).`);
       onLimpiarParams();
     } else if (mp === 'error') {
       const reason = searchParams.get('reason') || '';
@@ -1159,14 +1180,15 @@ function TabPagos({ consultorio, searchParams, onLimpiarParams }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function handleDesconectar() {
+  async function handleDesconectar(slot) {
     setError('');
     setOkMsg('');
     setSubmitting(true);
     try {
-      await desconectarMP(consultorio.id);
-      setOkMsg('Cuenta de Mercado Pago desconectada.');
-      setOpenDesconectar(false);
+      await desconectarMP(consultorio.id, slot);
+      const label = slot === 'secondary' ? 'segunda cuenta' : 'cuenta principal';
+      setOkMsg(`Se desconectó la ${label} de Mercado Pago.`);
+      setDesconectarSlot(null);
     } catch (err) {
       setError(err.message || 'No se pudo desconectar.');
     } finally {
@@ -1174,54 +1196,173 @@ function TabPagos({ consultorio, searchParams, onLimpiarParams }) {
     }
   }
 
-  const integrado = consultorio.mpIntegrado === true && consultorio.mpConfig != null;
+  // Lectura de slots (con fallback a legacy mpConfig para primary).
+  // Esta logica es la misma que tiene leerMpConfigDelSlot del backend
+  // — la replicamos aca porque no podemos importar de api/_lib en el
+  // frontend.
+  const primaryConfig = consultorio.mpConfigs?.primary
+    || (consultorio.mpIntegrado && consultorio.mpConfig
+        ? { ...consultorio.mpConfig, ownerAdminUid: consultorio.mpConfig.connectedByUid }
+        : null);
+  const secondaryConfig = consultorio.mpConfigs?.secondary || null;
+
+  const cantidadAdmins = (consultorio.adminUids || []).length;
+  const esMultiAdmin = cantidadAdmins >= 2;
+
+  // Aviso post-conexion del primer slot cuando hay 2 admins:
+  // mostrar mensaje invitando al segundo a conectar
+  const necesitaSegundaCuenta = esMultiAdmin && primaryConfig && !secondaryConfig;
+  const repartoActivo = !!consultorio.repartoActivado;
+  const repartoIniciaEn = consultorio.repartoIniciaEn?.toDate
+    ? consultorio.repartoIniciaEn.toDate()
+    : null;
 
   return (
     <section className="cp-config-section">
       <header className="cp-config-section__head">
         <h2 className="cp-config-section__title">Mercado Pago</h2>
         <p className="cp-config-section__sub">
-          Vinculá tu cuenta de Mercado Pago para que los profesionales puedan pagarte
-          su parte de las sesiones automáticamente. ConsulPay procesa el pago y se
-          queda con su comisión ({consultorio.comisionConsulpay ?? '—'}%).
+          {esMultiAdmin
+            ? <>Cada administradora puede vincular su cuenta de Mercado Pago. Cuando ambas
+              están conectadas, ConsulPay alterna los cobros mes a mes (del 15 al 14)
+              entre las dos cuentas. Comisión ConsulPay: {consultorio.comisionConsulpay ?? '—'}%.</>
+            : <>Vinculá tu cuenta de Mercado Pago para que los profesionales puedan pagarte
+              su parte de las sesiones automáticamente. ConsulPay procesa el pago y se
+              queda con su comisión ({consultorio.comisionConsulpay ?? '—'}%).</>
+          }
         </p>
       </header>
 
       {error && <div className="cp-config-error" role="alert">{error}</div>}
       {okMsg && <div className="cp-config-ok" role="status">{okMsg}</div>}
 
-      {integrado ? (
-        <MPConectadaCard
-          mpConfig={consultorio.mpConfig}
-          onDesconectar={() => setOpenDesconectar(true)}
-          submitting={submitting}
-        />
+      {/* Caso 1 admin: una sola card como antes */}
+      {!esMultiAdmin ? (
+        primaryConfig ? (
+          <MPSlotCard
+            slot="primary"
+            mpConfig={primaryConfig}
+            mapMiembros={mapMiembros}
+            callerUid={callerUid}
+            mostrarOwner={false}
+            onDesconectar={() => setDesconectarSlot('primary')}
+            submitting={submitting}
+          />
+        ) : (
+          <MPSlotEmptyCard
+            slot="primary"
+            mostrarOwner={false}
+            onConectar={() => { setError(''); setConectarSlot('primary'); }}
+          />
+        )
       ) : (
-        <MPDesconectadaCard
-          onAbrirModal={() => { setError(''); setOpenConectarModal(true); }}
-        />
+        /* Caso 2 admins: dos cards lado a lado */
+        <div className="cp-mp-slots">
+          {primaryConfig ? (
+            <MPSlotCard
+              slot="primary"
+              mpConfig={primaryConfig}
+              mapMiembros={mapMiembros}
+              callerUid={callerUid}
+              mostrarOwner={true}
+              onDesconectar={() => setDesconectarSlot('primary')}
+              submitting={submitting}
+            />
+          ) : (
+            <MPSlotEmptyCard
+              slot="primary"
+              mostrarOwner={true}
+              onConectar={() => { setError(''); setConectarSlot('primary'); }}
+            />
+          )}
+
+          {secondaryConfig ? (
+            <MPSlotCard
+              slot="secondary"
+              mpConfig={secondaryConfig}
+              mapMiembros={mapMiembros}
+              callerUid={callerUid}
+              mostrarOwner={true}
+              onDesconectar={() => setDesconectarSlot('secondary')}
+              submitting={submitting}
+            />
+          ) : (
+            <MPSlotEmptyCard
+              slot="secondary"
+              mostrarOwner={true}
+              onConectar={() => { setError(''); setConectarSlot('secondary'); }}
+            />
+          )}
+        </div>
       )}
 
-      {openDesconectar && (
+      {/* Aviso cuando hay 2 admins y solo se conecto la primera cuenta */}
+      {necesitaSegundaCuenta && (
+        <div className="cp-mp-aviso cp-mp-aviso--info">
+          <strong>Falta que se conecte la segunda cuenta.</strong>
+          <p>
+            Cuando la otra administradora vincule su Mercado Pago, vamos a activar
+            automáticamente el reparto de cobros entre las dos cuentas.
+          </p>
+        </div>
+      )}
+
+      {/* Aviso cuando ambas estan conectadas pero el reparto todavia no arranca */}
+      {esMultiAdmin && primaryConfig && secondaryConfig && repartoActivo && repartoIniciaEn && new Date() < repartoIniciaEn && (
+        <div className="cp-mp-aviso cp-mp-aviso--success">
+          <strong>Reparto activado.</strong>
+          <p>
+            La rotación de cobros entre las dos cuentas arranca el{' '}
+            {repartoIniciaEn.toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })}.
+            Hasta esa fecha, los cobros van a la cuenta principal.
+          </p>
+        </div>
+      )}
+
+      {esMultiAdmin && primaryConfig && secondaryConfig && repartoActivo && repartoIniciaEn && new Date() >= repartoIniciaEn && (
+        <div className="cp-mp-aviso cp-mp-aviso--success">
+          <strong>Reparto activo.</strong>
+          <p>
+            Los cobros se alternan entre ambas cuentas según el ciclo (del 15 al 14).
+            Mirá el detalle del reparto y cómo compensar diferencias en{' '}
+            <a href="/admin/reparto" className="cp-mp-aviso__link">Reparto entre socias</a>.
+          </p>
+        </div>
+      )}
+
+      {desconectarSlot && (
         <DesconectarMPModal
-          onCancelar={() => setOpenDesconectar(false)}
-          onConfirmar={handleDesconectar}
+          slot={desconectarSlot}
+          tieneSecondary={!!secondaryConfig}
+          onCancelar={() => setDesconectarSlot(null)}
+          onConfirmar={() => handleDesconectar(desconectarSlot)}
           submitting={submitting}
         />
       )}
 
-      {openConectarModal && (
+      {conectarSlot && (
         <ConectarMPModal
           consultorioId={consultorio.id}
-          onCancelar={() => setOpenConectarModal(false)}
-          onError={(msg) => { setError(msg); setOpenConectarModal(false); }}
+          slot={conectarSlot}
+          onCancelar={() => setConectarSlot(null)}
+          onError={(msg) => { setError(msg); setConectarSlot(null); }}
         />
       )}
     </section>
   );
 }
 
-function MPDesconectadaCard({ onAbrirModal }) {
+/**
+ * Card cuando el slot esta vacio (no hay cuenta MP vinculada).
+ *
+ * Si mostrarOwner=true (caso multi-admin), incluye el label "Cuenta
+ * principal" o "Segunda cuenta" para diferenciar visualmente los dos
+ * slots. Si mostrarOwner=false (caso 1 admin), se ve igual que la
+ * card original — sin label de slot.
+ */
+function MPSlotEmptyCard({ slot, mostrarOwner, onConectar }) {
+  const labelSlot = slot === 'secondary' ? 'Segunda cuenta' : 'Cuenta principal';
+
   return (
     <div className="cp-mp-card cp-mp-card--off">
       <div className="cp-mp-card__icon" aria-hidden="true">
@@ -1233,15 +1374,19 @@ function MPDesconectadaCard({ onAbrirModal }) {
         </svg>
       </div>
       <div className="cp-mp-card__body">
+        {mostrarOwner && (
+          <div className="cp-mp-card__slot-label">{labelSlot}</div>
+        )}
         <h3 className="cp-mp-card__title">Cuenta no vinculada</h3>
         <p className="cp-mp-card__hint">
-          Al conectar Mercado Pago, los pagos de tus profesionales caen directamente
-          en tu cuenta de MP. ConsulPay solo procesa la transacción y se queda con su
-          comisión.
+          {mostrarOwner
+            ? 'La administradora que use esta cuenta puede vincularla acá. Una vez conectada, los cobros que le toquen le caen directo a su MP.'
+            : 'Al conectar Mercado Pago, los pagos de tus profesionales caen directamente en tu cuenta de MP. ConsulPay solo procesa la transacción y se queda con su comisión.'
+          }
         </p>
 
         <div className="cp-mp-card__actions">
-          <Button variant="primary" onClick={onAbrirModal}>
+          <Button variant="primary" onClick={onConectar}>
             Conectar Mercado Pago
           </Button>
         </div>
@@ -1250,13 +1395,13 @@ function MPDesconectadaCard({ onAbrirModal }) {
   );
 }
 
-function ConectarMPModal({ consultorioId, onCancelar, onError }) {
+function ConectarMPModal({ consultorioId, slot, onCancelar, onError }) {
   const [authorizeUrl, setAuthorizeUrl] = useState(null);
   const [loadingUrl, setLoadingUrl] = useState(true);
 
   useEffect(() => {
     let cancelado = false;
-    obtenerUrlConexionMP(consultorioId)
+    obtenerUrlConexionMP(consultorioId, slot)
       .then(({ authorizeUrl }) => {
         if (cancelado) return;
         setAuthorizeUrl(authorizeUrl);
@@ -1268,7 +1413,7 @@ function ConectarMPModal({ consultorioId, onCancelar, onError }) {
       });
     return () => { cancelado = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [consultorioId]);
+  }, [consultorioId, slot]);
 
   function handleAbrirMP() {
     window.open('https://www.mercadopago.com.ar/', '_blank', 'noopener,noreferrer');
@@ -1333,11 +1478,33 @@ function ConectarMPModal({ consultorioId, onCancelar, onError }) {
   );
 }
 
-function MPConectadaCard({ mpConfig, onDesconectar, submitting }) {
+/**
+ * Card cuando el slot tiene cuenta MP vinculada.
+ *
+ * Si mostrarOwner=true (caso multi-admin), muestra:
+ *   - Label del slot (Cuenta principal / Segunda cuenta)
+ *   - A que admin pertenece este slot (con tag "Vos" si es el caller)
+ * Si mostrarOwner=false (caso 1 admin), se ve igual que antes.
+ *
+ * Solo el admin DUEÑO del slot puede desconectar (boton oculto para
+ * los otros). Esto evita que una socia desconecte la cuenta de la otra.
+ */
+function MPSlotCard({ slot, mpConfig, mapMiembros, callerUid, mostrarOwner, onDesconectar, submitting }) {
   const venc = diasHastaVencimiento(mpConfig.expiresAt);
   const conectadoAt = mpConfig.connectedAt?.toDate
     ? mpConfig.connectedAt.toDate()
     : (mpConfig.connectedAt instanceof Date ? mpConfig.connectedAt : null);
+
+  const labelSlot = slot === 'secondary' ? 'Segunda cuenta' : 'Cuenta principal';
+
+  // Resolver el admin dueño del slot. ownerAdminUid es el campo nuevo;
+  // connectedByUid es el legacy (para mpConfig migrado).
+  const ownerUid = mpConfig.ownerAdminUid || mpConfig.connectedByUid;
+  const owner = ownerUid ? mapMiembros[ownerUid] : null;
+  const ownerLabel = owner
+    ? (owner.displayName || owner.email || `Usuario ${ownerUid.slice(0, 6)}`)
+    : 'Administradora';
+  const callerEsOwner = ownerUid === callerUid;
 
   return (
     <div className="cp-mp-card cp-mp-card--on">
@@ -1348,12 +1515,29 @@ function MPConectadaCard({ mpConfig, onDesconectar, submitting }) {
         </svg>
       </div>
       <div className="cp-mp-card__body">
+        {mostrarOwner && (
+          <div className="cp-mp-card__slot-label">{labelSlot}</div>
+        )}
+
         <h3 className="cp-mp-card__title">
           Cuenta vinculada
           {mpConfig.livemode === false && (
             <span className="cp-admin-badge cp-admin-badge--you">Sandbox</span>
           )}
         </h3>
+
+        {mostrarOwner && (
+          <div className="cp-mp-card__owner">
+            <span className="cp-mp-card__owner-label">Pertenece a</span>
+            <span className="cp-mp-card__owner-name">
+              {ownerLabel}
+              {callerEsOwner && (
+                <span className="cp-admin-badge cp-admin-badge--you" style={{ marginLeft: 8 }}>Vos</span>
+              )}
+            </span>
+          </div>
+        )}
+
         <dl className="cp-mp-card__meta">
           <div>
             <dt>User ID de Mercado Pago</dt>
@@ -1381,32 +1565,82 @@ function MPConectadaCard({ mpConfig, onDesconectar, submitting }) {
             </div>
           )}
         </dl>
+
         <div className="cp-mp-card__actions">
-          <Button
-            variant="secondary"
-            onClick={onDesconectar}
-            disabled={submitting}
-          >
-            Desconectar
-          </Button>
+          {/* Solo el dueño del slot puede desconectar.
+              En caso 1 admin (mostrarOwner=false) siempre se muestra. */}
+          {(!mostrarOwner || callerEsOwner) ? (
+            <Button
+              variant="secondary"
+              onClick={onDesconectar}
+              disabled={submitting}
+            >
+              Desconectar
+            </Button>
+          ) : (
+            <span className="cp-mp-card__nota-readonly">
+              Solo {ownerLabel.split(' ')[0]} puede desconectar esta cuenta.
+            </span>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-function DesconectarMPModal({ onCancelar, onConfirmar, submitting }) {
+function DesconectarMPModal({ slot, tieneSecondary, onCancelar, onConfirmar, submitting }) {
+  // Mensajes claros segun el slot que se desconecta y el estado actual:
+  // - primary cuando NO hay secondary: vuelve al estado "sin MP" (caso comun)
+  // - primary cuando SI hay secondary: secondary se promueve a primary
+  //   (esto lo hace buildUpdateParaDesconectarSlot del helper backend)
+  // - secondary: el reparto se desactiva, vuelve a flow de 1 cuenta
+  const labelSlot = slot === 'secondary' ? 'segunda cuenta' : 'cuenta principal';
+
+  let descripcion;
+  if (slot === 'secondary') {
+    descripcion = (
+      <>
+        Vas a desconectar la <strong>segunda cuenta de Mercado Pago</strong>.
+        El reparto entre socias se va a desactivar y todos los cobros nuevos
+        van a caer en la cuenta principal.
+        <br /><br />
+        Las compensaciones de ciclos pasados se preservan en el historial.
+        Podés volver a conectar la cuenta cuando quieras.
+      </>
+    );
+  } else if (tieneSecondary) {
+    descripcion = (
+      <>
+        Vas a desconectar la <strong>cuenta principal de Mercado Pago</strong>.
+        Como hay una segunda cuenta conectada, va a pasar a ser la principal
+        automáticamente.
+        <br /><br />
+        El reparto entre socias se va a desactivar hasta que vuelva a haber
+        2 cuentas vinculadas.
+      </>
+    );
+  } else {
+    descripcion = (
+      <>
+        Los profesionales van a dejar de poder pagarte por ConsulPay hasta que
+        reconectes. Verán un mensaje "El método de pago está deshabilitado,
+        contactá al dueño del consultorio".
+        <br /><br />
+        Tus pagos en curso (si hubiera) se mantienen intactos. Podés reconectar
+        cuando quieras.
+      </>
+    );
+  }
+
   return (
     <div className="cp-modal-overlay" onClick={onCancelar}>
       <div className="cp-modal cp-modal--confirm-admin" onClick={(e) => e.stopPropagation()}>
         <button className="cp-modal__close" onClick={onCancelar} aria-label="Cerrar"
           disabled={submitting}>×</button>
 
-        <h2 className="cp-modal__title">¿Desconectar Mercado Pago?</h2>
+        <h2 className="cp-modal__title">¿Desconectar la {labelSlot}?</h2>
         <div className="cp-modal__sub">
-          Los profesionales van a dejar de poder pagarte por ConsulPay hasta que reconectes.
-          Verán un mensaje "El método de pago está deshabilitado, contactá al dueño del consultorio".
-          {' '}Tus pagos en curso (si hubiera) se mantienen intactos. Podés reconectar cuando quieras.
+          {descripcion}
         </div>
 
         <div className="cp-modal__actions">

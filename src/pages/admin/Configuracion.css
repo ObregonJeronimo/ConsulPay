@@ -637,6 +637,110 @@
   margin-top: 4px;
 }
 
+/* ============================================================
+   Multi-slot (cuando hay 2 admins en el consultorio)
+   ----------------------------------------------------------------
+   Las dos cuentas se muestran lado a lado en grid. En mobile pasan
+   a ser una columna unica.
+   ============================================================ */
+
+.cp-mp-slots {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 720px) {
+  .cp-mp-slots {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Label de slot ("Cuenta principal" / "Segunda cuenta") arriba de
+   cada card en modo multi-admin */
+.cp-mp-card__slot-label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cp-text-faint);
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+/* Owner del slot (que admin lo conecto) */
+.cp-mp-card__owner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--cp-surface-sunken);
+  border-radius: var(--cp-radius-sm);
+  margin: 8px 0 12px;
+  font-size: 13px;
+}
+
+.cp-mp-card__owner-label {
+  color: var(--cp-text-muted);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cp-mp-card__owner-name {
+  color: var(--cp-text);
+  font-weight: 500;
+}
+
+/* Nota cuando el caller no es el dueño del slot (no puede desconectar) */
+.cp-mp-card__nota-readonly {
+  font-size: 12px;
+  color: var(--cp-text-muted);
+  font-style: italic;
+}
+
+/* ============================================================
+   Avisos contextuales del flow multi-admin
+   ============================================================ */
+
+.cp-mp-aviso {
+  margin-top: 16px;
+  padding: 14px 18px;
+  border-radius: var(--cp-radius-md);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.cp-mp-aviso strong {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.cp-mp-aviso p {
+  margin: 0;
+  color: var(--cp-text-muted);
+}
+
+.cp-mp-aviso--info {
+  background: var(--cp-info-bg);
+  color: var(--cp-info);
+  border: 1px solid color-mix(in srgb, var(--cp-info) 15%, transparent);
+}
+.cp-mp-aviso--info p { color: color-mix(in srgb, var(--cp-info) 78%, var(--cp-text)); }
+
+.cp-mp-aviso--success {
+  background: var(--cp-success-bg);
+  color: var(--cp-success);
+  border: 1px solid color-mix(in srgb, var(--cp-success) 15%, transparent);
+}
+.cp-mp-aviso--success p { color: color-mix(in srgb, var(--cp-success) 78%, var(--cp-text)); }
+
+.cp-mp-aviso__link {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
 @media (max-width: 600px) {
   .cp-mp-card {
     flex-direction: column;
