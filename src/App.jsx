@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 import { AuthProvider } from './contexts/AuthContext.jsx';
@@ -6,40 +6,42 @@ import ProtectedRoute from './routes/ProtectedRoute.jsx';
 import RootRedirect from './routes/RootRedirect.jsx';
 import AppShell from './components/layout/AppShell.jsx';
 import Spinner from './components/ui/Spinner.jsx';
+import ChunkErrorBoundary from './components/ChunkErrorBoundary.jsx';
 
 import Landing from './pages/Landing.jsx';
 import Login from './pages/Login.jsx';
 
 import { ROLES } from './lib/constants.js';
+import lazyWithRetry, { clearChunkReloadFlag } from './lib/lazyWithRetry.js';
 
 // Lazy: se cargan solo cuando el usuario navega a la ruta correspondiente.
 // Esto parte el bundle en chunks más chicos: quien solo visita la landing
 // no descarga el código del admin, y viceversa.
-const CrearConsultorio = lazy(() => import('./pages/CrearConsultorio.jsx'));
-const AceptarInvitacion = lazy(() => import('./pages/AceptarInvitacion.jsx'));
-const Pendiente = lazy(() => import('./pages/Pendiente.jsx'));
-const DashboardSuper = lazy(() => import('./pages/super/Dashboard.jsx'));
-const ConfiguracionSuper = lazy(() => import('./pages/super/ConfiguracionSuper.jsx'));
-const ConsultoriosSuper = lazy(() => import('./pages/super/ConsultoriosSuper.jsx'));
-const DashboardAdmin = lazy(() => import('./pages/admin/Dashboard.jsx'));
-const Profesionales = lazy(() => import('./pages/admin/Profesionales.jsx'));
-const Configuracion = lazy(() => import('./pages/admin/Configuracion.jsx'));
-const Pacientes = lazy(() => import('./pages/admin/Pacientes.jsx'));
-const Sesiones = lazy(() => import('./pages/admin/Sesiones.jsx'));
-const Solicitudes = lazy(() => import('./pages/admin/Solicitudes.jsx'));
-const PagosAdmin = lazy(() => import('./pages/admin/Pagos.jsx'));
-const Reparto = lazy(() => import('./pages/admin/Reparto.jsx'));
-const MiPanel = lazy(() => import('./pages/profesional/MiPanel.jsx'));
-const MisPacientes = lazy(() => import('./pages/profesional/MisPacientes.jsx'));
-const MisSesiones = lazy(() => import('./pages/profesional/MisSesiones.jsx'));
-const MisPagos = lazy(() => import('./pages/profesional/MisPagos.jsx'));
-const RetornoPago = lazy(() => import('./pages/profesional/RetornoPago.jsx'));
+const CrearConsultorio = lazyWithRetry(() => import('./pages/CrearConsultorio.jsx'));
+const AceptarInvitacion = lazyWithRetry(() => import('./pages/AceptarInvitacion.jsx'));
+const Pendiente = lazyWithRetry(() => import('./pages/Pendiente.jsx'));
+const DashboardSuper = lazyWithRetry(() => import('./pages/super/Dashboard.jsx'));
+const ConfiguracionSuper = lazyWithRetry(() => import('./pages/super/ConfiguracionSuper.jsx'));
+const ConsultoriosSuper = lazyWithRetry(() => import('./pages/super/ConsultoriosSuper.jsx'));
+const DashboardAdmin = lazyWithRetry(() => import('./pages/admin/Dashboard.jsx'));
+const Profesionales = lazyWithRetry(() => import('./pages/admin/Profesionales.jsx'));
+const Configuracion = lazyWithRetry(() => import('./pages/admin/Configuracion.jsx'));
+const Pacientes = lazyWithRetry(() => import('./pages/admin/Pacientes.jsx'));
+const Sesiones = lazyWithRetry(() => import('./pages/admin/Sesiones.jsx'));
+const Solicitudes = lazyWithRetry(() => import('./pages/admin/Solicitudes.jsx'));
+const PagosAdmin = lazyWithRetry(() => import('./pages/admin/Pagos.jsx'));
+const Reparto = lazyWithRetry(() => import('./pages/admin/Reparto.jsx'));
+const MiPanel = lazyWithRetry(() => import('./pages/profesional/MiPanel.jsx'));
+const MisPacientes = lazyWithRetry(() => import('./pages/profesional/MisPacientes.jsx'));
+const MisSesiones = lazyWithRetry(() => import('./pages/profesional/MisSesiones.jsx'));
+const MisPagos = lazyWithRetry(() => import('./pages/profesional/MisPagos.jsx'));
+const RetornoPago = lazyWithRetry(() => import('./pages/profesional/RetornoPago.jsx'));
 
 // Paginas legales publicas (sin auth) — se incluyen como lazy igual
 // que el resto, asi no engordan el bundle inicial. Quien viene a leer
 // los terminos descarga solo ese chunk.
-const PoliticaPrivacidad = lazy(() => import('./pages/legal/PoliticaPrivacidad.jsx'));
-const TerminosCondiciones = lazy(() => import('./pages/legal/TerminosCondiciones.jsx'));
+const PoliticaPrivacidad = lazyWithRetry(() => import('./pages/legal/PoliticaPrivacidad.jsx'));
+const TerminosCondiciones = lazyWithRetry(() => import('./pages/legal/TerminosCondiciones.jsx'));
 
 /**
  * Fallback que se muestra mientras un chunk lazy está descargándose.
@@ -61,11 +63,19 @@ function RouteFallback() {
 }
 
 export default function App() {
+  // Si llegamos hasta aca sin pantalla en blanco, todo cargo bien.
+  // Limpiamos el flag para que la proxima vez que falle un chunk (otro
+  // deploy futuro) tambien tenga su retry+reload.
+  useEffect(() => {
+    clearChunkReloadFlag();
+  }, []);
+
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Suspense fallback={<RouteFallback />}>
-          <Routes>
+    <ChunkErrorBoundary>
+      <AuthProvider>
+        <BrowserRouter>
+          <Suspense fallback={<RouteFallback />}>
+            <Routes>
             {/* ---------- Públicas ---------- */}
             <Route path="/inicio" element={<Landing />} />
             <Route path="/login" element={<Login />} />
@@ -123,6 +133,7 @@ export default function App() {
           </Routes>
         </Suspense>
       </BrowserRouter>
-    </AuthProvider>
+      </AuthProvider>
+    </ChunkErrorBoundary>
   );
 }
