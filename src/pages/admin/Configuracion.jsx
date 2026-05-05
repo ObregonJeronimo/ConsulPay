@@ -861,7 +861,15 @@ function TabAdministradores({ consultorio, callerUid }) {
       setOkMsg(`${nombre} fue promovido a administrador.`);
       setProfesionalAPromover('');
     } catch (err) {
-      setError(err.message || 'No se pudo promover.');
+      // Caso especial: si ya hay 2 admins, mostramos un mensaje mas
+      // suave indicando que es un limite en evolucion, no un error.
+      const esLimiteAdmins = err.message?.includes('máximo de 2 administradores')
+        || err.message?.includes('máximo de');
+      if (esLimiteAdmins) {
+        setError('No puede haber más de 2 administradores en un consultorio. Estamos trabajando en ello…');
+      } else {
+        setError(err.message || 'No se pudo promover.');
+      }
     } finally {
       setSubmitting(false);
     }
