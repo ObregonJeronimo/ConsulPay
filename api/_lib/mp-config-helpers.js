@@ -195,6 +195,54 @@ export function calcularProximoDia15(fecha) {
   return proximoMes;
 }
 
+/**
+ * Calcula el rango de fechas [desde, hasta] del ciclo que contiene
+ * a una fecha dada. Los ciclos van del 15 al 14 del mes siguiente.
+ *
+ * Ejemplos:
+ *   fecha = 20-jul-2025 → { desde: 15-jul-2025, hasta: 14-ago-2025 23:59:59 }
+ *   fecha = 14-ago-2025 → { desde: 15-jul-2025, hasta: 14-ago-2025 23:59:59 }
+ *   fecha = 15-ago-2025 → { desde: 15-ago-2025, hasta: 14-sep-2025 23:59:59 }
+ *
+ * @param {Date} fecha - fecha cualquiera dentro del ciclo
+ * @returns {{ desde: Date, hasta: Date }}
+ */
+export function calcularRangoDelCiclo(fecha) {
+  const d = new Date(fecha);
+  const dia = d.getDate();
+
+  let desde, hasta;
+  if (dia >= 15) {
+    // Estamos en la primera mitad del ciclo: del 15 actual al 14 del proximo mes
+    desde = new Date(d.getFullYear(), d.getMonth(), 15, 0, 0, 0, 0);
+    hasta = new Date(d.getFullYear(), d.getMonth() + 1, 14, 23, 59, 59, 999);
+  } else {
+    // Estamos en la segunda mitad: del 15 del mes anterior al 14 actual
+    desde = new Date(d.getFullYear(), d.getMonth() - 1, 15, 0, 0, 0, 0);
+    hasta = new Date(d.getFullYear(), d.getMonth(), 14, 23, 59, 59, 999);
+  }
+
+  return { desde, hasta };
+}
+
+/**
+ * Devuelve un identificador legible del ciclo que contiene a la fecha.
+ * Formato: "AAAA-MM-15" donde AAAA-MM es el mes en que arranca el ciclo.
+ *
+ * Ejemplos:
+ *   fecha = 20-jul-2025 → "2025-07-15"
+ *   fecha = 14-ago-2025 → "2025-07-15"
+ *   fecha = 15-ago-2025 → "2025-08-15"
+ *
+ * Util como ID de la coleccion compensaciones (un doc por ciclo).
+ */
+export function calcularIdDelCiclo(fecha) {
+  const { desde } = calcularRangoDelCiclo(fecha);
+  const yyyy = desde.getFullYear();
+  const mm = String(desde.getMonth() + 1).padStart(2, '0');
+  return `${yyyy}-${mm}-15`;
+}
+
 /* ============================================================
    Acceso a token vigente del slot que cobra
    ============================================================ */

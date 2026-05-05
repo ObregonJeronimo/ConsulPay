@@ -133,3 +133,80 @@ export async function getPagoMP({ accessToken, paymentId }) {
 
   return data;
 }
+
+/**
+ * Busca pagos en MP filtrando por rango de fechas.
+ *
+ * Usado por el panel de reparto entre socias para ver cuanto cobro
+ * cada cuenta MP en un ciclo dado (15 al 14 del mes siguiente).
+ *
+ * Filtros que aplicamos:
+ *   - range = date_created (cuando se creo el pago)
+ *   - status = approved (solo pagos aprobados; los pending/rejected
+ *     no cuentan para el reparto)
+ *   - limit = 100, offset = 0 (paginar manualmente si hace falta)
+ *
+ * MP API: GET /v1/payments/search
+ *
+ * @param {Object} params
+ * @param {string} params.accessToken - access_token del slot consultado
+ * @param {Date}   params.desde - inicio del rango (inclusive)
+ * @param {Date}   params.hasta - fin del rango (inclusive)
+ * @param {number} [params.limit=100] - max resultados (max 100 segun MP)
+ * @param {number} [params.offset=0] - paginacion
+ * @returns {Promise<{
+ *   results: Array,
+ *   paging: { total, limit, offset }
+ * }>}
+ */
+export async function searchPagosMP({
+  accessToken,
+  desde,
+  hasta,
+  limit = 100,
+  offset = 0,
+}) {
+  if (!accessToken) throw new Error('accessToken requerido');
+  if (!(desde instanceof Date)) throw new Error('desde debe ser Date');
+  if (!(hasta instanceof Date)) throw new Error('hasta debe ser Date');
+  if (desde > hasta) throw new Error('desde debe ser <= hasta');
+
+  // MP usa formato ISO 8601 con offset (ej: 2025-07-15T00:00:00.000-03:00)
+  // Pero acepta tambien Z (UTC). Usamos UTC porque los Date de JS lo
+  // hacen mas predecible.
+  const beginDate = desde.toISOString();
+  const endDate = hasta.toISOString();
+
+  const params = new URLSearchParams({
+    sort: 'date_created',
+    criteria: 'desc',
+    range: 'date_created',
+    begin_date: beginDate,
+    end_date: endDate,
+    status: 'approved',
+    limit: String(limit),
+    offset: String(offset),
+  });
+
+  const url = `${MP_BASE}/v1/payments/search?${params.toString()}`;
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = data?.message || `MP devolvio ${res.status}`;
+    const err = new Error(`Error buscando pagos: ${msg}`);
+    err.mpStatus = res.status;
+    throw err;
+  }
+
+  return {
+    results: Array.isArray(data.results) ? data.results : [],
+    paging: data.paging || { total: 0, limit, offset },
+  };
+}
