@@ -19,7 +19,8 @@
   flex-wrap: wrap;
   gap: var(--cp-space-4);
   /* Altura mínima para que el skeleton y el header real ocupen el mismo espacio.
-     El h1 + sub ocupan ~70px, más el padding del gap. */
+     El h1 (~35px) + sub (~20px) + gap = ~70px. Con flex-wrap en mobile puede
+     crecer, pero el mínimo ancla el espacio y reduce el CLS. */
   min-height: 70px;
 }
 
@@ -42,11 +43,25 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: var(--cp-space-4);
+  /* min-height para que el grid ocupe el mismo espacio en skeleton y en contenido real,
+     evitando que cp-metrics-grid cambie de posición vertical (CLS). */
+  min-height: 116px;
 }
 
 @media (max-width: 900px) {
   .cp-metrics-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .cp-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+  /* En mobile el botón del header wrappea a una segunda fila.
+     Reservar altura mínima para que la grilla no se desplace (CLS). */
+  .cp-page-header {
+    min-height: 130px;
   }
 }
 
