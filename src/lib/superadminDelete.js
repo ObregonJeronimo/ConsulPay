@@ -103,23 +103,41 @@ async function callSuperApi(accion, params) {
     body: JSON.stringify({ accion, ...params }),
   });
 
+  // Leemos el body como texto primero, para poder mostrar el contenido
+  // crudo si no es JSON valido (ej: Vercel devuelve HTML cuando la
+  // funcion serverless crashea antes de poder responder).
+  const rawText = await res.text();
   let data;
   try {
-    data = await res.json();
+    data = rawText ? JSON.parse(rawText) : {};
   } catch {
     data = {};
   }
 
   if (!res.ok) {
-    // Si el backend envia detalle (mensaje tecnico), lo concatenamos
-    // al mensaje principal para tener mas info en el frontend.
+    // Si el body no es JSON parseable, lo mostramos crudo (truncado)
+    // para ver al menos el mensaje de error de Vercel/Node.
+    const detalleFallback = !data.detalle && !data.error && rawText
+      ? rawText.slice(0, 300)
+      : null;
+
     const errMsg = data.detalle && data.detalle !== data.error
       ? `${data.error || `Error ${res.status}`} — ${data.detalle}`
-      : (data.error || `Error ${res.status}`);
+      : (data.error || detalleFallback || `Error ${res.status}`);
+
+    // Log a consola para diagnostico (queda visible en DevTools)
+    console.error('[callSuperApi] Error response:', {
+      status: res.status,
+      contentType: res.headers.get('content-type'),
+      data,
+      rawText: rawText.slice(0, 500),
+    });
+
     const err = new Error(errMsg);
     err.status = res.status;
     err.codigo = data.codigo;
     err.detalle = data;
+    err.rawText = rawText;
     throw err;
   }
 
