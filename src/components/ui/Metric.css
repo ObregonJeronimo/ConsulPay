@@ -7,6 +7,9 @@
   border: 1px solid var(--cp-border);
   border-radius: var(--cp-radius-lg);
   padding: var(--cp-space-5) 22px;
+  /* min-height consistente con el SkeletonBox(height="100px") del Dashboard.
+     Evita layout shift cuando el skeleton se reemplaza por el contenido real. */
+  min-height: 100px;
 }
 
 .cp-metric__label {

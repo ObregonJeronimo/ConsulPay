@@ -6,6 +6,9 @@
   display: flex;
   flex-direction: column;
   gap: var(--cp-space-10);
+  /* Reservar altura mínima para evitar CLS entre skeleton y contenido real.
+     El skeleton y el dashboard normal ocupan al menos este espacio. */
+  min-height: 400px;
 }
 
 /* ---- Page header ---- */
@@ -15,6 +18,9 @@
   align-items: flex-end;
   flex-wrap: wrap;
   gap: var(--cp-space-4);
+  /* Altura mínima para que el skeleton y el header real ocupen el mismo espacio.
+     El h1 + sub ocupan ~70px, más el padding del gap. */
+  min-height: 70px;
 }
 
 .cp-page-title {
