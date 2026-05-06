@@ -52,14 +52,14 @@ export const CONSULTORIOS_PAGE_SIZE = 5;
  * edicion (como valores iniciales) como en la lista (para mostrar
  * "comision actual" cuando no esta definida explicitamente).
  *
- * Coinciden con la logica de negocio:
- *  - Free default: 6%
- *  - Pro default: 2%
+ * Coinciden con la logica de negocio (modelo nuevo, sobre valor total):
+ *  - Free default: 1%
+ *  - Pro default: 0.5%
  *  - puedeVerPlanPro default: true (habilitado para todos por default)
  */
 export const DEFAULTS_CONSULTORIO_SUPER = {
-  comisionFree: 6,
-  comisionPro: 2,
+  comisionFree: 1,
+  comisionPro: 0.5,
   puedeVerPlanPro: true,
 };
 

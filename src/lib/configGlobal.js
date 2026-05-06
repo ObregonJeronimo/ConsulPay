@@ -5,9 +5,22 @@
  * globales que solo el superadmin puede modificar y que todo el sistema
  * lee como referencia.
  *
- * Por ahora maneja la "comisión que se queda ConsulPay" según el plan
- * del consultorio. Cuando se cree un consultorio nuevo, se usa este
- * valor para inicializar su `comisionConsulpay`.
+ * Maneja la "comisión que se queda ConsulPay" según el plan del
+ * consultorio. Cuando se crea un consultorio nuevo, se usan estos
+ * valores para inicializar sus campos comisionFree/comisionPro.
+ *
+ * NUEVO MODELO (2026):
+ *   La comisión ConsulPay se calcula sobre el VALOR TOTAL INICIAL de la
+ *   sesión (lo que paga el paciente), NO sobre el monto que el profesional
+ *   le debe al consultorio. Es decir, si el paciente paga $25.000 y el
+ *   consultorio cobra 22%, el monto consultorio es $5.500 — pero la
+ *   comisión ConsulPay se calcula sobre los $25.000.
+ *
+ *   Free: 1% sobre el valor total
+ *   Pro:  0.5% sobre el valor total
+ *
+ *   El admin del consultorio decide si absorbe ese 0.5%/1% o lo traslada
+ *   al profesional aumentando el % del método de pago.
  *
  * IMPORTANTE: cambiar la config global NO afecta consultorios ya
  * existentes (sus comisiones quedan "grandfathered" en el valor que
@@ -23,10 +36,12 @@ import { db } from './firebase.js';
 /**
  * Defaults de fabrica. Si el doc /config/global no existe todavia
  * (primer arranque del sistema), usamos estos valores.
+ *
+ * Modelo nuevo: 1% en free, 0.5% en pro, sobre el valor total de la sesion.
  */
 export const CONFIG_GLOBAL_DEFAULT = Object.freeze({
-  comisionFree: 6, // 6% en plan free
-  comisionPro: 2,  // 2% en plan pro (paga $50.000/mes)
+  comisionFree: 1,   // 1% en plan free (sobre valor total)
+  comisionPro: 0.5,  // 0.5% en plan pro (sobre valor total)
 });
 
 const DOC_REF = () => doc(db, 'config', 'global');

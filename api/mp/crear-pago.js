@@ -6,18 +6,21 @@
  *  1. Valida auth + que el caller sea profesional del consultorio.
  *  2. Lee las sesiones a saldar y verifica que sean del profesional,
  *     del consultorio, y esten en estadoPago='debido'.
- *  3. Calcula montoTotal = suma de montoConsultorio.
- *  4. Calcula marketplaceFee usando la comision correcta segun el plan
- *     actual del consultorio (comisionPro si plan='pro', comisionFree
- *     si plan='free'). Backwards compat con comisionConsulpay viejo.
- *  5. Decide a que slot MP le toca cobrar (rotacion 15-15 si hay 2
+ *  3. Calcula montoTotal = suma de montoConsultorio (lo que paga el profesional).
+ *  4. Calcula valorTotalSesiones = suma de valorTotal (lo que pago originalmente
+ *     el paciente). Esta es la base de la comision Consulpay (modelo nuevo 2026).
+ *  5. Calcula marketplaceFee = valorTotalSesiones * comisionPct, usando la
+ *     comision correcta segun el plan actual del consultorio (comisionPro si
+ *     plan='pro', comisionFree si plan='free'). Backwards compat con
+ *     comisionConsulpay viejo.
+ *  6. Decide a que slot MP le toca cobrar (rotacion 15-15 si hay 2
  *     admins con MP conectada y reparto activo) y refresca el access
  *     token de ese slot si esta proximo a vencer.
- *  6. Crea preferencia en MP con marketplace_fee. El dinero cae directo
+ *  7. Crea preferencia en MP con marketplace_fee. El dinero cae directo
  *     en la cuenta MP del slot que cobra.
- *  7. Crea doc /pagos_consultorio/{pagoId} con estado='pendiente' +
+ *  8. Crea doc /pagos_consultorio/{pagoId} con estado='pendiente' +
  *     trazabilidad del slot/usuario MP que recibe.
- *  8. Devuelve { initPointUrl, pagoId } al frontend.
+ *  9. Devuelve { initPointUrl, pagoId } al frontend.
  *
  * SOPORTE MULTI-ADMIN
  * ----------------------------------------------------------------
@@ -162,7 +165,8 @@ export default async function handler(req, res) {
   const sesionesRefs = sesionesIds.map((id) => db.collection('sesiones').doc(id));
   const sesionesSnaps = await db.getAll(...sesionesRefs);
 
-  let montoTotal = 0;
+  let montoTotal = 0;       // suma de montoConsultorio (lo que paga el profesional)
+  let valorTotalSesiones = 0; // suma de valorTotal (base para la comision Consulpay)
   const sesionesValidadas = [];
   for (const snap of sesionesSnaps) {
     if (!snap.exists) {
@@ -194,7 +198,13 @@ export default async function handler(req, res) {
         error: `La sesión ${snap.id} tiene monto invalido.`,
       });
     }
+    // valorTotal puede no estar en sesiones muy viejas — fallback al
+    // monto que paga el profesional (lo que daria un fee subestimado
+    // en vez de explotar). En sesiones nuevas siempre esta.
+    const valorTot = Number(sData.valorTotal) || monto;
+
     montoTotal += monto;
+    valorTotalSesiones += valorTot;
     sesionesValidadas.push({ id: snap.id, data: sData });
   }
 
@@ -220,10 +230,30 @@ export default async function handler(req, res) {
   }
   const { comisionPct, fuente: fuenteComision } = comisionResolved;
 
-  // Caso especial: comision = 0% (consultorios de cortesia, partners, etc.)
-  // En MP el marketplace_fee debe ser >= 0 — 0 es valido, no hay que tratar
-  // como error. Simplemente no se cobra comision a consulpay.
-  const fee = Math.round((montoTotal * comisionPct / 100) * 100) / 100;
+  // MODELO NUEVO (2026): la comision ConsulPay se calcula sobre el
+  // VALOR TOTAL INICIAL de las sesiones (lo que paga el paciente),
+  // NO sobre montoConsultorio (lo que el profesional le debe).
+  //
+  // Ejemplo: paciente paga $25.000, consultorio cobra 22% al profesional,
+  // el profesional debe $5.500. Si comisionPct=0.5%, el fee es:
+  //   fee = $25.000 * 0.5% = $125
+  // El profesional paga $5.500 a MP, y MP redirige $125 a la cuenta de
+  // ConsulPay (marketplace_fee), dejando $5.375 al consultorio.
+  //
+  // ATENCION: si fee >= montoTotal, MP rechaza. Esto solo podria pasar
+  // si comisionPct es absurdamente alta (ej. 100%) y/o el % de metodo
+  // del consultorio es muy bajo. Como salvaguarda, lo capeamos al 95%
+  // de montoTotal.
+  let fee = Math.round((valorTotalSesiones * comisionPct / 100) * 100) / 100;
+  const feeMaximo = Math.round((montoTotal * 0.95) * 100) / 100;
+  if (fee > feeMaximo) {
+    console.warn(
+      `[crear-pago] fee calculado (${fee}) excede el 95% de montoTotal ` +
+      `(${montoTotal}). Capeado a ${feeMaximo}. Consultorio: ${consultorioId}, ` +
+      `comisionPct: ${comisionPct}, valorTotalSesiones: ${valorTotalSesiones}`,
+    );
+    fee = feeMaximo;
+  }
   const montoConsultorio = Math.round((montoTotal - fee) * 100) / 100;
 
   // ---------- 5. Asegurar access token vigente del slot que toca cobrar ----------

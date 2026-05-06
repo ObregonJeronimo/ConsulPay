@@ -51,18 +51,21 @@ export default async function handler(req, res) {
 
   const db = getFirestore();
 
-  // Leer comision Free (config global), con fallback 6
-  let comisionFree = 6;
+  // En el modelo nuevo, cada consultorio ya tiene comisionFree configurada.
+  // Al bajar a Free NO sobrescribimos: dejamos lo que cada consultorio tenga.
+  // Solo verificamos que NO falte el campo (compat consultorios antiguos).
+  // Si falta, leemos el default desde config/global como fallback.
+  let comisionFreeDefault = 1;
   try {
-    const cfgSnap = await db.collection('config').doc('comisiones').get();
+    const cfgSnap = await db.collection('config').doc('global').get();
     if (cfgSnap.exists) {
       const cfg = cfgSnap.data();
-      if (typeof cfg.free === 'number' && cfg.free >= 0 && cfg.free <= 100) {
-        comisionFree = cfg.free;
+      if (typeof cfg.comisionFree === 'number' && cfg.comisionFree >= 0 && cfg.comisionFree <= 100) {
+        comisionFreeDefault = cfg.comisionFree;
       }
     }
   } catch (err) {
-    console.warn('No se pudo leer config/comisiones, uso 6% default:', err.message);
+    console.warn('No se pudo leer config/global, uso 1% default:', err.message);
   }
 
   const ahora = new Date();
@@ -97,16 +100,28 @@ export default async function handler(req, res) {
     // Vencido. Bajamos a Free siempre (haya cancelado o no — si no
     // cancelo y MP no cobro, igual bajamos por seguridad. Si despues
     // MP cobra, el webhook va a re-extender el periodo).
+    //
+    // Solo seteamos comisionFree si el consultorio NO tiene el campo
+    // (compat consultorio antiguo). Si ya lo tiene configurado, lo
+    // respetamos.
     try {
-      await doc.ref.update({
+      const tieneComisionFree = typeof data.comisionFree === 'number'
+        && data.comisionFree >= 0
+        && data.comisionFree <= 100;
+
+      const update = {
         plan: 'free',
-        comisionConsulpay: comisionFree,
         planVenceEn: null,
         'subscription.status':
           sub.status === 'authorized' ? 'expired' : (sub.status || 'expired'),
         'subscription.expiredAt': FieldValue.serverTimestamp(),
         'subscription.updatedAt': FieldValue.serverTimestamp(),
-      });
+      };
+      if (!tieneComisionFree) {
+        update.comisionFree = comisionFreeDefault;
+      }
+
+      await doc.ref.update(update);
       stats.bajadosAFree += 1;
       console.log(
         `Cron: bajado a Free consultorio ${doc.id} (subStatus=${sub.status}, fin=${finDate.toISOString()})`,

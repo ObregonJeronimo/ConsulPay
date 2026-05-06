@@ -46,16 +46,19 @@ export async function crearConsultorio(params) {
   if (!ownerUid) throw new Error('ownerUid requerido');
   if (!nombreConsultorio?.trim()) throw new Error('El nombre del consultorio es obligatorio');
 
-  // Leemos la comision global del plan free ANTES de la transaction.
-  // Si no existe el doc /config/global, usa los defaults de fabrica (6%).
-  // Es una lectura mas, pero no es critica — si falla, igual creamos el
-  // consultorio con el default del plan.
-  let comisionInicial = 6; // fallback en caso de error de red al leer config
+  // Leemos las comisiones globales (free y pro) ANTES de la transaction.
+  // Si no existe el doc /config/global, usa los defaults de fabrica (1%/0.5%).
+  // El consultorio se crea con AMBOS valores porque cuando suba a Pro va a
+  // necesitar el comisionPro ya configurado. Si falla la lectura, usamos
+  // los defaults — no es critico bloquear la creacion del consultorio.
+  let comisionFreeInicial = 1;  // fallback nuevo modelo
+  let comisionProInicial = 0.5; // fallback nuevo modelo
   try {
     const configGlobal = await obtenerConfigGlobal();
-    comisionInicial = configGlobal.comisionFree;
+    comisionFreeInicial = configGlobal.comisionFree;
+    comisionProInicial = configGlobal.comisionPro;
   } catch (err) {
-    console.warn('No se pudo leer config global, usando default 6%:', err);
+    console.warn('No se pudo leer config global, usando defaults 1%/0.5%:', err);
   }
 
   // Genero un id nuevo para el consultorio
@@ -88,7 +91,10 @@ export async function crearConsultorio(params) {
       adminUids: [ownerUid],
       plan: PLANES.FREE,
       planVenceEn: null,
-      comisionConsulpay: comisionInicial,
+      // Modelo nuevo: ambos campos por consultorio. El backend resuelve
+      // cual usar segun el plan actual al cobrar.
+      comisionFree: comisionFreeInicial,
+      comisionPro: comisionProInicial,
       mpIntegrado: false,
       mpConfig: null,
       ualaIntegrado: false,

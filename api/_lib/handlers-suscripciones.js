@@ -105,24 +105,47 @@ export async function procesarPreapproval(db, accessToken, preapprovalId) {
   }
 
   if (cambiaPlanAPro) {
-    // Activar Plan Pro: comision baja a 2%.
-    let comisionPro = 2;
-    try {
-      const cfgSnap = await db.collection('config').doc('comisiones').get();
-      if (cfgSnap.exists) {
-        const cfg = cfgSnap.data();
-        if (typeof cfg.pro === 'number' && cfg.pro >= 0 && cfg.pro <= 100) {
-          comisionPro = cfg.pro;
-        }
-      }
-    } catch (err) {
-      console.warn('No se pudo leer config/comisiones, uso 2% default:', err.message);
-    }
-
+    // Activar Plan Pro. En el modelo nuevo NO sobrescribimos campos de
+    // comision: cada consultorio ya tiene comisionFree y comisionPro
+    // configurados (desde su creacion o ajustados por superadmin).
+    // El backend resuelve cual usar segun plan actual al cobrar.
+    //
+    // Backwards compat: si el consultorio NO tiene comisionPro definido
+    // (consultorio antiguo del modelo viejo), seteamos un fallback desde
+    // config/global para que no quede sin comision al subir a Pro.
     updates.plan = 'pro';
-    updates.comisionConsulpay = comisionPro;
     updates.planVenceEn = currentPeriodEnd || null;
     updates['subscription.consecutiveFailures'] = 0;
+
+    try {
+      const consSnap = await db.collection('consultorios').doc(consultorioId).get();
+      const consData = consSnap.exists ? consSnap.data() : {};
+      const tieneComisionPro = typeof consData.comisionPro === 'number'
+        && consData.comisionPro >= 0
+        && consData.comisionPro <= 100;
+      if (!tieneComisionPro) {
+        // Leer default del config global (modelo nuevo)
+        let comisionProDefault = 0.5;
+        try {
+          const cfgSnap = await db.collection('config').doc('global').get();
+          if (cfgSnap.exists) {
+            const cfg = cfgSnap.data();
+            if (typeof cfg.comisionPro === 'number' && cfg.comisionPro >= 0 && cfg.comisionPro <= 100) {
+              comisionProDefault = cfg.comisionPro;
+            }
+          }
+        } catch (err) {
+          console.warn('No se pudo leer config/global, uso 0.5% default:', err.message);
+        }
+        updates.comisionPro = comisionProDefault;
+        console.log(
+          `Consultorio ${consultorioId} no tenia comisionPro definido, ` +
+          `seteado a ${comisionProDefault}% al subir a Pro.`,
+        );
+      }
+    } catch (err) {
+      console.warn(`No se pudo verificar comisionPro de ${consultorioId}:`, err.message);
+    }
   }
 
   await db.collection('consultorios').doc(consultorioId).update(updates);
