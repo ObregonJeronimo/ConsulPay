@@ -16,9 +16,9 @@
  *   - Codigo Civil y Comercial de la Nacion (Argentina)
  *
  * Notas sobre clausulas comerciales:
- *   - Las comisiones (6% Free, 2% Pro) NO se hardcodean acá porque
- *     pueden cambiar via /config/comisiones. Se mencionan como
- *     "según el plan vigente al momento de cada operación".
+ *   - Las comisiones (1% Free, 0.5% Pro sobre el valor total inicial de la
+ *     sesion) NO se hardcodean acá porque pueden cambiar via /config/global.
+ *     Se mencionan como "según el plan vigente al momento de cada operación".
  *   - El precio del Plan Pro tampoco se hardcodea ($50.000/mes)
  *     porque sale de env var CONSULPAY_PRECIO_PRO_ARS.
  */

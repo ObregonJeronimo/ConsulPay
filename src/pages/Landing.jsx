@@ -302,7 +302,7 @@ function Precios() {
               <li><CheckIcon /> Panel de autogestión para profesionales</li>
               <li><CheckIcon /> Pagos vía transferencia manual</li>
               <li className="lp-price-card__muted">
-                <CheckIcon /> 6% comisión ConsulPay por transacción MP
+                <CheckIcon /> 1% comisión ConsulPay sobre el valor total de cada sesión
               </li>
             </ul>
 
@@ -331,7 +331,7 @@ function Precios() {
               <li><CheckIcon /> Split automático de pagos</li>
               <li><CheckIcon /> Soporte prioritario</li>
               <li className="lp-price-card__highlight">
-                <CheckIcon /> <strong>2%</strong> comisión ConsulPay por transacción MP
+                <CheckIcon /> <strong>0.5%</strong> comisión ConsulPay sobre el valor total de cada sesión
               </li>
             </ul>
 
@@ -342,8 +342,10 @@ function Precios() {
         </div>
 
         <p className="lp-pricing__note">
-          Además de la comisión de ConsulPay, Mercado Pago aplica ~6% por cobro
-          inmediato. Los porcentajes se descuentan automáticamente de cada transacción.
+          La comisión de ConsulPay se calcula sobre el valor total inicial de cada
+          sesión (lo que paga el paciente). Mercado Pago, además, aplica su propia
+          comisión por procesar el cobro. Todos los porcentajes se descuentan
+          automáticamente de cada transacción.
         </p>
       </div>
     </section>
