@@ -8,6 +8,15 @@
     <meta name="description" content="ConsulPay — Gestión de consultorios y pagos de profesionales" />
     <title>ConsulPay</title>
 
+    <!-- Preconnects: abren TCP+TLS antes de que el JS los necesite.
+         Lighthouse marcó estos 3 como candidatos con ahorros de 290-400ms c/u.
+         firebaseapp.com: iframe de auth de Firebase (se carga siempre).
+         googleapis.com / firestore.googleapis.com: llamadas de auth y Firestore. -->
+    <link rel="preconnect" href="https://consulpay-b84f0.firebaseapp.com" crossorigin />
+    <link rel="preconnect" href="https://www.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://apis.google.com" crossorigin />
+
     <!-- Fonts -->
     <!-- preconnect: ahorra ~100ms abriendo TCP+TLS antes de pedir el CSS -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
