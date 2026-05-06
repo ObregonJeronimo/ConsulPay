@@ -42,9 +42,9 @@
 
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 
-import { verificarAuthHeader } from '../_lib/auth.js';
-import { initAdmin } from '../_lib/firebase-admin.js';
-import { jsonResponse, readJsonBody } from '../_lib/http.js';
+import { verificarAuthHeader } from './_lib/auth.js';
+import { initAdmin } from './_lib/firebase-admin.js';
+import { jsonResponse, readJsonBody } from './_lib/http.js';
 
 /* ============================================================
    Helpers internos
@@ -340,6 +340,7 @@ async function ejecutarEliminarProfesional(db, callerUid, callerData, body) {
    ============================================================ */
 
 async function ejecutarMigrarComisiones2026(db, callerUid, callerData, body) {
+  console.log('[migrar-2026] INICIO. dryRun=', body.dryRun);
   const dryRun = body.dryRun === true;
   const NUEVO_FREE = 1;
   const NUEVO_PRO = 0.5;
@@ -351,22 +352,22 @@ async function ejecutarMigrarComisiones2026(db, callerUid, callerData, body) {
   let cfgNeedsUpdate = false;
 
   // 1. /config/global
+  console.log('[migrar-2026] Leyendo /config/global...');
   try {
     const cfgRef = db.collection('config').doc('global');
     const cfgSnap = await cfgRef.get();
     const cfgData = cfgSnap.exists ? cfgSnap.data() : {};
+    console.log('[migrar-2026] config/global existe=', cfgSnap.exists, 'data=', cfgData);
     cfgNeedsUpdate = (
       Number(cfgData.comisionFree) !== NUEVO_FREE
       || Number(cfgData.comisionPro) !== NUEVO_PRO
     );
     if (cfgNeedsUpdate) {
       const fActual = Number.isFinite(Number(cfgData.comisionFree))
-        ? Number(cfgData.comisionFree) : 'no-existe';
+        ? String(Number(cfgData.comisionFree)) : 'no-existe';
       const pActual = Number.isFinite(Number(cfgData.comisionPro))
-        ? Number(cfgData.comisionPro) : 'no-existe';
-      log.push(
-        `config/global: ${fActual}/${pActual} → ${NUEVO_FREE}/${NUEVO_PRO}`,
-      );
+        ? String(Number(cfgData.comisionPro)) : 'no-existe';
+      log.push('config/global: ' + fActual + '/' + pActual + ' -> ' + NUEVO_FREE + '/' + NUEVO_PRO);
       if (!dryRun) {
         await cfgRef.set({
           comisionFree: NUEVO_FREE,
@@ -378,28 +379,30 @@ async function ejecutarMigrarComisiones2026(db, callerUid, callerData, body) {
       }
     }
   } catch (err) {
-    console.error('[migrar-2026] Error leyendo/escribiendo config/global:', err);
-    errores.push(`config/global: ${err.message}`);
+    console.error('[migrar-2026] Error en /config/global:', err);
+    errores.push('config/global: ' + (err && err.message ? err.message : String(err)));
   }
 
   // 2. Cada consultorio
+  console.log('[migrar-2026] Leyendo coleccion consultorios...');
   let consSnap;
   try {
     consSnap = await db.collection('consultorios').get();
+    console.log('[migrar-2026] consultorios.size=', consSnap.size);
   } catch (err) {
-    console.error('[migrar-2026] Error leyendo coleccion consultorios:', err);
+    console.error('[migrar-2026] Error leyendo consultorios:', err);
     return {
       status: 500,
       payload: {
-        error: 'No se pudo leer la colección de consultorios.',
-        detalle: err.message,
+        error: 'No se pudo leer la coleccion de consultorios.',
+        detalle: err && err.message ? err.message : String(err),
       },
     };
   }
 
   for (const doc of consSnap.docs) {
     try {
-      const data = doc.data();
+      const data = doc.data() || {};
       const updates = {};
       const nombre = data.nombre || '(sin nombre)';
 
@@ -408,25 +411,21 @@ async function ejecutarMigrarComisiones2026(db, callerUid, callerData, body) {
       const tieneFree = Number.isFinite(cFree) && cFree >= 0 && cFree <= 100;
       const tienePro = Number.isFinite(cPro) && cPro >= 0 && cPro <= 100;
 
-      // Caso A: no tiene comisionFree o tiene valor del modelo viejo (>=2)
-      if (!tieneFree) {
-        updates.comisionFree = NUEVO_FREE;
-      } else if (cFree >= 2) {
+      if (!tieneFree || cFree >= 2) {
         updates.comisionFree = NUEVO_FREE;
       }
-
-      // Caso B: no tiene comisionPro o tiene valor del modelo viejo (>=1.5)
-      if (!tienePro) {
-        updates.comisionPro = NUEVO_PRO;
-      } else if (cPro >= 1.5) {
+      if (!tienePro || cPro >= 1.5) {
         updates.comisionPro = NUEVO_PRO;
       }
 
       if (Object.keys(updates).length > 0) {
+        const fStr = tieneFree ? String(cFree) : 'no-existe';
+        const pStr = tienePro ? String(cPro) : 'no-existe';
+        const fNuevo = updates.comisionFree !== undefined ? String(updates.comisionFree) : fStr;
+        const pNuevo = updates.comisionPro !== undefined ? String(updates.comisionPro) : pStr;
         log.push(
-          `consultorio ${doc.id} (${nombre}, plan=${data.plan || 'free'}): ` +
-          `free ${tieneFree ? cFree : 'no-existe'}→${updates.comisionFree ?? cFree}, ` +
-          `pro ${tienePro ? cPro : 'no-existe'}→${updates.comisionPro ?? cPro}`,
+          'consultorio ' + doc.id + ' (' + nombre + ', plan=' + (data.plan || 'free') + '): ' +
+          'free ' + fStr + '->' + fNuevo + ', pro ' + pStr + '->' + pNuevo
         );
         if (!dryRun) {
           await doc.ref.update(updates);
@@ -434,17 +433,17 @@ async function ejecutarMigrarComisiones2026(db, callerUid, callerData, body) {
         consultoriosActualizados++;
       }
     } catch (err) {
-      console.error(`[migrar-2026] Error procesando consultorio ${doc.id}:`, err);
-      errores.push(`consultorio ${doc.id}: ${err.message}`);
+      console.error('[migrar-2026] Error consultorio ' + doc.id + ':', err);
+      errores.push('consultorio ' + doc.id + ': ' + (err && err.message ? err.message : String(err)));
     }
   }
 
   console.log(
-    `[super:migrar-comisiones-2026] ${dryRun ? '(DRY-RUN) ' : ''}` +
-    `Ejecutado por ${callerData.email || callerUid}. ` +
-    `Consultorios afectados: ${consultoriosActualizados}/${consSnap.size}. ` +
-    `config/global: ${configGlobalActualizado || (dryRun && cfgNeedsUpdate) ? 'sí' : 'no'}. ` +
-    `Errores: ${errores.length}.`,
+    '[migrar-2026] FIN.' +
+    ' dryRun=' + dryRun +
+    ' afectados=' + consultoriosActualizados + '/' + consSnap.size +
+    ' cfgUpdate=' + (configGlobalActualizado || (dryRun && cfgNeedsUpdate)) +
+    ' errores=' + errores.length
   );
 
   return {
