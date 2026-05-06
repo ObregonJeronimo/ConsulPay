@@ -111,7 +111,12 @@ async function callSuperApi(accion, params) {
   }
 
   if (!res.ok) {
-    const err = new Error(data.error || `Error ${res.status}`);
+    // Si el backend envia detalle (mensaje tecnico), lo concatenamos
+    // al mensaje principal para tener mas info en el frontend.
+    const errMsg = data.detalle && data.detalle !== data.error
+      ? `${data.error || `Error ${res.status}`} — ${data.detalle}`
+      : (data.error || `Error ${res.status}`);
+    const err = new Error(errMsg);
     err.status = res.status;
     err.codigo = data.codigo;
     err.detalle = data;

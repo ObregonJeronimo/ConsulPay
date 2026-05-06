@@ -345,71 +345,97 @@ async function ejecutarMigrarComisiones2026(db, callerUid, callerData, body) {
   const NUEVO_PRO = 0.5;
 
   const log = [];
+  const errores = [];
   let consultoriosActualizados = 0;
   let configGlobalActualizado = false;
+  let cfgNeedsUpdate = false;
 
   // 1. /config/global
-  const cfgRef = db.collection('config').doc('global');
-  const cfgSnap = await cfgRef.get();
-  const cfgData = cfgSnap.exists ? cfgSnap.data() : {};
-  const cfgNeedsUpdate = (
-    Number(cfgData.comisionFree) !== NUEVO_FREE
-    || Number(cfgData.comisionPro) !== NUEVO_PRO
-  );
-  if (cfgNeedsUpdate) {
-    log.push(
-      `config/global: ${Number(cfgData.comisionFree)}/${Number(cfgData.comisionPro)} ` +
-      `→ ${NUEVO_FREE}/${NUEVO_PRO}`,
+  try {
+    const cfgRef = db.collection('config').doc('global');
+    const cfgSnap = await cfgRef.get();
+    const cfgData = cfgSnap.exists ? cfgSnap.data() : {};
+    cfgNeedsUpdate = (
+      Number(cfgData.comisionFree) !== NUEVO_FREE
+      || Number(cfgData.comisionPro) !== NUEVO_PRO
     );
-    if (!dryRun) {
-      await cfgRef.set({
-        comisionFree: NUEVO_FREE,
-        comisionPro: NUEVO_PRO,
-        updatedAt: FieldValue.serverTimestamp(),
-        updatedBy: callerUid,
-      }, { merge: true });
-      configGlobalActualizado = true;
+    if (cfgNeedsUpdate) {
+      const fActual = Number.isFinite(Number(cfgData.comisionFree))
+        ? Number(cfgData.comisionFree) : 'no-existe';
+      const pActual = Number.isFinite(Number(cfgData.comisionPro))
+        ? Number(cfgData.comisionPro) : 'no-existe';
+      log.push(
+        `config/global: ${fActual}/${pActual} → ${NUEVO_FREE}/${NUEVO_PRO}`,
+      );
+      if (!dryRun) {
+        await cfgRef.set({
+          comisionFree: NUEVO_FREE,
+          comisionPro: NUEVO_PRO,
+          updatedAt: FieldValue.serverTimestamp(),
+          updatedBy: callerUid,
+        }, { merge: true });
+        configGlobalActualizado = true;
+      }
     }
+  } catch (err) {
+    console.error('[migrar-2026] Error leyendo/escribiendo config/global:', err);
+    errores.push(`config/global: ${err.message}`);
   }
 
   // 2. Cada consultorio
-  const consSnap = await db.collection('consultorios').get();
+  let consSnap;
+  try {
+    consSnap = await db.collection('consultorios').get();
+  } catch (err) {
+    console.error('[migrar-2026] Error leyendo coleccion consultorios:', err);
+    return {
+      status: 500,
+      payload: {
+        error: 'No se pudo leer la colección de consultorios.',
+        detalle: err.message,
+      },
+    };
+  }
+
   for (const doc of consSnap.docs) {
-    const data = doc.data();
-    const updates = {};
-    const nombre = data.nombre || '(sin nombre)';
+    try {
+      const data = doc.data();
+      const updates = {};
+      const nombre = data.nombre || '(sin nombre)';
 
-    const cFree = Number(data.comisionFree);
-    const cPro = Number(data.comisionPro);
-    const tieneFree = Number.isFinite(cFree) && cFree >= 0 && cFree <= 100;
-    const tienePro = Number.isFinite(cPro) && cPro >= 0 && cPro <= 100;
+      const cFree = Number(data.comisionFree);
+      const cPro = Number(data.comisionPro);
+      const tieneFree = Number.isFinite(cFree) && cFree >= 0 && cFree <= 100;
+      const tienePro = Number.isFinite(cPro) && cPro >= 0 && cPro <= 100;
 
-    // Caso A: no tiene comisionFree
-    if (!tieneFree) {
-      updates.comisionFree = NUEVO_FREE;
-    } else if (cFree >= 2) {
-      // Modelo viejo (>=2% para Free era el default 6%). Bajamos.
-      updates.comisionFree = NUEVO_FREE;
-    }
-
-    // Caso B: no tiene comisionPro
-    if (!tienePro) {
-      updates.comisionPro = NUEVO_PRO;
-    } else if (cPro >= 1.5) {
-      // Modelo viejo (>=1.5% para Pro era 2%). Bajamos.
-      updates.comisionPro = NUEVO_PRO;
-    }
-
-    if (Object.keys(updates).length > 0) {
-      log.push(
-        `consultorio ${doc.id} (${nombre}, plan=${data.plan || 'free'}): ` +
-        `free ${tieneFree ? cFree : 'no-existe'}→${updates.comisionFree ?? cFree}, ` +
-        `pro ${tienePro ? cPro : 'no-existe'}→${updates.comisionPro ?? cPro}`,
-      );
-      if (!dryRun) {
-        await doc.ref.update(updates);
+      // Caso A: no tiene comisionFree o tiene valor del modelo viejo (>=2)
+      if (!tieneFree) {
+        updates.comisionFree = NUEVO_FREE;
+      } else if (cFree >= 2) {
+        updates.comisionFree = NUEVO_FREE;
       }
-      consultoriosActualizados++;
+
+      // Caso B: no tiene comisionPro o tiene valor del modelo viejo (>=1.5)
+      if (!tienePro) {
+        updates.comisionPro = NUEVO_PRO;
+      } else if (cPro >= 1.5) {
+        updates.comisionPro = NUEVO_PRO;
+      }
+
+      if (Object.keys(updates).length > 0) {
+        log.push(
+          `consultorio ${doc.id} (${nombre}, plan=${data.plan || 'free'}): ` +
+          `free ${tieneFree ? cFree : 'no-existe'}→${updates.comisionFree ?? cFree}, ` +
+          `pro ${tienePro ? cPro : 'no-existe'}→${updates.comisionPro ?? cPro}`,
+        );
+        if (!dryRun) {
+          await doc.ref.update(updates);
+        }
+        consultoriosActualizados++;
+      }
+    } catch (err) {
+      console.error(`[migrar-2026] Error procesando consultorio ${doc.id}:`, err);
+      errores.push(`consultorio ${doc.id}: ${err.message}`);
     }
   }
 
@@ -417,7 +443,8 @@ async function ejecutarMigrarComisiones2026(db, callerUid, callerData, body) {
     `[super:migrar-comisiones-2026] ${dryRun ? '(DRY-RUN) ' : ''}` +
     `Ejecutado por ${callerData.email || callerUid}. ` +
     `Consultorios afectados: ${consultoriosActualizados}/${consSnap.size}. ` +
-    `config/global actualizado: ${configGlobalActualizado || (dryRun && cfgNeedsUpdate)}.`,
+    `config/global: ${configGlobalActualizado || (dryRun && cfgNeedsUpdate) ? 'sí' : 'no'}. ` +
+    `Errores: ${errores.length}.`,
   );
 
   return {
@@ -429,6 +456,7 @@ async function ejecutarMigrarComisiones2026(db, callerUid, callerData, body) {
       consultoriosActualizados,
       configGlobalActualizado: configGlobalActualizado || (dryRun && cfgNeedsUpdate),
       log,
+      errores: errores.length > 0 ? errores : undefined,
     },
   };
 }
