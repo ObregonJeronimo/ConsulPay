@@ -500,3 +500,74 @@
   color: var(--cp-text-muted);
   line-height: 1.55;
 }
+
+/* ============================================================
+   Lista de profesionales con deuda abierta del mes
+   ============================================================
+   Item por profesional, con su monto adeudado a la derecha.
+   Tipografia consistente con el resto del Dashboard. */
+.cp-deuda-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.cp-deuda-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  border: 0.5px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  background: var(--cp-bg);
+  margin-bottom: 8px;
+  transition: border-color var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-deuda-item:hover {
+  border-color: var(--cp-border-strong);
+}
+
+.cp-deuda-item:last-child {
+  margin-bottom: 0;
+}
+
+.cp-deuda-item__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.cp-deuda-item__name {
+  font-family: var(--cp-font-sans);
+  font-weight: 500;
+  font-size: 14.5px;
+  color: var(--cp-text);
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cp-deuda-item__sub {
+  font-size: 12.5px;
+  color: var(--cp-text-muted);
+  margin-top: 2px;
+}
+
+.cp-deuda-item__monto {
+  font-family: var(--cp-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--cp-danger);
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .cp-deuda-item { padding: 12px 14px; gap: 12px; }
+  .cp-deuda-item__name { font-size: 14px; }
+  .cp-deuda-item__monto { font-size: 15px; }
+}

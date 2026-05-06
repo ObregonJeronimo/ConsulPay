@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import Metric from '../../components/ui/Metric.jsx';
@@ -7,9 +7,15 @@ import { SkeletonBox } from '../../components/ui/Skeleton.jsx';
 
 import { useAuth } from '../../hooks/useAuth.js';
 import { useConsultorio } from '../../hooks/useConsultorio.js';
-import { formatoARS, PLANES } from '../../lib/constants.js';
+import { ESTADOS_PAGO_SESION, formatoARS, PLANES } from '../../lib/constants.js';
 import { suscribirProfesionales } from '../../lib/profesionales.js';
 import { suscribirInvitaciones } from '../../lib/invitaciones.js';
+import {
+  finDeMes,
+  inicioDeMes,
+  suscribirSesionesConsultorio,
+  totalesGlobales,
+} from '../../lib/sesiones.js';
 
 import './Dashboard.css';
 
@@ -31,6 +37,7 @@ export default function Dashboard() {
 
   const [profesionales, setProfesionales] = useState([]);
   const [invitaciones, setInvitaciones] = useState([]);
+  const [sesionesMes, setSesionesMes] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -44,6 +51,60 @@ export default function Dashboard() {
 
     return () => { unsubP(); unsubI(); };
   }, [user?.consultorioId]);
+
+  // Suscripcion a sesiones del mes en curso para alimentar las metricas.
+  // Se filtra en el query por rango [inicioDeMes, finDeMes] para no
+  // traer datos de meses anteriores. Cuando alguien marca/desmarca
+  // pagada, el snapshot se actualiza solo y las metricas refrescan.
+  useEffect(() => {
+    if (!user?.consultorioId) return;
+    const ahora = new Date();
+    const desde = inicioDeMes(ahora);
+    const hasta = finDeMes(ahora);
+    const unsub = suscribirSesionesConsultorio(
+      user.consultorioId,
+      (data) => setSesionesMes(data),
+      { desde, hasta },
+    );
+    return unsub;
+  }, [user?.consultorioId]);
+
+  // Stats del mes (mismas reglas que la pagina de Sesiones):
+  // - porCobrar = suma de montoConsultorio de sesiones DEBIDA
+  //   (lo que el profesional aun no le pago al consultorio)
+  // - cobrado   = suma de montoConsultorio de sesiones PAGADA
+  // - cantidad  = cantidad de "encuentros" (con cantidadSesiones)
+  const stats = useMemo(() => totalesGlobales(sesionesMes), [sesionesMes]);
+  const cobrado = stats.totalConsultorio - stats.debido;
+  const porCobrar = stats.debido;
+  const cantidadEncuentros = stats.cantidad;
+  const cantidadRegistros = stats.cantidadRegistros;
+
+  // Profesionales con deuda abierta del mes (agrupado).
+  // Mostramos los top 5 con mayor deuda, cada uno con su monto y cantidad
+  // de sesiones impagas. Si hay 0, fallback al placeholder original.
+  const deudaPorProfesional = useMemo(() => {
+    const mapa = new Map();
+    for (const s of sesionesMes) {
+      if (s.estadoPago !== ESTADOS_PAGO_SESION.DEBIDO) continue;
+      const uid = s.profesionalUid;
+      if (!uid) continue;
+      const prev = mapa.get(uid) || { uid, monto: 0, sesiones: 0 };
+      prev.monto += Number(s.montoConsultorio || 0);
+      prev.sesiones += 1;
+      mapa.set(uid, prev);
+    }
+    const arr = Array.from(mapa.values());
+    arr.sort((a, b) => b.monto - a.monto);
+    return arr.slice(0, 5);
+  }, [sesionesMes]);
+
+  // Mapa profesionalUid -> displayName/email para mostrar nombres
+  const mapaProfesionales = useMemo(() => {
+    const m = {};
+    for (const p of profesionales) m[p.uid] = p;
+    return m;
+  }, [profesionales]);
 
   // Calcular el mes una sola vez, sin Firestore. Se usa en el skeleton y en el render final.
   const mesActual = new Intl.DateTimeFormat('es-AR', { month: 'long' }).format(new Date());
@@ -116,30 +177,74 @@ export default function Dashboard() {
         </Link>
       </header>
 
-      {/* Métricas — por ahora 0 en todos, se llenan cuando haya sesiones */}
+      {/* Metricas del mes en curso. Las sesiones se suscriben en useEffect
+          y se totalizan con totalesGlobales(), igual que en /admin/sesiones.
+          Si no hay sesiones todavia, mostramos el sub helper "Sin sesiones
+          todavía" para no dejar cards en blanco. */}
       <section className="cp-metrics-grid">
-        <Metric label="Por cobrar" value={formatoARS.format(0)} sub="Sin sesiones todavía" />
-        <Metric label="Cobrado este mes" value={formatoARS.format(0)} sub="Sin sesiones todavía" />
+        <Metric
+          label="Por cobrar"
+          value={formatoARS.format(porCobrar)}
+          sub={cantidadRegistros === 0
+            ? 'Sin sesiones todavía'
+            : (porCobrar > 0
+              ? `${deudaPorProfesional.length} ${deudaPorProfesional.length === 1 ? 'profesional debe' : 'profesionales deben'}`
+              : 'Todo cobrado este mes')}
+        />
+        <Metric
+          label="Cobrado este mes"
+          value={formatoARS.format(cobrado)}
+          sub={cantidadRegistros === 0 ? 'Sin sesiones todavía' : 'ya recibido por el consultorio'}
+        />
         <Metric
           label="Profesionales activos"
           value={profesionalesActivos.length}
           sub={invitacionesPendientes.length > 0 ? `${invitacionesPendientes.length} pendiente${invitacionesPendientes.length === 1 ? '' : 's'}` : null}
         />
-        <Metric label="Sesiones del mes" value={0} sub="Sin registros todavía" />
+        <Metric
+          label="Sesiones del mes"
+          value={cantidadEncuentros}
+          sub={cantidadRegistros === 0
+            ? 'Sin registros todavía'
+            : `${cantidadRegistros} ${cantidadRegistros === 1 ? 'registro' : 'registros'}`}
+        />
       </section>
 
-      {/* Placeholder hasta tener sesiones */}
+      {/* Profesionales con deuda abierta */}
       <section className="cp-section">
         <div className="cp-section-head">
           <h2 className="cp-section-title">Profesionales con deuda abierta</h2>
           <Link to="/admin/profesionales" className="cp-section-link">Ver todos →</Link>
         </div>
-        <div className="cp-placeholder-box">
-          <p style={{ color: 'var(--cp-text-muted)', fontSize: 14 }}>
-            Todavía no se registraron sesiones este mes. Cuando tus profesionales hagan
-            sesiones con pacientes, la deuda acumulada va a aparecer acá.
-          </p>
-        </div>
+        {deudaPorProfesional.length === 0 ? (
+          <div className="cp-placeholder-box">
+            <p style={{ color: 'var(--cp-text-muted)', fontSize: 14 }}>
+              {cantidadRegistros === 0
+                ? 'Todavía no se registraron sesiones este mes. Cuando tus profesionales hagan sesiones con pacientes, la deuda acumulada va a aparecer acá.'
+                : '✓ No hay deuda abierta este mes. Todos los profesionales están al día con sus pagos.'}
+            </p>
+          </div>
+        ) : (
+          <ul className="cp-deuda-list">
+            {deudaPorProfesional.map((d) => {
+              const prof = mapaProfesionales[d.uid];
+              const nombre = prof?.displayName || prof?.email || 'Profesional sin nombre';
+              return (
+                <li key={d.uid} className="cp-deuda-item">
+                  <div className="cp-deuda-item__info">
+                    <div className="cp-deuda-item__name">{nombre}</div>
+                    <div className="cp-deuda-item__sub">
+                      {d.sesiones} {d.sesiones === 1 ? 'sesión impaga' : 'sesiones impagas'}
+                    </div>
+                  </div>
+                  <div className="cp-deuda-item__monto">
+                    {formatoARS.format(d.monto)}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </section>
     </div>
   );
