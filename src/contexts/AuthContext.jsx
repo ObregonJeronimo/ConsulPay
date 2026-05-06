@@ -12,6 +12,12 @@
  * (rol, estado, consultorioId, permitirEdicionSesiones, etc.) se
  * refleja al instante en useAuth().user, sin necesidad de re-login.
  *
+ * OPTIMIZACIÓN LCP (render optimista):
+ * El doc del usuario se cachea en localStorage. En visitas recurrentes,
+ * se usa ese cache como estado inicial (loading=false desde el primer
+ * render) y se actualiza silenciosamente cuando Firebase resuelve.
+ * Esto elimina el blank state de ~800ms que causaba LCP alto.
+ *
  * El hook useAuth() vive en ../hooks/useAuth.js para que este archivo
  * solo exporte componentes (requerido por react-refresh).
  */
@@ -23,9 +29,35 @@ import { auth } from '../lib/firebase.js';
 import { getUserDoc, signOut as authSignOut, suscribirUserDoc } from '../lib/auth.js';
 import { AuthContext } from './authContextValue.js';
 
+const USER_CACHE_KEY = 'cp_user_cache';
+
+function leerCache() {
+  try {
+    const raw = localStorage.getItem(USER_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function escribirCache(userData) {
+  try {
+    if (userData) {
+      localStorage.setItem(USER_CACHE_KEY, JSON.stringify(userData));
+    } else {
+      localStorage.removeItem(USER_CACHE_KEY);
+    }
+  } catch {
+    // localStorage puede estar bloqueado en modo privado — no es crítico
+  }
+}
+
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // Arrancar con el cache si existe: loading=false y user del cache.
+  // Firebase va a confirmar/invalidar esto en background via onAuthStateChanged.
+  const cachedUser = leerCache();
+  const [user, setUser] = useState(cachedUser);
+  const [loading, setLoading] = useState(!cachedUser);
 
   /*
     Ref a la suscripcion al doc del usuario. La guardamos aca (no en
@@ -50,6 +82,8 @@ export function AuthProvider({ children }) {
       limpiarUnsubDoc();
 
       if (!firebaseUser) {
+        // No hay sesion: limpiar cache y estado
+        escribirCache(null);
         setUser(null);
         setLoading(false);
         return;
@@ -63,6 +97,7 @@ export function AuthProvider({ children }) {
           venir con datos validos y no con snap.exists() === false.
         */
         const initial = await getUserDoc(firebaseUser);
+        escribirCache(initial);
         setUser(initial);
         setLoading(false);
 
@@ -74,10 +109,12 @@ export function AuthProvider({ children }) {
           reaccione (probablemente cierre sesion).
         */
         unsubDocRef.current = suscribirUserDoc(firebaseUser.uid, (docData) => {
+          escribirCache(docData);
           setUser(docData);
         });
       } catch (err) {
         console.error('Error cargando doc de usuario:', err);
+        escribirCache(null);
         setUser(null);
         setLoading(false);
       }
@@ -105,6 +142,7 @@ export function AuthProvider({ children }) {
       refresh: async () => {
         if (auth.currentUser) {
           const doc = await getUserDoc(auth.currentUser);
+          escribirCache(doc);
           setUser(doc);
         }
       },
