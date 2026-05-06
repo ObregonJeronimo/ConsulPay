@@ -315,6 +315,125 @@ async function ejecutarEliminarProfesional(db, callerUid, callerData, body) {
 }
 
 /* ============================================================
+   Accion: migrar-comisiones-2026
+   ============================================================
+   Migracion one-shot del modelo de comisiones viejo (6%/2% sobre
+   montoConsultorio) al nuevo (1%/0.5% sobre valorTotal de la sesion).
+   El backend ya calcula `valorTotal * comisionPct`; lo unico que
+   resta es asegurar que cada consultorio tenga `comisionFree` y
+   `comisionPro` con valores razonables del modelo nuevo.
+
+   Comportamiento:
+   1. Lee /config/global y lo actualiza a {comisionFree:1, comisionPro:0.5}
+      si no estan en esos valores.
+   2. Para cada consultorio:
+      a. Si NO tiene `comisionFree` -> setea 1.
+      b. Si NO tiene `comisionPro` -> setea 0.5.
+      c. Si tiene `comisionFree`/`comisionPro` con valores del modelo
+         viejo (>=2 ambos), los baja a los nuevos defaults.
+      d. Si tiene `comisionConsulpay` (legacy), lo deja como esta para
+         no romper nada en docs viejos. El frontend ya no lo usa.
+   3. Es idempotente: correrla 2 veces no rompe nada.
+
+   Body extra: { dryRun?: boolean }
+     - Si dryRun=true, devuelve lo que CAMBIARIA pero no escribe nada.
+   ============================================================ */
+
+async function ejecutarMigrarComisiones2026(db, callerUid, callerData, body) {
+  const dryRun = body.dryRun === true;
+  const NUEVO_FREE = 1;
+  const NUEVO_PRO = 0.5;
+
+  const log = [];
+  let consultoriosActualizados = 0;
+  let configGlobalActualizado = false;
+
+  // 1. /config/global
+  const cfgRef = db.collection('config').doc('global');
+  const cfgSnap = await cfgRef.get();
+  const cfgData = cfgSnap.exists ? cfgSnap.data() : {};
+  const cfgNeedsUpdate = (
+    Number(cfgData.comisionFree) !== NUEVO_FREE
+    || Number(cfgData.comisionPro) !== NUEVO_PRO
+  );
+  if (cfgNeedsUpdate) {
+    log.push(
+      `config/global: ${Number(cfgData.comisionFree)}/${Number(cfgData.comisionPro)} ` +
+      `→ ${NUEVO_FREE}/${NUEVO_PRO}`,
+    );
+    if (!dryRun) {
+      await cfgRef.set({
+        comisionFree: NUEVO_FREE,
+        comisionPro: NUEVO_PRO,
+        updatedAt: FieldValue.serverTimestamp(),
+        updatedBy: callerUid,
+      }, { merge: true });
+      configGlobalActualizado = true;
+    }
+  }
+
+  // 2. Cada consultorio
+  const consSnap = await db.collection('consultorios').get();
+  for (const doc of consSnap.docs) {
+    const data = doc.data();
+    const updates = {};
+    const nombre = data.nombre || '(sin nombre)';
+
+    const cFree = Number(data.comisionFree);
+    const cPro = Number(data.comisionPro);
+    const tieneFree = Number.isFinite(cFree) && cFree >= 0 && cFree <= 100;
+    const tienePro = Number.isFinite(cPro) && cPro >= 0 && cPro <= 100;
+
+    // Caso A: no tiene comisionFree
+    if (!tieneFree) {
+      updates.comisionFree = NUEVO_FREE;
+    } else if (cFree >= 2) {
+      // Modelo viejo (>=2% para Free era el default 6%). Bajamos.
+      updates.comisionFree = NUEVO_FREE;
+    }
+
+    // Caso B: no tiene comisionPro
+    if (!tienePro) {
+      updates.comisionPro = NUEVO_PRO;
+    } else if (cPro >= 1.5) {
+      // Modelo viejo (>=1.5% para Pro era 2%). Bajamos.
+      updates.comisionPro = NUEVO_PRO;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      log.push(
+        `consultorio ${doc.id} (${nombre}, plan=${data.plan || 'free'}): ` +
+        `free ${tieneFree ? cFree : 'no-existe'}→${updates.comisionFree ?? cFree}, ` +
+        `pro ${tienePro ? cPro : 'no-existe'}→${updates.comisionPro ?? cPro}`,
+      );
+      if (!dryRun) {
+        await doc.ref.update(updates);
+      }
+      consultoriosActualizados++;
+    }
+  }
+
+  console.log(
+    `[super:migrar-comisiones-2026] ${dryRun ? '(DRY-RUN) ' : ''}` +
+    `Ejecutado por ${callerData.email || callerUid}. ` +
+    `Consultorios afectados: ${consultoriosActualizados}/${consSnap.size}. ` +
+    `config/global actualizado: ${configGlobalActualizado || (dryRun && cfgNeedsUpdate)}.`,
+  );
+
+  return {
+    status: 200,
+    payload: {
+      ok: true,
+      dryRun,
+      consultoriosTotal: consSnap.size,
+      consultoriosActualizados,
+      configGlobalActualizado: configGlobalActualizado || (dryRun && cfgNeedsUpdate),
+      log,
+    },
+  };
+}
+
+/* ============================================================
    Handler principal (router)
    ============================================================ */
 
@@ -366,9 +485,12 @@ export default async function handler(req, res) {
       case 'eliminar-profesional':
         resultado = await ejecutarEliminarProfesional(db, callerUid, callerData, body);
         break;
+      case 'migrar-comisiones-2026':
+        resultado = await ejecutarMigrarComisiones2026(db, callerUid, callerData, body);
+        break;
       default:
         return jsonResponse(res, 400, {
-          error: `Accion desconocida: "${accion}". Validas: eliminar-consultorio, eliminar-profesional.`,
+          error: `Accion desconocida: "${accion}". Validas: eliminar-consultorio, eliminar-profesional, migrar-comisiones-2026.`,
         });
     }
   } catch (err) {

@@ -714,6 +714,9 @@ function BadgeEstado({ estado }) {
 
 function EditarConsultorioModal({ consultorio, submitting, onCancelar, onConfirmar }) {
   const valoresIniciales = useMemo(() => {
+    // Modelo nuevo: cada consultorio tiene comisionFree y comisionPro
+    // configuradas explicitamente. Si por alguna razon faltan (consultorio
+    // muy viejo no migrado), caemos al legacy y luego al default global.
     const tieneNuevos = (
       Number.isFinite(Number(consultorio.comisionFree))
       && Number.isFinite(Number(consultorio.comisionPro))
@@ -725,15 +728,13 @@ function EditarConsultorioModal({ consultorio, submitting, onCancelar, onConfirm
         puedeVerPlanPro: consultorio.puedeVerPlanPro !== false,
       };
     }
-    const legacy = Number(consultorio.comisionConsulpay);
-    const tieneLegacy = Number.isFinite(legacy) && legacy >= 0 && legacy <= 100;
+    // Fallback solo para consultorios sin migrar: si no tienen los campos
+    // nuevos, usamos defaults del modelo nuevo (1% / 0.5%) sin importar
+    // el legacy comisionConsulpay (que era de un modelo distinto y daria
+    // valores muy altos para el modelo nuevo).
     return {
-      comisionFree: consultorio.plan === 'free' && tieneLegacy
-        ? legacy
-        : DEFAULTS_CONSULTORIO_SUPER.comisionFree,
-      comisionPro: consultorio.plan === 'pro' && tieneLegacy
-        ? legacy
-        : DEFAULTS_CONSULTORIO_SUPER.comisionPro,
+      comisionFree: DEFAULTS_CONSULTORIO_SUPER.comisionFree,
+      comisionPro: DEFAULTS_CONSULTORIO_SUPER.comisionPro,
       puedeVerPlanPro: consultorio.puedeVerPlanPro !== false,
     };
   }, [consultorio]);
@@ -799,9 +800,9 @@ function EditarConsultorioModal({ consultorio, submitting, onCancelar, onConfirm
           <div className="cp-modal-edit-cons__section">
             <h3 className="cp-modal-edit-cons__section-title">Comisiones</h3>
             <p className="cp-modal-edit-cons__section-hint">
-              % que ConsulPay cobra sobre cada pago. Se aplica según el plan
-              activo del consultorio. <strong>0% es válido</strong> para casos
-              de cortesía.
+              % que ConsulPay cobra sobre el <strong>valor total inicial</strong> de
+              cada sesión (lo que paga el paciente). Se aplica según el plan activo
+              del consultorio. <strong>0% es válido</strong> para casos de cortesía.
             </p>
 
             <div className="cp-config-row">
@@ -813,7 +814,7 @@ function EditarConsultorioModal({ consultorio, submitting, onCancelar, onConfirm
                 onChange={(e) => setComisionFree(e.target.value)}
                 min="0"
                 max="100"
-                step="0.5"
+                step="0.1"
                 disabled={submitting}
                 hint={`Default: ${DEFAULTS_CONSULTORIO_SUPER.comisionFree}%`}
               />
@@ -825,7 +826,7 @@ function EditarConsultorioModal({ consultorio, submitting, onCancelar, onConfirm
                 onChange={(e) => setComisionPro(e.target.value)}
                 min="0"
                 max="100"
-                step="0.5"
+                step="0.1"
                 disabled={submitting}
                 hint={`Default: ${DEFAULTS_CONSULTORIO_SUPER.comisionPro}%`}
               />

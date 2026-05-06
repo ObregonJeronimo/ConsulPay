@@ -10,20 +10,28 @@ import {
   actualizarConfigGlobal,
   obtenerConfigGlobal,
 } from '../../lib/configGlobal.js';
+import { migrarComisiones2026 } from '../../lib/superadminDelete.js';
 
 import './ConfiguracionSuper.css';
 
 /**
  * Panel de configuracion global de la plataforma (solo superadmin).
  *
- * Por ahora maneja las comisiones que se queda ConsulPay segun el plan
- * del consultorio. Cuando se cree un consultorio nuevo, esos valores
- * se usan para inicializar su `comisionConsulpay`.
+ * Maneja las comisiones que se queda ConsulPay segun el plan del
+ * consultorio. Cuando se crea un consultorio nuevo, esos valores se
+ * usan para inicializar sus campos `comisionFree` y `comisionPro`.
+ *
+ * Modelo nuevo (2026): comision se calcula sobre el VALOR TOTAL inicial
+ * de la sesion (lo que paga el paciente). Defaults: 1% Free / 0.5% Pro.
  *
  * IMPORTANTE: cambiar estos valores NO actualiza consultorios existentes.
  * Los valores nuevos se aplican solo a consultorios que se creen DESPUES
  * del cambio. Esto es a proposito: no queremos cambiar silenciosamente
  * la comision de clientes que ya tienen un acuerdo.
+ *
+ * Para migrar masivamente consultorios viejos, hay un boton "Ejecutar
+ * migracion 2026" que llama al endpoint /api/super con accion
+ * `migrar-comisiones-2026`.
  */
 export default function ConfiguracionSuper() {
   const { user } = useAuth();
@@ -35,6 +43,11 @@ export default function ConfiguracionSuper() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+
+  // Estado de la migracion 2026 (one-shot)
+  const [migrating, setMigrating] = useState(false);
+  const [migrateResult, setMigrateResult] = useState(null);
+  const [migrateError, setMigrateError] = useState('');
 
   useEffect(() => {
     let cancelado = false;
@@ -105,6 +118,20 @@ export default function ConfiguracionSuper() {
     }
   }
 
+  async function handleMigrar(dryRun) {
+    setMigrateError('');
+    setMigrateResult(null);
+    setMigrating(true);
+    try {
+      const r = await migrarComisiones2026({ dryRun });
+      setMigrateResult(r);
+    } catch (err) {
+      setMigrateError(err.message || 'Error al migrar.');
+    } finally {
+      setMigrating(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="cp-super-config">
@@ -132,9 +159,11 @@ export default function ConfiguracionSuper() {
         <div className="cp-super-config__section-head">
           <h2 className="cp-super-config__section-title">Comisión de ConsulPay</h2>
           <p className="cp-super-config__section-hint">
-            Porcentaje que se queda ConsulPay sobre cada pago de profesional →
-            consultorio, según el plan que tenga ese consultorio. El resto va
-            al consultorio.
+            Porcentaje que se queda ConsulPay sobre el <strong>valor total inicial</strong>{' '}
+            de cada sesión (lo que paga el paciente al profesional), según el plan que
+            tenga ese consultorio. Estos valores son <em>defaults de fábrica</em>: solo
+            se usan al crear consultorios nuevos. Los consultorios ya existentes
+            mantienen sus valores hasta que se editen manualmente.
           </p>
         </div>
 
@@ -190,6 +219,69 @@ export default function ConfiguracionSuper() {
             {saving ? <><Spinner size={14} /> Guardando…</> : 'Guardar cambios'}
           </Button>
         </div>
+      </section>
+
+      {/* ============================================================
+          Migracion 2026: del modelo viejo (6%/2% sobre montoConsultorio)
+          al modelo nuevo (1%/0.5% sobre valorTotal). One-shot.
+          ============================================================ */}
+      <section className="cp-super-config__section cp-super-config__section--migracion">
+        <div className="cp-super-config__section-head">
+          <h2 className="cp-super-config__section-title">Migración modelo 2026</h2>
+          <p className="cp-super-config__section-hint">
+            Migra todos los consultorios al modelo nuevo de comisiones (1% Free /
+            0.5% Pro sobre el valor total inicial de cada sesión). <strong>Solo
+            ejecutar una vez.</strong> Es idempotente, pero correrla varias veces
+            no aporta nada. Recomendado: primero ejecutar como <em>dry-run</em>{' '}
+            para previsualizar el impacto.
+          </p>
+        </div>
+
+        <div className="cp-super-config__actions" style={{ gap: 12 }}>
+          <Button
+            variant="secondary"
+            onClick={() => handleMigrar(true)}
+            disabled={migrating}
+          >
+            {migrating ? <><Spinner size={14} /> Calculando…</> : 'Previsualizar (dry-run)'}
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => {
+              if (confirm('¿Ejecutar migración real? Esto va a modificar todos los consultorios.')) {
+                handleMigrar(false);
+              }
+            }}
+            disabled={migrating}
+          >
+            {migrating ? <><Spinner size={14} /> Migrando…</> : 'Ejecutar migración'}
+          </Button>
+        </div>
+
+        {migrateError && <div className="cp-config-error">{migrateError}</div>}
+
+        {migrateResult && (
+          <div className={migrateResult.dryRun ? 'cp-config-ok' : 'cp-config-ok'} style={{ marginTop: 12 }}>
+            <div style={{ fontWeight: 600, marginBottom: 6 }}>
+              {migrateResult.dryRun ? '🔍 Dry-run completado' : '✓ Migración aplicada'}
+            </div>
+            <div style={{ fontSize: 13, marginBottom: 8 }}>
+              Consultorios afectados: <strong>{migrateResult.consultoriosActualizados}</strong>{' '}
+              de {migrateResult.consultoriosTotal}.{' '}
+              config/global: {migrateResult.configGlobalActualizado ? 'actualizado' : 'sin cambios'}.
+            </div>
+            {migrateResult.log && migrateResult.log.length > 0 && (
+              <details style={{ fontSize: 12, fontFamily: 'monospace' }}>
+                <summary style={{ cursor: 'pointer' }}>Ver detalle ({migrateResult.log.length} líneas)</summary>
+                <ul style={{ marginTop: 8, paddingLeft: 20, lineHeight: 1.5 }}>
+                  {migrateResult.log.map((line, i) => (
+                    <li key={i}>{line}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
+        )}
       </section>
     </div>
   );

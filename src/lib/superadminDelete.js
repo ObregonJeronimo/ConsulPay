@@ -150,3 +150,18 @@ export async function eliminarProfesionalSuper({ uid, consultorioId, modo }) {
     modo,
   });
 }
+
+/**
+ * Migracion one-shot del modelo de comisiones viejo (6%/2%) al nuevo
+ * (1%/0.5% sobre valor total inicial). Idempotente.
+ *
+ * @param {object} [params]
+ * @param {boolean} [params.dryRun] - si es true, devuelve lo que cambiaria
+ *   pero no escribe nada. Util para previsualizar.
+ * @returns {Promise<{ ok:true, dryRun:boolean, consultoriosTotal:number,
+ *   consultoriosActualizados:number, configGlobalActualizado:boolean,
+ *   log:string[] }>}
+ */
+export async function migrarComisiones2026({ dryRun = false } = {}) {
+  return await callSuperApi('migrar-comisiones-2026', { dryRun });
+}
