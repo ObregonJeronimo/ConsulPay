@@ -214,7 +214,7 @@ export default function Dashboard() {
       <section className="cp-section">
         <div className="cp-section-head">
           <h2 className="cp-section-title">Profesionales con deuda abierta</h2>
-          <Link to="/admin/profesionales" className="cp-section-link">Ver todos →</Link>
+          <Link to="/admin/sesiones" className="cp-section-link">Ver todos →</Link>
         </div>
         {deudaPorProfesional.length === 0 ? (
           <div className="cp-placeholder-box">
