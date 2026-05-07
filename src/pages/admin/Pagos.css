@@ -91,6 +91,12 @@
 
 /* ============================================================
    Modal de detalle de pago
+   ----------------------------------------------------------------
+   El modal base (.cp-modal) no tiene padding (lo controla cada
+   subcomponente: __title, __form, etc). Como aca usamos <dl> directo
+   en lugar de un .cp-modal__form, le damos su propio padding lateral
+   + bottom y scroll vertical interno para que no desborde el viewport
+   en pagos con muchos campos (ID de MP, ID preferencia, errores, etc).
    ============================================================ */
 
 .cp-modal--detalle-pago {
@@ -101,6 +107,18 @@
   display: grid;
   gap: 14px;
   margin: 0;
+
+  /* Mismo ritmo lateral que .cp-modal__form (32px) + bottom para que
+     el ultimo campo no toque el borde del modal. Top en 0 porque el
+     .cp-modal__title de arriba ya aporta separacion. */
+  padding: 0 32px 32px;
+
+  /* Scroll vertical cuando el contenido excede la altura del modal.
+     El modal base limita altura a calc(100vh - 40px). flex:1 + min-height:0
+     son necesarios para que el scroll funcione dentro del flex container. */
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .cp-detalle-pago > div {
@@ -109,6 +127,12 @@
   gap: 2px;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--cp-border);
+
+  /* Evita que valores largos (emails, IDs de MP) desborden hacia los
+     lados. word-break es para los IDs sin espacios; el min-width:0 es
+     para que el flex item respete el ancho del contenedor. */
+  min-width: 0;
+  word-break: break-word;
 }
 
 .cp-detalle-pago > div:last-child {
@@ -128,6 +152,9 @@
   margin: 0;
   font-size: 14px;
   color: var(--cp-text);
+  /* Permite que el contenido baje a la siguiente linea si es largo,
+     en vez de salirse del modal. */
+  overflow-wrap: anywhere;
 }
 
 .cp-detalle-pago__total {
@@ -158,4 +185,15 @@
   color: var(--cp-text-faint);
   font-weight: 400;
   margin-left: 4px;
+}
+
+/* Mobile: padding lateral mas chico para aprovechar el ancho */
+@media (max-width: 640px) {
+  .cp-detalle-pago {
+    padding: 0 20px 24px;
+    gap: 12px;
+  }
+  .cp-detalle-pago dt { font-size: 11px; }
+  .cp-detalle-pago dd { font-size: 13.5px; }
+  .cp-detalle-pago__total dd { font-size: 19px !important; }
 }
