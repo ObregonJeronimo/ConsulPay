@@ -175,12 +175,14 @@ service cloud.firestore {
       */
       allow update: if esSuperadmin()
         || (esAdminDe(consultorioId)
-            // Campos siempre blindados
-            && request.resource.data.plan == resource.data.plan
-            && request.resource.data.planVenceEn == resource.data.planVenceEn
-            && request.resource.data.comisionConsulpay == resource.data.comisionConsulpay
-            // Campos opcionales nuevos: usar campoNoCambia para soportar
-            // docs viejos que pueden no tenerlos definidos
+            // Campos siempre blindados — usamos campoNoCambia para todos
+            // para que funcione tambien con docs viejos que no tengan algunos
+            // de estos campos definidos. campoNoCambia maneja los 3 casos:
+            // ambos sin definir, ambos definidos e iguales, o uno solo
+            // definido (rechaza).
+            && campoNoCambia('plan')
+            && campoNoCambia('planVenceEn')
+            && campoNoCambia('comisionConsulpay')
             && campoNoCambia('comisionFree')
             && campoNoCambia('comisionPro')
             && campoNoCambia('puedeVerPlanPro')
@@ -191,17 +193,17 @@ service cloud.firestore {
             && campoNoCambia('repartoActivado')
             && campoNoCambia('repartoIniciaEn')
             && campoNoCambia('repartoActivadoEn')
-            && request.resource.data.mpIntegrado == resource.data.mpIntegrado
-            && request.resource.data.mpConfig == resource.data.mpConfig
-            && request.resource.data.ualaIntegrado == resource.data.ualaIntegrado
-            && request.resource.data.ualaConfig == resource.data.ualaConfig
-            && request.resource.data.estado == resource.data.estado
+            && campoNoCambia('mpIntegrado')
+            && campoNoCambia('mpConfig')
+            && campoNoCambia('ualaIntegrado')
+            && campoNoCambia('ualaConfig')
+            && campoNoCambia('estado')
             // Reglas sobre owner y admins:
             //   - ownerUid siempre debe estar en adminUids
             //   - adminUids no puede quedar vacio (>= 1)
             //   - adminUids no puede tener mas de 2 admins (limite duro
-            //     del flow de "reparto entre socias" — ver src/lib/admins.js
-            //     constante MAX_ADMINS_POR_CONSULTORIO)
+            //     del flow de "reparto entre administradores" — ver
+            //     src/lib/admins.js constante MAX_ADMINS_POR_CONSULTORIO)
             //   - El owner actual puede ser cambiado solo si el caller
             //     es el owner viejo (transferencia de ownership)
             && (
