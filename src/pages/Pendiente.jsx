@@ -1,10 +1,41 @@
+import { useEffect } from 'react';
+import { Navigate } from 'react-router-dom';
+
 import Button from '../components/ui/Button.jsx';
 import { useAuth } from '../hooks/useAuth.js';
-import { ESTADOS_USUARIO } from '../lib/constants.js';
+import { ESTADOS_USUARIO, ROLES } from '../lib/constants.js';
 import './Pendiente.css';
 
 export default function Pendiente() {
   const { user, signOut, refresh } = useAuth();
+
+  // Si el user paso a ser admin/superadmin (porque acaba de crear su
+  // consultorio o porque el sistema cambio su rol), redirigimos al
+  // panel correspondiente. Esto evita quedar atrapado en /pendiente
+  // despues de crear el consultorio mientras el state termina de
+  // propagarse desde el onSnapshot.
+  if (user?.rol === ROLES.ADMIN) {
+    return <Navigate to="/admin" replace />;
+  }
+  if (user?.rol === ROLES.SUPERADMIN) {
+    return <Navigate to="/super" replace />;
+  }
+  // Y si es profesional ya activo, al panel de profesional.
+  if (user?.rol === ROLES.PROFESIONAL && user?.estado === ESTADOS_USUARIO.ACTIVO) {
+    return <Navigate to="/mi-panel" replace />;
+  }
+
+  // Refresco automatico cada 4 segundos para detectar cambios del lado
+  // del backend (admin aprobo, rol subio, etc.) sin que el user tenga que
+  // tocar "Volver a comprobar" manualmente. La suscripcion live del
+  // AuthContext deberia hacer esto solo, pero como red de seguridad
+  // forzamos un poll por las dudas.
+  useEffect(() => {
+    const id = setInterval(() => {
+      refresh().catch(() => {});
+    }, 4000);
+    return () => clearInterval(id);
+  }, [refresh]);
 
   const rechazado = user?.estado === ESTADOS_USUARIO.RECHAZADO;
   const suspendido = user?.estado === ESTADOS_USUARIO.SUSPENDIDO;

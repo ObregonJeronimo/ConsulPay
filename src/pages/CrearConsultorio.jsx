@@ -106,8 +106,30 @@ export default function CrearConsultorio() {
         metodosPagoPaciente: metodosActivos,
       });
 
-      // Refresco el doc del user para que AuthContext tenga rol=admin y el nuevo consultorioId
-      await refresh();
+      // Refresco el doc del user para que AuthContext tenga rol=admin y el nuevo consultorioId.
+      // Esto dispara setUser en el provider, pero React no garantiza que el siguiente
+      // render lo vea sincrono — y el navigate('/admin') de abajo evalua el ProtectedRoute
+      // potencialmente con el state viejo (rol=profesional) y termina mandando al user a
+      // /pendiente. Como red de seguridad, /pendiente.jsx detecta si el user ya es admin
+      // y redirige a /admin solo. Pero igual hacemos lo correcto aca: no navegar hasta
+      // que el doc reciente tenga rol=admin.
+      let intentos = 0;
+      while (intentos < 10) {
+        await refresh();
+        // En este punto, el call a refresh ya escribio el nuevo user en el state
+        // del provider. Como leerCache lee localStorage, podemos chequearlo via
+        // el cache que escribio el refresh (el cache se sincroniza en cada setUser).
+        // Pero como no tenemos acceso directo al state actualizado dentro de este
+        // closure, usamos un pequeno wait y reintentamos. Si despues de 10 intentos
+        // (1.5s) no se actualizo, navegamos igual y dejamos que /pendiente redirija.
+        await new Promise((r) => setTimeout(r, 150));
+        intentos++;
+        // Heuristica: si el localStorage del cache muestra rol=admin, cortamos.
+        try {
+          const cached = JSON.parse(localStorage.getItem('cp_user_cache') || 'null');
+          if (cached?.rol === 'admin') break;
+        } catch { /* ignore */ }
+      }
 
       // Redirigir al dashboard admin
       navigate('/admin', { replace: true, state: { justCreated: consultorioId } });
