@@ -1338,3 +1338,172 @@
   .cp-comision-banner__title { font-size: 13px; }
   .cp-comision-banner__text { font-size: 12.5px; }
 }
+
+/* ============================================================
+   Panel "Sobre la comisión de Mercado Pago"
+   ============================================================
+   Acordeon (<details>) que aparece debajo de las cards de slots MP
+   cuando hay al menos una cuenta vinculada. Explica que MP cobra
+   su propia comision, independiente de la de ConsulPay, y como
+   bajarla configurando un plazo de acreditacion mas largo.
+
+   Reutiliza el naranja de Consulpay (--cp-cp-orange) para que
+   visualmente quede claro que es info de la marca, no una alerta. */
+.cp-mp-info {
+  margin-top: 18px;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  background: var(--cp-bg);
+  overflow: hidden;
+  transition: border-color var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-mp-info[open] {
+  border-color: var(--cp-cp-orange-border);
+}
+
+.cp-mp-info__summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  font-family: var(--cp-font-sans);
+  transition: background var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-mp-info__summary::-webkit-details-marker {
+  display: none;
+}
+
+.cp-mp-info__summary:hover {
+  background: var(--cp-surface-hover);
+}
+
+.cp-mp-info__icon {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--cp-cp-orange);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--cp-font-serif);
+  font-style: italic;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.cp-mp-info__title {
+  flex: 1;
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--cp-text);
+  letter-spacing: -0.005em;
+}
+
+.cp-mp-info__chevron {
+  flex-shrink: 0;
+  color: var(--cp-text-muted);
+  transition: transform var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-mp-info[open] .cp-mp-info__chevron {
+  transform: rotate(180deg);
+}
+
+.cp-mp-info__body {
+  padding: 4px 16px 16px;
+  border-top: 1px solid var(--cp-border);
+  margin-top: 0;
+  background: var(--cp-cp-orange-bg);
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--cp-text-muted);
+}
+
+.cp-mp-info__body p {
+  margin: 12px 0;
+}
+
+.cp-mp-info__body p:first-of-type {
+  margin-top: 14px;
+}
+
+.cp-mp-info__body strong {
+  color: var(--cp-text);
+  font-weight: 600;
+}
+
+.cp-mp-info__list {
+  list-style: none;
+  padding: 0;
+  margin: 14px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cp-mp-info__list li {
+  padding: 10px 14px;
+  background: var(--cp-bg);
+  border: 1px solid var(--cp-cp-orange-border);
+  border-radius: var(--cp-radius-sm);
+  font-family: var(--cp-font-mono);
+  font-size: 13px;
+  color: var(--cp-text);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+}
+
+.cp-mp-info__note {
+  font-family: var(--cp-font-sans);
+  font-size: 12.5px;
+  color: var(--cp-text-faint);
+  font-style: italic;
+}
+
+.cp-mp-info__hint {
+  margin-top: 14px !important;
+  padding: 12px 14px;
+  background: var(--cp-bg);
+  border-radius: var(--cp-radius-sm);
+  border: 1px solid var(--cp-cp-orange-border);
+}
+
+.cp-mp-info__hint--small {
+  font-size: 12px;
+  font-style: italic;
+  color: var(--cp-text-faint);
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+.cp-mp-info__hint em {
+  font-style: italic;
+  color: var(--cp-text);
+}
+
+.cp-mp-info__link {
+  color: var(--cp-cp-orange);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.cp-mp-info__link:hover {
+  color: var(--cp-text);
+}
+
+@media (max-width: 640px) {
+  .cp-mp-info__summary { padding: 12px 14px; gap: 10px; }
+  .cp-mp-info__title { font-size: 13.5px; }
+  .cp-mp-info__body { padding: 4px 14px 14px; font-size: 13px; }
+  .cp-mp-info__list li { padding: 9px 12px; font-size: 12.5px; }
+}

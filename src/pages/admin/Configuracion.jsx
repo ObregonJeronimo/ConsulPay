@@ -1443,6 +1443,14 @@ function TabPagos({ consultorio, searchParams, onLimpiarParams }) {
         </div>
       )}
 
+      {/* Panel informativo sobre la comision de Mercado Pago. Aparece
+          siempre que haya al menos una cuenta vinculada — antes no tiene
+          sentido. Es un <details> para que arranque colapsado: el admin
+          que ya sabe esto no se distrae con un bloque grande. */}
+      {(primaryConfig || secondaryConfig) && (
+        <SobreComisionMP />
+      )}
+
       {desconectarSlot && (
         <DesconectarMPModal
           slot={desconectarSlot}
@@ -1462,6 +1470,79 @@ function TabPagos({ consultorio, searchParams, onLimpiarParams }) {
         />
       )}
     </section>
+  );
+}
+
+/**
+ * Panel informativo sobre la comisión que cobra Mercado Pago.
+ *
+ * MP cobra su propia comisión (~6% si es al instante, baja con plazos
+ * más largos) que es independiente y se suma a la comisión de
+ * ConsulPay. Como esto es una fuente común de confusión ("¿por qué
+ * recibí menos plata de la que esperaba?"), explicamos el modelo
+ * y cómo el admin puede bajarla configurando un plazo más largo.
+ *
+ * Es un <details> para arrancar colapsado: el admin que ya sabe
+ * esto no se distrae; el que no, lo encuentra cuando pregunta.
+ */
+function SobreComisionMP() {
+  return (
+    <details className="cp-mp-info">
+      <summary className="cp-mp-info__summary">
+        <span className="cp-mp-info__icon" aria-hidden>?</span>
+        <span className="cp-mp-info__title">Sobre la comisión de Mercado Pago</span>
+        <svg className="cp-mp-info__chevron" viewBox="0 0 24 24" width="16" height="16"
+          fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+          strokeLinejoin="round" aria-hidden>
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </summary>
+      <div className="cp-mp-info__body">
+        <p>
+          Además de la comisión de ConsulPay, <strong>Mercado Pago cobra su
+          propia comisión</strong> por procesar el cobro. Se descuenta
+          automáticamente del monto que recibís en tu cuenta MP — es independiente
+          de lo que cobra ConsulPay.
+        </p>
+
+        <p>
+          <strong>El porcentaje depende del plazo de acreditación</strong> que
+          tengas configurado en tu cuenta de Mercado Pago:
+        </p>
+
+        <ul className="cp-mp-info__list">
+          <li>
+            <strong>Al instante</strong> · ~6.29% + IVA
+            <span className="cp-mp-info__note">la plata cae enseguida pero pagás más</span>
+          </li>
+          <li>
+            <strong>14 días</strong> · ~3.49% + IVA
+            <span className="cp-mp-info__note">balance común entre tiempo y costo</span>
+          </li>
+          <li>
+            <strong>30 días</strong> · ~1.99% + IVA
+            <span className="cp-mp-info__note">la opción más económica si podés esperar</span>
+          </li>
+        </ul>
+
+        <p className="cp-mp-info__hint">
+          <strong>¿Cómo cambiarlo?</strong> Entrá a tu cuenta de Mercado Pago →{' '}
+          <em>Tu negocio → Costos por cobrar</em> y elegí el plazo que prefieras.
+          Es un ajuste tuyo, no de ConsulPay. Si tenés flujo de caja para esperar,
+          mover de "al instante" a 14 o 30 días te puede ahorrar varios puntos
+          porcentuales en cada cobro.
+        </p>
+
+        <p className="cp-mp-info__hint cp-mp-info__hint--small">
+          Los porcentajes son orientativos y pueden variar según el tipo de
+          cuenta, rubro, antigüedad y volumen mensual. Los valores oficiales y
+          actualizados están en el{' '}
+          <a href="https://www.mercadopago.com.ar/ayuda/tarifas-cobrar-mercado-pago_280"
+             target="_blank" rel="noopener noreferrer"
+             className="cp-mp-info__link">tarifario de Mercado Pago</a>.
+        </p>
+      </div>
+    </details>
   );
 }
 
