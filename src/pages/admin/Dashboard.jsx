@@ -256,6 +256,17 @@ export default function Dashboard() {
 function OnboardingPasos() {
   const { consultorio } = useConsultorio();
 
+  // Comisiones del modelo nuevo: leemos los valores reales del consultorio
+  // (o el helper devuelve el default si no estan seteados). Esto se actualiza
+  // automaticamente si el superadmin cambia las comisiones, sin necesidad
+  // de re-deployar.
+  const comisionFreePct = Number.isFinite(Number(consultorio?.comisionFree))
+    ? Number(consultorio.comisionFree)
+    : 1;
+  const comisionProPct = Number.isFinite(Number(consultorio?.comisionPro))
+    ? Number(consultorio.comisionPro)
+    : 0.5;
+
   const pasos = [
     {
       num: '01',
@@ -313,8 +324,11 @@ function OnboardingPasos() {
             <div className="cp-onboarding__plan-name">Free</div>
           </div>
           <div className="cp-onboarding__plan-desc">
-            Usás ConsulPay sin pagar mensualidad. Cuando tus profesionales paguen vía Mercado Pago,
-            se queda un 6% ConsulPay. Podés cambiar al Plan Pago en cualquier momento desde Configuración.
+            Usás ConsulPay sin pagar mensualidad. Cuando tus profesionales cobren vía
+            Mercado Pago, se descuenta una comisión del{' '}
+            <strong>{comisionFreePct}%</strong> sobre el valor total de cada sesión.
+            Si querés bajar la comisión, podés pasarte al{' '}
+            <strong>Plan Pro ({comisionProPct}%)</strong> en cualquier momento desde Configuración.
           </div>
         </div>
       )}
