@@ -1336,8 +1336,8 @@ function TabPagos({ consultorio, searchParams, onLimpiarParams }) {
         <h2 className="cp-config-section__title">Mercado Pago</h2>
         <p className="cp-config-section__sub">
           {esMultiAdmin
-            ? <>Cada administradora puede vincular su cuenta de Mercado Pago. Cuando ambas
-              están conectadas, ConsulPay alterna los cobros mes a mes (del 15 al 14)
+            ? <>Cada administrador puede vincular su cuenta de Mercado Pago. Cuando ambos
+              tengan su cuenta conectada, ConsulPay alterna los cobros mes a mes (del 15 al 14)
               entre las dos cuentas. Comisión ConsulPay: {comisionPctTxt} sobre el valor total de cada sesión.</>
             : <>Vinculá tu cuenta de Mercado Pago para que los profesionales puedan pagarte
               su parte de las sesiones automáticamente. ConsulPay procesa el pago y se
@@ -1414,7 +1414,7 @@ function TabPagos({ consultorio, searchParams, onLimpiarParams }) {
         <div className="cp-mp-aviso cp-mp-aviso--info">
           <strong>Falta que se conecte la segunda cuenta.</strong>
           <p>
-            Cuando la otra administradora vincule su Mercado Pago, vamos a activar
+            Cuando el otro administrador vincule su Mercado Pago, vamos a activar
             automáticamente el reparto de cobros entre las dos cuentas.
           </p>
         </div>
@@ -1438,7 +1438,7 @@ function TabPagos({ consultorio, searchParams, onLimpiarParams }) {
           <p>
             Los cobros se alternan entre ambas cuentas según el ciclo (del 15 al 14).
             Mirá el detalle del reparto y cómo compensar diferencias en{' '}
-            <a href="/admin/reparto" className="cp-mp-aviso__link">Reparto entre socias</a>.
+            <a href="/admin/reparto" className="cp-mp-aviso__link">Reparto entre administradores</a>.
           </p>
         </div>
       )}
@@ -1493,7 +1493,7 @@ function MPSlotEmptyCard({ slot, mostrarOwner, onConectar }) {
         <h3 className="cp-mp-card__title">Cuenta no vinculada</h3>
         <p className="cp-mp-card__hint">
           {mostrarOwner
-            ? 'La administradora que use esta cuenta puede vincularla acá. Una vez conectada, los cobros que le toquen le caen directo a su MP.'
+            ? 'El administrador que use esta cuenta puede vincularla acá. Una vez conectada, los cobros que le toquen le caen directo a su MP.'
             : 'Al conectar Mercado Pago, los pagos de tus profesionales caen directamente en tu cuenta de MP. ConsulPay solo procesa la transacción y se queda con su comisión.'
           }
         </p>
@@ -1600,7 +1600,7 @@ function ConectarMPModal({ consultorioId, slot, onCancelar, onError }) {
  * Si mostrarOwner=false (caso 1 admin), se ve igual que antes.
  *
  * Solo el admin DUEÑO del slot puede desconectar (boton oculto para
- * los otros). Esto evita que una socia desconecte la cuenta de la otra.
+ * los otros). Esto evita que un admin desconecte la cuenta del otro.
  */
 function MPSlotCard({ slot, mpConfig, mapMiembros, callerUid, mostrarOwner, onDesconectar, submitting }) {
   const venc = diasHastaVencimiento(mpConfig.expiresAt);
@@ -1714,7 +1714,7 @@ function DesconectarMPModal({ slot, tieneSecondary, onCancelar, onConfirmar, sub
     descripcion = (
       <>
         Vas a desconectar la <strong>segunda cuenta de Mercado Pago</strong>.
-        El reparto entre socias se va a desactivar y todos los cobros nuevos
+        El reparto entre administradores se va a desactivar y todos los cobros nuevos
         van a caer en la cuenta principal.
         <br /><br />
         Las compensaciones de ciclos pasados se preservan en el historial.
@@ -1728,7 +1728,7 @@ function DesconectarMPModal({ slot, tieneSecondary, onCancelar, onConfirmar, sub
         Como hay una segunda cuenta conectada, va a pasar a ser la principal
         automáticamente.
         <br /><br />
-        El reparto entre socias se va a desactivar hasta que vuelva a haber
+        El reparto entre administradores se va a desactivar hasta que vuelva a haber
         2 cuentas vinculadas.
       </>
     );

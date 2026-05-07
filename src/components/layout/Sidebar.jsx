@@ -60,7 +60,7 @@ const Icon = {
   /*
     Split: dos flechas que se separan, simbolizando el "reparto" entre
     dos personas. Usado solo en el item de menu "Reparto" cuando hay
-    2 administradoras en el consultorio.
+    2 administradores en el consultorio.
   */
   Split: () => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">

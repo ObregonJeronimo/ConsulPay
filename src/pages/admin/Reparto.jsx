@@ -130,9 +130,9 @@ export default function RepartoEntreSocias() {
     <div className="cp-reparto">
       <header className="cp-page-header">
         <div>
-          <h1 className="cp-page-title">Reparto entre socias</h1>
+          <h1 className="cp-page-title">Reparto entre administradores</h1>
           <p className="cp-page-sub">
-            Cuando ambas administradoras tienen su Mercado Pago conectado,
+            Cuando ambos administradores tienen su Mercado Pago conectado,
             ConsulPay alterna a quién le caen los cobros mes a mes (del 15 al 14)
             y te ayuda a calcular la compensación al final de cada ciclo.
           </p>
@@ -155,7 +155,7 @@ export default function RepartoEntreSocias() {
           <h2 className="cp-reparto__section-title">Compensaciones pasadas</h2>
           <p className="cp-reparto__section-sub">
             Cierre de ciclos previos. Cada uno mantiene su historial aunque
-            se desconecten cuentas o se vayan administradoras.
+            se desconecten cuentas o se vayan administradores.
           </p>
         </header>
 
@@ -190,17 +190,18 @@ export default function RepartoEntreSocias() {
    ============================================================ */
 
 function RepartoNoDisponible({ consultorio }) {
+  const cantidadAdmins = consultorio.adminUids?.length || 1;
   return (
     <div className="cp-reparto">
       <header className="cp-page-header">
-        <h1 className="cp-page-title">Reparto entre socias</h1>
+        <h1 className="cp-page-title">Reparto entre administradores</h1>
       </header>
       <div className="cp-reparto__aviso cp-reparto__aviso--neutral">
-        <strong>Esta función se activa cuando hay 2 administradoras en el consultorio.</strong>
+        <strong>Esta función se activa cuando hay 2 administradores en el consultorio.</strong>
         <p>
           Tu consultorio "{consultorio.nombre}" tiene actualmente
-          {(consultorio.adminUids?.length || 1) === 1 ? ' 1 administradora' : ` ${consultorio.adminUids?.length} administradoras`}.
-          Para usar el reparto entre socias, sumá una segunda administradora desde Configuración.
+          {cantidadAdmins === 1 ? ' 1 administrador' : ` ${cantidadAdmins} administradores`}.
+          Para usar el reparto entre administradores, sumá un segundo administrador desde Configuración.
         </p>
       </div>
     </div>
@@ -210,9 +211,9 @@ function RepartoNoDisponible({ consultorio }) {
 function RepartoEsperandoSegundaCuenta({ consultorio }) {
   return (
     <div className="cp-reparto__aviso cp-reparto__aviso--info">
-      <strong>Esperando que la segunda administradora conecte su Mercado Pago.</strong>
+      <strong>Esperando que el segundo administrador conecte su Mercado Pago.</strong>
       <p>
-        El reparto se activa cuando ambas administradoras tienen su cuenta MP vinculada.
+        El reparto se activa cuando ambos administradores tienen su cuenta MP vinculada.
         Mientras tanto, todos los cobros van a la cuenta principal.
       </p>
     </div>

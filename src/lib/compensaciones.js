@@ -1,5 +1,5 @@
 /**
- * Cliente frontend para compensaciones del "reparto entre socias".
+ * Cliente frontend para compensaciones del "reparto entre administradores".
  *
  * Modelo:
  *   /consultorios/{consultorioId}/compensaciones/{idCiclo}

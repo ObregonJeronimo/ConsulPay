@@ -9,8 +9,9 @@
  * ----------------------------------------------------------------
  * El sistema permite hasta 2 admins por consultorio. La razon es que
  * cuando hay 2 admins, ConsulPay habilita el flow de "reparto entre
- * socias" con doble cuenta MP conectada y rotacion del 15 al 15 de
- * cada mes. Esa logica solo funciona limpia con exactamente 2 admins.
+ * administradores" con doble cuenta MP conectada y rotacion del 15
+ * al 15 de cada mes. Esa logica solo funciona limpia con exactamente
+ * 2 admins.
  *
  * Si en el futuro se quiere soportar 3+ admins, hay que repensar la
  * estrategia de reparto (split 1:N de MP, etc.). Por ahora, 2 es el
@@ -198,7 +199,7 @@ export async function promoverAAdmin({ consultorioId, callerUid, nuevoUid }) {
  * (M4: estado=retirado).
  *
  * NOTA sobre el reparto: si el consultorio tenia 2 admins y se baja a 1,
- * el flow de "reparto entre socias" se desactiva automaticamente. Los
+ * el flow de "reparto entre administradores" se desactiva automaticamente. Los
  * registros historicos de compensaciones se preservan (ver
  * /consultorios/{id}/compensaciones — esos docs no se borran nunca).
  *
