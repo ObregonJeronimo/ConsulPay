@@ -89,6 +89,21 @@ service cloud.firestore {
             && resource.data.consultorioId == miUsuario().consultorioId
             && request.resource.data.rol == resource.data.rol
             && request.resource.data.consultorioId == resource.data.consultorioId)
+        // Promocion / democion entre 'profesional' y 'admin' por parte de
+        // otro admin del MISMO consultorio. Solo se puede:
+        //   - cambiar rol entre 'profesional' y 'admin' (no a otros)
+        //   - mantener el consultorioId
+        //   - mantener el estado (no se puede activar/retirar a la vez)
+        // El otro lado de la promocion (agregar al adminUids del consultorio)
+        // se valida en la rule de /consultorios. Si una falla, la transaction
+        // entera falla (atomicidad).
+        || (esAdmin()
+            && resource.data.consultorioId == miUsuario().consultorioId
+            && request.resource.data.consultorioId == resource.data.consultorioId
+            && request.resource.data.estado == resource.data.estado
+            && resource.data.rol in ['profesional', 'admin']
+            && request.resource.data.rol in ['profesional', 'admin']
+            && request.auth.uid != uid)
         || (esDueno(uid)
             && !intentaEscalarPrivilegios()
             && request.resource.data.estado == resource.data.estado)
