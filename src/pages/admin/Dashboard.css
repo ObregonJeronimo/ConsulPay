@@ -71,6 +71,9 @@
     /* En mobile el page-header ya stackea (regla global de shared-ui)
        y no necesita reservar 130px. Lo bajamos para no dejar hueco. */
     min-height: 0;
+    /* Padding extra abajo para separar el boton "Registrar sesion" de
+       la primera card de metricas (se sentian chocadas). */
+    padding-bottom: var(--cp-space-2);
   }
 }
 

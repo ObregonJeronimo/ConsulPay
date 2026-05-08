@@ -577,13 +577,22 @@
   }
 
   /* Cuando hay un boton dentro del header (ej "+ Registrar sesion"),
-     que ocupe todo el ancho disponible para ser facil de tocar. */
+     que ocupe todo el ancho disponible para ser facil de tocar.
+     Si el boton viene envuelto en un <Link><a>, el ancho 100% se
+     aplica al wrapper Y al boton interno asi se centra y se ve
+     completo, no chiquito a la izquierda. */
   .cp-page-header > button,
   .cp-page-header > a,
   .cp-page-header > .cp-btn {
     width: 100%;
     justify-content: center;
     min-height: 44px;
+  }
+
+  .cp-page-header > a > button,
+  .cp-page-header > a > .cp-btn {
+    width: 100%;
+    justify-content: center;
   }
 
   /* Section head: si hay accion a la derecha, mantener row pero permitir
