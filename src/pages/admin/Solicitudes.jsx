@@ -329,16 +329,16 @@ function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSel
                 className={`cp-solicitudes-tabla__row ${resuelta ? 'cp-solicitudes-tabla__row--resuelta' : ''}`}
                 onClick={() => onSeleccionar(s)}
               >
-                <td>
+                <td data-label="Tipo">
                   <span className={`cp-solicitud-tipo cp-solicitud-tipo--${s.tipo}`}>
                     {iconoTipo(s.tipo)}
                     {LABELS_TIPO_SOLICITUD[s.tipo]}
                   </span>
                 </td>
-                <td style={{ fontSize: 13.5 }}>
+                <td data-label="Profesional" style={{ fontSize: 13.5 }}>
                   {s.profesionalNombre || nombreProfesional(prof)}
                 </td>
-                <td>
+                <td data-label="Paciente">
                   {pac ? (
                     <div className="cp-prof-cell">
                       <Avatar initials={inicialesPaciente(pac)} size={28} />
@@ -351,11 +351,11 @@ function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSel
                     <span style={{ color: 'var(--cp-text-faint)', fontSize: 13.5 }}>—</span>
                   )}
                 </td>
-                <td style={{ fontSize: 13, color: 'var(--cp-text-muted)' }}>
+                <td data-label="Solicitada" style={{ fontSize: 13, color: 'var(--cp-text-muted)' }}>
                   {formatoRelativo(s.createdAt)}
                 </td>
-                <td>{badgeEstado(s.estado)}</td>
-                <td style={{ textAlign: 'right' }}>
+                <td data-label="Estado">{badgeEstado(s.estado)}</td>
+                <td className="cp-solicitudes-tabla__action-cell" style={{ textAlign: 'right' }}>
                   <button
                     type="button"
                     className="cp-prof-action"

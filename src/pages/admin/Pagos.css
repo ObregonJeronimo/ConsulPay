@@ -197,3 +197,157 @@
   .cp-detalle-pago dd { font-size: 13.5px; }
   .cp-detalle-pago__total dd { font-size: 19px !important; }
 }
+
+/* ============================================================
+   Mobile (<=640px) — Fase 5: Pagos en cards apiladas
+   ============================================================ */
+@media (max-width: 640px) {
+  .cp-pagos-admin {
+    max-width: 100%;
+  }
+
+  /* Stats: pasar de auto-fit a 1 columna en mobile chico */
+  .cp-pagos-stats {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+
+  /* Cada card de stat: padding mas chico y tipografia bajada */
+  .cp-stat {
+    padding: 14px 16px !important;
+  }
+
+  .cp-stat__label {
+    font-size: 11.5px;
+  }
+
+  .cp-stat__value {
+    font-size: 22px !important;
+  }
+
+  .cp-stat__hint {
+    font-size: 12px;
+  }
+
+  /* Chips de filtro: scroll horizontal con snap */
+  .cp-pagos-filtros {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .cp-pagos-filtros__chips {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    margin: 0 -4px;
+    padding: 0 4px;
+  }
+
+  .cp-pagos-filtros__chips::-webkit-scrollbar { display: none; }
+
+  .cp-pagos-filtros__chip {
+    flex-shrink: 0;
+    scroll-snap-align: start;
+    min-height: 36px;
+  }
+
+  /* Tabla -> cards apiladas */
+  .cp-pagos-admin .cp-table-wrap {
+    overflow-x: visible;
+    border: none;
+    background: transparent;
+    border-radius: 0;
+  }
+
+  .cp-pagos-admin .cp-table {
+    display: block;
+    min-width: 0;
+  }
+
+  .cp-pagos-admin .cp-table thead {
+    display: none;
+  }
+
+  .cp-pagos-admin .cp-table tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .cp-pagos-row {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 14px;
+    background: var(--cp-surface);
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius-md);
+    padding: 14px;
+  }
+
+  .cp-pagos-admin .cp-table td {
+    display: block;
+    padding: 4px 0;
+    border-bottom: none;
+    font-size: 13.5px;
+  }
+
+  .cp-pagos-admin .cp-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 10.5px;
+    font-weight: 500;
+    color: var(--cp-text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 2px;
+  }
+
+  /* Fecha + Profesional full-width arriba */
+  .cp-pagos-admin .cp-table td[data-label="Fecha"] {
+    grid-column: 1 / -1;
+    border-bottom: 1px solid var(--cp-border);
+    padding-bottom: 8px;
+    margin-bottom: 4px;
+    font-weight: 500;
+  }
+
+  .cp-pagos-admin .cp-table td[data-label="Profesional"] {
+    grid-column: 1 / -1;
+  }
+
+  /* Bruto y Recibido en row (los 2 valores mas importantes) */
+  /* Comision y Cargo MP en row debajo */
+  /* Registros y Estado en row debajo */
+
+  /* Recibido destacado: borde izquierdo verde + bg suave */
+  .cp-pagos-admin .cp-table td[data-label="Recibido"] {
+    background: var(--cp-success-bg);
+    padding: 6px 10px !important;
+    border-radius: var(--cp-radius-sm);
+  }
+
+  /* Numeros: alineacion izquierda en card */
+  .cp-pagos-admin .cp-table .cp-num {
+    text-align: left;
+  }
+
+  /* Estado full-width abajo */
+  .cp-pagos-admin .cp-table td[data-label="Estado"] {
+    grid-column: 1 / -1;
+    margin-top: 4px;
+  }
+
+  /* Nota asterisco mobile */
+  .cp-pagos-nota-asterisco {
+    margin: -12px 0 16px;
+    font-size: 11.5px;
+  }
+
+  /* Empty state */
+  .cp-sesiones-empty {
+    padding: 32px 16px;
+  }
+}

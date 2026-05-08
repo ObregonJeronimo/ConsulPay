@@ -598,6 +598,112 @@
    apretado. Reducimos la columna de "campo" y ajustamos paddings.
    ============================================================ */
 @media (max-width: 640px) {
+  /* Tabs bar (Pendientes / Resueltas): scroll horizontal */
+  .cp-tabs-bar {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+    margin: 0 -4px;
+    padding: 0 4px;
+  }
+  .cp-tabs-bar::-webkit-scrollbar { display: none; }
+
+  .cp-tabs-bar button {
+    flex-shrink: 0;
+    min-height: 40px;
+  }
+
+  /* Tabla -> cards apiladas */
+  .cp-solicitudes .cp-table-wrap {
+    overflow-x: visible;
+    border: none;
+    background: transparent;
+    border-radius: 0;
+  }
+
+  .cp-solicitudes .cp-table {
+    display: block;
+    min-width: 0;
+  }
+
+  .cp-solicitudes .cp-table thead {
+    display: none;
+  }
+
+  .cp-solicitudes .cp-table tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .cp-solicitudes-tabla__row {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 14px;
+    background: var(--cp-surface);
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius-md);
+    padding: 14px;
+  }
+
+  .cp-solicitudes .cp-table td {
+    display: block;
+    padding: 4px 0;
+    border-bottom: none;
+    font-size: 13.5px;
+  }
+
+  .cp-solicitudes .cp-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 10.5px;
+    font-weight: 500;
+    color: var(--cp-text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 2px;
+  }
+
+  /* Tipo + Estado en row 1 */
+  /* Profesional + Solicitada en row 2 (default 2 cols) */
+
+  /* Paciente full-width (avatar + nombre) */
+  .cp-solicitudes .cp-table td[data-label="Paciente"] {
+    grid-column: 1 / -1;
+    border-bottom: 1px solid var(--cp-border);
+    padding-bottom: 8px;
+    margin-bottom: 4px;
+  }
+
+  /* Boton "Ver detalle" full-width abajo */
+  .cp-solicitudes-tabla__action-cell {
+    grid-column: 1 / -1;
+    border-top: 1px solid var(--cp-border);
+    padding-top: 10px !important;
+    margin-top: 4px;
+    text-align: center !important;
+  }
+
+  .cp-solicitudes-tabla__action-cell button {
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
+  }
+
+  /* Empty state */
+  .cp-solicitudes-empty {
+    padding: 40px 20px;
+  }
+
+  .cp-solicitudes-empty__title {
+    font-size: 18px;
+  }
+
+  .cp-solicitudes-empty__desc {
+    font-size: 13px;
+  }
+
+  /* Modal de detalle: ya existe rule, mantengo y agrego */
   .cp-modal--detalle {
     max-height: 95vh;
   }
@@ -608,23 +714,58 @@
     gap: 6px;
   }
 
-  .cp-diff__head,
-  .cp-diff__row {
-    grid-template-columns: 130px 1fr 1fr;
+  /* Diff: las 3 columnas (campo, antes, despues) -> 1 columna stackeada */
+  .cp-diff__head {
+    display: none;
   }
 
-  .cp-diff__head--single,
+  .cp-diff__row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--cp-border);
+  }
+
   .cp-diff__row--single {
-    grid-template-columns: 130px 1fr;
+    grid-template-columns: 1fr;
   }
 
   .cp-diff__campo {
     font-size: 10.5px;
-    padding: 8px 10px;
+    padding: 0;
+    color: var(--cp-text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 500;
   }
 
   .cp-diff__valor {
-    font-size: 12.5px;
-    padding: 8px 10px;
+    font-size: 13px;
+    padding: 6px 8px;
+    border-radius: var(--cp-radius-sm);
+    background: var(--cp-bg);
+  }
+
+  /* Marcar antes/despues con prefix label */
+  .cp-diff__valor--antes::before {
+    content: 'Antes: ';
+    font-size: 10.5px;
+    color: var(--cp-text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 500;
+    display: block;
+    margin-bottom: 2px;
+  }
+
+  .cp-diff__valor--despues::before {
+    content: 'Después: ';
+    font-size: 10.5px;
+    color: var(--cp-success);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 500;
+    display: block;
+    margin-bottom: 2px;
   }
 }

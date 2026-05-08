@@ -220,8 +220,8 @@ export default function PagosAdmin() {
                     onClick={() => setPagoSeleccionado(p)}
                     style={{ cursor: 'pointer' }}
                   >
-                    <td>{formatoFechaCorta(p.createdAt)}</td>
-                    <td>
+                    <td data-label="Fecha">{formatoFechaCorta(p.createdAt)}</td>
+                    <td data-label="Profesional">
                       <div className="cp-prof-cell">
                         <Avatar initials={inicialesProfesional(prof)} size={28} />
                         <div>
@@ -234,20 +234,20 @@ export default function PagosAdmin() {
                         </div>
                       </div>
                     </td>
-                    <td className="cp-num">{formatoARS.format(p.montoTotal || 0)}</td>
-                    <td className="cp-num" style={{ color: 'var(--cp-text-muted)' }}>
+                    <td data-label="Bruto" className="cp-num">{formatoARS.format(p.montoTotal || 0)}</td>
+                    <td data-label="Comisión" className="cp-num" style={{ color: 'var(--cp-text-muted)' }}>
                       −{formatoARS.format(p.montoConsulpay || 0)}
                     </td>
-                    <td className="cp-num" style={{ color: 'var(--cp-text-muted)' }}>
+                    <td data-label="Cargo MP" className="cp-num" style={{ color: 'var(--cp-text-muted)' }}>
                       {tieneFee
                         ? `−${formatoARS.format(p.feeMercadoPago || 0)}`
                         : <span style={{ color: 'var(--cp-text-faint)' }}>—</span>}
                     </td>
-                    <td className="cp-num" style={{ color: 'var(--cp-success)', fontWeight: 500 }}>
+                    <td data-label="Recibido" className="cp-num" style={{ color: 'var(--cp-success)', fontWeight: 500 }}>
                       {formatoARS.format(montoNetoEfectivo(p))}
                     </td>
-                    <td className="cp-num">{p.sesionesIds?.length || 0}</td>
-                    <td>
+                    <td data-label="Registros" className="cp-num">{p.sesionesIds?.length || 0}</td>
+                    <td data-label="Estado">
                       <Badge tone={tonoEstadoPago(p.estado)}>
                         {labelEstadoPago(p.estado)}
                       </Badge>
