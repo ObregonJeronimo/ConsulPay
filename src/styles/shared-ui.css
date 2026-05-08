@@ -547,3 +547,80 @@
   border-radius: var(--cp-radius-md);
   font-size: 13.5px;
 }
+
+/* ============================================================
+   Mobile responsive — Fase 0: ajustes globales compartidos
+   ============================================================
+   Cubre los elementos de layout comunes (page headers, sections,
+   tabs) que aparecen en TODAS las paginas. Cada fase posterior
+   ajusta sus propios componentes especificos.
+   ============================================================ */
+
+@media (max-width: 640px) {
+  /* Page title: bajar de 32px a 24px en mobile chico */
+  .cp-page-title {
+    font-size: 24px;
+    line-height: 1.15;
+  }
+
+  .cp-page-sub {
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+
+  /* Page header: stackear verticalmente cuando hay un boton/accion al
+     lado del titulo. flex-wrap + gap-3 para que el boton baje pero
+     mantenga su tamanio. */
+  .cp-page-header {
+    align-items: stretch;
+    gap: var(--cp-space-3);
+  }
+
+  /* Cuando hay un boton dentro del header (ej "+ Registrar sesion"),
+     que ocupe todo el ancho disponible para ser facil de tocar. */
+  .cp-page-header > button,
+  .cp-page-header > a,
+  .cp-page-header > .cp-btn {
+    width: 100%;
+    justify-content: center;
+    min-height: 44px;
+  }
+
+  /* Section head: si hay accion a la derecha, mantener row pero permitir
+     wrap. Si la accion no entra, baja sola. */
+  .cp-section-head {
+    flex-wrap: wrap;
+    gap: var(--cp-space-2);
+  }
+
+  /* Tabs: scroll horizontal con snap en mobile. Asi no se aplastan
+     ni se cortan. */
+  .cp-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap !important;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    /* Evitar que se vea la barra de scroll horizontal. */
+    scrollbar-width: none;
+  }
+  .cp-tabs::-webkit-scrollbar { display: none; }
+
+  .cp-tab {
+    flex-shrink: 0;
+    scroll-snap-align: start;
+    min-height: 40px;
+  }
+
+  /* Botones globales: minimo 44px de alto (estandar tactil) */
+  .cp-btn,
+  button.cp-btn {
+    min-height: 44px;
+  }
+}
+
+/* Pantalla muy chica: title aun mas chico */
+@media (max-width: 380px) {
+  .cp-page-title {
+    font-size: 22px;
+  }
+}

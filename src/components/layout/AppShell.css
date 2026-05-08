@@ -1,19 +1,20 @@
 /* ============================================================
    AppShell — layout wrapper (sidebar + main content)
    ----------------------------------------------------------------
-   Tomamos decisiones deliberadas de espacio aca:
-   1. NO usamos max-width: 1200px en el main. En pantallas grandes
-      (24"+) el contenido se estira para aprovechar todo el ancho
-      disponible. Esto es importante para paginas con tablas anchas
-      como Sesiones (9 columnas), donde antes el max-width achicaba
-      el espacio util y forzaba scroll horizontal.
-   2. Padding lateral mas chico (28px en vez de 48px) para ganar
-      espacio horizontal. Compensamos visualmente con padding mas
-      generoso adentro de los componentes.
-   3. En pantallas anchas (>1600px), agregamos max-width muy alto
-      (1600px) para que el contenido no quede desproporcionadamente
-      ancho en monitores 4K — sigue dejando aprovechar mucho mas
-      ancho que antes.
+   Desktop (>900px):
+     - Grid 2 columnas: sidebar (var(--cp-sidebar-width)) + main
+     - Sidebar fijo a la izquierda, siempre visible
+     - Header mobile y backdrop ocultos
+     - NO usamos max-width restrictivo en main: aprovechamos pantallas
+       grandes (24"+). Limitamos a 1600px solo en monitores >1700px
+       para que el contenido no se estire desproporcionadamente.
+
+   Mobile (<=900px):
+     - Sidebar se vuelve un drawer fixed a la izquierda con transform
+     - Hidden por default (translateX(-100%)), slide-in al abrir
+     - Backdrop oscuro detras
+     - Header sticky con hamburger arriba
+     - Main ocupa todo el ancho
    ============================================================ */
 
 .cp-shell {
@@ -22,9 +23,15 @@
   min-height: 100vh;
 }
 
+.cp-shell__sidebar {
+  /* En desktop el sidebar es flujo normal (parte del grid).
+     El componente <Sidebar> adentro se posiciona via su propio CSS. */
+  display: contents;
+}
+
 .cp-shell__main {
-  /* Padding lateral compacto: 28px en vez de los 48px de antes. Eso
-     nos da 40px mas de ancho horizontal para tablas anchas. */
+  /* Padding lateral compacto: 28px en vez de 48px. Eso nos da 40px mas
+     de ancho horizontal para tablas anchas como Sesiones (9 columnas). */
   padding: var(--cp-space-10) 28px var(--cp-space-16);
   width: 100%;
   /* min-width: 0 hace que el grid child no se estire por su contenido
@@ -32,23 +39,202 @@
   min-width: 0;
 }
 
+/* Header sticky mobile: oculto en desktop */
+.cp-shell__mobile-header,
+.cp-shell__sidebar-close,
+.cp-shell__backdrop {
+  display: none;
+}
+
 /* En monitores muy grandes evitamos que el contenido se estire
-   demasiado a lo ancho — pero el limite es generoso (1600px) para
-   que las tablas anchas no queden cortadas. Antes era 1200px lo
-   cual era restrictivo en pantallas tipicas (1366px). */
+   demasiado a lo ancho. Limite generoso (1600px) para que las
+   tablas anchas no queden cortadas. */
 @media (min-width: 1700px) {
   .cp-shell__main {
     max-width: 1600px;
   }
 }
 
-/* ---- Responsive: en mobile la sidebar se transforma en top bar ---- */
+/* ============================================================
+   Mobile / tablet (<=900px)
+   ============================================================ */
 @media (max-width: 900px) {
+
+  /* Layout: una sola columna, main a ancho completo */
   .cp-shell {
     grid-template-columns: 1fr;
   }
 
+  /* Header sticky con hamburger + brand */
+  .cp-shell__mobile-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--cp-space-3);
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background: var(--cp-bg);
+    border-bottom: 1px solid var(--cp-border);
+    padding: var(--cp-space-3) var(--cp-space-4);
+    /* Pequenia transparencia visual para que se note el sticky cuando
+       hay scroll detras. */
+    backdrop-filter: saturate(1.4);
+    -webkit-backdrop-filter: saturate(1.4);
+  }
+
+  .cp-shell__hamburger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: var(--cp-radius-sm);
+    background: transparent;
+    color: var(--cp-text);
+    cursor: pointer;
+    transition: background var(--cp-dur-fast) var(--cp-ease),
+                border-color var(--cp-dur-fast) var(--cp-ease);
+  }
+
+  .cp-shell__hamburger:hover,
+  .cp-shell__hamburger:focus-visible {
+    background: var(--cp-surface-hover);
+    border-color: var(--cp-border);
+  }
+
+  .cp-shell__hamburger svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .cp-shell__mobile-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .cp-shell__mobile-brand-mark {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    background: var(--cp-accent);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--cp-font-serif);
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: -0.01em;
+  }
+
+  .cp-shell__mobile-brand-name {
+    font-family: var(--cp-font-serif);
+    font-weight: 500;
+    font-size: 17px;
+    color: var(--cp-text);
+    letter-spacing: -0.015em;
+  }
+
+  /* Spacer del lado derecho para balancear con el hamburger.
+     Mismo width que el hamburger asi el brand queda centrado opticamente. */
+  .cp-shell__mobile-spacer {
+    width: 40px;
+    flex-shrink: 0;
+  }
+
+  /* Sidebar como drawer slide-in desde la izquierda */
+  .cp-shell__sidebar {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    max-width: 85vw;
+    z-index: 50;
+    background: var(--cp-bg);
+    border-right: 1px solid var(--cp-border);
+    transform: translateX(-100%);
+    transition: transform 240ms cubic-bezier(0.32, 0.72, 0, 1);
+    /* will-change para que el browser optimice el slide */
+    will-change: transform;
+    /* Permitir scroll interno si el menu es mas largo que la pantalla */
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .cp-shell__sidebar--open {
+    transform: translateX(0);
+  }
+
+  /* Boton X arriba a la derecha del drawer */
+  .cp-shell__sidebar-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: none;
+    border-radius: var(--cp-radius-sm);
+    background: transparent;
+    color: var(--cp-text-muted);
+    cursor: pointer;
+    z-index: 1;
+    transition: background var(--cp-dur-fast) var(--cp-ease),
+                color var(--cp-dur-fast) var(--cp-ease);
+  }
+
+  .cp-shell__sidebar-close:hover,
+  .cp-shell__sidebar-close:focus-visible {
+    background: var(--cp-surface-hover);
+    color: var(--cp-text);
+  }
+
+  .cp-shell__sidebar-close svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  /* Backdrop oscuro detras del drawer */
+  .cp-shell__backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: rgba(20, 14, 8, 0.45);
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    /* Animacion sutil de fade-in */
+    animation: cp-shell-backdrop-in 200ms ease-out;
+  }
+
+  @keyframes cp-shell-backdrop-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  /* Main: padding mas chico en mobile, ya no necesita compensar sidebar */
   .cp-shell__main {
-    padding: var(--cp-space-6) var(--cp-space-5) var(--cp-space-12);
+    padding: var(--cp-space-6) var(--cp-space-4) var(--cp-space-12);
+  }
+}
+
+/* En pantallas muy chicas, padding aun mas reducido */
+@media (max-width: 480px) {
+  .cp-shell__main {
+    padding: var(--cp-space-5) var(--cp-space-3) var(--cp-space-10);
+  }
+
+  .cp-shell__mobile-header {
+    padding: var(--cp-space-2) var(--cp-space-3);
   }
 }

@@ -194,43 +194,45 @@
   height: 15px;
 }
 
-/* ---- Responsive: mobile ---- */
+/* ---- Responsive: mobile (sidebar dentro del drawer del AppShell) ----
+   En mobile el wrapper .cp-shell__sidebar (de AppShell.css) se vuelve
+   un drawer fixed de 280px. Adentro, el sidebar mantiene su layout
+   vertical original — solo lo ajustamos un poco para no quedar
+   apretado contra los bordes y dejar espacio para el boton X. */
 @media (max-width: 900px) {
   .cp-sidebar {
     position: static;
     height: auto;
+    min-height: 100%;
     width: 100%;
     border-right: none;
-    border-bottom: 1px solid var(--cp-border);
-    flex-direction: row;
-    overflow-x: auto;
-    gap: var(--cp-space-4);
-    padding: var(--cp-space-3) var(--cp-space-4);
+    /* El padding superior es mas amplio para no chocar con el boton X
+       que pone AppShell arriba a la derecha del drawer. */
+    padding: var(--cp-space-10) var(--cp-space-4) var(--cp-space-5);
   }
 
+  /* Brand mas chico en mobile y sin margin-bottom extra
+     (ya viene del gap del flex container). */
   .cp-sidebar__brand {
-    margin-bottom: 0;
-    flex-shrink: 0;
+    margin-bottom: var(--cp-space-2);
   }
 
-  .cp-sidebar__section {
-    flex-direction: row;
-    gap: 2px;
+  /* Items de nav un poco mas grandes y con mas tap area en mobile.
+     44px es el minimo recomendado por Apple/Android para targets
+     tactiles. */
+  .cp-nav-item {
+    padding: 10px var(--cp-space-3);
+    font-size: 14.5px;
+    min-height: 44px;
   }
 
-  .cp-sidebar__label {
-    display: none;
+  .cp-nav-item__icon {
+    width: 18px;
+    height: 18px;
   }
 
-  .cp-sidebar__footer {
-    margin-top: 0;
-    margin-left: auto;
-    padding: 0;
-    border-top: none;
-    flex-shrink: 0;
-  }
-
+  /* Footer: visible completo en mobile (en el drawer hay espacio) */
   .cp-sidebar__user {
-    display: none;
+    display: block;
   }
 }
