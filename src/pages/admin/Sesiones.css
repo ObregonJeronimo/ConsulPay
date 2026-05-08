@@ -675,3 +675,186 @@
   font-style: italic;
   line-height: 1.45;
 }
+
+/* ============================================================
+   Mobile (<=640px) — Fase 2: tabla a cards apiladas
+   ============================================================
+   La tabla con 9 columnas no entra en mobile y forzar scroll
+   horizontal queda muy mal. Convertimos cada <tr> en una card
+   apilada via CSS, sin tocar el JSX. Cada <td> usa data-label
+   (agregado en JSX) para mostrar la etiqueta de la columna a
+   la izquierda en cada fila de la card.
+   ============================================================ */
+
+@media (max-width: 640px) {
+
+  /* Header con titulo + boton + selector de mes:
+     stackear todo, selector tomando todo el ancho */
+  .cp-sesiones-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .cp-mes-selector {
+    margin-top: 0;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .cp-mes-selector__label {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* Filtros: 1 columna (search arriba, selects debajo) */
+  .cp-sesiones-filtros {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .cp-sesiones-filtros__search,
+  .cp-sesiones-filtros__select {
+    height: 44px;
+  }
+
+  /* Tabla -> cards apiladas */
+  .cp-table-wrap {
+    /* Ya no es scroll horizontal en mobile, las cards se apilan */
+    overflow-x: visible;
+    border: none;
+    background: transparent;
+    border-radius: 0;
+  }
+
+  .cp-sesiones-tabla {
+    /* min-width: max-content del .cp-table base se anula */
+    min-width: 0;
+    display: block;
+  }
+
+  /* Ocultar thead — cada td muestra su propia etiqueta via data-label */
+  .cp-sesiones-tabla thead {
+    display: none;
+  }
+
+  .cp-sesiones-tabla tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* Cada <tr> ahora es una card */
+  .cp-sesiones-tabla__row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 12px;
+    background: var(--cp-surface);
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius-md);
+    padding: 12px 14px;
+  }
+
+  .cp-sesiones-tabla__row:hover {
+    background: var(--cp-surface-hover);
+  }
+
+  /* Las <td> normales se vuelven items con label arriba.
+     Excepciones: la fecha y las acciones (full-width) */
+  .cp-sesiones-tabla td {
+    display: block;
+    padding: 4px 0;
+    border-bottom: none;
+    font-size: 13.5px;
+  }
+
+  /* Etiqueta antes del valor */
+  .cp-sesiones-tabla td::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 10.5px;
+    font-weight: 500;
+    color: var(--cp-text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 2px;
+  }
+
+  /* Td sin data-label (acciones) no muestra label */
+  .cp-sesiones-tabla td:not([data-label])::before {
+    content: none;
+  }
+
+  /* Fecha en la primera fila ocupando todo el ancho */
+  .cp-sesiones-tabla td[data-label="Fecha"] {
+    grid-column: 1 / -1;
+    border-bottom: 1px solid var(--cp-border);
+    padding-bottom: 8px;
+    margin-bottom: 4px;
+  }
+
+  /* Paciente tambien full-width (suele tener nombre largo) */
+  .cp-sesiones-tabla td[data-label="Paciente"] {
+    grid-column: 1 / -1;
+  }
+
+  /* Metodo full-width (puede tener badge "diferido") */
+  .cp-sesiones-tabla td[data-label="Método"] {
+    grid-column: 1 / -1;
+  }
+
+  /* Estado full-width al final */
+  .cp-sesiones-tabla td[data-label="Estado"] {
+    grid-column: 1 / -1;
+  }
+
+  /* Acciones full-width abajo */
+  .cp-sesiones-tabla__actions-cell {
+    grid-column: 1 / -1;
+    border-top: 1px solid var(--cp-border);
+    padding-top: 10px !important;
+    margin-top: 4px;
+  }
+
+  .cp-sesiones-tabla__actions {
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  /* Numeros: alineacion izquierda en mobile (en tabla normal van a la
+     derecha pero en card el label esta arriba y el valor abajo) */
+  .cp-sesiones-tabla .cp-num {
+    text-align: left;
+  }
+
+  /* Fecha cell: dia + hora en linea */
+  .cp-sesiones-tabla .cp-fecha-cell {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .cp-sesiones-tabla .cp-fecha-cell__dia {
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .cp-sesiones-tabla .cp-fecha-cell__hora {
+    font-size: 12.5px;
+  }
+
+  /* Botones de iconos mas grandes en mobile (44px touch target) */
+  .cp-sesiones-tabla .cp-icon-btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  /* Si la sesion esta pagada, dejamos un indicador mas visible */
+  .cp-sesiones-tabla__row--pagada {
+    opacity: 0.7;
+  }
+
+  /* Empty state: padding mas chico */
+  .cp-sesiones-empty {
+    padding: 32px 16px;
+  }
+}

@@ -419,13 +419,22 @@
    pantalla y el padding del overlay se reduce. */
 @media (max-width: 640px) {
   .cp-modal-overlay {
-    padding: 10px;
+    /* En mobile el modal ocupa casi toda la pantalla. Padding minimo
+       arriba y abajo para que no se vea pegado al borde. */
+    padding: 0;
+    align-items: flex-end;  /* Slide-up desde abajo: mas natural en mobile */
   }
   .cp-modal {
-    max-height: calc(100vh - 20px);
+    max-height: 95vh;
+    max-width: 100%;
+    width: 100%;
+    /* Bordes redondeados solo arriba para que parezca bottom sheet */
+    border-radius: var(--cp-radius-lg) var(--cp-radius-lg) 0 0;
+    /* Animacion: slide-up desde abajo en lugar de fade-zoom */
+    animation: cp-modal-up 280ms var(--cp-ease) both;
   }
   .cp-modal__title {
-    padding: 24px 24px 0;
+    padding: 20px 24px 0;
     padding-right: 56px;
     font-size: 19px;
   }
@@ -439,6 +448,11 @@
     bottom: -24px;
     margin-bottom: -24px;
   }
+}
+
+@keyframes cp-modal-up {
+  from { transform: translateY(40px); opacity: 0.5; }
+  to { transform: translateY(0); opacity: 1; }
 }
 
 /* ============================================================

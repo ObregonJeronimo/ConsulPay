@@ -553,16 +553,16 @@ function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, onEditar, o
                 className={`cp-sesiones-tabla__row ${pagada ? 'cp-sesiones-tabla__row--pagada' : ''}`}
                 onClick={() => onEditar(s)}
               >
-                <td>
+                <td data-label="Fecha">
                   <div className="cp-fecha-cell">
                     <div className="cp-fecha-cell__dia">{f.dia}</div>
                     <div className="cp-fecha-cell__hora">{f.hora}</div>
                   </div>
                 </td>
-                <td style={{ fontSize: 13.5 }}>
+                <td data-label="Profesional" style={{ fontSize: 13.5 }}>
                   {prof ? nombreProfesional(prof) : <span style={{ color: 'var(--cp-text-faint)' }}>—</span>}
                 </td>
-                <td>
+                <td data-label="Paciente">
                   {pac ? (
                     <div className="cp-prof-cell">
                       <Avatar initials={inicialesPaciente(pac)} size={28} />
@@ -575,13 +575,13 @@ function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, onEditar, o
                     </div>
                   ) : <span style={{ color: 'var(--cp-text-faint)' }}>Paciente eliminado</span>}
                 </td>
-                <td style={{ fontSize: 13 }}>
+                <td data-label="Método" style={{ fontSize: 13 }}>
                   {s.metodoPagoNombre}
                   {s.metodoPagoTipo === TIPOS_METODO_PAGO.DIFERIDO && (
                     <span className="cp-badge cp-badge--diferido" style={{ marginLeft: 6 }}>diferido</span>
                   )}
                 </td>
-                <td className="cp-num">
+                <td data-label="Valor" className="cp-num">
                   {formatoARS.format(s.valorTotal)}
                   {cantidad > 1 && s.valorSesion ? (
                     <div style={{ fontSize: 11, color: 'var(--cp-text-muted)', marginTop: 2 }}>
@@ -589,19 +589,19 @@ function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, onEditar, o
                     </div>
                   ) : null}
                 </td>
-                <td className="cp-num" style={{ color: 'var(--cp-accent)' }}>
+                <td data-label="Consultorio" className="cp-num" style={{ color: 'var(--cp-accent)' }}>
                   {formatoARS.format(s.montoConsultorio)}
                 </td>
-                <td className="cp-num" style={{ color: 'var(--cp-success)' }}>
+                <td data-label="Profesional" className="cp-num" style={{ color: 'var(--cp-success)' }}>
                   {formatoARS.format(s.montoProfesional)}
                 </td>
-                <td>
+                <td data-label="Estado">
                   <span className={`cp-badge ${pagada ? 'cp-badge--pagada' : 'cp-badge--debido'}`}>
                     <span className="cp-badge__dot" />
                     {pagada ? 'Pagada' : 'Debida'}
                   </span>
                 </td>
-                <td onClick={(e) => e.stopPropagation()}>
+                <td className="cp-sesiones-tabla__actions-cell" onClick={(e) => e.stopPropagation()}>
                   <div className="cp-sesiones-tabla__actions">
                     <button
                       className={`cp-icon-btn ${pagada ? '' : 'cp-icon-btn--success'}`}
