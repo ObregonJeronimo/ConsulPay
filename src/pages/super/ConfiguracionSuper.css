@@ -88,3 +88,37 @@
   justify-content: flex-end;
   margin-top: 14px;
 }
+
+/* ============================================================
+   Mobile (<=640px) — Fase 6: Super Configuracion
+   ============================================================ */
+@media (max-width: 640px) {
+  .cp-super-config__section {
+    padding: 16px;
+  }
+
+  .cp-super-config__row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .cp-super-config__label {
+    font-size: 12.5px;
+  }
+
+  .cp-super-config__input {
+    width: 100%;
+    height: 44px;
+  }
+
+  .cp-super-config__actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .cp-super-config__actions button {
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
+  }
+}

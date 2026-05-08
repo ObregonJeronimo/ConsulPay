@@ -229,3 +229,54 @@
   from { opacity: 0; transform: translateY(16px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+/* ============================================================
+   Mobile (<=640px)
+   ============================================================ */
+@media (max-width: 640px) {
+  .ai-nav {
+    padding: 14px 16px;
+  }
+
+  .ai-main {
+    padding: 28px 16px;
+    align-items: stretch;
+  }
+
+  .ai-card {
+    padding: 24px 20px;
+    max-width: 100%;
+  }
+
+  .ai-title {
+    font-size: 24px;
+  }
+
+  .ai-sub {
+    font-size: 13.5px;
+    margin-bottom: 20px;
+  }
+
+  /* Detail rows: stack vertical (label arriba, value abajo) */
+  .ai-detail__row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 8px 0;
+    font-size: 13px;
+  }
+
+  .ai-detail__label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  /* Centered card (estado de invitacion) */
+  .ai-icon {
+    width: 48px;
+    height: 48px;
+  }
+
+  .ai-icon svg { width: 24px; height: 24px; }
+}

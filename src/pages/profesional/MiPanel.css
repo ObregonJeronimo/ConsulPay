@@ -272,3 +272,48 @@
   color: var(--cp-text-muted);
   margin-top: 3px;
 }
+
+/* ============================================================
+   Mobile (<=640px) — Fase 6: ajustes finales del panel profesional
+   ============================================================ */
+@media (max-width: 640px) {
+  /* Cards de panel: padding mas compacto y tipografia bajada */
+  .cp-panel-card {
+    padding: 16px 18px !important;
+  }
+
+  .cp-panel-card__label {
+    font-size: 11px !important;
+  }
+
+  .cp-panel-card__value {
+    font-size: 24px !important;
+  }
+
+  .cp-panel-card__hint {
+    font-size: 12px !important;
+  }
+
+  /* Quick actions / accesos rapidos: stack vertical */
+  .cp-panel__cta {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 10px;
+  }
+
+  .cp-panel__cta button,
+  .cp-panel__cta a {
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
+  }
+
+  /* Saludo / header del panel */
+  .cp-panel__welcome-name {
+    font-size: 22px !important;
+  }
+
+  .cp-panel__welcome-sub {
+    font-size: 13px !important;
+  }
+}

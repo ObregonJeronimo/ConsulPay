@@ -648,3 +648,69 @@
     justify-content: flex-end;
   }
 }
+
+/* ============================================================
+   Mobile (<=640px) — Fase 6: Super Consultorios
+   ============================================================ */
+@media (max-width: 640px) {
+  .cp-super-tree {
+    gap: 14px;
+  }
+
+  .cp-super-section {
+    padding: 16px;
+  }
+
+  .cp-super-section__head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    margin-bottom: 12px;
+  }
+
+  .cp-super-section__title {
+    font-size: 17px;
+  }
+
+  .cp-super-section__meta {
+    font-size: 12px;
+  }
+
+  .cp-super-section__hint {
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  /* Lista de users / consultorios */
+  .cp-super-tree__users,
+  .cp-super-tree__list {
+    gap: 8px;
+  }
+
+  /* Cada item: stack vertical */
+  .cp-super-consultorio,
+  .cp-super-user-item {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 10px;
+    padding: 14px;
+  }
+
+  /* Acciones full-width */
+  .cp-super-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .cp-super-actions button {
+    width: 100%;
+    min-height: 40px;
+    justify-content: center;
+  }
+
+  /* Modal de superadmin: bottom-sheet ya viene del shared */
+  .cp-super-modal__form {
+    grid-template-columns: 1fr !important;
+  }
+}

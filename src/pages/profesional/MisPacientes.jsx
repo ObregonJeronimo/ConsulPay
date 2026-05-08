@@ -108,7 +108,7 @@ export default function MisPacientes() {
                 const valor = metodo?.valorSesionDefault ?? 0;
                 return (
                   <tr key={p.id}>
-                    <td>
+                    <td data-label="Paciente">
                       <div className="cp-prof-cell">
                         <Avatar initials={iniciales(p.nombre, p.apellido)} size={32} />
                         <div>
@@ -119,7 +119,7 @@ export default function MisPacientes() {
                         </div>
                       </div>
                     </td>
-                    <td style={{ fontSize: 13.5 }}>
+                    <td data-label="Método" style={{ fontSize: 13.5 }}>
                       {metodo ? (
                         <>
                           {metodo.nombre}
@@ -129,11 +129,11 @@ export default function MisPacientes() {
                         </>
                       ) : <span style={{ color: 'var(--cp-danger)' }}>—</span>}
                     </td>
-                    <td className="cp-num">{formatoARS.format(valor)}</td>
-                    <td style={{ fontSize: 13, color: 'var(--cp-text-muted)' }}>
+                    <td data-label="Valor sesión" className="cp-num">{formatoARS.format(valor)}</td>
+                    <td data-label="Obra social Nº" style={{ fontSize: 13, color: 'var(--cp-text-muted)' }}>
                       {p.obraSocialNumero || '—'}
                     </td>
-                    <td style={{ fontSize: 13, color: 'var(--cp-text-muted)' }}>
+                    <td data-label="Contacto" style={{ fontSize: 13, color: 'var(--cp-text-muted)' }}>
                       {p.telefono || p.email || '—'}
                     </td>
                   </tr>

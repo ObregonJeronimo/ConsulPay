@@ -573,13 +573,13 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, onEdi
                 className={`cp-sesiones-tabla__row ${pagada ? 'cp-sesiones-tabla__row--pagada' : ''}`}
                 onClick={() => !accionesDisabled && onEditar(s)}
               >
-                <td>
+                <td data-label="Fecha">
                   <div className="cp-fecha-cell">
                     <div className="cp-fecha-cell__dia">{f.dia}</div>
                     <div className="cp-fecha-cell__hora">{f.hora}</div>
                   </div>
                 </td>
-                <td>
+                <td data-label="Paciente">
                   {pac ? (
                     <div className="cp-prof-cell">
                       <Avatar initials={inicialesPaciente(pac)} size={28} />
@@ -591,7 +591,7 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, onEdi
                     </div>
                   ) : <span style={{ color: 'var(--cp-text-faint)' }}>Paciente eliminado</span>}
                 </td>
-                <td className="cp-num">
+                <td data-label="Sesiones" className="cp-num">
                   <span
                     className={esAgrupada ? 'cp-cantidad-cell cp-cantidad-cell--grupo' : 'cp-cantidad-cell'}
                     title={esAgrupada ? `Este registro representa ${cantidad} sesiones agrupadas` : '1 sesión'}
@@ -599,13 +599,13 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, onEdi
                     {cantidad}
                   </span>
                 </td>
-                <td style={{ fontSize: 13 }}>
+                <td data-label="Método" style={{ fontSize: 13 }}>
                   {s.metodoPagoNombre}
                   {s.metodoPagoTipo === TIPOS_METODO_PAGO.DIFERIDO && (
                     <span className="cp-badge cp-badge--diferido" style={{ marginLeft: 6 }}>diferido</span>
                   )}
                 </td>
-                <td className="cp-num">
+                <td data-label="Valor" className="cp-num">
                   {formatoARS.format(s.valorTotal)}
                   {esAgrupada && s.valorSesion ? (
                     <div style={{ fontSize: 11, color: 'var(--cp-text-muted)', marginTop: 2 }}>
@@ -613,13 +613,13 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, onEdi
                     </div>
                   ) : null}
                 </td>
-                <td className="cp-num" style={{ color: 'var(--cp-success)' }}>
+                <td data-label="Mi parte" className="cp-num" style={{ color: 'var(--cp-success)' }}>
                   {formatoARS.format(s.montoProfesional)}
                 </td>
-                <td className="cp-num" style={{ color: 'var(--cp-accent)' }}>
+                <td data-label="Al consultorio" className="cp-num" style={{ color: 'var(--cp-accent)' }}>
                   {formatoARS.format(s.montoConsultorio)}
                 </td>
-                <td>
+                <td data-label="Estado">
                   {tienePendiente ? (
                     <span className="cp-badge cp-badge--debido">
                       <ClockIcon />
@@ -632,7 +632,7 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, onEdi
                     </span>
                   )}
                 </td>
-                <td onClick={(e) => e.stopPropagation()}>
+                <td className="cp-sesiones-tabla__actions-cell" onClick={(e) => e.stopPropagation()}>
                   <div className="cp-sesiones-tabla__actions">
                     <button
                       className="cp-icon-btn"

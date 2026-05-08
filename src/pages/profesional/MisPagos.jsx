@@ -350,8 +350,8 @@ export default function MisPagos() {
                           />
                         </td>
                       )}
-                      <td>{formatoFechaCorta(s.fecha)}</td>
-                      <td>
+                      <td data-label="Fecha">{formatoFechaCorta(s.fecha)}</td>
+                      <td data-label="Paciente">
                         {pac ? (
                           <div className="cp-prof-cell">
                             <Avatar initials={inicialesPaciente(pac)} size={26} />
@@ -359,11 +359,11 @@ export default function MisPagos() {
                           </div>
                         ) : <span style={{ color: 'var(--cp-text-faint)' }}>Paciente eliminado</span>}
                       </td>
-                      <td style={{ fontSize: 13 }}>{s.metodoPagoNombre}</td>
-                      <td className="cp-num" style={{ color: 'var(--cp-success)' }}>
+                      <td data-label="Método" style={{ fontSize: 13 }}>{s.metodoPagoNombre}</td>
+                      <td data-label="Mi parte" className="cp-num" style={{ color: 'var(--cp-success)' }}>
                         {formatoARS.format(s.montoProfesional)}
                       </td>
-                      <td className="cp-num" style={{ color: 'var(--cp-accent)' }}>
+                      <td data-label="Al consultorio" className="cp-num" style={{ color: 'var(--cp-accent)' }}>
                         {formatoARS.format(s.montoConsultorio)}
                       </td>
                     </tr>
@@ -392,10 +392,10 @@ export default function MisPagos() {
               <tbody>
                 {pagosFiltrados.map((p) => (
                   <tr key={p.id}>
-                    <td>{formatoFechaCorta(p.createdAt)}</td>
-                    <td className="cp-num">{formatoARS.format(p.montoTotal || 0)}</td>
-                    <td className="cp-num">{p.sesionesIds?.length || 0}</td>
-                    <td>
+                    <td data-label="Fecha">{formatoFechaCorta(p.createdAt)}</td>
+                    <td data-label="Monto pagado" className="cp-num">{formatoARS.format(p.montoTotal || 0)}</td>
+                    <td data-label="Sesiones" className="cp-num">{p.sesionesIds?.length || 0}</td>
+                    <td data-label="Estado">
                       <Badge tone={tonoEstadoPago(p.estado)}>
                         {labelEstadoPago(p.estado)}
                       </Badge>

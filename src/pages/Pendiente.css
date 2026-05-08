@@ -70,3 +70,37 @@
   gap: var(--cp-space-2);
   margin-top: var(--cp-space-4);
 }
+
+/* ============================================================
+   Mobile (<=640px)
+   ============================================================ */
+@media (max-width: 640px) {
+  .cp-pendiente {
+    padding: var(--cp-space-4);
+  }
+
+  .cp-pendiente__card {
+    padding: var(--cp-space-7) var(--cp-space-5);
+  }
+
+  .cp-pendiente__title {
+    font-size: 22px;
+  }
+
+  .cp-pendiente__msg {
+    font-size: 13.5px;
+  }
+
+  /* Botones full-width apilados verticalmente */
+  .cp-pendiente__actions {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .cp-pendiente__actions button {
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
+  }
+}

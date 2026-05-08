@@ -296,3 +296,30 @@
     padding: var(--cp-space-6) var(--cp-space-5);
   }
 }
+
+/* ============================================================
+   Mobile (<=640px) — Fase 6: Login compacto
+   ============================================================ */
+@media (max-width: 640px) {
+  .cp-login__form-side {
+    padding: var(--cp-space-5) var(--cp-space-4);
+  }
+
+  .cp-login__container {
+    max-width: 100%;
+  }
+
+  .cp-login__title {
+    font-size: 26px;
+  }
+
+  .cp-login__sub {
+    font-size: 13.5px;
+  }
+
+  .cp-login__google,
+  .cp-login__submit {
+    min-height: 48px;
+    font-size: 14px;
+  }
+}
