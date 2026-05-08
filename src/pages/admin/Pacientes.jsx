@@ -614,7 +614,7 @@ function PacientesTabla({
 
             return (
               <tr key={p.id}>
-                <td>
+                <td data-label="Paciente">
                   <div className="cp-prof-cell">
                     <Avatar initials={iniciales(p.nombre, p.apellido)} size={32} />
                     <div>
@@ -629,20 +629,20 @@ function PacientesTabla({
                     </div>
                   </div>
                 </td>
-                <td style={{ fontSize: 13.5 }}>
+                <td data-label="Profesional/es" style={{ fontSize: 13.5 }}>
                   <ProfesionalesCelda
                     pacienteUids={profUids}
                     mapaProfesionales={mapaProfesionales}
                   />
                 </td>
-                <td style={{ fontSize: 13.5 }}>
+                <td data-label="Método" style={{ fontSize: 13.5 }}>
                   {metodo ? metodo.nombre : <span style={{ color: 'var(--cp-danger)' }}>Método eliminado</span>}
                 </td>
-                <td className="cp-num">{formatoARS.format(valor)}</td>
-                <td style={{ fontSize: 13, color: 'var(--cp-text-muted)' }}>
+                <td data-label="Valor sesión" className="cp-num">{formatoARS.format(valor)}</td>
+                <td data-label="Obra social Nº" style={{ fontSize: 13, color: 'var(--cp-text-muted)' }}>
                   {p.obraSocialNumero || '—'}
                 </td>
-                <td style={{ textAlign: 'right' }}>
+                <td className="cp-pacientes-table__actions" style={{ textAlign: 'right' }}>
                   <button
                     className="cp-prof-action"
                     onClick={() => onEditar(p)}

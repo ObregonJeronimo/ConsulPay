@@ -685,3 +685,142 @@
     justify-content: center;
   }
 }
+
+/* ============================================================
+   Mobile (<=640px) — Fase 3: Pacientes en cards apiladas
+   ============================================================ */
+@media (max-width: 640px) {
+  /* Filtros: 1 columna stackeada */
+  .cp-filtros {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .cp-filtros__search,
+  .cp-filtros__select {
+    width: 100%;
+    min-width: 0;
+    height: 44px;
+  }
+
+  /* Boton "Ver archivados" full-width */
+  .cp-archivados-btn {
+    width: 100%;
+    justify-content: center;
+    min-height: 44px;
+  }
+
+  /* Tabla Pacientes -> cards apiladas */
+  .cp-pacientes-table {
+    display: block;
+    min-width: 0;
+  }
+
+  .cp-pacientes-table thead {
+    display: none;
+  }
+
+  .cp-pacientes-table tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .cp-pacientes-table tbody tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 14px;
+    background: var(--cp-surface);
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius-md);
+    padding: 14px;
+  }
+
+  .cp-pacientes-table td {
+    display: block;
+    padding: 4px 0;
+    border-bottom: none;
+    font-size: 13.5px;
+  }
+
+  .cp-pacientes-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 10.5px;
+    font-weight: 500;
+    color: var(--cp-text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 2px;
+  }
+
+  /* Paciente full-width arriba (con avatar y datos) */
+  .cp-pacientes-table td[data-label="Paciente"] {
+    grid-column: 1 / -1;
+    border-bottom: 1px solid var(--cp-border);
+    padding-bottom: 10px;
+    margin-bottom: 4px;
+  }
+
+  /* Profesional/es full-width (puede ser largo) */
+  .cp-pacientes-table td[data-label="Profesional/es"] {
+    grid-column: 1 / -1;
+  }
+
+  /* Metodo, Valor sesion en grid 2 columnas */
+  /* (default grid-template-columns: 1fr 1fr) */
+
+  /* Obra social full-width */
+  .cp-pacientes-table td[data-label="Obra social Nº"] {
+    grid-column: 1 / -1;
+  }
+
+  /* Acciones full-width abajo, alineadas a derecha */
+  .cp-pacientes-table__actions {
+    grid-column: 1 / -1;
+    border-top: 1px solid var(--cp-border);
+    padding-top: 10px !important;
+    margin-top: 4px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  /* Botones de acciones mas grandes para tap */
+  .cp-pacientes-table__actions .cp-prof-action {
+    min-width: 40px;
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Numeros: alineacion izquierda en card (en tabla van a la derecha) */
+  .cp-pacientes-table .cp-num {
+    text-align: left;
+  }
+
+  /* Wrap de tabla: sin border ni padding (las cards ya lo tienen) */
+  .cp-pacientes .cp-table-wrap {
+    overflow-x: visible;
+    border: none;
+    background: transparent;
+    border-radius: 0;
+  }
+
+  /* Avatar mas chico en mobile para que quepa el nombre */
+  .cp-pacientes-table .cp-prof-cell {
+    gap: 10px;
+  }
+
+  /* Empty state: padding mas chico */
+  .cp-pacientes__empty-filtered {
+    padding: 32px 16px !important;
+  }
+
+  /* Page sub mas chico */
+  .cp-pacientes .cp-page-sub {
+    font-size: 13px;
+  }
+}

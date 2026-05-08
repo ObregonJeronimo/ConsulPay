@@ -356,7 +356,7 @@ function ProfesionalesTabla({ profesionales, onSuspender, onReactivar, onRetirar
         <tbody>
           {profesionales.map((p) => (
             <tr key={p.uid}>
-              <td>
+              <td data-label="Profesional">
                 <div className="cp-prof-cell">
                   <Avatar initials={iniciales(p.displayName || p.email)} size={32} />
                   <div>
@@ -367,18 +367,18 @@ function ProfesionalesTabla({ profesionales, onSuspender, onReactivar, onRetirar
                   </div>
                 </div>
               </td>
-              <td style={{ fontSize: 13.5, color: 'var(--cp-text-muted)' }}>{p.email}</td>
-              <td>
+              <td data-label="Email" style={{ fontSize: 13.5, color: 'var(--cp-text-muted)' }}>{p.email}</td>
+              <td data-label="Estado">
                 {p.estado === ESTADOS_USUARIO.ACTIVO && <Badge tone="success">Activo</Badge>}
                 {p.estado === ESTADOS_USUARIO.SUSPENDIDO && <Badge tone="danger">Suspendido</Badge>}
                 {p.estado === ESTADOS_USUARIO.PENDIENTE && <Badge tone="warning">Pendiente</Badge>}
               </td>
               {onSuspender && (
-                <td>
+                <td data-label="Edición directa">
                   <ToggleEdicionDirecta profesional={p} />
                 </td>
               )}
-              <td style={{ textAlign: 'right' }}>
+              <td className="cp-prof-tabla__actions" style={{ textAlign: 'right' }}>
                 {onSuspender && (
                   <button className="cp-prof-action" onClick={() => onSuspender(p.uid)}>
                     Suspender
@@ -433,7 +433,7 @@ function ProfesionalesTablaRetirados({ profesionales }) {
               : (p.retiradoAt instanceof Date ? p.retiradoAt : null);
             return (
               <tr key={p.uid} className="cp-prof-row--retirado">
-                <td>
+                <td data-label="Profesional">
                   <div className="cp-prof-cell">
                     <Avatar initials={iniciales(p.displayName || p.email)} size={32} />
                     <div>
@@ -444,11 +444,11 @@ function ProfesionalesTablaRetirados({ profesionales }) {
                     </div>
                   </div>
                 </td>
-                <td style={{ fontSize: 13.5, color: 'var(--cp-text-muted)' }}>{p.email}</td>
-                <td style={{ fontSize: 13.5, color: 'var(--cp-text-muted)' }}>
+                <td data-label="Email" style={{ fontSize: 13.5, color: 'var(--cp-text-muted)' }}>{p.email}</td>
+                <td data-label="Retiro" style={{ fontSize: 13.5, color: 'var(--cp-text-muted)' }}>
                   {retiradoAt ? formatoFechaLarga.format(retiradoAt) : '—'}
                 </td>
-                <td>
+                <td data-label="Estado">
                   <Badge tone="neutral">Retirado</Badge>
                 </td>
               </tr>

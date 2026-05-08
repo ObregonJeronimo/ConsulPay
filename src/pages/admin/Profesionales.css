@@ -196,3 +196,155 @@
 /* Los avisos de deuda (.cp-retiro-deuda-aviso, .cp-retiro-deuda-ok)
    viven en shared-ui.css porque se reusan tambien desde el panel del
    profesional (MiPanel.jsx) cuando hace auto-retiro. */
+
+/* ============================================================
+   Mobile (<=640px) — Fase 3: Profesionales en cards apiladas
+   ============================================================ */
+@media (max-width: 640px) {
+
+  /* Page sub mas chico */
+  .cp-profs .cp-page-sub {
+    font-size: 13px;
+  }
+
+  /* Section: gap interno */
+  .cp-profs .cp-section {
+    gap: 12px;
+  }
+
+  .cp-section-head {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .cp-section-title {
+    font-size: 17px;
+  }
+
+  .cp-section-hint {
+    font-size: 12.5px;
+    line-height: 1.5;
+  }
+
+  /* Tabla -> cards apiladas. Las dos tablas (activos/retirados) usan
+     .cp-table base, pero ambas estan dentro de .cp-profs */
+  .cp-profs .cp-table-wrap {
+    overflow-x: visible;
+    border: none;
+    background: transparent;
+    border-radius: 0;
+  }
+
+  .cp-profs .cp-table {
+    display: block;
+    min-width: 0;
+  }
+
+  .cp-profs .cp-table thead {
+    display: none;
+  }
+
+  .cp-profs .cp-table tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .cp-profs .cp-table tbody tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 14px;
+    background: var(--cp-surface);
+    border: 1px solid var(--cp-border);
+    border-radius: var(--cp-radius-md);
+    padding: 14px;
+  }
+
+  .cp-profs .cp-table td {
+    display: block;
+    padding: 4px 0;
+    border-bottom: none;
+    font-size: 13.5px;
+  }
+
+  .cp-profs .cp-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 10.5px;
+    font-weight: 500;
+    color: var(--cp-text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 2px;
+  }
+
+  /* Profesional full-width (avatar + nombre + meta) */
+  .cp-profs .cp-table td[data-label="Profesional"] {
+    grid-column: 1 / -1;
+    border-bottom: 1px solid var(--cp-border);
+    padding-bottom: 10px;
+    margin-bottom: 4px;
+  }
+
+  /* Email full-width (puede ser largo) */
+  .cp-profs .cp-table td[data-label="Email"] {
+    grid-column: 1 / -1;
+    word-break: break-all;
+  }
+
+  /* Edicion directa full-width */
+  .cp-profs .cp-table td[data-label="Edición directa"] {
+    grid-column: 1 / -1;
+  }
+
+  /* Estado y Retiro: 2 columnas (default) o full si solo uno */
+  .cp-profs .cp-table td[data-label="Estado"],
+  .cp-profs .cp-table td[data-label="Retiro"] {
+    /* En la tabla de retirados Estado y Retiro son 2 cols al lado.
+       En tabla de activos Estado va solo. */
+  }
+
+  /* Acciones full-width abajo */
+  .cp-prof-tabla__actions {
+    grid-column: 1 / -1;
+    border-top: 1px solid var(--cp-border);
+    padding-top: 10px !important;
+    margin-top: 4px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  /* Botones de accion mas anchos en mobile */
+  .cp-prof-tabla__actions .cp-prof-action {
+    min-height: 40px;
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+
+  /* Invitaciones pendientes: padding y gap */
+  .cp-invitaciones {
+    gap: 8px;
+  }
+
+  .cp-invitacion {
+    padding: 14px !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+  }
+
+  /* Empty state mas compacto */
+  .cp-empty-profs {
+    padding: 32px 20px !important;
+  }
+
+  .cp-empty-profs__title {
+    font-size: 19px !important;
+  }
+
+  .cp-empty-profs__desc {
+    font-size: 13.5px !important;
+  }
+}
