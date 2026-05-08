@@ -756,3 +756,11 @@
     font-size: 22px;
   }
 }
+
+/* TEMPORAL DEBUG — borrar despues */
+@media (max-width: 640px) {
+  .cp-shell__main { outline: 2px solid red !important; }
+  .cp-solicitudes { outline: 2px solid blue !important; }
+  .cp-solicitudes > header { outline: 2px solid green !important; }
+  .cp-solicitudes > header > div { outline: 2px solid orange !important; }
+}
