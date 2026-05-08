@@ -225,18 +225,19 @@
     to { opacity: 1; }
   }
 
-  /* Main: padding mas chico en mobile, ya no necesita compensar sidebar.
-     Padding-top reducido a 16px (antes 24px) para que el contenido este
-     mas cerca del header sticky y no se sienta tan despegado. */
+  /* Main: padding-top mas chico en mobile. El header sticky ya separa
+     visualmente del contenido, no hace falta dejar 16px adicionales
+     que en paginas con titulo + subtitulo livianos (ej Solicitudes)
+     hacen que el header sticky parezca enorme por contraste. */
   .cp-shell__main {
-    padding: var(--cp-space-4) var(--cp-space-4) var(--cp-space-12);
+    padding: 12px var(--cp-space-4) var(--cp-space-12);
   }
 }
 
 /* En pantallas muy chicas, padding aun mas reducido */
 @media (max-width: 480px) {
   .cp-shell__main {
-    padding: var(--cp-space-3) var(--cp-space-3) var(--cp-space-10);
+    padding: 10px var(--cp-space-3) var(--cp-space-10);
   }
 
   .cp-shell__mobile-header {
