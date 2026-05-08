@@ -49,3 +49,30 @@
 .cp-metric__trend--neutral {
   color: var(--cp-text-muted);
 }
+
+/* ============================================================
+   Mobile (<=640px)
+   ----------------------------------------------------------------
+   Padding mas compacto y tipografia reducida para que las cards
+   no ocupen tanta altura vertical. La etiqueta sigue arriba pero
+   el valor y el sub se acercan visualmente. */
+@media (max-width: 640px) {
+  .cp-metric {
+    padding: var(--cp-space-3) var(--cp-space-4);
+    min-height: 0;
+  }
+
+  .cp-metric__label {
+    font-size: 11px;
+    margin-bottom: 4px;
+  }
+
+  .cp-metric__value {
+    font-size: 22px;
+  }
+
+  .cp-metric__sub {
+    font-size: 11.5px;
+    margin-top: 2px;
+  }
+}

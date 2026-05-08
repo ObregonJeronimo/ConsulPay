@@ -51,21 +51,33 @@
 @media (max-width: 900px) {
   .cp-metrics-grid {
     grid-template-columns: repeat(2, 1fr);
+    /* En mobile el grid es mas compacto, pero seguimos con 2 columnas
+       para que las 4 metricas entren en una pantalla de 2x2. Dejamos
+       1 columna solo en pantallas muy chicas (<420px). */
+    gap: var(--cp-space-3);
+    min-height: 0;
   }
 }
 
-@media (max-width: 560px) {
-  .cp-metrics-grid {
-    grid-template-columns: 1fr;
+@media (max-width: 640px) {
+  .cp-dashboard {
+    /* Reducir el gap general entre secciones de 80px (--cp-space-10)
+       a 32px (--cp-space-7). En mobile 80px se ve como un hueco enorme. */
+    gap: var(--cp-space-7);
+    min-height: 0;
   }
-  /* En mobile el botón del header wrappea a una segunda fila.
-     Reservar altura mínima para que la grilla no se desplace (CLS). */
+
   .cp-page-header {
-    min-height: 130px;
+    /* En mobile el page-header ya stackea (regla global de shared-ui)
+       y no necesita reservar 130px. Lo bajamos para no dejar hueco. */
+    min-height: 0;
   }
 }
 
-@media (max-width: 560px) {
+/* Pantallas muy chicas (<420px): pasar a 1 columna porque las cards
+   con 2 columnas quedan muy estrechas y los valores grandes ($XX.XXX)
+   no entran. */
+@media (max-width: 420px) {
   .cp-metrics-grid {
     grid-template-columns: 1fr;
   }
@@ -570,4 +582,68 @@
   .cp-deuda-item { padding: 12px 14px; gap: 12px; }
   .cp-deuda-item__name { font-size: 14px; }
   .cp-deuda-item__monto { font-size: 15px; }
+}
+
+/* ============================================================
+   Mobile (<=640px): ajustes finales del Dashboard
+   ============================================================ */
+@media (max-width: 640px) {
+  /* Placeholder box (cuando no hay deuda o no hay sesiones): padding
+     mas compacto para no ocupar tanto vertical en pantalla chica. */
+  .cp-placeholder-box {
+    padding: 20px 16px;
+  }
+
+  .cp-placeholder-box p {
+    font-size: 13px !important;
+    line-height: 1.5;
+  }
+
+  /* Onboarding plan box: padding mas chico, gap interno menor */
+  .cp-onboarding__plan {
+    padding: 16px 18px;
+  }
+
+  .cp-onboarding__plan-name {
+    font-size: 19px;
+  }
+
+  .cp-onboarding__plan-desc {
+    font-size: 13px;
+  }
+
+  /* Section title: bajar de 24px a 18px en mobile */
+  .cp-section-title {
+    font-size: 18px;
+  }
+
+  /* Onboarding (cuando recien se crea el consultorio) */
+  .cp-onboarding {
+    gap: var(--cp-space-7) !important;
+  }
+
+  .cp-onboarding__intro {
+    gap: 4px;
+  }
+
+  .cp-onboarding__title {
+    font-size: 22px !important;
+    line-height: 1.2;
+  }
+
+  .cp-onboarding-step {
+    padding: 18px 20px !important;
+  }
+
+  .cp-onboarding-step__num {
+    font-size: 22px !important;
+  }
+
+  .cp-onboarding-step__title {
+    font-size: 16px !important;
+  }
+
+  .cp-onboarding-step__desc {
+    font-size: 13px !important;
+  }
 }
