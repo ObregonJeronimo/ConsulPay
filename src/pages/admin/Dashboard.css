@@ -171,21 +171,8 @@
   text-align: right;
 }
 
-.cp-prof-cell {
-  display: flex;
-  align-items: center;
-  gap: var(--cp-space-3);
-}
-
-.cp-prof-name {
-  font-weight: 500;
-  color: var(--cp-text);
-}
-
-.cp-prof-meta {
-  font-size: 12px;
-  color: var(--cp-text-muted);
-}
+/* .cp-prof-cell, .cp-prof-name, .cp-prof-meta viven en shared-ui.css
+   (se usan en multiples paginas). */
 
 /* ---- Two col ---- */
 .cp-two-col {
@@ -285,43 +272,8 @@
   gap: 6px;
 }
 
-.cp-icon-btn {
-  width: 30px;
-  height: 30px;
-  border-radius: var(--cp-radius-sm);
-  border: 1px solid var(--cp-border-strong);
-  background: var(--cp-surface);
-  color: var(--cp-text-muted);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition:
-    background var(--cp-dur-fast) var(--cp-ease),
-    border-color var(--cp-dur-fast) var(--cp-ease),
-    color var(--cp-dur-fast) var(--cp-ease);
-}
-
-.cp-icon-btn:hover {
-  background: var(--cp-surface-hover);
-}
-
-.cp-icon-btn svg {
-  width: 14px;
-  height: 14px;
-}
-
-.cp-icon-btn--approve:hover {
-  background: var(--cp-success-bg);
-  color: var(--cp-success);
-  border-color: var(--cp-success);
-}
-
-.cp-icon-btn--reject:hover {
-  background: var(--cp-danger-bg);
-  color: var(--cp-danger);
-  border-color: var(--cp-danger);
-}
+/* .cp-icon-btn y sus variantes (--approve, --reject, --danger, --success)
+   viven en shared-ui.css. Se usan tambien en Sesiones, MisSesiones. */
 
 .cp-empty {
   color: var(--cp-text-muted);

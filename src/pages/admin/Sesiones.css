@@ -86,7 +86,14 @@
 }
 
 /* ============================================================
-   Stats cards (4 columnas en desktop, 2 en mobile)
+   Stats cards (grid)
+   ----------------------------------------------------------------
+   Las clases .cp-stat / .cp-stat__label / .cp-stat__value / .cp-stat__hint
+   y los modificadores --debido, --success viven en shared-ui.css porque
+   se usan en multiples paginas (Sesiones, Pagos). Antes estaban solo
+   aca y eso causaba un bug donde al entrar directo a /admin/pagos los
+   estilos no aplicaban hasta navegar a Sesiones primero (chunks CSS
+   por pagina con dependencia cruzada).
    ============================================================ */
 .cp-sesiones-stats {
   display: grid;
@@ -97,43 +104,6 @@
 @media (max-width: 900px) {
   .cp-sesiones-stats { grid-template-columns: repeat(2, 1fr); }
 }
-
-.cp-stat {
-  background: var(--cp-surface);
-  border: 1px solid var(--cp-border);
-  border-radius: var(--cp-radius-lg);
-  padding: 16px 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.cp-stat__label {
-  font-size: 11.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--cp-text-muted);
-  font-weight: 500;
-}
-
-.cp-stat__value {
-  font-family: var(--cp-font-mono);
-  font-size: 22px;
-  font-variant-numeric: tabular-nums;
-  color: var(--cp-text);
-  line-height: 1.15;
-  letter-spacing: -0.01em;
-}
-
-.cp-stat__hint {
-  font-size: 12px;
-  color: var(--cp-text-faint);
-  margin-top: 2px;
-}
-
-/* Tono especial para "debido" (coral) y "cobrado" (verde) */
-.cp-stat--debido .cp-stat__value { color: var(--cp-accent); }
-.cp-stat--success .cp-stat__value { color: var(--cp-success); }
 
 /* ============================================================
    Filtros
@@ -368,42 +338,9 @@
   white-space: nowrap;
 }
 
-.cp-icon-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--cp-radius-sm);
-  background: transparent;
-  border: 1px solid transparent;
-  color: var(--cp-text-faint);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: all var(--cp-dur-fast) var(--cp-ease);
-}
-
-.cp-icon-btn:hover {
-  background: var(--cp-surface-hover);
-  color: var(--cp-text);
-  border-color: var(--cp-border-strong);
-}
-
-.cp-icon-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.cp-icon-btn--danger:hover:not(:disabled) {
-  background: var(--cp-danger-bg);
-  color: var(--cp-danger);
-  border-color: var(--cp-danger);
-}
-
-.cp-icon-btn--success:hover:not(:disabled) {
-  background: var(--cp-success-bg);
-  color: var(--cp-success);
-  border-color: var(--cp-success);
-}
+/* .cp-icon-btn y sus variantes (--danger, --success, --approve, --reject)
+   viven en shared-ui.css para que esten siempre disponibles. Se usan en
+   Sesiones, Dashboard, MisSesiones. */
 
 /* ============================================================
    Empty state
