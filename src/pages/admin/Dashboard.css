@@ -11,32 +11,15 @@
   min-height: 400px;
 }
 
-/* ---- Page header ---- */
-.cp-page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  flex-wrap: wrap;
-  gap: var(--cp-space-4);
-  /* Altura mínima para que el skeleton y el header real ocupen el mismo espacio.
-     El h1 (~35px) + sub (~20px) + gap = ~70px. Con flex-wrap en mobile puede
-     crecer, pero el mínimo ancla el espacio y reduce el CLS. */
-  min-height: 70px;
-}
-
-.cp-page-title {
-  font-family: var(--cp-font-serif);
-  font-size: var(--cp-text-3xl);
-  font-weight: 500;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
-  margin-bottom: var(--cp-space-1);
-}
-
-.cp-page-sub {
-  color: var(--cp-text-muted);
-  font-size: var(--cp-text-base);
-}
+/* ---- Page header (estilos base en shared-ui.css) ----
+   .cp-page-header, .cp-page-title, .cp-page-sub viven en shared-ui.css
+   porque se usan en multiples paginas (Dashboard, Solicitudes, Pacientes,
+   Profesionales, Pagos, Sesiones, etc). Antes los tenia este archivo y
+   eso generaba: en mobile, el min-height: 70px y align-items: flex-end
+   se aplicaban a todas las paginas SOLO si Dashboard.css estaba cargado
+   (CSS chunk lazy), causando inconsistencias visuales — paginas como
+   Solicitudes parecian tener el header sticky enorme cuando en realidad
+   era el cp-page-header de la pagina creciendo por el flex-end. */
 
 /* ---- Metrics grid ---- */
 .cp-metrics-grid {
