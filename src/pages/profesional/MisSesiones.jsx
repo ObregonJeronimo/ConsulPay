@@ -23,6 +23,7 @@ import {
   getCantidadSesiones,
   inicioDeMes,
   nombreDelMes,
+  liquidarMontoSesion,
   suscribirSesionesProfesional,
   totalesGlobales,
 } from '../../lib/sesiones.js';
@@ -30,11 +31,12 @@ import {
   armarPayloadParaSolicitud,
   solicitarCrearSesion,
   solicitarEliminarSesion,
+  solicitarLiquidarMonto,
   solicitarModificarSesion,
   suscribirSolicitudesDelProfesional,
 } from '../../lib/solicitudes.js';
 
-import { GroupBadge, SesionModal } from '../admin/Sesiones.jsx';
+import { GroupBadge, LiquidarMontoModal, SesionModal } from '../admin/Sesiones.jsx';
 import '../admin/Sesiones.css';
 
 /* ============================================================
@@ -136,6 +138,7 @@ export default function MisSesiones() {
   const [loadingSesiones, setLoadingSesiones] = useState(true);
 
   const [editando, setEditando] = useState(null); // null | 'nueva' | sesion
+  const [liquidando, setLiquidando] = useState(null); // sesion en pendiente_monto que vamos a liquidar
 
   // Si no tiene confianza, mostramos un banner aclaratorio y las acciones
   // crean solicitudes en lugar de tocar /sesiones/ directamente.
@@ -281,6 +284,34 @@ export default function MisSesiones() {
     }
   }
 
+  // Cargar monto liquidado de una sesion en pendiente_monto.
+  // Si el profesional tiene confianza -> directo. Si no -> solicitud al admin.
+  function handleAbrirLiquidar(sesion) {
+    setLiquidando(sesion);
+  }
+
+  async function handleConfirmarLiquidar(valor) {
+    if (!liquidando) return;
+    try {
+      if (tieneConfianza) {
+        await liquidarMontoSesion(liquidando.id, valor, user.uid);
+      } else {
+        const pac = mapaPacientes[liquidando.pacienteId];
+        await solicitarLiquidarMonto({
+          consultorioId: user.consultorioId,
+          sesionId: liquidando.id,
+          valorLiquidado: valor,
+          profesionalUid: user.uid,
+          profesionalNombre: user.displayName || user.email,
+          pacienteNombre: pac ? nombrePaciente(pac) : 'Paciente',
+        });
+      }
+      setLiquidando(null);
+    } catch (err) {
+      throw err;
+    }
+  }
+
   /* ---- Renders ---- */
 
   if (loadingConsultorio) {
@@ -391,6 +422,7 @@ export default function MisSesiones() {
               sesionesConPendiente={sesionesConPendiente}
               onEditar={(s) => setEditando(s)}
               onEliminar={handleEliminar}
+              onLiquidar={handleAbrirLiquidar}
             />
           )}
         </>
@@ -410,6 +442,16 @@ export default function MisSesiones() {
           modoSolicitud={!tieneConfianza}
           onClose={() => setEditando(null)}
           onGuardar={handleGuardar}
+        />
+      )}
+
+      {liquidando && (
+        <LiquidarMontoModal
+          sesion={liquidando}
+          paciente={mapaPacientes[liquidando.pacienteId]}
+          modoSolicitud={!tieneConfianza}
+          onClose={() => setLiquidando(null)}
+          onConfirmar={handleConfirmarLiquidar}
         />
       )}
     </div>
@@ -540,7 +582,7 @@ function StatsProfesional({ stats, yaPagado }) {
    Las acciones quedan deshabilitadas si la sesion ya fue pagada o
    si tiene una solicitud pendiente.
    ============================================================ */
-function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, onEditar, onEliminar }) {
+function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, onEditar, onEliminar, onLiquidar }) {
   return (
     <div className="cp-table-wrap">
       <table className="cp-table cp-sesiones-tabla">
@@ -562,6 +604,7 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, onEdi
             const pac = mapaPacientes[s.pacienteId];
             const f = formatoFechaHoraCorta(s.fecha);
             const pagada = s.estadoPago === ESTADOS_PAGO_SESION.PAGADO;
+            const pendienteMonto = s.estadoPago === ESTADOS_PAGO_SESION.PENDIENTE_MONTO;
             const tienePendiente = sesionesConPendiente.has(s.id);
             const accionesDisabled = pagada || tienePendiente;
             const cantidad = getCantidadSesiones(s);
@@ -570,7 +613,7 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, onEdi
             return (
               <tr
                 key={s.id}
-                className={`cp-sesiones-tabla__row ${pagada ? 'cp-sesiones-tabla__row--pagada' : ''}`}
+                className={`cp-sesiones-tabla__row ${pagada ? 'cp-sesiones-tabla__row--pagada' : ''} ${pendienteMonto ? 'cp-sesiones-tabla__row--pendiente-monto' : ''}`}
                 onClick={() => !accionesDisabled && onEditar(s)}
               >
                 <td data-label="Fecha">
@@ -606,24 +649,35 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, onEdi
                   )}
                 </td>
                 <td data-label="Valor" className="cp-num">
-                  {formatoARS.format(s.valorTotal)}
-                  {esAgrupada && s.valorSesion ? (
-                    <div style={{ fontSize: 11, color: 'var(--cp-text-muted)', marginTop: 2 }}>
-                      {formatoARS.format(s.valorSesion)} c/u
-                    </div>
-                  ) : null}
+                  {pendienteMonto ? (
+                    <span style={{ color: 'var(--cp-text-faint)', fontStyle: 'italic' }}>—</span>
+                  ) : (
+                    <>
+                      {formatoARS.format(s.valorTotal)}
+                      {esAgrupada && s.valorSesion ? (
+                        <div style={{ fontSize: 11, color: 'var(--cp-text-muted)', marginTop: 2 }}>
+                          {formatoARS.format(s.valorSesion)} c/u
+                        </div>
+                      ) : null}
+                    </>
+                  )}
                 </td>
                 <td data-label="Mi parte" className="cp-num" style={{ color: 'var(--cp-success)' }}>
-                  {formatoARS.format(s.montoProfesional)}
+                  {pendienteMonto ? <span style={{ color: 'var(--cp-text-faint)' }}>—</span> : formatoARS.format(s.montoProfesional)}
                 </td>
                 <td data-label="Al consultorio" className="cp-num" style={{ color: 'var(--cp-accent)' }}>
-                  {formatoARS.format(s.montoConsultorio)}
+                  {pendienteMonto ? <span style={{ color: 'var(--cp-text-faint)' }}>—</span> : formatoARS.format(s.montoConsultorio)}
                 </td>
                 <td data-label="Estado">
                   {tienePendiente ? (
                     <span className="cp-badge cp-badge--debido">
                       <ClockIcon />
                       Solicitud pendiente
+                    </span>
+                  ) : pendienteMonto ? (
+                    <span className="cp-badge cp-badge--pendiente-monto">
+                      <span className="cp-badge__dot" />
+                      Pendiente liquidar
                     </span>
                   ) : (
                     <span className={`cp-badge ${pagada ? 'cp-badge--pagada' : 'cp-badge--debido'}`}>
@@ -634,24 +688,37 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, onEdi
                 </td>
                 <td className="cp-sesiones-tabla__actions-cell" onClick={(e) => e.stopPropagation()}>
                   <div className="cp-sesiones-tabla__actions">
-                    <button
-                      className="cp-icon-btn"
-                      onClick={() => onEditar(s)}
-                      title={tienePendiente ? 'Hay una solicitud pendiente para esta sesión' : 'Editar'}
-                      aria-label="Editar"
-                      disabled={accionesDisabled}
-                    >
-                      <EditIcon />
-                    </button>
-                    <button
-                      className="cp-icon-btn cp-icon-btn--danger"
-                      onClick={() => onEliminar(s)}
-                      title={tienePendiente ? 'Hay una solicitud pendiente para esta sesión' : 'Eliminar'}
-                      aria-label="Eliminar"
-                      disabled={accionesDisabled}
-                    >
-                      <TrashIcon />
-                    </button>
+                    {pendienteMonto && !tienePendiente ? (
+                      <button
+                        className="cp-icon-btn cp-icon-btn--success"
+                        onClick={() => onLiquidar(s)}
+                        title="Liquidar monto de obra social"
+                        aria-label="Liquidar monto"
+                      >
+                        <CheckIcon />
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          className="cp-icon-btn"
+                          onClick={() => onEditar(s)}
+                          title={tienePendiente ? 'Hay una solicitud pendiente para esta sesión' : 'Editar'}
+                          aria-label="Editar"
+                          disabled={accionesDisabled}
+                        >
+                          <EditIcon />
+                        </button>
+                        <button
+                          className="cp-icon-btn cp-icon-btn--danger"
+                          onClick={() => onEliminar(s)}
+                          title={tienePendiente ? 'Hay una solicitud pendiente para esta sesión' : 'Eliminar'}
+                          aria-label="Eliminar"
+                          disabled={accionesDisabled}
+                        >
+                          <TrashIcon />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </td>
               </tr>

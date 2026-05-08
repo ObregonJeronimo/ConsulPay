@@ -79,6 +79,8 @@ function describirSolicitudCreada(solicitud, pacienteNombre, cantidadSesiones) {
       return `Solicitó modificar la sesión con ${descPaciente(pacienteNombre)}${sufijo}`;
     case TIPOS_SOLICITUD_SESION.ELIMINAR:
       return `Solicitó eliminar la sesión con ${descPaciente(pacienteNombre)}${sufijo}`;
+    case TIPOS_SOLICITUD_SESION.LIQUIDAR_MONTO:
+      return `Solicitó liquidar el monto de la sesión con ${descPaciente(pacienteNombre)}${sufijo}`;
     default:
       return 'Creó una solicitud';
   }
@@ -278,6 +280,98 @@ export async function solicitarEliminarSesion({
   return ref.id;
 }
 
+/**
+ * Solicitar liquidar el monto de una sesion en pendiente_monto (obra social).
+ * Solo se usa cuando el profesional NO tiene edicion directa.
+ *
+ * payloadPropuesto incluye:
+ *   - valorLiquidado: el total que dijo la obra social
+ *   - valorSesion / valorTotal / montoConsultorio / montoProfesional ya
+ *     calculados en cliente para que el admin vea el preview en el modal
+ *     de la solicitud y no tenga que recalcular.
+ *
+ * Cuando el admin aprueba, el aprobador llama a la misma logica de
+ * liquidarMontoSesion (recalcula y graba). El payload guardado sirve
+ * de auditoria pero la liquidacion final usa los datos guardados en el
+ * doc de sesion en el momento de la aprobacion.
+ */
+export async function solicitarLiquidarMonto({
+  consultorioId,
+  sesionId,
+  valorLiquidado,
+  profesionalUid,
+  profesionalNombre,
+  pacienteNombre,
+}) {
+  await validarNoHayPendienteParaSesion(consultorioId, sesionId);
+
+  const snap = await getDoc(doc(db, 'sesiones', sesionId));
+  if (!snap.exists()) {
+    throw new Error('La sesión que querés liquidar ya no existe.');
+  }
+  const payloadAnterior = { id: snap.id, ...snap.data() };
+
+  if (payloadAnterior.estadoPago !== ESTADOS_PAGO_SESION.PENDIENTE_MONTO) {
+    throw new Error('Esta sesión ya tiene monto liquidado.');
+  }
+
+  const v = Number(valorLiquidado);
+  if (!Number.isFinite(v) || v <= 0) {
+    throw new Error('El valor liquidado debe ser un número mayor a cero');
+  }
+
+  // Calculamos el preview del split usando el % guardado en la sesion
+  const cantidad = Number(payloadAnterior.cantidadSesiones) || 1;
+  const porcentaje = Number(payloadAnterior.porcentajeConsultorio) || 0;
+  const montoConsultorio = Math.round((v * porcentaje) / 100);
+  const montoProfesional = v - montoConsultorio;
+  const valorUnitario = cantidad > 0 ? Math.round(v / cantidad) : v;
+
+  const payloadPropuesto = {
+    valorLiquidado: v,
+    valorTotal: v,
+    valorSesion: valorUnitario,
+    montoConsultorio,
+    montoProfesional,
+    estadoPago: ESTADOS_PAGO_SESION.DEBIDO,
+  };
+
+  const ref = await addDoc(collection(db, 'solicitudes_sesion'), {
+    consultorioId,
+    profesionalUid,
+    profesionalNombre: profesionalNombre || null,
+    tipo: TIPOS_SOLICITUD_SESION.LIQUIDAR_MONTO,
+    sesionId,
+    payloadPropuesto,
+    payloadAnterior,
+    estado: ESTADOS_SOLICITUD_SESION.PENDIENTE,
+    motivoRechazo: null,
+    createdAt: serverTimestamp(),
+    resolvedAt: null,
+    resolvedByUid: null,
+    resolvedByNombre: null,
+  });
+
+  await escribirLog({
+    consultorioId,
+    sesionId,
+    solicitudId: ref.id,
+    tipo: TIPOS_LOG_SESION.SOLICITUD_CREADA,
+    actorUid: profesionalUid,
+    actorRol: 'profesional',
+    actorNombre: profesionalNombre || null,
+    descripcion: describirSolicitudCreada(
+      { tipo: TIPOS_SOLICITUD_SESION.LIQUIDAR_MONTO },
+      pacienteNombre,
+      payloadAnterior?.cantidadSesiones,
+    ),
+    payloadAnterior,
+    payloadNuevo: payloadPropuesto,
+  });
+
+  return ref.id;
+}
+
 /* ============================================================
    Resolver solicitud (admin)
    ============================================================ */
@@ -442,6 +536,66 @@ export async function aprobarSolicitud({
       descripcion: 'Aprobó la solicitud de eliminación. La sesión fue eliminada.',
       payloadAnterior: sesActual,
       payloadNuevo: null,
+    });
+    return;
+  }
+
+  if (sol.tipo === TIPOS_SOLICITUD_SESION.LIQUIDAR_MONTO) {
+    // Verificacion extra: la sesion sigue en pendiente_monto.
+    // Si ya fue liquidada por otro lado (por ej. el admin lo hizo
+    // manualmente despues), marcamos obsoleta.
+    if (sesActual.estadoPago !== ESTADOS_PAGO_SESION.PENDIENTE_MONTO) {
+      await actualizarSolicitudResuelta({
+        solicitudId,
+        adminUid,
+        adminNombre,
+        estado: ESTADOS_SOLICITUD_SESION.OBSOLETA,
+      });
+      await escribirLog({
+        consultorioId,
+        sesionId: sol.sesionId,
+        solicitudId,
+        tipo: TIPOS_LOG_SESION.SOLICITUD_OBSOLETA,
+        actorUid: adminUid,
+        actorRol: 'admin',
+        actorNombre: adminNombre,
+        descripcion: 'La solicitud quedó obsoleta: la sesión ya fue liquidada por otro camino.',
+      });
+      throw new Error('Esta sesión ya fue liquidada. La solicitud queda obsoleta.');
+    }
+
+    // Aplicamos los valores del payloadPropuesto. Como la solicitud
+    // guarda el valorLiquidado original, podemos recalcular si quisieramos
+    // pero los valores ya estan calculados al momento de pedirla y
+    // el porcentaje del metodo no cambia (snapshot guardado en la sesion).
+    await updateDoc(doc(db, 'sesiones', sol.sesionId), {
+      valorTotal: sol.payloadPropuesto.valorTotal,
+      valorSesion: sol.payloadPropuesto.valorSesion,
+      montoConsultorio: sol.payloadPropuesto.montoConsultorio,
+      montoProfesional: sol.payloadPropuesto.montoProfesional,
+      estadoPago: ESTADOS_PAGO_SESION.DEBIDO,
+      updatedAt: serverTimestamp(),
+      updatedByUid: adminUid,
+    });
+
+    await actualizarSolicitudResuelta({
+      solicitudId,
+      adminUid,
+      adminNombre,
+      estado: ESTADOS_SOLICITUD_SESION.APROBADA,
+    });
+
+    await escribirLog({
+      consultorioId,
+      sesionId: sol.sesionId,
+      solicitudId,
+      tipo: TIPOS_LOG_SESION.SOLICITUD_APROBADA,
+      actorUid: adminUid,
+      actorRol: 'admin',
+      actorNombre: adminNombre,
+      descripcion: 'Aprobó la liquidación del monto de la obra social.',
+      payloadAnterior: sesActual,
+      payloadNuevo: sol.payloadPropuesto,
     });
     return;
   }

@@ -253,6 +253,19 @@
   color: var(--cp-info, #4a6c9b);
 }
 
+/* Estado pendiente_monto (sesion de obra social sin valor liquidado).
+   Color ambar/amarillo para diferenciarlo del rojo (debido) y verde (pagado). */
+.cp-badge--pendiente-monto {
+  background: var(--cp-warning-bg, rgba(220, 170, 50, 0.15));
+  color: var(--cp-warning, #b8860b);
+}
+
+/* Row con sesion en pendiente_monto: borde lateral amarillo sutil para
+   destacarla visualmente del resto. */
+.cp-sesiones-tabla__row--pendiente-monto td:first-child {
+  border-left: 3px solid var(--cp-warning, #b8860b);
+}
+
 /* Estados de solicitudes (Fase B) */
 .cp-badge--rechazada {
   background: var(--cp-danger-bg);
@@ -793,5 +806,59 @@
   /* Empty state: padding mas chico */
   .cp-sesiones-empty {
     padding: 32px 16px;
+  }
+}
+
+/* ============================================================
+   Aviso "Sesion de obra social" en el modal de creacion
+   ----------------------------------------------------------------
+   Aparece en lugar del input de valor cuando el metodo es diferido.
+   Le explica al user que el monto se carga despues via "Liquidar".
+   ============================================================ */
+.cp-aviso-diferido {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  background: var(--cp-warning-bg, rgba(220, 170, 50, 0.10));
+  border: 1px solid var(--cp-warning-border, rgba(220, 170, 50, 0.3));
+  border-radius: var(--cp-radius-md);
+  padding: 14px 16px;
+}
+
+.cp-aviso-diferido__icon {
+  font-size: 22px;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.cp-aviso-diferido__title {
+  font-weight: 500;
+  color: var(--cp-text);
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.cp-aviso-diferido__text {
+  font-size: 13px;
+  color: var(--cp-text-muted);
+  line-height: 1.55;
+}
+
+.cp-aviso-diferido__text strong {
+  color: var(--cp-warning, #b8860b);
+  font-weight: 500;
+}
+
+@media (max-width: 640px) {
+  .cp-aviso-diferido {
+    padding: 12px 14px;
+    gap: 10px;
+  }
+  .cp-aviso-diferido__title {
+    font-size: 13px;
+  }
+  .cp-aviso-diferido__text {
+    font-size: 12.5px;
   }
 }

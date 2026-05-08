@@ -299,6 +299,17 @@ service cloud.firestore {
           && data.montoProfesional is number;
     }
 
+    // Una sesion en pendiente_monto (obra social sin valor liquidado)
+    // tiene valorTotal=0, montoConsultorio=0, montoProfesional=0. Es
+    // coherente trivialmente (0*N/100=0). No exigimos sesionSplitEsCoherente
+    // ni el chequeo del split tradicional para este estado.
+    function sesionPendienteMontoValida(data) {
+      return data.estadoPago == 'pendiente_monto'
+          && data.valorTotal == 0
+          && data.montoConsultorio == 0
+          && data.montoProfesional == 0;
+    }
+
     function profesionalTieneConfianza() {
       return esProfesional()
         && miUsuario().permitirEdicionSesiones == true;
@@ -310,15 +321,28 @@ service cloud.firestore {
         || (esProfesionalDe(resource.data.consultorioId)
             && resource.data.profesionalUid == request.auth.uid);
 
+      // Crear: estadoPago debe ser 'debido' (caso normal) o 'pendiente_monto'
+      // (cuando se crea con metodo diferido sin valor cargado).
       allow create: if (esSuperadmin()
         || esAdminDe(request.resource.data.consultorioId)
         || (profesionalTieneConfianza()
             && esProfesionalDe(request.resource.data.consultorioId)
             && request.resource.data.profesionalUid == request.auth.uid))
-        && request.resource.data.estadoPago == 'debido'
         && sesionTieneCamposBasicos(request.resource.data)
-        && sesionSplitEsCoherente(request.resource.data);
+        && (
+          (request.resource.data.estadoPago == 'debido'
+            && sesionSplitEsCoherente(request.resource.data))
+          ||
+          sesionPendienteMontoValida(request.resource.data)
+        );
 
+      // Update: tres casos validos
+      //   1. Cambio normal con split coherente y estadoPago == 'debido' o 'pagado'
+      //   2. Sesion sigue en 'pendiente_monto' (no se cambio nada economico)
+      //   3. Transicion 'pendiente_monto' -> 'debido' con nuevo valor liquidado
+      //      (sesionSplitEsCoherente ya valida que el split sea coherente)
+      // El profesional sin confianza no puede hacer transicion 'pendiente_monto' -> 'debido'
+      // directamente porque su rule lo restringe a estadoPago igual al previo.
       allow update: if (esSuperadmin()
         || esAdminDe(resource.data.consultorioId)
         || (profesionalTieneConfianza()
@@ -326,9 +350,19 @@ service cloud.firestore {
             && resource.data.profesionalUid == request.auth.uid
             && request.resource.data.profesionalUid == resource.data.profesionalUid
             && request.resource.data.consultorioId == resource.data.consultorioId
-            && request.resource.data.estadoPago == resource.data.estadoPago))
+            && (request.resource.data.estadoPago == resource.data.estadoPago
+                || (resource.data.estadoPago == 'pendiente_monto'
+                    && request.resource.data.estadoPago == 'debido'))))
         && sesionTieneCamposBasicos(request.resource.data)
-        && sesionSplitEsCoherente(request.resource.data);
+        && (
+          (request.resource.data.estadoPago == 'debido'
+            && sesionSplitEsCoherente(request.resource.data))
+          ||
+          (request.resource.data.estadoPago == 'pagado'
+            && sesionSplitEsCoherente(request.resource.data))
+          ||
+          sesionPendienteMontoValida(request.resource.data)
+        );
 
       allow delete: if esSuperadmin()
         || esAdminDe(resource.data.consultorioId)
@@ -351,7 +385,8 @@ service cloud.firestore {
         && request.resource.data.estado == 'pendiente'
         && (request.resource.data.tipo == 'crear'
             || request.resource.data.tipo == 'modificar'
-            || request.resource.data.tipo == 'eliminar');
+            || request.resource.data.tipo == 'eliminar'
+            || request.resource.data.tipo == 'liquidar_monto');
 
       allow update: if esSuperadmin()
         || (esAdminDe(resource.data.consultorioId)

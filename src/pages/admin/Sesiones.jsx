@@ -25,6 +25,7 @@ import {
   finDeMes,
   getCantidadSesiones,
   inicioDeMes,
+  liquidarMontoSesion,
   marcarSesionDebida,
   marcarSesionPagada,
   nombreDelMes,
@@ -138,6 +139,7 @@ export default function Sesiones() {
   const [filtroEstado, setFiltroEstado] = useState('todos');
 
   const [editando, setEditando] = useState(null);
+  const [liquidando, setLiquidando] = useState(null);  // sesion a la que vamos a cargarle el monto
 
   useEffect(() => {
     if (!user?.consultorioId) return;
@@ -280,6 +282,23 @@ export default function Sesiones() {
     }
   }
 
+  // Abre el modal de liquidacion para cargar el monto de una sesion
+  // de obra social que estaba en pendiente_monto. El admin siempre
+  // puede liquidar directo.
+  function handleAbrirLiquidar(sesion) {
+    setLiquidando(sesion);
+  }
+
+  async function handleConfirmarLiquidar(valor) {
+    if (!liquidando) return;
+    try {
+      await liquidarMontoSesion(liquidando.id, valor, user.uid);
+      setLiquidando(null);
+    } catch (err) {
+      throw err;
+    }
+  }
+
   if (loadingConsultorio) {
     return (
       <div className="cp-sesiones">
@@ -413,6 +432,7 @@ export default function Sesiones() {
               onEditar={(s) => setEditando(s)}
               onEliminar={handleEliminar}
               onTogglePagado={handleTogglePagado}
+              onLiquidar={handleAbrirLiquidar}
             />
           )}
         </>
@@ -429,6 +449,15 @@ export default function Sesiones() {
           consultorioId={user.consultorioId}
           onClose={() => setEditando(null)}
           onGuardar={handleGuardar}
+        />
+      )}
+
+      {liquidando && (
+        <LiquidarMontoModal
+          sesion={liquidando}
+          paciente={mapaPacientes[liquidando.pacienteId]}
+          onClose={() => setLiquidando(null)}
+          onConfirmar={handleConfirmarLiquidar}
         />
       )}
     </div>
@@ -522,7 +551,7 @@ export function GroupBadge({ cantidad }) {
 /* ============================================================
    Tabla de sesiones (vista admin)
    ============================================================ */
-function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, onEditar, onEliminar, onTogglePagado }) {
+function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, onEditar, onEliminar, onTogglePagado, onLiquidar }) {
   return (
     <div className="cp-table-wrap">
       <table className="cp-table cp-sesiones-tabla">
@@ -545,12 +574,13 @@ function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, onEditar, o
             const prof = mapaProfesionales[s.profesionalUid];
             const f = formatoFechaHoraCorta(s.fecha);
             const pagada = s.estadoPago === ESTADOS_PAGO_SESION.PAGADO;
+            const pendienteMonto = s.estadoPago === ESTADOS_PAGO_SESION.PENDIENTE_MONTO;
             const cantidad = getCantidadSesiones(s);
 
             return (
               <tr
                 key={s.id}
-                className={`cp-sesiones-tabla__row ${pagada ? 'cp-sesiones-tabla__row--pagada' : ''}`}
+                className={`cp-sesiones-tabla__row ${pagada ? 'cp-sesiones-tabla__row--pagada' : ''} ${pendienteMonto ? 'cp-sesiones-tabla__row--pendiente-monto' : ''}`}
                 onClick={() => onEditar(s)}
               >
                 <td data-label="Fecha">
@@ -582,35 +612,59 @@ function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, onEditar, o
                   )}
                 </td>
                 <td data-label="Valor" className="cp-num">
-                  {formatoARS.format(s.valorTotal)}
-                  {cantidad > 1 && s.valorSesion ? (
-                    <div style={{ fontSize: 11, color: 'var(--cp-text-muted)', marginTop: 2 }}>
-                      {formatoARS.format(s.valorSesion)} c/u
-                    </div>
-                  ) : null}
+                  {pendienteMonto ? (
+                    <span style={{ color: 'var(--cp-text-faint)', fontStyle: 'italic' }}>—</span>
+                  ) : (
+                    <>
+                      {formatoARS.format(s.valorTotal)}
+                      {cantidad > 1 && s.valorSesion ? (
+                        <div style={{ fontSize: 11, color: 'var(--cp-text-muted)', marginTop: 2 }}>
+                          {formatoARS.format(s.valorSesion)} c/u
+                        </div>
+                      ) : null}
+                    </>
+                  )}
                 </td>
                 <td data-label="Consultorio" className="cp-num" style={{ color: 'var(--cp-accent)' }}>
-                  {formatoARS.format(s.montoConsultorio)}
+                  {pendienteMonto ? <span style={{ color: 'var(--cp-text-faint)' }}>—</span> : formatoARS.format(s.montoConsultorio)}
                 </td>
                 <td data-label="Profesional" className="cp-num" style={{ color: 'var(--cp-success)' }}>
-                  {formatoARS.format(s.montoProfesional)}
+                  {pendienteMonto ? <span style={{ color: 'var(--cp-text-faint)' }}>—</span> : formatoARS.format(s.montoProfesional)}
                 </td>
                 <td data-label="Estado">
-                  <span className={`cp-badge ${pagada ? 'cp-badge--pagada' : 'cp-badge--debido'}`}>
-                    <span className="cp-badge__dot" />
-                    {pagada ? 'Pagada' : 'Debida'}
-                  </span>
+                  {pendienteMonto ? (
+                    <span className="cp-badge cp-badge--pendiente-monto">
+                      <span className="cp-badge__dot" />
+                      Pendiente liquidar
+                    </span>
+                  ) : (
+                    <span className={`cp-badge ${pagada ? 'cp-badge--pagada' : 'cp-badge--debido'}`}>
+                      <span className="cp-badge__dot" />
+                      {pagada ? 'Pagada' : 'Debida'}
+                    </span>
+                  )}
                 </td>
                 <td className="cp-sesiones-tabla__actions-cell" onClick={(e) => e.stopPropagation()}>
                   <div className="cp-sesiones-tabla__actions">
-                    <button
-                      className={`cp-icon-btn ${pagada ? '' : 'cp-icon-btn--success'}`}
-                      onClick={() => onTogglePagado(s)}
-                      title={pagada ? 'Marcar como debida' : 'Marcar como pagada'}
-                      aria-label={pagada ? 'Marcar como debida' : 'Marcar como pagada'}
-                    >
-                      {pagada ? <RevertIcon /> : <CheckIcon />}
-                    </button>
+                    {pendienteMonto ? (
+                      <button
+                        className="cp-icon-btn cp-icon-btn--success"
+                        onClick={() => onLiquidar(s)}
+                        title="Liquidar monto de obra social"
+                        aria-label="Liquidar monto"
+                      >
+                        <CheckIcon />
+                      </button>
+                    ) : (
+                      <button
+                        className={`cp-icon-btn ${pagada ? '' : 'cp-icon-btn--success'}`}
+                        onClick={() => onTogglePagado(s)}
+                        title={pagada ? 'Marcar como debida' : 'Marcar como pagada'}
+                        aria-label={pagada ? 'Marcar como debida' : 'Marcar como pagada'}
+                      >
+                        {pagada ? <RevertIcon /> : <CheckIcon />}
+                      </button>
+                    )}
                     <button
                       className="cp-icon-btn"
                       onClick={() => onEditar(s)}
@@ -718,6 +772,13 @@ export function SesionModal({
   useEffect(() => {
     if (!metodoId || !esNueva) return;
     const m = metodos.find((x) => x.id === metodoId);
+    // Si el metodo es diferido (obra social), el valor se carga despues
+    // via "Liquidar monto" — limpiamos el campo para que la sesion se
+    // cree como pendiente_monto.
+    if (m?.tipo === TIPOS_METODO_PAGO.DIFERIDO) {
+      setValorSesion('');
+      return;
+    }
     if (m && !valorSesion) {
       setValorSesion(String(m.valorSesionDefault ?? ''));
     }
@@ -729,6 +790,17 @@ export function SesionModal({
   const valorSesionNum = Number(valorSesion) || 0;
   const valorTotal = valorSesionNum * cantidadNum;
   const split = calcularSplit(valorTotal, porcentaje);
+
+  // Cuando el metodo es diferido (obra social), no se carga valor en el
+  // momento — la obra social informa el monto despues. Esto cambia varias
+  // cosas en el modal: ocultamos el input de valor, no mostramos preview
+  // de split, y la sesion se guardara en estado pendiente_monto.
+  const esDiferido = metodoSeleccionado?.tipo === TIPOS_METODO_PAGO.DIFERIDO;
+
+  // Solo permitimos editar valor en una sesion existente que no sea diferida
+  // pendiente_monto. Si la sesion ya tiene monto liquidado (estadoPago=debido)
+  // se puede editar normalmente como antes.
+  const esLiquidacionPendiente = !esNueva && sesion?.estadoPago === ESTADOS_PAGO_SESION.PENDIENTE_MONTO;
 
   // El profesional NO puede editar el método de pago. Lo configura el
   // admin en la ficha del paciente. Lo mostramos como solo lectura.
@@ -773,7 +845,8 @@ export function SesionModal({
     }
 
     if (cantidadNum < 1) { setError('La cantidad de sesiones debe ser al menos 1'); return; }
-    if (valorSesionNum < 0) { setError('El valor por sesión no puede ser negativo'); return; }
+    if (!esDiferido && valorSesionNum < 0) { setError('El valor por sesión no puede ser negativo'); return; }
+    if (!esDiferido && valorSesionNum === 0) { setError('Tenés que ingresar un valor para la sesión'); return; }
 
     setSubmitting(true);
     try {
@@ -783,7 +856,9 @@ export function SesionModal({
         pacienteId,
         fecha,
         metodo: metodoSeleccionado,
-        valorSesion: valorSesionNum,
+        // Si es diferido, mandamos undefined para que armarPayload genere
+        // la sesion en estado pendiente_monto (sin valor).
+        valorSesion: esDiferido ? undefined : valorSesionNum,
         cantidadSesiones: cantidadNum,
         notas,
       });
@@ -899,23 +974,38 @@ export function SesionModal({
             )}
           </div>
 
-          <Input
-            name="valorSesion"
-            type="number"
-            label="Valor por sesión"
-            value={valorSesion}
-            onChange={(e) => setValorSesion(e.target.value)}
-            min="0"
-            step="any"
-            required
-            hint={metodoSeleccionado
-              ? cantidadNum > 1
-                ? `Total: ${formatoARS.format(valorTotal)} (${cantidadNum} × ${formatoARS.format(valorSesionNum)})`
-                : `Default del método: ${formatoARS.format(metodoSeleccionado.valorSesionDefault ?? 0)} — podés cargar cualquier monto si esta sesión fue distinta.`
-              : 'Elegí un método primero para ver el valor sugerido.'}
-          />
+          {esDiferido ? (
+            <div className="cp-aviso-diferido">
+              <div className="cp-aviso-diferido__icon" aria-hidden>⏳</div>
+              <div className="cp-aviso-diferido__body">
+                <div className="cp-aviso-diferido__title">Sesión de obra social</div>
+                <div className="cp-aviso-diferido__text">
+                  El valor de esta sesión se carga después, cuando la obra social informe el monto.
+                  Mientras tanto, la sesión queda como <strong>pendiente de liquidar</strong> y no
+                  suma al cobro pendiente. Cuando llegue el monto, hacé click en el ✓ de la sesión
+                  para liquidarla.
+                </div>
+              </div>
+            </div>
+          ) : (
+            <Input
+              name="valorSesion"
+              type="number"
+              label="Valor por sesión"
+              value={valorSesion}
+              onChange={(e) => setValorSesion(e.target.value)}
+              min="0"
+              step="any"
+              required
+              hint={metodoSeleccionado
+                ? cantidadNum > 1
+                  ? `Total: ${formatoARS.format(valorTotal)} (${cantidadNum} × ${formatoARS.format(valorSesionNum)})`
+                  : `Default del método: ${formatoARS.format(metodoSeleccionado.valorSesionDefault ?? 0)} — podés cargar cualquier monto si esta sesión fue distinta.`
+                : 'Elegí un método primero para ver el valor sugerido.'}
+            />
+          )}
 
-          {metodoSeleccionado && valorTotal > 0 && (
+          {metodoSeleccionado && valorTotal > 0 && !esDiferido && (
             <div className="cp-split-preview">
               <div className="cp-split-preview__col cp-split-preview__col--profesional">
                 <span className="cp-split-preview__label">Para el profesional</span>
@@ -956,6 +1046,111 @@ export function SesionModal({
               {submitting
                 ? <><Spinner size={14} /> {labelBoton}</>
                 : labelBoton}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   Modal de liquidacion de monto (obra social)
+   ----------------------------------------------------------------
+   Aparece cuando el user (admin o profesional con edicion directa)
+   hace click en el ✓ de una sesion en estado pendiente_monto.
+   El profesional sin edicion directa tiene su propia version (ver
+   LiquidarMontoSolicitudModal en MisSesiones).
+
+   Pide el valor TOTAL liquidado por la obra social, muestra preview
+   del split usando el % del metodo (snapshot guardado en la sesion),
+   y al confirmar llama al onConfirmar que internamente actualiza la
+   sesion via liquidarMontoSesion().
+   ============================================================ */
+export function LiquidarMontoModal({ sesion, paciente, modoSolicitud, onClose, onConfirmar }) {
+  const [valor, setValor] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const valorNum = Number(valor) || 0;
+  const porcentaje = Number(sesion?.porcentajeConsultorio) || 0;
+  const split = calcularSplit(valorNum, porcentaje);
+  const cantidad = getCantidadSesiones(sesion);
+
+  async function onSubmit(e) {
+    e.preventDefault();
+    setError('');
+    if (!valorNum || valorNum <= 0) {
+      setError('Ingresá un valor mayor a cero');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await onConfirmar(valorNum);
+    } catch (err) {
+      setError(err.message || 'No se pudo liquidar el monto');
+      setSubmitting(false);
+    }
+  }
+
+  const nombrePac = paciente
+    ? `${paciente.nombre || ''} ${paciente.apellido || ''}`.trim() || 'Paciente'
+    : 'Paciente eliminado';
+
+  const titulo = modoSolicitud ? 'Solicitar liquidación de monto' : 'Liquidar monto';
+  const labelBoton = submitting
+    ? (modoSolicitud ? 'Enviando…' : 'Liquidando…')
+    : (modoSolicitud ? 'Enviar solicitud' : 'Liquidar');
+
+  return (
+    <div className="cp-modal-overlay" onClick={onClose}>
+      <div className="cp-modal" onClick={(e) => e.stopPropagation()}>
+        <button className="cp-modal__close" onClick={onClose} aria-label="Cerrar">×</button>
+
+        <h2 className="cp-modal__title">{titulo}</h2>
+        <p className="cp-modal__sub">
+          {modoSolicitud
+            ? `Cargá el monto que liquidó la obra social. La solicitud quedará pendiente hasta que el administrador la apruebe.`
+            : `Cargá el monto que liquidó la obra social ${sesion.metodoPagoNombre} por la sesión de ${nombrePac}${cantidad > 1 ? ` (${cantidad} sesiones)` : ''}.`}
+        </p>
+
+        <form className="cp-modal__form" onSubmit={onSubmit}>
+          <Input
+            name="valorLiquidado"
+            type="number"
+            label="Valor total liquidado"
+            value={valor}
+            onChange={(e) => setValor(e.target.value)}
+            min="0"
+            step="any"
+            autoFocus
+            required
+            hint={cantidad > 1
+              ? `Se va a dividir entre ${cantidad} sesiones automáticamente`
+              : 'Lo que efectivamente pagó la obra social por esta sesión'}
+          />
+
+          {valorNum > 0 && (
+            <div className="cp-split-preview">
+              <div className="cp-split-preview__col cp-split-preview__col--profesional">
+                <span className="cp-split-preview__label">Para el profesional</span>
+                <span className="cp-split-preview__value">{formatoARS.format(split.montoProfesional)}</span>
+              </div>
+              <div className="cp-split-preview__col cp-split-preview__col--consultorio">
+                <span className="cp-split-preview__label">Para el consultorio ({porcentaje}%)</span>
+                <span className="cp-split-preview__value">{formatoARS.format(split.montoConsultorio)}</span>
+              </div>
+            </div>
+          )}
+
+          {error && <div className="cp-modal__error">{error}</div>}
+
+          <div className="cp-modal__actions">
+            <Button type="button" variant="ghost" onClick={onClose} disabled={submitting}>
+              Cancelar
+            </Button>
+            <Button type="submit" variant="primary" disabled={submitting || !valorNum}>
+              {submitting ? <><Spinner size={14} /> {labelBoton}</> : labelBoton}
             </Button>
           </div>
         </form>

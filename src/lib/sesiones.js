@@ -33,6 +33,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   onSnapshot,
   orderBy,
   query,
@@ -122,6 +123,46 @@ function armarPayload({
     throw new Error('La cantidad de sesiones debe ser un número entero mayor o igual a 1');
   }
 
+  // ============================================================
+  // Caso especial: metodo diferido (obra social) sin valor cargado.
+  // ============================================================
+  // Para sesiones de obra social, el monto que va a liquidar la prepaga
+  // no se sabe al momento de registrar la sesion (lo informa la obra
+  // social meses despues). Permitimos crearlas sin valor — el flow
+  // "Liquidar monto" (boton tilde en la lista) carga el monto despues.
+  //
+  // Estas sesiones quedan en estadoPago = 'pendiente_monto', NO suman
+  // al cobro pendiente del profesional, y no figuran en MisPagos hasta
+  // que se liquiden.
+  const tipoMetodo = metodo.tipo || 'inmediato';
+  const esDiferido = tipoMetodo === 'diferido';
+  const sinValor = (valorSesion === undefined || valorSesion === null || valorSesion === '')
+    && (valorTotalIn === undefined || valorTotalIn === null || valorTotalIn === '');
+
+  if (esDiferido && sinValor) {
+    return {
+      consultorioId,
+      profesionalUid,
+      pacienteId,
+      fecha: Timestamp.fromDate(fecha),
+
+      metodoPagoId: metodo.id,
+      metodoPagoNombre: metodo.nombre || '',
+      metodoPagoTipo: tipoMetodo,
+
+      cantidadSesiones: cantidad,
+      valorSesion: 0,
+
+      valorTotal: 0,
+      porcentajeConsultorio: Number(metodo.porcentajeConsultorio) || 0,
+      montoConsultorio: 0,
+      montoProfesional: 0,
+
+      estadoPago: ESTADOS_PAGO_SESION.PENDIENTE_MONTO,
+      notas: notas?.trim() || null,
+    };
+  }
+
   // Calcular valorSesion y valorTotal segun lo que llegue.
   let unitario, total;
   if (valorSesion !== undefined && valorSesion !== null && valorSesion !== '') {
@@ -154,7 +195,7 @@ function armarPayload({
     // la sesion mantiene los valores con los que se cobro.
     metodoPagoId: metodo.id,
     metodoPagoNombre: metodo.nombre || '',
-    metodoPagoTipo: metodo.tipo || 'inmediato',
+    metodoPagoTipo: tipoMetodo,
 
     // Datos de agrupacion
     cantidadSesiones: cantidad,
@@ -244,6 +285,53 @@ export async function marcarSesionPagada(sesionId, updatedByUid) {
 
 export async function marcarSesionDebida(sesionId, updatedByUid) {
   await updateDoc(doc(db, 'sesiones', sesionId), {
+    estadoPago: ESTADOS_PAGO_SESION.DEBIDO,
+    updatedAt: serverTimestamp(),
+    updatedByUid: updatedByUid ?? null,
+  });
+}
+
+/* ============================================================
+   Liquidar monto de una sesion en pendiente_monto (obra social)
+   ----------------------------------------------------------------
+   Se llama cuando la obra social informa cuanto liquido. Recibe el
+   valor TOTAL liquidado (lo que el sistema reparte segun el % del
+   metodo). La sesion pasa de pendiente_monto -> debido y empieza a
+   sumar al cobro pendiente del profesional.
+
+   Solo se ejecuta de manera directa por:
+     - Admin del consultorio (siempre)
+     - Profesional con permitirEdicionSesiones=true
+   El profesional sin edicion directa no llama este helper, sino que
+   crea una solicitud tipo LIQUIDAR_MONTO via solicitudes.js.
+   ============================================================ */
+export async function liquidarMontoSesion(sesionId, valorLiquidado, updatedByUid) {
+  const v = Number(valorLiquidado);
+  if (!Number.isFinite(v) || v <= 0) {
+    throw new Error('El valor liquidado debe ser un número mayor a cero');
+  }
+
+  // Releemos el doc para obtener el porcentajeConsultorio del snapshot
+  // que se guardo cuando se creo la sesion.
+  const ref = doc(db, 'sesiones', sesionId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) throw new Error('La sesión no existe');
+  const data = snap.data();
+
+  if (data.estadoPago !== ESTADOS_PAGO_SESION.PENDIENTE_MONTO) {
+    throw new Error('Esta sesión ya tiene monto liquidado');
+  }
+
+  const cantidad = data.cantidadSesiones || 1;
+  const porcentaje = Number(data.porcentajeConsultorio) || 0;
+  const { montoConsultorio, montoProfesional } = calcularSplit(v, porcentaje);
+  const valorUnitario = cantidad > 0 ? Math.round(v / cantidad) : v;
+
+  await updateDoc(ref, {
+    valorTotal: v,
+    valorSesion: valorUnitario,
+    montoConsultorio,
+    montoProfesional,
     estadoPago: ESTADOS_PAGO_SESION.DEBIDO,
     updatedAt: serverTimestamp(),
     updatedByUid: updatedByUid ?? null,

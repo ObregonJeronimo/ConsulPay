@@ -52,6 +52,10 @@ export const ESTADOS_CONSULTORIO = {
 export const ESTADOS_PAGO_SESION = {
   DEBIDO: 'debido',
   PAGADO: 'pagado',
+  /** Sesion creada con metodo diferido (obra social) sin valor cargado.
+   *  No suma al cobro pendiente del profesional hasta que se liquide
+   *  el monto via el flow "Liquidar monto" (boton tilde en la lista). */
+  PENDIENTE_MONTO: 'pendiente_monto',
 };
 
 export const ESTADOS_PAGO = {
@@ -104,9 +108,10 @@ export const ESTADOS_INVITACION = {
    queda pendiente hasta que el admin la apruebe o rechace.
    ============================================================ */
 export const TIPOS_SOLICITUD_SESION = {
-  CREAR: 'crear',           // Crear una sesion nueva
-  MODIFICAR: 'modificar',   // Modificar una sesion existente
-  ELIMINAR: 'eliminar',     // Eliminar una sesion
+  CREAR: 'crear',                       // Crear una sesion nueva
+  MODIFICAR: 'modificar',               // Modificar una sesion existente
+  ELIMINAR: 'eliminar',                 // Eliminar una sesion
+  LIQUIDAR_MONTO: 'liquidar_monto',     // Cargar el monto de una sesion de obra social que estaba en pendiente_monto
 };
 
 export const ESTADOS_SOLICITUD_SESION = {
@@ -121,6 +126,7 @@ export const LABELS_TIPO_SOLICITUD = {
   [TIPOS_SOLICITUD_SESION.CREAR]: 'Crear sesión',
   [TIPOS_SOLICITUD_SESION.MODIFICAR]: 'Modificar sesión',
   [TIPOS_SOLICITUD_SESION.ELIMINAR]: 'Eliminar sesión',
+  [TIPOS_SOLICITUD_SESION.LIQUIDAR_MONTO]: 'Liquidar monto obra social',
 };
 
 /* ============================================================

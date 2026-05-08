@@ -115,6 +115,7 @@ function iconoTipo(tipo) {
     case TIPOS_SOLICITUD_SESION.CREAR: return <PlusIcon />;
     case TIPOS_SOLICITUD_SESION.MODIFICAR: return <EditIcon />;
     case TIPOS_SOLICITUD_SESION.ELIMINAR: return <TrashIcon />;
+    case TIPOS_SOLICITUD_SESION.LIQUIDAR_MONTO: return <CheckIcon />;
     default: return null;
   }
 }
