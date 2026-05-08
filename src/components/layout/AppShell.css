@@ -80,6 +80,11 @@
        lo que sumado al hamburger de 40px daba un header de ~64px. Ahora
        ~56px que se siente menos invasivo en pantallas chicas. */
     padding: var(--cp-space-2) var(--cp-space-4);
+    /* Altura fija para que no crezca aunque el contenido interno tenga
+       su propio padding/margin. Si en algun lado un estilo cascadea,
+       el max-height impide que el header se vuelva enorme. */
+    min-height: 56px;
+    max-height: 56px;
     /* Pequenia transparencia visual para que se note el sticky cuando
        hay scroll detras. */
     backdrop-filter: saturate(1.4);
@@ -149,7 +154,17 @@
     flex-shrink: 0;
   }
 
-  /* Sidebar como drawer slide-in desde la izquierda */
+  /* Sidebar como drawer slide-in desde la izquierda.
+     ----------------------------------------------------------------
+     Critico: position: fixed saca al sidebar del flujo visual pero
+     en CSS grid el grid-item sigue reservando su celda en el grid
+     a menos que le digamos explicitamente que no la ocupe.
+     grid-row: 1; grid-column: 1; lo apila junto al header (mismo
+     espacio del grid) — y como ambos estan posicionados (sticky/fixed)
+     no se pisan visualmente. Sin esto, el aside reserva una fila
+     completa de altura "auto" en el grid en algunas paginas (como
+     Solicitudes) y empuja el main hacia abajo, generando el hueco
+     gigante reportado. */
   .cp-shell__sidebar {
     display: block;
     position: fixed;
@@ -159,6 +174,8 @@
     width: 280px;
     max-width: 85vw;
     z-index: 50;
+    grid-row: 1;
+    grid-column: 1;
     background: var(--cp-bg);
     border-right: 1px solid var(--cp-border);
     transform: translateX(-100%);
