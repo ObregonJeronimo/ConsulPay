@@ -76,7 +76,10 @@
     z-index: 30;
     background: var(--cp-bg);
     border-bottom: 1px solid var(--cp-border);
-    padding: var(--cp-space-3) var(--cp-space-4);
+    /* Padding compacto: 8px vertical x 16px horizontal. Antes era 12x16
+       lo que sumado al hamburger de 40px daba un header de ~64px. Ahora
+       ~56px que se siente menos invasivo en pantallas chicas. */
+    padding: var(--cp-space-2) var(--cp-space-4);
     /* Pequenia transparencia visual para que se note el sticky cuando
        hay scroll detras. */
     backdrop-filter: saturate(1.4);
@@ -222,16 +225,18 @@
     to { opacity: 1; }
   }
 
-  /* Main: padding mas chico en mobile, ya no necesita compensar sidebar */
+  /* Main: padding mas chico en mobile, ya no necesita compensar sidebar.
+     Padding-top reducido a 16px (antes 24px) para que el contenido este
+     mas cerca del header sticky y no se sienta tan despegado. */
   .cp-shell__main {
-    padding: var(--cp-space-6) var(--cp-space-4) var(--cp-space-12);
+    padding: var(--cp-space-4) var(--cp-space-4) var(--cp-space-12);
   }
 }
 
 /* En pantallas muy chicas, padding aun mas reducido */
 @media (max-width: 480px) {
   .cp-shell__main {
-    padding: var(--cp-space-5) var(--cp-space-3) var(--cp-space-10);
+    padding: var(--cp-space-3) var(--cp-space-3) var(--cp-space-10);
   }
 
   .cp-shell__mobile-header {

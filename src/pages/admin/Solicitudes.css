@@ -598,6 +598,12 @@
    apretado. Reducimos la columna de "campo" y ajustamos paddings.
    ============================================================ */
 @media (max-width: 640px) {
+  /* Gap entre secciones (header, tabs, lista) reducido en mobile.
+     24px se sentia despegado en pantallas chicas. */
+  .cp-solicitudes {
+    gap: var(--cp-space-4);
+  }
+
   /* Tabs bar (Pendientes / Resueltas): scroll horizontal */
   .cp-tabs-bar {
     overflow-x: auto;
