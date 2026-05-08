@@ -635,7 +635,7 @@ function MetodosGrupo({ titulo, hint, metodos, consulpayPct, planLabel, onUpdate
                 type="number"
                 value={m.valorSesionDefault ?? ''}
                 min="0"
-                step="500"
+                step="any"
                 onChange={(e) => {
                   const v = e.target.value;
                   onUpdate(m.id, 'valorSesionDefault', v === '' ? '' : Number(v));
@@ -708,7 +708,7 @@ function PorcentajeConConsulpay({ value, consulpayPct, planLabel, onChange }) {
           value={value ?? ''}
           min="0"
           max="100"
-          step="0.5"
+          step="any"
           onChange={(e) => {
             const v = e.target.value;
             onChange(v === '' ? '' : Number(v));
@@ -854,7 +854,7 @@ function ModalNuevoMetodo({ onClose, onAgregar, consulpayPct, planLabel }) {
               onChange={(e) => setPorcentaje(e.target.value)}
               min="0"
               max="100"
-              step="0.5"
+              step="any"
               hint={
                 consulpayPct > 0 && totalConConsulpay !== null
                   ? `+ ${consulpayPct}% ConsulPay (plan ${planLabel}) = ${totalConConsulpay}% total sobre el valor de la sesión`
@@ -868,7 +868,7 @@ function ModalNuevoMetodo({ onClose, onAgregar, consulpayPct, planLabel }) {
               value={valorSesion}
               onChange={(e) => setValorSesion(e.target.value)}
               min="0"
-              step="500"
+              step="any"
               hint={`Actualmente ${formatoARS.format(Number(valorSesion) || 0)}`}
             />
           </div>

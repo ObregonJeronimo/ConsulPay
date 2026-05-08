@@ -181,21 +181,19 @@ function armarPayload({
  * extra. Si un usuario maliciosamente burla esto, no hay riesgo de
  * seguridad — solo de coherencia historica.
  */
+/**
+ * Antes validabamos que la fecha de la sesion no fuera anterior a la
+ * creacion del consultorio. Esa restriccion molestaba: hay consultorios
+ * que adoptan ConsulPay despues de venir trabajando hace meses/anios y
+ * necesitan cargar sesiones historicas para tener un libro completo.
+ *
+ * La funcion sigue exportada por compatibilidad con los call sites
+ * existentes, pero ahora es un no-op. Cualquier fecha valida (incluso
+ * de varios anios atras) se acepta.
+ */
+// eslint-disable-next-line no-unused-vars
 export function validarFechaContraConsultorio(fecha, consultorio) {
-  if (!consultorio?.createdAt) return; // sin fecha, no podemos validar
-  const creacion = consultorio.createdAt?.toDate
-    ? consultorio.createdAt.toDate()
-    : (consultorio.createdAt instanceof Date ? consultorio.createdAt : null);
-  if (!creacion) return;
-  // Comparamos solo dia (hora 00:00 del dia de creacion). Asi permitimos
-  // cargar sesiones del mismo dia que se creo el consultorio.
-  const minimo = new Date(creacion.getFullYear(), creacion.getMonth(), creacion.getDate(), 0, 0, 0, 0);
-  if (fecha.getTime() < minimo.getTime()) {
-    const fmt = creacion.toLocaleDateString('es-AR', {
-      day: 'numeric', month: 'long', year: 'numeric',
-    });
-    throw new Error(`La fecha de la sesión no puede ser anterior a la creación del consultorio (${fmt}).`);
-  }
+  // No-op intencional. Ver doc arriba.
 }
 
 /* ============================================================

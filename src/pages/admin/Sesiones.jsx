@@ -118,22 +118,6 @@ function dateAInputValue(d) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-/**
- * Devuelve la fecha minima ISO (YYYY-MM-DDTHH:MM) para el input
- * datetime-local, basada en la fecha de creacion del consultorio.
- * Sirve para que el navegador bloquee fechas anteriores al picker.
- */
-function fechaMinimaParaInput(consultorio) {
-  if (!consultorio?.createdAt) return undefined;
-  const d = consultorio.createdAt?.toDate
-    ? consultorio.createdAt.toDate()
-    : (consultorio.createdAt instanceof Date ? consultorio.createdAt : null);
-  if (!d) return undefined;
-  // Hora 00:00 del dia de creacion para permitir el dia entero
-  const minimo = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
-  return dateAInputValue(minimo);
-}
-
 /* ============================================================
    Pagina principal
    ============================================================ */
@@ -746,8 +730,6 @@ export function SesionModal({
   const valorTotal = valorSesionNum * cantidadNum;
   const split = calcularSplit(valorTotal, porcentaje);
 
-  const fechaMinIso = useMemo(() => fechaMinimaParaInput(consultorio), [consultorio]);
-
   // El profesional NO puede editar el método de pago. Lo configura el
   // admin en la ficha del paciente. Lo mostramos como solo lectura.
   const metodoBloqueado = !esAdmin;
@@ -860,9 +842,7 @@ export function SesionModal({
               label="Fecha y hora"
               value={fechaInput}
               onChange={(e) => setFechaInput(e.target.value)}
-              min={fechaMinIso}
               required
-              hint={fechaMinIso ? 'No puede ser anterior a la creación del consultorio.' : undefined}
             />
 
             <Input

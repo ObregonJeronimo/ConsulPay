@@ -500,7 +500,7 @@ function MetodosStep({ metodos, setMetodos, onBack, onFinalizar, submitting, err
                   onChange={(e) => updateField(m.id, 'valorSesionDefault', Number(e.target.value) || 0)}
                   className="cc-metodo__input cc-metodo__input--num"
                   min="0"
-                  step="500"
+                  step="any"
                 />
               </div>
               <div className="cc-metodo__cell">
@@ -511,7 +511,7 @@ function MetodosStep({ metodos, setMetodos, onBack, onFinalizar, submitting, err
                   className="cc-metodo__input cc-metodo__input--num"
                   min="0"
                   max="100"
-                  step="1"
+                  step="any"
                 />
                 <span className="cc-metodo__suffix">%</span>
               </div>
