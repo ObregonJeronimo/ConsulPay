@@ -60,9 +60,17 @@
    ============================================================ */
 @media (max-width: 900px) {
 
-  /* Layout: una sola columna, main a ancho completo */
+  /* Layout: en mobile salimos del CSS grid completamente. El grid
+     causaba un bug donde el aside (position: fixed) reservaba una
+     celda con altura intrinseca del 100vh (por su top:0; bottom:0),
+     empujando al main hacia abajo del viewport y generando un hueco
+     enorme entre el header sticky y el contenido. Con flex column
+     simple, el aside fixed sale del flow y header + main quedan
+     apilados sin huecos. */
   .cp-shell {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+    grid-template-columns: none;
   }
 
   /* Header sticky con hamburger + brand */
@@ -155,16 +163,8 @@
   }
 
   /* Sidebar como drawer slide-in desde la izquierda.
-     ----------------------------------------------------------------
-     Critico: position: fixed saca al sidebar del flujo visual pero
-     en CSS grid el grid-item sigue reservando su celda en el grid
-     a menos que le digamos explicitamente que no la ocupe.
-     grid-row: 1; grid-column: 1; lo apila junto al header (mismo
-     espacio del grid) — y como ambos estan posicionados (sticky/fixed)
-     no se pisan visualmente. Sin esto, el aside reserva una fila
-     completa de altura "auto" en el grid en algunas paginas (como
-     Solicitudes) y empuja el main hacia abajo, generando el hueco
-     gigante reportado. */
+     position: fixed lo saca del flow del flex column del .cp-shell,
+     asi no afecta al apilado natural de header sticky + main. */
   .cp-shell__sidebar {
     display: block;
     position: fixed;
@@ -174,8 +174,6 @@
     width: 280px;
     max-width: 85vw;
     z-index: 50;
-    grid-row: 1;
-    grid-column: 1;
     background: var(--cp-bg);
     border-right: 1px solid var(--cp-border);
     transform: translateX(-100%);
