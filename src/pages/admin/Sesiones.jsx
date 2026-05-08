@@ -393,6 +393,7 @@ export default function Sesiones() {
               onChange={(e) => setFiltroEstado(e.target.value)}
             >
               <option value="todos">Todos los estados</option>
+              <option value={ESTADOS_PAGO_SESION.PENDIENTE_MONTO}>A liquidar</option>
               <option value={ESTADOS_PAGO_SESION.DEBIDO}>Debidas</option>
               <option value={ESTADOS_PAGO_SESION.PAGADO}>Pagadas</option>
             </select>
