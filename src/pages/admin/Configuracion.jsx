@@ -190,6 +190,9 @@ export default function Configuracion() {
             {consultorio.plan === 'pro' && (
               <span className="cp-tab__count cp-tab__count--ok">PRO</span>
             )}
+            {consultorio.plan === 'ultra' && (
+              <span className="cp-tab__count cp-tab__count--ultra">ULTRA</span>
+            )}
           </button>
         )}
       </div>
@@ -428,7 +431,10 @@ function TabMetodos({ metodos: metodosOriginales, consultorio, consultorioId, on
   // sobre el valor total de la sesion.
   const consulpay = useMemo(() => comisionDeConsultorio(consultorio), [consultorio]);
   const consulpayPct = Number.isFinite(consulpay.pct) ? consulpay.pct : 0;
-  const planLabel = consultorio.plan === 'pro' ? 'Pro' : 'Free';
+  // comisionDeConsultorio ya devuelve la etiqueta correcta para el plan
+  // activo: 'Ultra' / 'Pro' / 'Free' / 'Legacy'. Usar eso aca evita
+  // re-calcular y soporta automaticamente nuevos planes.
+  const planLabel = consulpay.etiqueta || 'Free';
 
   useEffect(() => {
     onDirtyChange(dirty);
@@ -1944,6 +1950,7 @@ function TabPlan({ consultorio, searchParams, onLimpiarParams }) {
   }
 
   const esPro = consultorio.plan === 'pro';
+  const esUltra = consultorio.plan === 'ultra';
   const sub = consultorio.subscription;
   const puedeContratar = puedeContratarPro(consultorio);
   const puedeCancelar = puedeCancelarPro(consultorio);
@@ -1953,8 +1960,9 @@ function TabPlan({ consultorio, searchParams, onLimpiarParams }) {
       <header className="cp-config-section__head">
         <h2 className="cp-config-section__title">Plan de tu consultorio</h2>
         <p className="cp-config-section__sub">
-          Manejá tu suscripción a ConsulPay. Solo el dueño del consultorio puede contratar
-          o cancelar. La comisión que cobra ConsulPay sobre los pagos depende del plan activo.
+          {esUltra
+            ? 'Tu consultorio tiene un plan personalizado. La comisión la negociaste directamente con ConsulPay.'
+            : 'Manejá tu suscripción a ConsulPay. Solo el dueño del consultorio puede contratar o cancelar. La comisión que cobra ConsulPay sobre los pagos depende del plan activo.'}
         </p>
       </header>
 
@@ -1965,6 +1973,7 @@ function TabPlan({ consultorio, searchParams, onLimpiarParams }) {
       <PlanActualCard
         consultorio={consultorio}
         esPro={esPro}
+        esUltra={esUltra}
         sub={sub}
         onContratar={() => { setError(''); setOpenContratar(true); }}
         onCancelar={() => { setError(''); setOpenCancelar(true); }}
@@ -1973,8 +1982,10 @@ function TabPlan({ consultorio, searchParams, onLimpiarParams }) {
         submitting={submitting}
       />
 
-      {/* Comparativa Free vs Pro */}
-      {!esPro && <ComparativaPlanes consultorio={consultorio} />}
+      {/* Comparativa Free vs Pro: solo visible para consultorios en Free
+          que pueden ver el Plan Pro. Ultra no muestra comparativa (es un
+          acuerdo cerrado). */}
+      {!esPro && !esUltra && <ComparativaPlanes consultorio={consultorio} />}
 
       {/* Historial de cobros */}
       {pagosMensualidad.length > 0 && (
@@ -2008,6 +2019,7 @@ function TabPlan({ consultorio, searchParams, onLimpiarParams }) {
 function PlanActualCard({
   consultorio,
   esPro,
+  esUltra,
   sub,
   onContratar,
   onCancelar,
@@ -2026,14 +2038,22 @@ function PlanActualCard({
     ? `${comisionInfo.pct}%`
     : '—';
 
+  const planModifier = esUltra ? 'ultra' : (esPro ? 'pro' : 'free');
+  const planNombre = esUltra ? 'Ultra' : (esPro ? 'Pro' : 'Free');
+
   return (
-    <div className={`cp-plan-card ${esPro ? 'cp-plan-card--pro' : 'cp-plan-card--free'}`}>
+    <div className={`cp-plan-card cp-plan-card--${planModifier}`}>
       <div className="cp-plan-card__head">
         <div>
           <div className="cp-plan-card__plan-label">Plan actual</div>
           <h3 className="cp-plan-card__plan-name">
-            {esPro ? 'Pro' : 'Free'}
-            {esPro && <span className="cp-plan-card__badge">PRO</span>}
+            {planNombre}
+            {esUltra && (
+              <span className="cp-plan-pill cp-plan-pill--ultra cp-plan-card__badge-ultra">
+                ULTRA
+              </span>
+            )}
+            {esPro && !esUltra && <span className="cp-plan-card__badge">PRO</span>}
           </h3>
         </div>
         <div className="cp-plan-card__comision">
@@ -2047,7 +2067,15 @@ function PlanActualCard({
         </div>
       </div>
 
-      {/* Detalles solo si hay suscripcion activa */}
+      {/* Mensaje especial para Ultra: explica que es un plan personalizado */}
+      {esUltra && (
+        <div className="cp-plan-card__ultra-note">
+          ✦ Tenés un plan personalizado negociado directamente con ConsulPay.
+          Para cambios en el plan, contactanos.
+        </div>
+      )}
+
+      {/* Detalles solo si hay suscripcion activa (Pro) */}
       {esPro && sub && (
         <dl className="cp-plan-card__meta">
           <div>

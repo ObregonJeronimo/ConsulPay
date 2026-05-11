@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 
 import Metric from '../../components/ui/Metric.jsx';
 import Button from '../../components/ui/Button.jsx';
+import PlanPill from '../../components/ui/PlanPill.jsx';
 import { SkeletonBox } from '../../components/ui/Skeleton.jsx';
 
 import { useAuth } from '../../hooks/useAuth.js';
@@ -167,7 +168,7 @@ export default function Dashboard() {
           <p className="cp-page-sub">
             {consultorio?.nombre}
             {' · '}
-            <PlanBadge plan={consultorio?.plan} />
+            <PlanPill plan={consultorio?.plan} />
           </p>
         </div>
         <Link to="/admin/sesiones/nueva">
@@ -336,14 +337,4 @@ function OnboardingPasos() {
   );
 }
 
-/* ============================================================
-   Plan badge
-   ============================================================ */
-function PlanBadge({ plan }) {
-  if (!plan) return null;
-  return (
-    <span className={`cp-plan-badge cp-plan-badge--${plan}`}>
-      {plan === PLANES.FREE ? 'Plan Free' : 'Plan Pago'}
-    </span>
-  );
-}
+

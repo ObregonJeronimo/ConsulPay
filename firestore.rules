@@ -185,7 +185,9 @@ service cloud.firestore {
             && campoNoCambia('comisionConsulpay')
             && campoNoCambia('comisionFree')
             && campoNoCambia('comisionPro')
+            && campoNoCambia('comisionUltra')
             && campoNoCambia('puedeVerPlanPro')
+            && campoNoCambia('puedeVerPlanUltra')
             && campoNoCambia('subscription')
             // Campos del nuevo modelo de reparto multi-admin
             // (escritos solo por backend via Admin SDK, que bypassea rules)

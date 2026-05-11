@@ -28,12 +28,19 @@ export const ESTADOS_USUARIO = {
    ============================================================ */
 export const PLANES = {
   FREE: 'free',
-  PAGO: 'pago',
+  PRO: 'pro',
+  // Plan Ultra: variante no publica, activada por superadmin para
+  // consultorios especificos (acuerdos puntuales). Tiene comision
+  // configurable por consultorio (comisionUltra). No aparece en la
+  // landing publica ni en la comparativa de planes a menos que el
+  // consultorio tenga puedeVerPlanUltra=true o ya este en Ultra.
+  ULTRA: 'ultra',
 };
 
 export const COMISION_POR_PLAN = {
-  [PLANES.FREE]: 6, // 6% que se queda ConsulPay
-  [PLANES.PAGO]: 2, // 2% que se queda ConsulPay
+  [PLANES.FREE]: 1,   // 1% (modelo 2026)
+  [PLANES.PRO]: 0.5,  // 0.5% (modelo 2026)
+  // ULTRA es por consultorio, no tiene default global.
 };
 
 export const PRECIO_MENSUALIDAD_PAGO = 50000; // ARS

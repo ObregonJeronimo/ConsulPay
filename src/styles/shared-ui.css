@@ -757,3 +757,70 @@
   }
 }
 
+
+/* ============================================================
+   Plan badges — chips distintivos para Plan Pro y Plan Ultra
+   ----------------------------------------------------------------
+   Plan Free se muestra con .cp-plan-pill base (gris/neutro), Pro
+   con dorado y Ultra con morado degradado. Los uso al lado del
+   nombre del consultorio en headers, y en la card del sidebar.
+   ============================================================ */
+.cp-plan-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  background: var(--cp-surface-sunken);
+  color: var(--cp-text-muted);
+  border: 1px solid var(--cp-border);
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+/* Pro: dorado discreto pero distintivo */
+.cp-plan-pill--pro {
+  background: var(--cp-plan-pro-bg);
+  color: var(--cp-plan-pro);
+  border-color: var(--cp-plan-pro-border);
+  font-weight: 600;
+}
+
+.cp-plan-pill--pro::before {
+  content: '★';
+  font-size: 10px;
+  line-height: 1;
+}
+
+/* Ultra: morado degradado con brillo sutil. Es el unico badge con
+   gradient en todo el sistema, por eso se nota mucho. */
+.cp-plan-pill--ultra {
+  background: var(--cp-plan-ultra-gradient);
+  color: #fff;
+  border-color: transparent;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  /* Sombra muy sutil para sensacion premium */
+  box-shadow: 0 1px 3px rgba(107, 79, 168, 0.25);
+}
+
+.cp-plan-pill--ultra::before {
+  content: '✦';
+  font-size: 11px;
+  line-height: 1;
+}
+
+/* Tamano grande para usar en el sidebar (mas notorio). */
+.cp-plan-pill--lg {
+  padding: 5px 14px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+
+.cp-plan-pill--lg.cp-plan-pill--ultra::before,
+.cp-plan-pill--lg.cp-plan-pill--pro::before {
+  font-size: 11.5px;
+}

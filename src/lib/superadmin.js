@@ -185,14 +185,30 @@ export async function cargarConsultorioConMiembros(consultorioId) {
  *     0% (caso de cortesia/partner). Permitimos hasta 100% (caso teorico,
  *     no esperamos llegar ahi en la practica pero no lo bloqueamos).
  *   - puedeVerPlanPro debe ser boolean.
+ *   - Si planEsUltra=true: el consultorio pasa al plan 'ultra' y se setea
+ *     comisionUltra. Si planEsUltra=false y antes estaba en ultra, vuelve
+ *     a 'free' (caemos al default seguro; si necesita 'pro' habria que
+ *     re-suscribir manualmente o tocar el campo a mano).
  *
  * @param {string} consultorioId
- * @param {{ comisionFree: number, comisionPro: number, puedeVerPlanPro: boolean }} cambios
+ * @param {{
+ *   comisionFree: number,
+ *   comisionPro: number,
+ *   puedeVerPlanPro: boolean,
+ *   planEsUltra?: boolean,
+ *   comisionUltra?: number | null
+ * }} cambios
  */
 export async function actualizarConfigSuper(consultorioId, cambios) {
   if (!consultorioId) throw new Error('consultorioId requerido');
 
-  const { comisionFree, comisionPro, puedeVerPlanPro } = cambios;
+  const {
+    comisionFree,
+    comisionPro,
+    puedeVerPlanPro,
+    planEsUltra,
+    comisionUltra,
+  } = cambios;
 
   // Validaciones
   if (!Number.isFinite(comisionFree) || comisionFree < 0 || comisionFree > 100) {
@@ -205,15 +221,50 @@ export async function actualizarConfigSuper(consultorioId, cambios) {
     throw new Error('puedeVerPlanPro debe ser true o false.');
   }
 
+  if (planEsUltra) {
+    if (!Number.isFinite(comisionUltra) || comisionUltra < 0 || comisionUltra > 100) {
+      throw new Error('La comisión Ultra debe ser un número entre 0 y 100 cuando el plan Ultra está activado.');
+    }
+  }
+
   // Redondeamos a 2 decimales para evitar floats raros (ej: 6.123456%)
   const comisionFreeR = Math.round(comisionFree * 100) / 100;
   const comisionProR = Math.round(comisionPro * 100) / 100;
 
-  await updateDoc(doc(db, 'consultorios', consultorioId), {
+  // Releemos el consultorio para decidir el plan resultante:
+  //   - Si planEsUltra=true: plan='ultra'
+  //   - Si planEsUltra=false y el plan actual es 'ultra': bajamos a 'free'
+  //     (los Ultra son acuerdos manuales; el superadmin si quiere subirlo
+  //     a pro despues lo hace manualmente)
+  //   - Si planEsUltra=false y el plan no es ultra: no tocamos plan
+  let nuevoPlan = null;
+  let nuevaComisionUltra;
+  if (planEsUltra === true) {
+    nuevoPlan = 'ultra';
+    nuevaComisionUltra = Math.round(comisionUltra * 100) / 100;
+  } else if (planEsUltra === false) {
+    // Solo tocamos si actualmente esta en ultra (para bajarlo). Si no, no.
+    const snap = await getDoc(doc(db, 'consultorios', consultorioId));
+    if (snap.exists() && snap.data().plan === 'ultra') {
+      nuevoPlan = 'free';
+      nuevaComisionUltra = null;
+    }
+  }
+
+  const update = {
     comisionFree: comisionFreeR,
     comisionPro: comisionProR,
     puedeVerPlanPro,
-  });
+  };
+
+  if (nuevoPlan !== null) {
+    update.plan = nuevoPlan;
+  }
+  if (nuevaComisionUltra !== undefined) {
+    update.comisionUltra = nuevaComisionUltra;
+  }
+
+  await updateDoc(doc(db, 'consultorios', consultorioId), update);
 }
 
 /* ============================================================
@@ -236,6 +287,14 @@ export async function actualizarConfigSuper(consultorioId, cambios) {
 export function comisionDeConsultorio(c) {
   const plan = c.plan || 'free';
   const esValido = (v) => Number.isFinite(v) && v >= 0 && v <= 100;
+
+  if (plan === 'ultra') {
+    const cU = Number(c.comisionUltra);
+    if (esValido(cU)) return { pct: cU, etiqueta: 'Ultra' };
+    // Si el plan figura como ultra pero no tiene comisionUltra seteada,
+    // caemos al Pro como fallback defensivo. No deberia pasar (el
+    // superadmin setea ambos campos juntos cuando activa Ultra).
+  }
 
   if (plan === 'pro') {
     const cP = Number(c.comisionPro);

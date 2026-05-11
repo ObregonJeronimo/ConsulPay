@@ -405,7 +405,8 @@ function ConsultorioCard({ consultorio, onEditar, onEliminarConsultorio, onAccio
   }
 
   const comision = comisionDeConsultorio(consultorio);
-  const planLabel = consultorio.plan === 'pro' ? 'Pro' : 'Free';
+  // Etiqueta del plan: Ultra / Pro / Free segun corresponda
+  const planLabel = comision.etiqueta || 'Free';
   const planProDeshabilitado = consultorio.puedeVerPlanPro === false;
 
   const tieneSuscripcionActiva = consultorio.subscription && (
@@ -413,7 +414,12 @@ function ConsultorioCard({ consultorio, onEditar, onEliminarConsultorio, onAccio
     || consultorio.subscription.status === 'pending_authorization'
     || consultorio.subscription.status === 'in_grace'
   );
-  const puedeEliminar = consultorio.plan === 'free' && !tieneSuscripcionActiva;
+  // Solo permitimos eliminar consultorios sin suscripcion activa. El plan
+  // Ultra es un acuerdo manual sin suscripcion MP, asi que se permite
+  // eliminar (al igual que Free sin sub). Pro con sub activa NO se puede
+  // eliminar — hay que cancelar la sub primero.
+  const puedeEliminar = (consultorio.plan === 'free' || consultorio.plan === 'ultra')
+    && !tieneSuscripcionActiva;
 
   const miembrosOrdenados = useMemo(() => {
     if (!miembros) return [];
@@ -721,27 +727,37 @@ function EditarConsultorioModal({ consultorio, submitting, onCancelar, onConfirm
       Number.isFinite(Number(consultorio.comisionFree))
       && Number.isFinite(Number(consultorio.comisionPro))
     );
-    if (tieneNuevos) {
-      return {
-        comisionFree: Number(consultorio.comisionFree),
-        comisionPro: Number(consultorio.comisionPro),
-        puedeVerPlanPro: consultorio.puedeVerPlanPro !== false,
-      };
-    }
-    // Fallback solo para consultorios sin migrar: si no tienen los campos
-    // nuevos, usamos defaults del modelo nuevo (1% / 0.5%) sin importar
-    // el legacy comisionConsulpay (que era de un modelo distinto y daria
-    // valores muy altos para el modelo nuevo).
+    const base = tieneNuevos
+      ? {
+          comisionFree: Number(consultorio.comisionFree),
+          comisionPro: Number(consultorio.comisionPro),
+          puedeVerPlanPro: consultorio.puedeVerPlanPro !== false,
+        }
+      : {
+          // Fallback solo para consultorios sin migrar
+          comisionFree: DEFAULTS_CONSULTORIO_SUPER.comisionFree,
+          comisionPro: DEFAULTS_CONSULTORIO_SUPER.comisionPro,
+          puedeVerPlanPro: consultorio.puedeVerPlanPro !== false,
+        };
+
     return {
-      comisionFree: DEFAULTS_CONSULTORIO_SUPER.comisionFree,
-      comisionPro: DEFAULTS_CONSULTORIO_SUPER.comisionPro,
-      puedeVerPlanPro: consultorio.puedeVerPlanPro !== false,
+      ...base,
+      // Plan Ultra: campos opcionales, default desactivado
+      planEsUltra: consultorio.plan === 'ultra',
+      comisionUltra: Number.isFinite(Number(consultorio.comisionUltra))
+        ? Number(consultorio.comisionUltra)
+        : 0,
     };
   }, [consultorio]);
 
   const [comisionFree, setComisionFree] = useState(String(valoresIniciales.comisionFree));
   const [comisionPro, setComisionPro] = useState(String(valoresIniciales.comisionPro));
   const [puedeVerPlanPro, setPuedeVerPlanPro] = useState(valoresIniciales.puedeVerPlanPro);
+  // Ultra: el toggle controla si el consultorio esta en plan Ultra o no.
+  // Al activarlo el plan pasa a 'ultra'. Al desactivarlo vuelve al plan que
+  // tenia antes (free o pro segun corresponda).
+  const [planEsUltra, setPlanEsUltra] = useState(valoresIniciales.planEsUltra);
+  const [comisionUltra, setComisionUltra] = useState(String(valoresIniciales.comisionUltra));
   const [errorLocal, setErrorLocal] = useState('');
 
   function validar() {
@@ -752,6 +768,12 @@ function EditarConsultorioModal({ consultorio, submitting, onCancelar, onConfirm
     }
     if (!Number.isFinite(cP) || cP < 0 || cP > 100) {
       return 'La comisión Pro debe ser un número entre 0 y 100.';
+    }
+    if (planEsUltra) {
+      const cU = Number(comisionUltra);
+      if (!Number.isFinite(cU) || cU < 0 || cU > 100) {
+        return 'La comisión Ultra debe ser un número entre 0 y 100.';
+      }
     }
     return null;
   }
@@ -768,6 +790,11 @@ function EditarConsultorioModal({ consultorio, submitting, onCancelar, onConfirm
       comisionFree: Number(comisionFree),
       comisionPro: Number(comisionPro),
       puedeVerPlanPro,
+      // Plan Ultra: si esta activado, cambiamos el plan a 'ultra' y seteamos
+      // comisionUltra. Si esta desactivado pero antes estaba en ultra, lo
+      // bajamos a 'free' (el caller decide si es free o pro segun corresponda).
+      planEsUltra,
+      comisionUltra: planEsUltra ? Number(comisionUltra) : null,
     });
   }
 
@@ -776,8 +803,10 @@ function EditarConsultorioModal({ consultorio, submitting, onCancelar, onConfirm
       Number(comisionFree) !== valoresIniciales.comisionFree
       || Number(comisionPro) !== valoresIniciales.comisionPro
       || puedeVerPlanPro !== valoresIniciales.puedeVerPlanPro
+      || planEsUltra !== valoresIniciales.planEsUltra
+      || (planEsUltra && Number(comisionUltra) !== valoresIniciales.comisionUltra)
     );
-  }, [comisionFree, comisionPro, puedeVerPlanPro, valoresIniciales]);
+  }, [comisionFree, comisionPro, puedeVerPlanPro, planEsUltra, comisionUltra, valoresIniciales]);
 
   return (
     <div className="cp-modal-overlay" onClick={onCancelar}>
@@ -793,7 +822,10 @@ function EditarConsultorioModal({ consultorio, submitting, onCancelar, onConfirm
         <div className="cp-modal__sub">
           <strong>{consultorio.nombre || '(sin nombre)'}</strong>
           {' · '}
-          Plan actual: {consultorio.plan === 'pro' ? 'Pro' : 'Free'}
+          Plan actual: {
+            consultorio.plan === 'ultra' ? 'Ultra' :
+            consultorio.plan === 'pro' ? 'Pro' : 'Free'
+          }
         </div>
 
         <form className="cp-modal__form" onSubmit={handleSubmit}>
@@ -869,6 +901,57 @@ function EditarConsultorioModal({ consultorio, submitting, onCancelar, onConfirm
           </div>
 
           {errorLocal && <div className="cp-modal__error">{errorLocal}</div>}
+
+          <div className="cp-modal-edit-cons__section cp-modal-edit-cons__section--ultra">
+            <h3 className="cp-modal-edit-cons__section-title">
+              <span className="cp-plan-pill cp-plan-pill--ultra cp-plan-pill--lg" style={{ fontSize: 11 }}>
+                Plan Ultra
+              </span>
+            </h3>
+            <p className="cp-modal-edit-cons__section-hint">
+              Plan personalizado, exclusivo (no publico). Solo el superadmin lo activa.
+              Al activarlo, el consultorio pasa al plan Ultra con la comisión que
+              configures abajo. El consultorio va a ver un badge morado "Plan Ultra"
+              en su Dashboard y sidebar.
+            </p>
+
+            <label className="cp-toggle-row">
+              <button
+                type="button"
+                className={`cc-toggle ${planEsUltra ? 'cc-toggle--on' : ''}`}
+                onClick={() => setPlanEsUltra(!planEsUltra)}
+                aria-pressed={planEsUltra}
+                disabled={submitting}
+              >
+                <span className="cc-toggle__thumb" />
+              </button>
+              <div className="cp-toggle-row__label">
+                <strong>
+                  {planEsUltra ? 'Plan Ultra activado' : 'Plan Ultra desactivado'}
+                </strong>
+                <span>
+                  {planEsUltra
+                    ? 'El consultorio está en Plan Ultra. Se aplica la comisión Ultra de abajo.'
+                    : 'El consultorio sigue en su plan normal (Free o Pro).'}
+                </span>
+              </div>
+            </label>
+
+            {planEsUltra && (
+              <Input
+                name="comisionUltra"
+                type="number"
+                label="Comisión Plan Ultra"
+                value={comisionUltra}
+                onChange={(e) => setComisionUltra(e.target.value)}
+                min="0"
+                max="100"
+                step="0.1"
+                disabled={submitting}
+                hint="% que ConsulPay cobra sobre el valor total cuando el consultorio está en Ultra. 0% es válido."
+              />
+            )}
+          </div>
 
           <div className="cp-modal__actions">
             <Button variant="secondary" type="button" onClick={onCancelar} disabled={submitting}>

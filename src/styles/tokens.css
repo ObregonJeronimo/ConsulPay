@@ -36,6 +36,22 @@
   --cp-info: #3E6F8A;
   --cp-info-bg: #DDE7EE;
 
+  /* ---------- Badges de planes premium ---------- */
+  /* Plan Pro: dorado/ambar elegante (no chillon). Sobrio pero distintivo
+     respecto al gris del Plan Free para que el cliente sienta el cambio. */
+  --cp-plan-pro: #B07D1F;
+  --cp-plan-pro-bg: #F5EBD3;
+  --cp-plan-pro-border: #D4B470;
+
+  /* Plan Ultra: morado profundo con sensacion premium. Distintivo de
+     Pro para que el cliente con Ultra sienta que es un nivel superior.
+     Usa un degradado suave en lugar de color plano para enfatizar. */
+  --cp-plan-ultra: #6B4FA8;
+  --cp-plan-ultra-hover: #5B4296;
+  --cp-plan-ultra-bg: #EDE5F7;
+  --cp-plan-ultra-border: #9B7EC9;
+  --cp-plan-ultra-gradient: linear-gradient(135deg, #7B5CB8 0%, #5B4296 100%);
+
   /* ---------- Tipografía ---------- */
   --cp-font-serif: 'Source Serif 4', Georgia, 'Times New Roman', serif;
   --cp-font-sans: 'Inter Tight', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;

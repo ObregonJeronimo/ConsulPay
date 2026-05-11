@@ -3,9 +3,10 @@ import { NavLink } from 'react-router-dom';
 
 import { useAuth } from '../../hooks/useAuth.js';
 import { useConsultorio } from '../../hooks/useConsultorio.js';
-import { ROLES } from '../../lib/constants.js';
+import { PLANES, ROLES } from '../../lib/constants.js';
 import { suscribirSolicitudesPendientes } from '../../lib/solicitudes.js';
 import Avatar from '../ui/Avatar.jsx';
+import PlanPill from '../ui/PlanPill.jsx';
 import './Sidebar.css';
 
 /* Íconos inline para tener control total del stroke-width */
@@ -188,20 +189,31 @@ export default function Sidebar() {
       )}
 
       <div className="cp-sidebar__footer">
-        <Avatar initials={iniciales(user?.displayName, user?.email)} size={30} />
-        <div className="cp-sidebar__user">
-          <div className="cp-sidebar__user-name">{nombre}</div>
-          <div className="cp-sidebar__user-role">{rolLabel}</div>
+        {/* Plan pill: solo aparece para planes premium (Pro o Ultra),
+            no para Free. Se muestra arriba del nombre/rol del user
+            como un "sello" del plan que tiene contratado el consultorio. */}
+        {consultorio && (consultorio.plan === PLANES.PRO || consultorio.plan === PLANES.ULTRA) && (
+          <div className="cp-sidebar__plan-pill-wrap">
+            <PlanPill plan={consultorio.plan} size="lg" />
+          </div>
+        )}
+
+        <div className="cp-sidebar__footer-user">
+          <Avatar initials={iniciales(user?.displayName, user?.email)} size={30} />
+          <div className="cp-sidebar__user">
+            <div className="cp-sidebar__user-name">{nombre}</div>
+            <div className="cp-sidebar__user-role">{rolLabel}</div>
+          </div>
+          <button
+            type="button"
+            onClick={signOut}
+            className="cp-sidebar__logout"
+            aria-label="Cerrar sesión"
+            title="Cerrar sesión"
+          >
+            <Icon.LogOut />
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={signOut}
-          className="cp-sidebar__logout"
-          aria-label="Cerrar sesión"
-          title="Cerrar sesión"
-        >
-          <Icon.LogOut />
-        </button>
       </div>
     </aside>
   );

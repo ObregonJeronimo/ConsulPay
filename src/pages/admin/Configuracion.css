@@ -756,6 +756,13 @@
   color: var(--cp-text-on-accent);
 }
 
+/* Variante ULTRA para el tab Plan: morado degradado, llamativo. */
+.cp-tab__count--ultra {
+  background: var(--cp-plan-ultra-gradient);
+  color: #fff;
+  letter-spacing: 0.06em;
+}
+
 /* ============================================================
    Modal de "Conectar Mercado Pago" (paso a paso preventivo)
    ============================================================ */
@@ -870,6 +877,38 @@
     var(--cp-accent-bg) 0%,
     var(--cp-surface) 60%
   );
+}
+
+/* Plan Ultra: degradado morado sutil para diferenciar del Pro (coral).
+   Sensacion premium pero sin saturar. */
+.cp-plan-card--ultra {
+  border-color: var(--cp-plan-ultra);
+  background: linear-gradient(
+    135deg,
+    var(--cp-plan-ultra-bg) 0%,
+    var(--cp-surface) 60%
+  );
+}
+
+.cp-plan-card--ultra .cp-plan-card__comision-value {
+  color: var(--cp-plan-ultra);
+}
+
+/* Badge ULTRA en el head de la card (en vez del span PRO plano) */
+.cp-plan-card__badge-ultra {
+  font-size: 11px !important;
+  padding: 4px 12px !important;
+}
+
+/* Mensaje especial debajo del head cuando es Ultra */
+.cp-plan-card__ultra-note {
+  background: rgba(107, 79, 168, 0.06);
+  border: 1px solid var(--cp-plan-ultra-border);
+  border-radius: var(--cp-radius-md);
+  padding: 14px 16px;
+  font-size: 13px;
+  color: var(--cp-plan-ultra);
+  line-height: 1.55;
 }
 
 .cp-plan-card__head {
