@@ -756,11 +756,13 @@
   color: var(--cp-text-on-accent);
 }
 
-/* Variante ULTRA para el tab Plan: morado degradado, llamativo. */
+/* Variante ULTRA para el tab Plan: negro luxury con detalle dorado. */
 .cp-tab__count--ultra {
   background: var(--cp-plan-ultra-gradient);
-  color: #fff;
-  letter-spacing: 0.06em;
+  color: var(--cp-plan-ultra-gold-soft);
+  border: 1px solid var(--cp-plan-ultra-gold);
+  letter-spacing: 0.08em;
+  font-size: 9.5px;
 }
 
 /* ============================================================
@@ -879,36 +881,48 @@
   );
 }
 
-/* Plan Ultra: degradado morado sutil para diferenciar del Pro (coral).
-   Sensacion premium pero sin saturar. */
+/* Plan Ultra: estilo luxury — fondo crema con borde negro fino,
+   detalles dorados. Sobrio pero claramente diferenciado del Pro.
+   El comision-value va en dorado para acentuar. */
 .cp-plan-card--ultra {
-  border-color: var(--cp-plan-ultra);
+  border: 1.5px solid var(--cp-plan-ultra);
   background: linear-gradient(
     135deg,
     var(--cp-plan-ultra-bg) 0%,
     var(--cp-surface) 60%
   );
+  box-shadow: 0 1px 0 var(--cp-plan-ultra-gold-soft);
 }
 
 .cp-plan-card--ultra .cp-plan-card__comision-value {
   color: var(--cp-plan-ultra);
 }
 
-/* Badge ULTRA en el head de la card (en vez del span PRO plano) */
+.cp-plan-card--ultra .cp-plan-card__plan-name {
+  color: var(--cp-plan-ultra);
+}
+
+/* Badge ULTRA en el head de la card (usa el pill luxury) */
 .cp-plan-card__badge-ultra {
-  font-size: 11px !important;
-  padding: 4px 12px !important;
+  font-size: 10.5px !important;
+  padding: 5px 14px !important;
 }
 
 /* Mensaje especial debajo del head cuando es Ultra */
 .cp-plan-card__ultra-note {
-  background: rgba(107, 79, 168, 0.06);
-  border: 1px solid var(--cp-plan-ultra-border);
+  background: var(--cp-plan-ultra);
+  color: var(--cp-plan-ultra-gold-soft);
+  border: 1px solid var(--cp-plan-ultra-gold);
   border-radius: var(--cp-radius-md);
-  padding: 14px 16px;
+  padding: 14px 18px;
   font-size: 13px;
-  color: var(--cp-plan-ultra);
   line-height: 1.55;
+  letter-spacing: 0.01em;
+}
+
+.cp-plan-card__ultra-note::first-letter {
+  color: var(--cp-plan-ultra-gold);
+  font-size: 1.15em;
 }
 
 .cp-plan-card__head {

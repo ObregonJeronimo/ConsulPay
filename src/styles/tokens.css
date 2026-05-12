@@ -43,14 +43,17 @@
   --cp-plan-pro-bg: #F5EBD3;
   --cp-plan-pro-border: #D4B470;
 
-  /* Plan Ultra: morado profundo con sensacion premium. Distintivo de
-     Pro para que el cliente con Ultra sienta que es un nivel superior.
-     Usa un degradado suave en lugar de color plano para enfatizar. */
-  --cp-plan-ultra: #6B4FA8;
-  --cp-plan-ultra-hover: #5B4296;
-  --cp-plan-ultra-bg: #EDE5F7;
-  --cp-plan-ultra-border: #9B7EC9;
-  --cp-plan-ultra-gradient: linear-gradient(135deg, #7B5CB8 0%, #5B4296 100%);
+  /* Plan Ultra: estilo "luxury" — negro profundo con detalles dorados.
+     Mas sobrio que un morado saturado y mejor integrado con la paleta
+     calida del tema. El dorado es el mismo que usa Pro para coherencia
+     pero el contraste sobre negro lo hace claramente premium. */
+  --cp-plan-ultra: #1A1614;              /* Negro calido (no negro puro) */
+  --cp-plan-ultra-hover: #0D0B0A;
+  --cp-plan-ultra-bg: #F5F1EC;           /* Crema sutil para cards */
+  --cp-plan-ultra-border: #1A1614;
+  --cp-plan-ultra-gold: #C9A55C;         /* Dorado para acentos */
+  --cp-plan-ultra-gold-soft: #E8D5A3;    /* Dorado claro para hover/glow */
+  --cp-plan-ultra-gradient: linear-gradient(135deg, #2A2420 0%, #0F0D0B 100%);
 
   /* ---------- Tipografía ---------- */
   --cp-font-serif: 'Source Serif 4', Georgia, 'Times New Roman', serif;

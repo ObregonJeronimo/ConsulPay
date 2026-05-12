@@ -568,3 +568,22 @@
     font-size: 13px !important;
   }
 }
+
+/* ============================================================
+   Texto sutil "Plan Ultra" en el subtitulo del header
+   ----------------------------------------------------------------
+   Solo aparece cuando el consultorio tiene Plan Ultra. NO es un
+   badge — es un texto en color dorado que dice "Plan Ultra" sin
+   pisar al nombre del consultorio. El badge llamativo va al sidebar.
+   ============================================================ */
+.cp-page-sub__ultra-text {
+  color: var(--cp-plan-ultra-gold);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.cp-page-sub__ultra-text::before {
+  content: '◆ ';
+  font-size: 0.85em;
+  vertical-align: 1px;
+}

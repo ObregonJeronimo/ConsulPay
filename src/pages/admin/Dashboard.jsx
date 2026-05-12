@@ -168,7 +168,13 @@ export default function Dashboard() {
           <p className="cp-page-sub">
             {consultorio?.nombre}
             {' · '}
-            <PlanPill plan={consultorio?.plan} />
+            {consultorio?.plan === 'ultra' ? (
+              // Ultra ya se muestra como badge llamativo en el sidebar.
+              // Aca solo dejamos texto sutil para evitar duplicacion visual.
+              <span className="cp-page-sub__ultra-text">Plan Ultra</span>
+            ) : (
+              <PlanPill plan={consultorio?.plan} />
+            )}
           </p>
         </div>
         <Link to="/admin/sesiones/nueva">

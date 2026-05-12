@@ -139,6 +139,15 @@ export default function Sidebar() {
 
   return (
     <aside className="cp-sidebar">
+      {/* Badge Plan Ultra: arriba de todo, como un "sello" del workspace.
+          Pro tambien se muestra aca arriba con su propio estilo. Free no
+          muestra nada. */}
+      {consultorio && (consultorio.plan === PLANES.ULTRA || consultorio.plan === PLANES.PRO) && (
+        <div className="cp-sidebar__plan-header">
+          <PlanPill plan={consultorio.plan} size="lg" />
+        </div>
+      )}
+
       <div className="cp-sidebar__brand">
         <div className="cp-sidebar__brand-mark">C</div>
         <div className="cp-sidebar__brand-name">ConsulPay</div>
@@ -189,15 +198,6 @@ export default function Sidebar() {
       )}
 
       <div className="cp-sidebar__footer">
-        {/* Plan pill: solo aparece para planes premium (Pro o Ultra),
-            no para Free. Se muestra arriba del nombre/rol del user
-            como un "sello" del plan que tiene contratado el consultorio. */}
-        {consultorio && (consultorio.plan === PLANES.PRO || consultorio.plan === PLANES.ULTRA) && (
-          <div className="cp-sidebar__plan-pill-wrap">
-            <PlanPill plan={consultorio.plan} size="lg" />
-          </div>
-        )}
-
         <div className="cp-sidebar__footer-user">
           <Avatar initials={iniciales(user?.displayName, user?.email)} size={30} />
           <div className="cp-sidebar__user">

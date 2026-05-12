@@ -795,32 +795,41 @@
   line-height: 1;
 }
 
-/* Ultra: morado degradado con brillo sutil. Es el unico badge con
-   gradient en todo el sistema, por eso se nota mucho. */
+/* Ultra: negro profundo con detalle dorado. Estilo "luxury", contrasta
+   limpiamente con la paleta calida del tema sin chillar.
+   El icono ◆ (diamante) es mas distintivo que ✦ para sensacion premium. */
 .cp-plan-pill--ultra {
   background: var(--cp-plan-ultra-gradient);
-  color: #fff;
-  border-color: transparent;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  /* Sombra muy sutil para sensacion premium */
-  box-shadow: 0 1px 3px rgba(107, 79, 168, 0.25);
+  color: var(--cp-plan-ultra-gold-soft);
+  border: 1px solid var(--cp-plan-ultra-gold);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 11px;
+  /* Glow dorado MUY sutil — apenas perceptible, le da sensacion de relieve */
+  box-shadow: 0 0 0 1px rgba(201, 165, 92, 0.15),
+              inset 0 1px 0 rgba(232, 213, 163, 0.08);
 }
 
 .cp-plan-pill--ultra::before {
-  content: '✦';
-  font-size: 11px;
+  content: '◆';
+  font-size: 9px;
   line-height: 1;
+  color: var(--cp-plan-ultra-gold);
 }
 
 /* Tamano grande para usar en el sidebar (mas notorio). */
 .cp-plan-pill--lg {
-  padding: 5px 14px;
-  font-size: 12px;
-  border-radius: 8px;
+  padding: 6px 16px;
+  font-size: 11.5px;
+  border-radius: 6px;
+  letter-spacing: 0.1em;
 }
 
-.cp-plan-pill--lg.cp-plan-pill--ultra::before,
+.cp-plan-pill--lg.cp-plan-pill--ultra::before {
+  font-size: 10px;
+}
+
 .cp-plan-pill--lg.cp-plan-pill--pro::before {
   font-size: 11.5px;
 }
