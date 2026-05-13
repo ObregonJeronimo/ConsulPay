@@ -6,7 +6,7 @@ import Spinner from '../../components/ui/Spinner.jsx';
 
 import { useAuth } from '../../hooks/useAuth.js';
 import { useConsultorio } from '../../hooks/useConsultorio.js';
-import { ESTADOS_PACIENTE, formatoARS } from '../../lib/constants.js';
+import { ESTADOS_PACIENTE, TIPOS_METODO_PAGO, formatoARS } from '../../lib/constants.js';
 import { suscribirPacientesProfesional } from '../../lib/pacientes.js';
 
 import './../admin/Pacientes.css';
@@ -129,7 +129,15 @@ export default function MisPacientes() {
                         </>
                       ) : <span style={{ color: 'var(--cp-danger)' }}>—</span>}
                     </td>
-                    <td data-label="Valor sesión" className="cp-num">{formatoARS.format(valor)}</td>
+                    <td data-label="Valor sesión" className="cp-num">
+                      {metodo?.tipo === TIPOS_METODO_PAGO.DIFERIDO ? (
+                        <span style={{ color: 'var(--cp-text-faint)', fontStyle: 'italic', fontSize: 13 }}>
+                          Según OS
+                        </span>
+                      ) : (
+                        formatoARS.format(valor)
+                      )}
+                    </td>
                     <td data-label="Obra social Nº" style={{ fontSize: 13, color: 'var(--cp-text-muted)' }}>
                       {p.obraSocialNumero || '—'}
                     </td>

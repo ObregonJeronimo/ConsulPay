@@ -12,6 +12,7 @@ import { useConsultorio } from '../../hooks/useConsultorio.js';
 import {
   ESTADOS_PACIENTE,
   ESTADOS_USUARIO,
+  TIPOS_METODO_PAGO,
   formatoARS,
 } from '../../lib/constants.js';
 import {
@@ -638,7 +639,15 @@ function PacientesTabla({
                 <td data-label="Método" style={{ fontSize: 13.5 }}>
                   {metodo ? metodo.nombre : <span style={{ color: 'var(--cp-danger)' }}>Método eliminado</span>}
                 </td>
-                <td data-label="Valor sesión" className="cp-num">{formatoARS.format(valor)}</td>
+                <td data-label="Valor sesión" className="cp-num">
+                  {metodo?.tipo === TIPOS_METODO_PAGO.DIFERIDO ? (
+                    <span style={{ color: 'var(--cp-text-faint)', fontStyle: 'italic', fontSize: 13 }}>
+                      Según OS
+                    </span>
+                  ) : (
+                    formatoARS.format(valor)
+                  )}
+                </td>
                 <td data-label="Obra social Nº" style={{ fontSize: 13, color: 'var(--cp-text-muted)' }}>
                   {p.obraSocialNumero || '—'}
                 </td>
@@ -946,19 +955,39 @@ function PacienteModal({ paciente, profesionales, metodos, onClose, onGuardar })
           )}
 
           {metodoSeleccionado && (
-            <div className="cp-valor-info">
-              <div className="cp-valor-info__main">
-                <span className="cp-valor-info__label">Valor de sesión</span>
-                <span className="cp-valor-info__amount">{formatoARS.format(valorDelMetodo)}</span>
+            metodoSeleccionado.tipo === TIPOS_METODO_PAGO.DIFERIDO ? (
+              // Para obras sociales / prepagas: el valor de la sesion lo
+              // decide la obra social al liquidar, no se carga aca. El
+              // profesional/admin lo ingresa en el modal de Liquidar monto
+              // dentro del tab Sesiones (boton ✓ de cada sesion pendiente).
+              <div className="cp-valor-info cp-valor-info--diferido">
+                <div className="cp-valor-info__main">
+                  <span className="cp-valor-info__label">Valor de sesión</span>
+                  <span className="cp-valor-info__amount-text">
+                    Lo decide la obra social
+                  </span>
+                </div>
+                <div className="cp-valor-info__hint">
+                  Las sesiones con <strong>{metodoSeleccionado.nombre}</strong> no
+                  llevan valor al crearse. Se carga después en el listado de
+                  sesiones cuando la obra social informe el monto.
+                </div>
               </div>
-              <div className="cp-valor-info__hint">
-                Definido por el método <strong>{metodoSeleccionado.nombre}</strong>.
-                {' '}
-                <Link to="/admin/configuracion" className="cp-valor-info__link" onClick={onClose}>
-                  Editar en Configuración →
-                </Link>
+            ) : (
+              <div className="cp-valor-info">
+                <div className="cp-valor-info__main">
+                  <span className="cp-valor-info__label">Valor de sesión</span>
+                  <span className="cp-valor-info__amount">{formatoARS.format(valorDelMetodo)}</span>
+                </div>
+                <div className="cp-valor-info__hint">
+                  Definido por el método <strong>{metodoSeleccionado.nombre}</strong>.
+                  {' '}
+                  <Link to="/admin/configuracion" className="cp-valor-info__link" onClick={onClose}>
+                    Editar en Configuración →
+                  </Link>
+                </div>
               </div>
-            </div>
+            )
           )}
 
           <div>

@@ -649,6 +649,21 @@
   letter-spacing: -0.01em;
 }
 
+/* Variante diferido (obra social): no muestra monto, sino texto
+   aclarando que lo decide la obra social al liquidar. Color ambar
+   para coherencia con el badge "Pendiente liquidar" de sesiones. */
+.cp-valor-info--diferido {
+  background: var(--cp-warning-bg, rgba(220, 170, 50, 0.08));
+  border-color: var(--cp-warning-border, rgba(220, 170, 50, 0.3));
+}
+
+.cp-valor-info__amount-text {
+  font-size: 13.5px;
+  font-style: italic;
+  color: var(--cp-warning, #b8860b);
+  font-weight: 500;
+}
+
 .cp-valor-info__hint {
   font-size: 12.5px;
   color: var(--cp-text-muted);
