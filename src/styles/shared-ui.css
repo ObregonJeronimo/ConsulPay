@@ -453,6 +453,18 @@
   z-index: 1;
 }
 
+/* Cuando las acciones estan SUELTAS en el modal (no dentro de un form,
+   ej: modal de confirmacion "Invitacion enviada"), no heredan padding
+   lateral del form. Le damos padding propio para que los botones no se
+   peguen al borde del modal. Tambien quitamos position:sticky porque
+   no hay form scrolleable detras. */
+.cp-modal > .cp-modal__actions {
+  padding: 16px 32px 32px;
+  margin: 8px 0 0;
+  position: static;
+  border-top: 1px solid var(--cp-border);
+}
+
 /* Variante para modales chicos sin form scrolleable (confirmaciones,
    alerts, etc): ahi NO queremos sticky porque el modal entero es
    chico y se ve mejor con los botones flotando como antes. Si una
@@ -487,6 +499,9 @@
   margin-top: 20px;
 }
 
+/* Icono de exito ✓ — se usa en modales tipo confirmacion sin form
+   (ej: "Invitacion enviada"). El padding lateral hace match con
+   .cp-modal__title / __sub para que no se pegue al borde izq. */
 .cp-modal__success {
   width: 56px;
   height: 56px;
@@ -496,14 +511,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 16px;
+  margin: 32px 32px 16px;
 }
 
+/* Caja de fallback con link copiable (cuando falla el envio de email).
+   Tambien necesita padding lateral porque va suelto en el modal. */
 .cp-modal__fallback {
   background: var(--cp-surface-sunken);
   border-radius: var(--cp-radius-md);
   padding: 12px 14px;
-  margin: 16px 0;
+  margin: 16px 32px;
 }
 
 .cp-modal__link {
@@ -556,6 +573,21 @@
   .cp-modal__actions {
     bottom: -24px;
     margin-bottom: -24px;
+  }
+  /* Acciones sueltas (modal sin form): padding lateral igual al title/sub
+     en mobile, padding bottom mayor para que no se peguen al borde inferior. */
+  .cp-modal > .cp-modal__actions {
+    padding: 16px 24px 24px;
+    margin: 8px 0 0;
+  }
+  /* Icono de exito y caja de fallback: padding lateral mobile */
+  .cp-modal__success {
+    margin: 24px 24px 14px;
+    width: 48px;
+    height: 48px;
+  }
+  .cp-modal__fallback {
+    margin: 14px 24px;
   }
 }
 
