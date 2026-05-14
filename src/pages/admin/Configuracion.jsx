@@ -543,6 +543,7 @@ function TabMetodos({ metodos: metodosOriginales, consultorio, consultorioId, on
 
       {inmediatos.length > 0 && (
         <MetodosGrupo
+          tipo="inmediato"
           titulo="Pago inmediato"
           hint="El paciente paga al profesional en el momento."
           metodos={inmediatos}
@@ -555,8 +556,9 @@ function TabMetodos({ metodos: metodosOriginales, consultorio, consultorioId, on
 
       {diferidos.length > 0 && (
         <MetodosGrupo
+          tipo="diferido"
           titulo="Pago diferido (obra social)"
-          hint="El dinero llega meses después. La deuda se activa al liquidar el lote."
+          hint="El dinero llega meses después. La deuda se activa cuando el profesional liquide el monto en cada sesión."
           metodos={diferidos}
           consulpayPct={consulpayPct}
           planLabel={planLabel}
@@ -606,19 +608,26 @@ function TabMetodos({ metodos: metodosOriginales, consultorio, consultorioId, on
 
 /* ============================================================
    Grupo de métodos (inmediatos o diferidos)
+   ----------------------------------------------------------------
+   Los métodos diferidos (obras sociales) NO tienen "Valor sesión default"
+   porque el monto se decide al liquidar cada sesión específica (la obra
+   social informa el monto meses después de la sesión). El header y las
+   rows se renderizan con menos columnas en ese caso.
    ============================================================ */
-function MetodosGrupo({ titulo, hint, metodos, consulpayPct, planLabel, onUpdate, onDelete }) {
+function MetodosGrupo({ tipo, titulo, hint, metodos, consulpayPct, planLabel, onUpdate, onDelete }) {
+  const esDiferido = tipo === 'diferido';
+
   return (
-    <div className="cp-metodos-group">
+    <div className={`cp-metodos-group ${esDiferido ? 'cp-metodos-group--diferido' : ''}`}>
       <div className="cp-metodos-group__head">
         <h3 className="cp-metodos-group__title">{titulo}</h3>
         <p className="cp-metodos-group__hint">{hint}</p>
       </div>
 
-      <div className="cp-metodos-tabla">
+      <div className={`cp-metodos-tabla ${esDiferido ? 'cp-metodos-tabla--diferido' : ''}`}>
         <div className="cp-metodos-tabla__head">
           <div>Nombre</div>
-          <div>Valor sesión default</div>
+          {!esDiferido && <div>Valor sesión default</div>}
           <div>% consultorio</div>
           <div>Estado</div>
           <div aria-label="Acciones" />
@@ -634,20 +643,22 @@ function MetodosGrupo({ titulo, hint, metodos, consulpayPct, planLabel, onUpdate
               />
             </div>
 
-            <div className="cp-metodo-row__cell">
-              <span className="cp-metodo-row__prefix">$</span>
-              <input
-                className="cp-metodo-row__input cp-metodo-row__input--num"
-                type="number"
-                value={m.valorSesionDefault ?? ''}
-                min="0"
-                step="any"
-                onChange={(e) => {
-                  const v = e.target.value;
-                  onUpdate(m.id, 'valorSesionDefault', v === '' ? '' : Number(v));
-                }}
-              />
-            </div>
+            {!esDiferido && (
+              <div className="cp-metodo-row__cell">
+                <span className="cp-metodo-row__prefix">$</span>
+                <input
+                  className="cp-metodo-row__input cp-metodo-row__input--num"
+                  type="number"
+                  value={m.valorSesionDefault ?? ''}
+                  min="0"
+                  step="any"
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    onUpdate(m.id, 'valorSesionDefault', v === '' ? '' : Number(v));
+                  }}
+                />
+              </div>
+            )}
 
             <div className="cp-metodo-row__cell cp-metodo-row__cell--pct">
               <PorcentajeConConsulpay
@@ -795,12 +806,17 @@ function ModalNuevoMetodo({ onClose, onAgregar, consulpayPct, planLabel }) {
       setError('El porcentaje debe estar entre 0 y 100.');
       return;
     }
+    const esDiferido = tipo === TIPOS_METODO_PAGO.DIFERIDO;
     onAgregar({
       id: slugFromNombre(nombre),
       nombre: nombre.trim(),
       tipo,
       porcentajeConsultorio: p,
-      valorSesionDefault: Number(valorSesion) || 0,
+      // Diferido: NO se guarda valorSesionDefault. El valor lo decide
+      // el profesional al liquidar cada sesion (boton ✓ con el monto
+      // que informa la obra social). Guardamos 0 explicito por compat
+      // pero la UI no lo muestra ni lo usa.
+      valorSesionDefault: esDiferido ? 0 : (Number(valorSesion) || 0),
     });
   }
 
@@ -867,16 +883,33 @@ function ModalNuevoMetodo({ onClose, onAgregar, consulpayPct, planLabel }) {
                   : undefined
               }
             />
-            <Input
-              name="valorSesion"
-              type="number"
-              label="Valor por sesión (default)"
-              value={valorSesion}
-              onChange={(e) => setValorSesion(e.target.value)}
-              min="0"
-              step="any"
-              hint={`Actualmente ${formatoARS.format(Number(valorSesion) || 0)}`}
-            />
+            {tipo === TIPOS_METODO_PAGO.DIFERIDO ? (
+              // Obras sociales no tienen valor default: cada liquidacion
+              // de la obra social informa un monto distinto. El profesional
+              // carga el monto al liquidar la sesion.
+              <div className="cp-aviso-diferido cp-aviso-diferido--compact">
+                <div className="cp-aviso-diferido__icon" aria-hidden>ⓘ</div>
+                <div className="cp-aviso-diferido__body">
+                  <div className="cp-aviso-diferido__title">Sin valor por defecto</div>
+                  <div className="cp-aviso-diferido__text">
+                    Las obras sociales no tienen un valor fijo. El monto se
+                    carga después en cada sesión cuando la obra social
+                    informa lo que liquidó.
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <Input
+                name="valorSesion"
+                type="number"
+                label="Valor por sesión (default)"
+                value={valorSesion}
+                onChange={(e) => setValorSesion(e.target.value)}
+                min="0"
+                step="any"
+                hint={`Actualmente ${formatoARS.format(Number(valorSesion) || 0)}`}
+              />
+            )}
           </div>
 
           {error && <div className="cp-modal__error">{error}</div>}

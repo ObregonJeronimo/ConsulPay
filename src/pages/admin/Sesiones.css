@@ -862,3 +862,25 @@
     font-size: 12.5px;
   }
 }
+
+/* Variante compacta del aviso para usar dentro de modales mas chicos
+   (ej: modal Nuevo metodo de pago). Mismo color/estructura, padding
+   reducido. */
+.cp-aviso-diferido--compact {
+  padding: 10px 12px;
+  gap: 10px;
+}
+
+.cp-aviso-diferido--compact .cp-aviso-diferido__icon {
+  font-size: 18px;
+}
+
+.cp-aviso-diferido--compact .cp-aviso-diferido__title {
+  font-size: 12.5px;
+  margin-bottom: 2px;
+}
+
+.cp-aviso-diferido--compact .cp-aviso-diferido__text {
+  font-size: 12px;
+  line-height: 1.45;
+}

@@ -228,6 +228,14 @@
 
 .cp-metodo-row:last-child { border-bottom: none; }
 
+/* Variante diferido (obras sociales): sin columna "Valor sesion default"
+   porque las obras sociales pagan montos variables que se definen al
+   liquidar cada sesion. Header y rows con 1 columna menos. */
+.cp-metodos-tabla--diferido .cp-metodos-tabla__head,
+.cp-metodos-tabla--diferido .cp-metodo-row {
+  grid-template-columns: 1.8fr 1fr 80px 40px;
+}
+
 .cp-metodo-row--off { opacity: 0.55; }
 
 .cp-metodo-row__cell {
@@ -293,6 +301,12 @@
     gap: 6px;
     padding: 8px 12px;
   }
+
+  .cp-metodos-tabla--diferido .cp-metodos-tabla__head,
+  .cp-metodos-tabla--diferido .cp-metodo-row {
+    grid-template-columns: 1.6fr 0.9fr 60px 34px;
+  }
+
   .cp-metodos-tabla__head { font-size: 10.5px; }
   .cp-metodo-row__input { padding: 6px 6px; font-size: 13px; }
 }
