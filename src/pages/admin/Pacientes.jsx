@@ -5,6 +5,7 @@ import Avatar from '../../components/ui/Avatar.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Input from '../../components/ui/Input.jsx';
+import MetodoPagoSelect from '../../components/ui/MetodoPagoSelect.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
 
 import { useAuth } from '../../hooks/useAuth.js';
@@ -488,16 +489,14 @@ function FiltrosBar({
         ))}
       </select>
 
-      <select
+      <MetodoPagoSelect
         className="cp-filtros__select"
+        metodos={metodos}
         value={filtroMetodo}
         onChange={(e) => setFiltroMetodo(e.target.value)}
       >
         <option value="todos">Todos los métodos</option>
-        {metodos.map((m) => (
-          <option key={m.id} value={m.id}>{m.nombre}</option>
-        ))}
-      </select>
+      </MetodoPagoSelect>
 
       {archivadosTotal > 0 && (
         <button
@@ -930,18 +929,13 @@ function PacienteModal({ paciente, profesionales, metodos, onClose, onGuardar })
             <label className="cp-field__label" style={{ display: 'block', marginBottom: 6 }}>
               Método de pago
             </label>
-            <select
+            <MetodoPagoSelect
               className="cp-select"
+              metodos={metodos}
               value={form.metodoPagoId}
               onChange={(e) => setField('metodoPagoId', e.target.value)}
               required
-            >
-              {metodos.map((m) => (
-                <option key={m.id} value={m.id} disabled={m.activo === false}>
-                  {m.nombre}{m.activo === false ? ' (inactivo)' : ''}
-                </option>
-              ))}
-            </select>
+            />
           </div>
 
           {metodoSeleccionado?.tipo === 'diferido' && (

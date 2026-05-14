@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Avatar from '../../components/ui/Avatar.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Input from '../../components/ui/Input.jsx';
+import MetodoPagoSelect from '../../components/ui/MetodoPagoSelect.jsx';
 import PacienteAutocomplete from '../../components/ui/PacienteAutocomplete.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
 
@@ -377,16 +378,14 @@ export default function Sesiones() {
                 <option key={p.uid} value={p.uid}>{nombreProfesional(p)}</option>
               ))}
             </select>
-            <select
+            <MetodoPagoSelect
               className="cp-sesiones-filtros__select"
+              metodos={metodos}
               value={filtroMetodo}
               onChange={(e) => setFiltroMetodo(e.target.value)}
             >
               <option value="todos">Todos los métodos</option>
-              {metodos.map((m) => (
-                <option key={m.id} value={m.id}>{m.nombre}</option>
-              ))}
-            </select>
+            </MetodoPagoSelect>
             <select
               className="cp-sesiones-filtros__select"
               value={filtroEstado}
@@ -954,20 +953,16 @@ export function SesionModal({
                 </span>
               )}
             </label>
-            <select
+            <MetodoPagoSelect
               className="cp-select"
+              metodos={metodos}
               value={metodoId}
               onChange={(e) => setMetodoId(e.target.value)}
               required
               disabled={metodoBloqueado}
             >
               <option value="" disabled>Elegir método…</option>
-              {metodos.map((m) => (
-                <option key={m.id} value={m.id} disabled={m.activo === false}>
-                  {m.nombre}{m.activo === false ? ' (inactivo)' : ''}
-                </option>
-              ))}
-            </select>
+            </MetodoPagoSelect>
             {metodoBloqueado && (
               <div style={{ fontSize: 12, color: 'var(--cp-text-muted)', marginTop: 4 }}>
                 El método de pago se configura desde la ficha del paciente. Si necesitás cambiarlo, hablá con el administrador del consultorio.
