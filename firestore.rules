@@ -352,6 +352,9 @@ service cloud.firestore {
             && resource.data.profesionalUid == request.auth.uid
             && request.resource.data.profesionalUid == resource.data.profesionalUid
             && request.resource.data.consultorioId == resource.data.consultorioId
+            // El profesional no puede cambiar quién recibió el dinero
+            && campoNoCambia('receptorUid')
+            && campoNoCambia('receptorNombre')
             && (request.resource.data.estadoPago == resource.data.estadoPago
                 || (resource.data.estadoPago == 'pendiente_monto'
                     && request.resource.data.estadoPago == 'debido'))))
