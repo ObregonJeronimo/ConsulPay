@@ -709,7 +709,7 @@ function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, onEditar, o
                   </div>
                 </td>
                 <td data-label="Profesional" style={{ fontSize: 13.5 }}>
-                  {prof ? nombreProfesional(prof) : <span style={{ color: 'var(--cp-text-faint)' }}>—</span>}
+                  {prof ? nombreProfesional(prof) : (s.profesionalNombre || <span style={{ color: 'var(--cp-text-faint)' }}>—</span>)}
                 </td>
                 <td data-label="Paciente">
                   {pac ? (
@@ -830,7 +830,7 @@ function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, onEditar, o
                   <div className="cp-row-mobile__mid">
                     {f.dia} {f.hora}
                     {' · '}
-                    {prof ? nombreProfesional(prof) : '—'}
+                    {prof ? nombreProfesional(prof) : (s.profesionalNombre || '—')}
                   </div>
                   <div className="cp-row-mobile__bot">
                     {s.metodoPagoNombre}
@@ -1659,7 +1659,7 @@ export function PagarMesModal({ consultorioId, profesionales, pacientes, mapaPac
                         />
                         <div>
                           <div className="cp-prof-name" style={{ fontSize: 13.5 }}>
-                            {r.pac ? `${r.pac.nombre || ''} ${r.pac.apellido || ''}`.trim() : 'Paciente eliminado'}
+                            {r.pac ? `${r.pac.nombre || ''} ${r.pac.apellido || ''}`.trim() : (r.pacienteNombre || r.pacienteId || '—')}
                           </div>
                           {r.pagadas.length > 0 && (
                             <div style={{ fontSize: 11.5, color: 'var(--cp-text-faint)' }}>

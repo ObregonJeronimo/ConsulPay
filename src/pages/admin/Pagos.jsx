@@ -28,8 +28,8 @@ import './Pagos.css';
 /* ============================================================
    Helpers
    ============================================================ */
-function nombreVisible(p) {
-  if (!p) return 'Profesional eliminado';
+function nombreVisible(p, fallback) {
+  if (!p) return fallback || '—';
   return p.displayName || p.email || `Usuario ${p.uid.slice(0, 6)}`;
 }
 function inicialesProfesional(p) {

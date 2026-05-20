@@ -25,7 +25,7 @@ import './MisPagos.css';
    Helpers
    ============================================================ */
 function nombrePaciente(p) {
-  if (!p) return 'Paciente eliminado';
+  if (!p) return '—';
   return `${p.apellido ?? ''}${p.apellido && p.nombre ? ', ' : ''}${p.nombre ?? ''}`;
 }
 function inicialesPaciente(p) {
@@ -358,7 +358,7 @@ export default function MisPagos() {
                             <Avatar initials={inicialesPaciente(pac)} size={26} />
                             <span style={{ fontSize: 13.5 }}>{nombrePaciente(pac)}</span>
                           </div>
-                        ) : <span style={{ color: 'var(--cp-text-faint)' }}>Paciente eliminado</span>}
+                        ) : <span style={{ color: 'var(--cp-text-muted)', fontSize: 13 }}>{s.pacienteNombre || '—'}</span>}
                       </td>
                       <td data-label="Método" style={{ fontSize: 13 }}>{s.metodoPagoNombre}</td>
                       <td data-label="Mi parte" className="cp-num" style={{ color: 'var(--cp-success)' }}>
@@ -376,7 +376,7 @@ export default function MisPagos() {
                               <Avatar initials={inicialesPaciente(pac)} size={26} />
                               <div className="cp-prof-name">{nombrePaciente(pac)}</div>
                             </div>
-                          ) : <span style={{ color: 'var(--cp-text-faint)' }}>Paciente eliminado</span>}
+                          ) : <span style={{ color: 'var(--cp-text-muted)', fontSize: 13 }}>{s.pacienteNombre || '—'}</span>}
                         </div>
                         <div className="cp-row-mobile__mid">
                           {formatoFechaCorta(s.fecha)} · {s.metodoPagoNombre}
