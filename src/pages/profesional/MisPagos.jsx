@@ -420,36 +420,6 @@ export default function MisPagos() {
         3. Es una accion destructiva poco frecuente, asi que va
            al final con visualmente menos peso.
       */}
-      <section className="cp-cuenta-section">
-        <div className="cp-cuenta-section__head">
-          <h2 className="cp-cuenta-section__title">Cuenta</h2>
-          <p className="cp-cuenta-section__sub">
-            Acciones relacionadas con tu vínculo al consultorio.
-          </p>
-        </div>
-        <div className="cp-cuenta-section__row">
-          <div className="cp-cuenta-section__info">
-            <div className="cp-cuenta-section__info-title">
-              Salir del consultorio
-            </div>
-            <div className="cp-cuenta-section__info-meta">
-              {consultorio?.nombre
-                ? `Te desvinculás de ${consultorio.nombre}.`
-                : 'Te desvinculás del consultorio.'}
-              {' '}Tus registros se mantienen guardados y para volver, el
-              admin tendrá que invitarte de nuevo.
-            </div>
-          </div>
-          <Button
-            variant="ghost"
-            type="button"
-            onClick={() => setOpenSalir(true)}
-          >
-            Salir del consultorio
-          </Button>
-        </div>
-      </section>
-
       {openSalir && (
         <SalirConsultorioModal
           consultorioId={user.consultorioId}
