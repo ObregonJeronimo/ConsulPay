@@ -693,7 +693,7 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, onEdi
                         </div>
                       </div>
                     </div>
-                  ) : <span style={{ color: 'var(--cp-text-faint)' }}>Paciente eliminado</span>}
+                  ) : <span style={{ color: 'var(--cp-text-muted)', fontSize: 13 }}>{s.pacienteNombre || 'Paciente eliminado'}</span>}
                 </td>
                 <td data-label="Sesiones" className="cp-num">
                   <span
@@ -806,7 +806,7 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, onEdi
                           {esAgrupada && <GroupBadge cantidad={cantidad} />}
                         </div>
                       </div>
-                    ) : <span style={{ color: 'var(--cp-text-faint)' }}>Paciente eliminado</span>}
+                    ) : <span style={{ color: 'var(--cp-text-muted)', fontSize: 13 }}>{s.pacienteNombre || 'Paciente eliminado'}</span>}
                   </div>
                   <div className="cp-row-mobile__mid">
                     {f.dia} {f.hora} · {s.metodoPagoNombre}

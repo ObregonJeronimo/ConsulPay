@@ -722,7 +722,7 @@ function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, onEditar, o
                         </div>
                       </div>
                     </div>
-                  ) : <span style={{ color: 'var(--cp-text-faint)' }}>Paciente eliminado</span>}
+                  ) : <span style={{ color: 'var(--cp-text-muted)', fontSize: 13 }}>{s.pacienteNombre || 'Paciente eliminado'}</span>}
                 </td>
                 <td data-label="Método" style={{ fontSize: 13 }}>
                   {s.metodoPagoNombre}
@@ -825,7 +825,7 @@ function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, onEditar, o
                           {cantidad > 1 && <GroupBadge cantidad={cantidad} />}
                         </div>
                       </div>
-                    ) : <span style={{ color: 'var(--cp-text-faint)' }}>Paciente eliminado</span>}
+                    ) : <span style={{ color: 'var(--cp-text-muted)', fontSize: 13 }}>{s.pacienteNombre || 'Paciente eliminado'}</span>}
                   </div>
                   <div className="cp-row-mobile__mid">
                     {f.dia} {f.hora}
@@ -1078,14 +1078,16 @@ export function SesionModal({
 
     setSubmitting(true);
     try {
+      const prof = profesionales.find((p) => p.uid === profesionalUid);
+      const pac = pacientes.find((p) => p.id === pacienteId);
       await onGuardar({
         consultorioId,
         profesionalUid,
+        profesionalNombre: prof ? (prof.displayName || prof.email || '') : '',
         pacienteId,
+        pacienteNombre: pac ? `${pac.apellido ?? ''} ${pac.nombre ?? ''}`.trim() : '',
         fecha,
         metodo: metodoSeleccionado,
-        // Si es diferido, mandamos undefined para que armarPayload genere
-        // la sesion en estado pendiente_monto (sin valor).
         valorSesion: esDiferido ? undefined : valorSesionNum,
         cantidadSesiones: cantidadNum,
         notas,

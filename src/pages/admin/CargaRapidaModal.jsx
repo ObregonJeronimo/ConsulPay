@@ -233,10 +233,14 @@ export default function CargaRapidaModal({
       try {
         const m = metodos.find((x) => x.id === f.metodoPagoId);
         const esDif = m?.tipo === TIPOS_METODO_PAGO.DIFERIDO;
+        const pac = pacientes.find((p) => p.id === f.pacienteId);
+        const profUidFinal = esAdmin ? profUid : profesionalUidFijo;
         await crearSesion({
           consultorioId,
-          profesionalUid: esAdmin ? profUid : profesionalUidFijo,
+          profesionalUid: profUidFinal,
+          profesionalNombre,
           pacienteId: f.pacienteId,
+          pacienteNombre: pac ? `${pac.apellido || ''} ${pac.nombre || ''}`.trim() : '',
           fecha: inputValueToDate(f.fechaInput),
           metodo: m,
           valorSesion: esDif ? undefined : Number(f.valorSesion),

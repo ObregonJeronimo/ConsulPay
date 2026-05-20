@@ -107,12 +107,14 @@ export { armarPayload as buildSesionData };
 function armarPayload({
   consultorioId,
   profesionalUid,
+  profesionalNombre,    // snapshot del nombre — opcional, para no depender del doc
   pacienteId,
-  fecha,                    // Date de JS
-  metodo,                   // objeto del array consultorio.metodosPagoPaciente
-  valorSesion,              // valor unitario (NUEVO, recomendado)
-  cantidadSesiones = 1,     // default 1
-  valorTotal: valorTotalIn, // legacy: si llega esto y no valorSesion
+  pacienteNombre,       // snapshot del nombre — opcional, para no depender del doc
+  fecha,
+  metodo,
+  valorSesion,
+  cantidadSesiones = 1,
+  valorTotal: valorTotalIn,
   notas,
 }) {
   if (!consultorioId) throw new Error('consultorioId requerido');
@@ -193,16 +195,16 @@ function armarPayload({
   return {
     consultorioId,
     profesionalUid,
+    profesionalNombre: profesionalNombre || null,  // snapshot — no cambia si se edita el perfil
     pacienteId,
+    pacienteNombre: pacienteNombre || null,        // snapshot — no cambia si se archiva/renombra
     fecha: Timestamp.fromDate(fecha),
 
-    // Snapshot del metodo: si despues el admin renombra o cambia el %,
-    // la sesion mantiene los valores con los que se cobro.
+    // Snapshot del metodo
     metodoPagoId: metodo.id,
     metodoPagoNombre: metodo.nombre || '',
     metodoPagoTipo: tipoMetodo,
 
-    // Datos de agrupacion
     cantidadSesiones: cantidad,
     valorSesion: unitario,
 
