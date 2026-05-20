@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import ActionMenu from '../../components/ui/ActionMenu.jsx';
+import DualScrollTable from '../../components/ui/DualScrollTable.jsx';
 import Avatar from '../../components/ui/Avatar.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Input from '../../components/ui/Input.jsx';
@@ -671,7 +672,7 @@ export function GroupBadge({ cantidad }) {
    ============================================================ */
 function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, onEditar, onEliminar, onTogglePagado, onLiquidar }) {
   return (
-    <div className="cp-compact-list cp-table-wrap">
+    <DualScrollTable className="cp-compact-list">
       <table className="cp-table cp-sesiones-tabla">
         <thead>
           <tr>
@@ -876,7 +877,7 @@ function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, onEditar, o
           })}
         </tbody>
       </table>
-    </div>
+    </DualScrollTable>
   );
 }
 

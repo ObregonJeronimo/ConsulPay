@@ -666,7 +666,10 @@ function CantidadPicker({ value, onChange }) {
           <div
             key={n}
             className={`cp-cr-picker__item ${String(n) === String(value) ? 'cp-cr-picker__item--sel' : ''}`}
-            onClick={() => onChange(String(n))}
+            onClick={(e) => {
+              onChange(String(n));
+              e.currentTarget.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            }}
           >
             {n}
           </div>

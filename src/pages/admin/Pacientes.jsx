@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import ActionMenu from '../../components/ui/ActionMenu.jsx';
+import DualScrollTable from '../../components/ui/DualScrollTable.jsx';
 import Avatar from '../../components/ui/Avatar.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -597,7 +598,7 @@ function PacientesTabla({
   onArchivar,
 }) {
   return (
-    <div className="cp-compact-list cp-table-wrap">
+    <DualScrollTable className="cp-compact-list">
       <table className="cp-table cp-pacientes-table">
         <thead>
           <tr>
@@ -692,7 +693,7 @@ function PacientesTabla({
           })}
         </tbody>
       </table>
-    </div>
+    </DualScrollTable>
   );
 }
 

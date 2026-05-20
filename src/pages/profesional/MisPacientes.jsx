@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import ActionMenu from '../../components/ui/ActionMenu.jsx';
+import DualScrollTable from '../../components/ui/DualScrollTable.jsx';
 import Avatar from '../../components/ui/Avatar.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
@@ -92,7 +93,7 @@ export default function MisPacientes() {
           </p>
         </div>
       ) : (
-        <div className="cp-compact-list cp-table-wrap">
+        <DualScrollTable className="cp-compact-list">
           <table className="cp-table cp-pacientes-table">
             <thead>
               <tr>
@@ -165,7 +166,7 @@ export default function MisPacientes() {
               })}
             </tbody>
           </table>
-        </div>
+        </DualScrollTable>
       )}
     </div>
   );

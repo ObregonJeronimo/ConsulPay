@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import Avatar from '../../components/ui/Avatar.jsx';
+import DualScrollTable from '../../components/ui/DualScrollTable.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
 
@@ -305,7 +306,7 @@ function EmptyState({ tab }) {
    ============================================================ */
 function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSeleccionar }) {
   return (
-    <div className="cp-compact-list cp-table-wrap">
+    <DualScrollTable className="cp-compact-list">
       <table className="cp-table cp-solicitudes-tabla">
         <thead>
           <tr>
@@ -412,7 +413,7 @@ function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSel
           })}
         </tbody>
       </table>
-    </div>
+    </DualScrollTable>
   );
 }
 

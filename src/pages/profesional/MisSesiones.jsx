@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import ActionMenu from '../../components/ui/ActionMenu.jsx';
+import DualScrollTable from '../../components/ui/DualScrollTable.jsx';
 import Avatar from '../../components/ui/Avatar.jsx';
 import CargaRapidaModal from '../admin/CargaRapidaModal.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -645,7 +646,7 @@ function StatsProfesional({ stats, yaPagado }) {
    ============================================================ */
 function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, onEditar, onEliminar, onLiquidar }) {
   return (
-    <div className="cp-compact-list cp-table-wrap">
+    <DualScrollTable className="cp-compact-list">
       <table className="cp-table cp-sesiones-tabla">
         <thead>
           <tr>
@@ -843,6 +844,6 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, onEdi
           })}
         </tbody>
       </table>
-    </div>
+    </DualScrollTable>
   );
 }

@@ -1,0 +1,60 @@
+/* ============================================================
+   DualScrollTable — scroll sincronizado arriba y abajo en tablas
+   ============================================================ */
+
+.cp-dual-scroll-outer {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Barra fantasma superior */
+.cp-dual-scroll__top-bar {
+  overflow-x: auto;
+  overflow-y: hidden;
+  height: 12px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--cp-border-strong) transparent;
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-bottom: none;
+  border-radius: var(--cp-radius-lg) var(--cp-radius-lg) 0 0;
+}
+
+.cp-dual-scroll__top-bar::-webkit-scrollbar { height: 8px; }
+.cp-dual-scroll__top-bar::-webkit-scrollbar-track { background: transparent; }
+.cp-dual-scroll__top-bar::-webkit-scrollbar-thumb {
+  background: var(--cp-border-strong);
+  border-radius: 4px;
+}
+.cp-dual-scroll__top-bar::-webkit-scrollbar-thumb:hover {
+  background: var(--cp-text-faint);
+}
+
+.cp-dual-scroll__top-inner { height: 1px; }
+
+/* Contenido: el cp-table-wrap normal pero con borde superior quitado
+   (ya lo tiene la barra superior) y radio solo abajo */
+.cp-dual-scroll__content.cp-table-wrap {
+  border-radius: 0 0 var(--cp-radius-lg) var(--cp-radius-lg);
+  border-top: none !important;
+}
+
+/* En mobile: ocultar barra superior, restaurar estilos normales del content */
+@media (max-width: 640px) {
+  .cp-dual-scroll__top-bar {
+    display: none;
+  }
+
+  /* Restaurar border-radius completo y border-top cuando no hay barra superior */
+  .cp-dual-scroll__content.cp-table-wrap {
+    border-radius: var(--cp-radius-lg);
+    border-top: 1px solid var(--cp-border) !important;
+  }
+
+  /* En mobile con cp-compact-list, el content no necesita borde ni fondo */
+  .cp-compact-list .cp-dual-scroll__content.cp-table-wrap {
+    border: none !important;
+    background: transparent !important;
+    border-radius: 0 !important;
+  }
+}

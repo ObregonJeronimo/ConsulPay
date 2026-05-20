@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import Avatar from '../../components/ui/Avatar.jsx';
+import DualScrollTable from '../../components/ui/DualScrollTable.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
@@ -317,7 +318,7 @@ export default function MisPagos() {
               </button>
             )}
           </div>
-          <div className="cp-compact-list cp-table-wrap">
+          <DualScrollTable className="cp-compact-list">
             <table className="cp-table cp-debe-tabla">
               <thead>
                 <tr>
@@ -393,7 +394,7 @@ export default function MisPagos() {
                 })}
               </tbody>
             </table>
-          </div>
+          </DualScrollTable>
         </section>
       )}
 
@@ -401,7 +402,7 @@ export default function MisPagos() {
       {pagosFiltrados.length > 0 && (
         <section className="cp-historial-section">
           <h2 className="cp-historial-section__title">Historial de pagos</h2>
-          <div className="cp-compact-list cp-table-wrap">
+          <DualScrollTable className="cp-compact-list">
             <table className="cp-table">
               <thead>
                 <tr>
@@ -444,7 +445,7 @@ export default function MisPagos() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </DualScrollTable>
         </section>
       )}
 

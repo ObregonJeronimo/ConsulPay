@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import Avatar from '../../components/ui/Avatar.jsx';
+import DualScrollTable from '../../components/ui/DualScrollTable.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
 
@@ -311,7 +312,7 @@ export default function PagosAdmin() {
           </p>
         </div>
       ) : (
-        <div className="cp-compact-list cp-table-wrap">
+        <DualScrollTable className="cp-compact-list">
           <table className="cp-table">
             <thead>
               <tr>
@@ -399,7 +400,7 @@ export default function PagosAdmin() {
               })}
             </tbody>
           </table>
-        </div>
+        </DualScrollTable>
       )}
 
       {pagoSeleccionado && (
