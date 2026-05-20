@@ -727,15 +727,18 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, onEdi
                         >
                           <EditIcon />
                         </button>
-                        <button
-                          className="cp-icon-btn cp-icon-btn--danger"
-                          onClick={() => onEliminar(s)}
-                          title={tienePendiente ? 'Hay una solicitud pendiente para esta sesión' : 'Eliminar'}
-                          aria-label="Eliminar"
-                          disabled={accionesDisabled}
-                        >
-                          <TrashIcon />
-                        </button>
+                        {/* Sesión pagada: el profesional NO puede eliminarla, solo el admin */}
+                        {!pagada && (
+                          <button
+                            className="cp-icon-btn cp-icon-btn--danger"
+                            onClick={() => onEliminar(s)}
+                            title={tienePendiente ? 'Hay una solicitud pendiente para esta sesión' : 'Eliminar'}
+                            aria-label="Eliminar"
+                            disabled={tienePendiente}
+                          >
+                            <TrashIcon />
+                          </button>
+                        )}
                       </>
                     )}
                   </div>
@@ -780,7 +783,8 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, onEdi
                       label: 'Corregir monto', icon: <EditIcon />, onClick: () => onLiquidar(s),
                     }] : []),
                     { label: 'Editar', icon: <EditIcon />, onClick: () => onEditar(s), disabled: accionesDisabled },
-                    { label: 'Eliminar', icon: <TrashIcon />, onClick: () => onEliminar(s), danger: true, disabled: accionesDisabled },
+                    // Pagada: el profesional no puede eliminar, solo el admin
+                    ...(!pagada ? [{ label: 'Eliminar', icon: <TrashIcon />, onClick: () => onEliminar(s), danger: true, disabled: tienePendiente }] : []),
                   ]} />
                 </td>
               </tr>
