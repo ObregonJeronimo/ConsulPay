@@ -225,7 +225,7 @@ export default function Sesiones() {
     return list;
   }, [sesiones, busqueda, filtroProfesional, filtroMetodo, filtroEstado, mapaPacientes, mapaProfesionales]);
 
-  const stats = useMemo(() => totalesGlobales(sesiones), [sesiones]);
+  const stats = useMemo(() => totalesGlobales(sesionesFiltradas), [sesionesFiltradas]);
   const cobrado = stats.totalConsultorio - stats.debido;
 
   /* ---- Handlers ---- */

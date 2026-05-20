@@ -763,9 +763,8 @@ function PacienteModal({ paciente, profesionales, metodos, onClose, onGuardar })
     if (paciente) {
       return getProfesionalesUids(paciente);
     }
-    // Default para nuevo: primer profesional preseleccionado, asi al
-    // crear rapido un paciente no hay que abrir el dropdown
-    return profesionales[0]?.uid ? [profesionales[0].uid] : [];
+    // Nuevo paciente: sin profesional preseleccionado. El admin elige.
+    return [];
   }, [paciente, profesionales]);
 
   const [form, setForm] = useState(() => ({
