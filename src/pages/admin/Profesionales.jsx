@@ -365,6 +365,20 @@ function ProfesionalesTabla({ profesionales, onSuspender, onReactivar, onRetirar
             );
 
             const acciones = [
+              // Edicion directa: solo si hay onSuspender (tab Activos).
+              // Muestra el estado actual y al elegirlo lo invierte.
+              ...(onSuspender ? [{
+                label: p.permitirEdicionSesiones
+                  ? 'Desactivar edición directa'
+                  : 'Activar edición directa',
+                onClick: async () => {
+                  try {
+                    await setPermitirEdicionSesiones(p.uid, !p.permitirEdicionSesiones);
+                  } catch (err) {
+                    alert('No se pudo cambiar la configuración. Intentá de nuevo.');
+                  }
+                },
+              }] : []),
               ...(onSuspender ? [{ label: 'Suspender', onClick: () => onSuspender(p.uid) }] : []),
               ...(onReactivar ? [{ label: 'Reactivar', onClick: () => onReactivar(p.uid) }] : []),
               ...(onRetirar ? [{ label: 'Retirar', onClick: () => onRetirar(p), danger: true }] : []),
