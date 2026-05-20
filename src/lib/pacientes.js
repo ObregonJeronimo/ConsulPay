@@ -46,10 +46,32 @@ import { ESTADOS_PACIENTE } from './constants.js';
  * Acepta tanto un string (legacy) como un array. Devuelve siempre
  * array sin duplicados ni vacíos.
  */
+/**
+ * Devuelve el array de metodoPagoIds del paciente, soportando
+ * tanto el campo legacy `metodoPagoId` (string) como el nuevo
+ * `metodosPagoIds` (string[]). Siempre devuelve array sin vacíos.
+ */
+export function getMetodosPaciente(paciente) {
+  if (!paciente) return [];
+  if (Array.isArray(paciente.metodosPagoIds) && paciente.metodosPagoIds.length > 0) {
+    return paciente.metodosPagoIds.filter(Boolean);
+  }
+  if (paciente.metodoPagoId) return [paciente.metodoPagoId];
+  return [];
+}
+
+/**
+ * Devuelve el primer método del paciente como id (o null).
+ * Para usar como valor por defecto cuando hay 1 solo método.
+ */
+export function getMetodoPrincipal(paciente) {
+  const ids = getMetodosPaciente(paciente);
+  return ids[0] ?? null;
+}
+
 function normalizarProfesionales(input) {
   if (!input) return [];
   const arr = Array.isArray(input) ? input : [input];
-  // Filtrar vacios y deduplicar manteniendo el orden
   const visto = new Set();
   const out = [];
   for (const uid of arr) {
@@ -62,33 +84,51 @@ function normalizarProfesionales(input) {
   return out;
 }
 
+function normalizarMetodos(input) {
+  if (!input) return [];
+  const arr = Array.isArray(input) ? input : [input];
+  const visto = new Set();
+  const out = [];
+  for (const id of arr) {
+    if (typeof id !== 'string' || !id.trim()) continue;
+    const m = id.trim();
+    if (visto.has(m)) continue;
+    visto.add(m);
+    out.push(m);
+  }
+  return out;
+}
+
 /* ============================================================
    Crear paciente
    ============================================================ */
 export async function crearPaciente({
   consultorioId,
-  profesionalesUids,   // array de UIDs (puede tambien recibir profesionalUid singular legacy)
-  profesionalUid,      // backwards compat — si llega esto, lo wrappemos en array
+  profesionalesUids,
+  profesionalUid,
   nombre,
   apellido,
   dni,
   telefono,
   email,
   obraSocialNumero,
-  metodoPagoId,
+  metodoPagoId,       // legacy: 1 solo método
+  metodosPagoIds,     // nuevo: array de 1 o más métodos
   valorSesionCustom,
   notas,
   createdByUid,
 }) {
   if (!consultorioId) throw new Error('consultorioId requerido');
 
-  // Aceptar ambos formatos para que llamadas legacy no se rompan
   const profesionales = normalizarProfesionales(profesionalesUids ?? profesionalUid);
   if (profesionales.length === 0) {
     throw new Error('Tenés que asignar al menos un profesional');
   }
 
-  if (!metodoPagoId) throw new Error('Tenés que elegir un método de pago');
+  // Normalizar métodos — soportar ambos formatos
+  const metodos = normalizarMetodos(metodosPagoIds ?? metodoPagoId);
+  if (metodos.length === 0) throw new Error('Tenés que elegir al menos un método de pago');
+
   if (!nombre?.trim()) throw new Error('El nombre es obligatorio');
   if (!apellido?.trim()) throw new Error('El apellido es obligatorio');
 
@@ -101,10 +141,9 @@ export async function crearPaciente({
     telefono: telefono?.trim() || null,
     email: email?.trim().toLowerCase() || null,
     obraSocialNumero: obraSocialNumero?.trim() || null,
-    metodoPagoId,
-    valorSesionCustom: valorSesionCustom
-      ? Number(valorSesionCustom)
-      : null,
+    metodosPagoIds: metodos,
+    metodoPagoId: metodos[0],   // mantener campo legacy para compatibilidad
+    valorSesionCustom: valorSesionCustom ? Number(valorSesionCustom) : null,
     notas: notas?.trim() || null,
     estado: ESTADOS_PACIENTE.ACTIVO,
     createdAt: serverTimestamp(),
@@ -152,6 +191,14 @@ export async function actualizarPaciente(pacienteId, campos) {
       throw new Error('El paciente debe tener al menos un profesional asignado');
     }
     update.profesionalesUids = profesionales;
+  }
+
+  // Campo array: metodosPagoIds (nuevo) — también actualiza metodoPagoId legacy
+  if (campos.metodosPagoIds !== undefined) {
+    const metodos = normalizarMetodos(campos.metodosPagoIds);
+    if (metodos.length === 0) throw new Error('El paciente debe tener al menos un método de pago');
+    update.metodosPagoIds = metodos;
+    update.metodoPagoId = metodos[0]; // mantener legacy
   }
 
   // Backwards compat por si algun caller viejo manda profesionalUid singular

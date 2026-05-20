@@ -25,6 +25,7 @@ import {
   TIPOS_METODO_PAGO,
   formatoARS,
 } from '../../lib/constants.js';
+import { getMetodosPaciente } from '../../lib/pacientes.js';
 import { crearSesion } from '../../lib/sesiones.js';
 
 import './CargaRapida.css';
@@ -52,16 +53,21 @@ function nombreProf(p) {
 
 /* ---- Fila inicial para un paciente ---- */
 function filaInicial(paciente, mapaMetodos, esAdmin) {
-  const metodo = mapaMetodos[paciente.metodoPagoId];
+  const metodoIds = getMetodosPaciente(paciente);
+  const tieneMulti = metodoIds.length > 1;
+  // Si tiene 1 solo método → pre-llenamos. Si tiene 2+ → vacío (debe elegir)
+  const metodoPagoId = tieneMulti ? '' : (metodoIds[0] || '');
+  const metodo = mapaMetodos[metodoPagoId];
   const esDiferido = metodo?.tipo === TIPOS_METODO_PAGO.DIFERIDO;
   return {
     id: paciente.id,
     pacienteId: paciente.id,
     fechaInput: dateAInputValue(new Date()),
-    cantidad: '',                         // vacío = obligatorio elegir
-    metodoPagoId: paciente.metodoPagoId || '',
+    cantidad: '',
+    metodoPagoId,
     valorSesion: esDiferido ? '' : (metodo?.valorSesionDefault !== undefined ? String(metodo.valorSesionDefault) : ''),
     error: null,
+    metodoIds,   // guardamos los ids disponibles para el selector
   };
 }
 
@@ -498,21 +504,43 @@ function FilaEditable({ fila, paciente, metodos, mapaMetodos, esAdmin, rowRef, o
       <div className={`cp-cr-fila__cell ${tieneError('metodo') ? 'cp-cr-fila__cell--err' : ''}`}>
         <span className="cp-cr-fila__label">Método</span>
         {esAdmin ? (
-          <select
-            className="cp-cr-input cp-cr-select"
-            value={fila.metodoPagoId}
-            onChange={(e) => onUpdate(fila.id, 'metodoPagoId', e.target.value)}
-          >
-            <option value="">Elegir…</option>
-            {metodos.map((m) => (
-              <option key={m.id} value={m.id}>{m.nombre}</option>
-            ))}
-          </select>
+          fila.metodoIds?.length > 1 ? (
+            // Admin + paciente con múltiples métodos → selector
+            <select
+              className="cp-cr-input cp-cr-select"
+              value={fila.metodoPagoId}
+              onChange={(e) => onUpdate(fila.id, 'metodoPagoId', e.target.value)}
+            >
+              <option value="">Seleccionar método…</option>
+              {metodos.filter((m) => fila.metodoIds.includes(m.id)).map((m) => (
+                <option key={m.id} value={m.id}>{m.nombre}</option>
+              ))}
+            </select>
+          ) : (
+            // Admin + paciente con 1 método → mostrar nombre (no editable en carga rápida)
+            <span className="cp-cr-metodo-info">
+              {metodo?.nombre || '—'}
+            </span>
+          )
         ) : (
-          <span className={`cp-cr-metodo-info ${esDiferido ? 'cp-cr-metodo-info--dif' : ''}`}>
-            {metodo?.nombre || '—'}
-            {esDiferido && <span className="cp-badge cp-badge--diferido" style={{ marginLeft: 6, fontSize: 11 }}>OS</span>}
-          </span>
+          // Profesional → siempre readonly
+          fila.metodoIds?.length > 1 ? (
+            <select
+              className="cp-cr-input cp-cr-select"
+              value={fila.metodoPagoId}
+              onChange={(e) => onUpdate(fila.id, 'metodoPagoId', e.target.value)}
+            >
+              <option value="">Seleccionar método…</option>
+              {metodos.filter((m) => fila.metodoIds.includes(m.id)).map((m) => (
+                <option key={m.id} value={m.id}>{m.nombre}</option>
+              ))}
+            </select>
+          ) : (
+            <span className={`cp-cr-metodo-info ${esDiferido ? 'cp-cr-metodo-info--dif' : ''}`}>
+              {metodo?.nombre || '—'}
+              {esDiferido && <span className="cp-badge cp-badge--diferido" style={{ marginLeft: 6, fontSize: 11 }}>OS</span>}
+            </span>
+          )
         )}
       </div>
 

@@ -839,3 +839,41 @@
     font-size: 13px;
   }
 }
+
+/* ---- Selector multi-método de pago ---- */
+.cp-pac-metodos-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cp-pac-metodo-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1.5px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  cursor: pointer;
+  transition: border-color 120ms, background 120ms;
+  user-select: none;
+  font-size: 14px;
+}
+
+.cp-pac-metodo-item input[type="checkbox"] {
+  display: none;
+}
+
+.cp-pac-metodo-item:hover {
+  background: var(--cp-surface-hover);
+}
+
+.cp-pac-metodo-item--sel {
+  border-color: var(--cp-accent);
+  background: var(--cp-accent-bg);
+}
+
+.cp-pac-metodo-item__nombre {
+  flex: 1;
+  font-weight: 500;
+}

@@ -16,7 +16,7 @@ import {
   LABELS_TIPO_SOLICITUD,
   TIPOS_METODO_PAGO,
 } from '../../lib/constants.js';
-import { suscribirPacientesProfesional } from '../../lib/pacientes.js';
+import { getMetodosPaciente, suscribirPacientesProfesional } from '../../lib/pacientes.js';
 import {
   actualizarSesion,
   crearSesion,

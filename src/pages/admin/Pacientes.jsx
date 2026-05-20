@@ -767,22 +767,33 @@ function PacienteModal({ paciente, profesionales, metodos, onClose, onGuardar })
     return [];
   }, [paciente, profesionales]);
 
-  const [form, setForm] = useState(() => ({
-    nombre: paciente?.nombre ?? '',
-    apellido: paciente?.apellido ?? '',
-    dni: paciente?.dni ?? '',
-    telefono: paciente?.telefono ?? '',
-    email: paciente?.email ?? '',
-    obraSocialNumero: paciente?.obraSocialNumero ?? '',
-    profesionalesUids: uidsIniciales,
-    metodoPagoId: paciente?.metodoPagoId ?? (metodos.find((m) => m.activo !== false)?.id ?? metodos[0]?.id ?? ''),
-    notas: paciente?.notas ?? '',
-  }));
+  const [form, setForm] = useState(() => {
+    const metodosIniciales = paciente
+      ? (Array.isArray(paciente.metodosPagoIds) && paciente.metodosPagoIds.length > 0
+          ? paciente.metodosPagoIds
+          : paciente.metodoPagoId ? [paciente.metodoPagoId] : [])
+      : [];
+    return {
+      nombre: paciente?.nombre ?? '',
+      apellido: paciente?.apellido ?? '',
+      dni: paciente?.dni ?? '',
+      telefono: paciente?.telefono ?? '',
+      email: paciente?.email ?? '',
+      obraSocialNumero: paciente?.obraSocialNumero ?? '',
+      profesionalesUids: uidsIniciales,
+      metodosPagoIds: metodosIniciales,
+      notas: paciente?.notas ?? '',
+    };
+  });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  const metodoSeleccionado = metodos.find((m) => m.id === form.metodoPagoId);
-  const valorDelMetodo = metodoSeleccionado?.valorSesionDefault ?? 0;
+  // Para mostrar info del primer método diferido (obra social)
+  const primerMetodo = metodos.find((m) => form.metodosPagoIds.includes(m.id));
+  const tieneDiferido = form.metodosPagoIds.some((id) => {
+    const m = metodos.find((x) => x.id === id);
+    return m?.tipo === TIPOS_METODO_PAGO.DIFERIDO;
+  });
 
   function setField(k, v) {
     setForm((prev) => ({ ...prev, [k]: v }));
@@ -819,7 +830,7 @@ function PacienteModal({ paciente, profesionales, metodos, onClose, onGuardar })
         email: form.email,
         obraSocialNumero: form.obraSocialNumero,
         profesionalesUids: form.profesionalesUids,
-        metodoPagoId: form.metodoPagoId,
+        metodosPagoIds: form.metodosPagoIds,
         valorSesionCustom: null,
         notas: form.notas,
       });
@@ -936,61 +947,81 @@ function PacienteModal({ paciente, profesionales, metodos, onClose, onGuardar })
 
           <div>
             <label className="cp-field__label" style={{ display: 'block', marginBottom: 6 }}>
-              Método de pago
+              Métodos de pago
+              <span style={{ color: 'var(--cp-text-faint)', fontWeight: 400, fontSize: 12, marginLeft: 8 }}>
+                (seleccioná uno o más)
+              </span>
             </label>
-            <MetodoPagoSelect
-              className="cp-select"
-              metodos={metodos}
-              value={form.metodoPagoId}
-              onChange={(e) => setField('metodoPagoId', e.target.value)}
-              required
-            />
+            <div className="cp-pac-metodos-lista">
+              {metodos.map((m) => {
+                const sel = form.metodosPagoIds.includes(m.id);
+                return (
+                  <label
+                    key={m.id}
+                    className={`cp-pac-metodo-item ${sel ? 'cp-pac-metodo-item--sel' : ''}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={sel}
+                      onChange={() => {
+                        setField('metodosPagoIds', sel
+                          ? form.metodosPagoIds.filter((x) => x !== m.id)
+                          : [...form.metodosPagoIds, m.id],
+                        );
+                      }}
+                    />
+                    <span className="cp-pac-metodo-item__nombre">{m.nombre}</span>
+                    {m.tipo === TIPOS_METODO_PAGO.DIFERIDO && (
+                      <span className="cp-badge cp-badge--diferido" style={{ fontSize: 11 }}>OS</span>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+            {form.metodosPagoIds.length === 0 && (
+              <p style={{ fontSize: 12, color: 'var(--cp-danger)', marginTop: 6 }}>
+                Seleccioná al menos un método de pago.
+              </p>
+            )}
           </div>
 
-          {metodoSeleccionado?.tipo === 'diferido' && (
+          {tieneDiferido && (
             <Input
               name="obraSocialNumero"
-              label={`Nº de afiliado (${metodoSeleccionado.nombre})`}
+              label="Nº de afiliado (obra social)"
               placeholder="Opcional"
               value={form.obraSocialNumero}
               onChange={(e) => setField('obraSocialNumero', e.target.value)}
             />
           )}
 
-          {metodoSeleccionado && (
-            metodoSeleccionado.tipo === TIPOS_METODO_PAGO.DIFERIDO ? (
-              // Para obras sociales / prepagas: el valor de la sesion lo
-              // decide la obra social al liquidar, no se carga aca. El
-              // profesional/admin lo ingresa en el modal de Liquidar monto
-              // dentro del tab Sesiones (boton ✓ de cada sesion pendiente).
-              <div className="cp-valor-info cp-valor-info--diferido">
-                <div className="cp-valor-info__main">
-                  <span className="cp-valor-info__label">Valor de sesión</span>
-                  <span className="cp-valor-info__amount-text">
-                    Lo decide la obra social
-                  </span>
-                </div>
-                <div className="cp-valor-info__hint">
-                  Las sesiones con <strong>{metodoSeleccionado.nombre}</strong> no
-                  llevan valor al crearse. Se carga después en el listado de
-                  sesiones cuando la obra social informe el monto.
-                </div>
+          {primerMetodo && !tieneDiferido && (
+            <div className="cp-valor-info">
+              <div className="cp-valor-info__main">
+                <span className="cp-valor-info__label">Valor de sesión</span>
+                <span className="cp-valor-info__amount">{formatoARS.format(primerMetodo.valorSesionDefault ?? 0)}</span>
               </div>
-            ) : (
-              <div className="cp-valor-info">
-                <div className="cp-valor-info__main">
-                  <span className="cp-valor-info__label">Valor de sesión</span>
-                  <span className="cp-valor-info__amount">{formatoARS.format(valorDelMetodo)}</span>
-                </div>
-                <div className="cp-valor-info__hint">
-                  Definido por el método <strong>{metodoSeleccionado.nombre}</strong>.
-                  {' '}
-                  <Link to="/admin/configuracion" className="cp-valor-info__link" onClick={onClose}>
-                    Editar en Configuración →
-                  </Link>
-                </div>
+              <div className="cp-valor-info__hint">
+                Definido por el método <strong>{primerMetodo.nombre}</strong>.
+                {' '}
+                <Link to="/admin/configuracion" className="cp-valor-info__link" onClick={onClose}>
+                  Editar en Configuración →
+                </Link>
               </div>
-            )
+            </div>
+          )}
+
+          {tieneDiferido && (
+            <div className="cp-valor-info cp-valor-info--diferido">
+              <div className="cp-valor-info__main">
+                <span className="cp-valor-info__label">Valor de sesión</span>
+                <span className="cp-valor-info__amount-text">Lo decide la obra social</span>
+              </div>
+              <div className="cp-valor-info__hint">
+                Las sesiones de obra social no llevan valor al crearse.
+                Se carga después cuando la OS informe el monto.
+              </div>
+            </div>
           )}
 
           <div>

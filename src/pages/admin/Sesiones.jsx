@@ -20,7 +20,7 @@ import {
   formatoARS,
   TIPOS_METODO_PAGO,
 } from '../../lib/constants.js';
-import { suscribirPacientesConsultorio } from '../../lib/pacientes.js';
+import { getMetodosPaciente, suscribirPacientesConsultorio } from '../../lib/pacientes.js';
 import { suscribirMiembrosConsultorio, suscribirProfesionales } from '../../lib/profesionales.js';
 import {
   calcularSplit,
@@ -930,14 +930,24 @@ export function SesionModal({
   });
   const [metodoId, setMetodoId] = useState(sesion?.metodoPagoId ?? '');
 
+  // Métodos disponibles según el paciente seleccionado.
+  // Si el paciente tiene 1 método → se muestra solo informativo (no selector).
+  // Si tiene 2+ → selector obligatorio (arranca vacío para que elija).
+  const pacienteActual = pacientes.find((p) => p.id === pacienteId);
+  const metodosPaciente = useMemo(() => {
+    if (!pacienteActual) return [];
+    const ids = getMetodosPaciente(pacienteActual);
+    return metodos.filter((m) => ids.includes(m.id));
+  }, [pacienteActual, metodos]);
+  const tieneMultiMetodo = metodosPaciente.length > 1;
+
   // Cantidad de sesiones — default 1, mínimo 1
   const [cantidad, setCantidad] = useState(() => {
     if (sesion?.cantidadSesiones) return String(sesion.cantidadSesiones);
     return '1';
   });
 
-  // Valor por sesión (unitario). Si la sesion existente tiene valorSesion,
-  // lo usamos; si no, derivamos de valorTotal/cantidadSesiones.
+  // Valor por sesión (unitario).
   const [valorSesion, setValorSesion] = useState(() => {
     if (sesion?.valorSesion !== undefined && sesion?.valorSesion !== null) {
       return String(sesion.valorSesion);
@@ -953,13 +963,18 @@ export function SesionModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  // Auto-cargar metodo del paciente al elegirlo (solo en alta nueva)
+  // Al elegir paciente en alta nueva: pre-cargar método si tiene solo 1
   useEffect(() => {
     if (!pacienteId || !esNueva) return;
     const pac = pacientes.find((p) => p.id === pacienteId);
     if (!pac) return;
-    if (!metodoId) {
-      setMetodoId(pac.metodoPagoId || '');
+    const ids = getMetodosPaciente(pac);
+    if (ids.length === 1) {
+      // Un solo método → se pre-selecciona automáticamente
+      setMetodoId(ids[0]);
+    } else {
+      // Más de uno → el usuario debe elegir, arranca vacío
+      setMetodoId('');
     }
   }, [pacienteId, esNueva]);   // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1146,35 +1161,43 @@ export function SesionModal({
           <div>
             <label className="cp-field__label" style={{ display: 'block', marginBottom: 6 }}>
               Método de pago
-              {metodoBloqueado && (
-                <span style={{
-                  marginLeft: 8,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  fontSize: 11,
-                  color: 'var(--cp-text-muted)',
-                  fontWeight: 'normal',
-                }}>
-                  <LockIcon />
-                  Configurado por el administrador
-                </span>
-              )}
             </label>
-            <MetodoPagoSelect
-              className="cp-select"
-              metodos={metodos}
-              value={metodoId}
-              onChange={(e) => setMetodoId(e.target.value)}
-              required
-              disabled={metodoBloqueado}
-            >
-              <option value="" disabled>Elegir método…</option>
-            </MetodoPagoSelect>
-            {metodoBloqueado && (
-              <div style={{ fontSize: 12, color: 'var(--cp-text-muted)', marginTop: 4 }}>
-                El método de pago se configura desde la ficha del paciente. Si necesitás cambiarlo, hablá con el administrador del consultorio.
+            {!pacienteId ? (
+              <div style={{ fontSize: 13, color: 'var(--cp-text-faint)', padding: '8px 0' }}>
+                — elegí un paciente primero
               </div>
+            ) : metodosPaciente.length === 0 ? (
+              <div style={{ fontSize: 13, color: 'var(--cp-danger)', padding: '8px 0' }}>
+                Este paciente no tiene métodos de pago configurados.
+              </div>
+            ) : !tieneMultiMetodo ? (
+              // Un solo método → readonly informativo
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '8px 12px', background: 'var(--cp-surface-sunken)',
+                borderRadius: 'var(--cp-radius-sm)', fontSize: 13.5,
+                color: 'var(--cp-text)', border: '1px solid var(--cp-border)',
+              }}>
+                {metodosPaciente[0]?.nombre}
+                {!esAdmin && (
+                  <span style={{ marginLeft: 4, fontSize: 11, color: 'var(--cp-text-muted)', display: 'flex', alignItems: 'center', gap: 3 }}>
+                    <LockIcon /> Configurado por el administrador
+                  </span>
+                )}
+              </div>
+            ) : (
+              // Más de un método → selector obligatorio (vacío por defecto)
+              <select
+                className="cp-select"
+                value={metodoId}
+                onChange={(e) => setMetodoId(e.target.value)}
+                required
+              >
+                <option value="" disabled>Seleccionar método de pago…</option>
+                {metodosPaciente.map((m) => (
+                  <option key={m.id} value={m.id}>{m.nombre}</option>
+                ))}
+              </select>
             )}
           </div>
 
