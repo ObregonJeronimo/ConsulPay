@@ -15,6 +15,7 @@ import {
   formatoARS,
   LABELS_TIPO_SOLICITUD,
   TIPOS_METODO_PAGO,
+  TIPOS_SOLICITUD_SESION,
 } from '../../lib/constants.js';
 import { getMetodosPaciente, suscribirPacientesProfesional } from '../../lib/pacientes.js';
 import {
