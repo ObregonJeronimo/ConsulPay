@@ -65,6 +65,7 @@ export default function PagosAdmin() {
   const [profesionales, setProfesionales] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filtroEstado, setFiltroEstado] = useState('todos');
+  const [filtroCanal, setFiltroCanal] = useState('manual'); // 'mp' | 'manual' | 'ambos'
   const [mes, setMes] = useState(() => inicioDeMes(new Date()));
   const [pagoSeleccionado, setPagoSeleccionado] = useState(null);
 
@@ -104,7 +105,17 @@ export default function PagosAdmin() {
     return pagos.filter((p) => p.estado === filtroEstado);
   }, [pagos, filtroEstado]);
 
-  // Stats de pagos vía MP (todo el historial, igual que antes)
+  // Pagos MP filtrados por el mes seleccionado
+  const pagosDelMes = useMemo(() => {
+    const desde = inicioDeMes(mes).getTime();
+    const hasta = finDeMes(mes).getTime();
+    return pagos.filter((p) => {
+      const t = p.createdAt?.toDate ? p.createdAt.toDate().getTime() : 0;
+      return t >= desde && t <= hasta;
+    });
+  }, [pagos, mes]);
+
+  // Stats MP del mes seleccionado
   const stats = useMemo(() => {
     let aprobados = 0;
     let pendientes = 0;
@@ -112,7 +123,7 @@ export default function PagosAdmin() {
     let totalComision = 0;
     let totalFeeMP = 0;
     let pagosSinFeeDetails = 0;
-    for (const p of pagos) {
+    for (const p of pagosDelMes) {
       if (p.estado === 'aprobado') {
         aprobados += 1;
         totalRecibido += montoNetoEfectivo(p);
@@ -127,7 +138,7 @@ export default function PagosAdmin() {
       }
     }
     return { aprobados, pendientes, totalRecibido, totalComision, totalFeeMP, pagosSinFeeDetails };
-  }, [pagos]);
+  }, [pagosDelMes]);
 
   // Stats de sesiones marcadas como "Pagadas" manualmente en el mes
   // (distinto de los pagos MP — estas se marcaron con el botón ✓ sin pasar por MP)
@@ -167,67 +178,109 @@ export default function PagosAdmin() {
         <div>
           <h1 className="cp-page-title">Pagos recibidos</h1>
           <p className="cp-page-sub">
-            Pagos MP e ingresos marcados manualmente por el consultorio.
+            Ingresos del consultorio por canal de cobro.
           </p>
         </div>
         <SelectorMes mes={mes} setMes={setMes} />
       </header>
 
-      {/* Resumen del mes: ingresos separados por canal + total */}
-      <div className="cp-pagos-resumen-mes">
-        <div className="cp-pagos-resumen-mes__card cp-pagos-resumen-mes__card--total">
-          <div className="cp-pagos-resumen-mes__label">Total ingresado en {nombreDelMes(mes)}</div>
-          <div className="cp-pagos-resumen-mes__value">{formatoARS.format(statsMes.totalCombinado)}</div>
-          <div className="cp-pagos-resumen-mes__hint">
-            MP + marcado pagado
-          </div>
+      {/* Toggle canal + resumen del mes */}
+      <div className="cp-pagos-canal-wrap">
+        {/* Toggle MP / Manual / Ambos */}
+        <div className="cp-pagos-canal-toggle">
+          <button
+            type="button"
+            className={`cp-pagos-canal-btn ${filtroCanal === 'manual' ? 'cp-pagos-canal-btn--active' : ''}`}
+            onClick={() => setFiltroCanal('manual')}
+          >
+            Pagos manuales
+          </button>
+          <button
+            type="button"
+            className={`cp-pagos-canal-btn ${filtroCanal === 'mp' ? 'cp-pagos-canal-btn--active' : ''}`}
+            onClick={() => setFiltroCanal('mp')}
+          >
+            Mercado Pago
+          </button>
+          <button
+            type="button"
+            className={`cp-pagos-canal-btn ${filtroCanal === 'ambos' ? 'cp-pagos-canal-btn--active' : ''}`}
+            onClick={() => setFiltroCanal('ambos')}
+          >
+            Ambos
+          </button>
         </div>
-        <div className="cp-pagos-resumen-mes__card">
-          <div className="cp-pagos-resumen-mes__label">Vía Mercado Pago</div>
-          <div className="cp-pagos-resumen-mes__value">{formatoARS.format(stats.totalRecibido)}</div>
-          <div className="cp-pagos-resumen-mes__hint">
-            {stats.aprobados} pago{stats.aprobados === 1 ? '' : 's'} aprobado{stats.aprobados === 1 ? '' : 's'}
-          </div>
-        </div>
-        <div className="cp-pagos-resumen-mes__card">
-          <div className="cp-pagos-resumen-mes__label">Marcado como pagado</div>
-          <div className="cp-pagos-resumen-mes__value">{formatoARS.format(statsMes.totalMarcadas)}</div>
-          <div className="cp-pagos-resumen-mes__hint">
-            {statsMes.cantMarcadas} sesión{statsMes.cantMarcadas === 1 ? '' : 'es'} marcada{statsMes.cantMarcadas === 1 ? '' : 's'}
-          </div>
-        </div>
-        <div className="cp-pagos-resumen-mes__card cp-pagos-resumen-mes__card--debe">
-          <div className="cp-pagos-resumen-mes__label">Pendiente de cobro</div>
-          <div className="cp-pagos-resumen-mes__value">{formatoARS.format(statsMes.totalDebe)}</div>
-          <div className="cp-pagos-resumen-mes__hint">sesiones que aún deben</div>
-        </div>
-      </div>
 
-      {/* Stats MP (todo el historial) */}
-      <div className="cp-pagos-stats">
-        <div className="cp-stat cp-stat--success">
-          <div className="cp-stat__label">Total recibido MP (historial)</div>
-          <div className="cp-stat__value">{formatoARS.format(stats.totalRecibido)}</div>
-          <div className="cp-stat__hint">
-            {stats.aprobados} pago{stats.aprobados === 1 ? '' : 's'} aprobado{stats.aprobados === 1 ? '' : 's'}
-            {stats.pagosSinFeeDetails > 0 && '*'}
-          </div>
+        {/* Stats según canal seleccionado */}
+        <div className="cp-pagos-resumen-mes">
+          {(filtroCanal === 'ambos') && (
+            <div className="cp-pagos-resumen-mes__card cp-pagos-resumen-mes__card--total">
+              <div className="cp-pagos-resumen-mes__label">Total en {nombreDelMes(mes)}</div>
+              <div className="cp-pagos-resumen-mes__value">
+                {formatoARS.format(statsMes.totalCombinado)}
+              </div>
+              <div className="cp-pagos-resumen-mes__hint">MP + marcado pagado</div>
+            </div>
+          )}
+
+          {(filtroCanal === 'mp' || filtroCanal === 'ambos') && (
+            <>
+              <div className="cp-pagos-resumen-mes__card">
+                <div className="cp-pagos-resumen-mes__label">Vía Mercado Pago</div>
+                <div className="cp-pagos-resumen-mes__value">
+                  {formatoARS.format(stats.totalRecibido)}
+                </div>
+                <div className="cp-pagos-resumen-mes__hint">
+                  {stats.aprobados} pago{stats.aprobados === 1 ? '' : 's'} aprobado{stats.aprobados === 1 ? '' : 's'}
+                </div>
+              </div>
+              <div className="cp-pagos-resumen-mes__card">
+                <div className="cp-pagos-resumen-mes__label">Comisión ConsulPay</div>
+                <div className="cp-pagos-resumen-mes__value">
+                  {formatoARS.format(stats.totalComision)}
+                </div>
+                <div className="cp-pagos-resumen-mes__hint">descontada antes de acreditar</div>
+              </div>
+              <div className="cp-pagos-resumen-mes__card">
+                <div className="cp-pagos-resumen-mes__label">Cargo Mercado Pago</div>
+                <div className="cp-pagos-resumen-mes__value">
+                  {formatoARS.format(stats.totalFeeMP)}
+                </div>
+                <div className="cp-pagos-resumen-mes__hint">
+                  {stats.pendientes > 0 && `${stats.pendientes} en proceso · `}tarifa MP
+                </div>
+              </div>
+            </>
+          )}
+
+          {(filtroCanal === 'manual' || filtroCanal === 'ambos') && (
+            <>
+              <div className="cp-pagos-resumen-mes__card cp-pagos-resumen-mes__card--marcado">
+                <div className="cp-pagos-resumen-mes__label">Marcado como pagado</div>
+                <div className="cp-pagos-resumen-mes__value">
+                  {formatoARS.format(statsMes.totalMarcadas)}
+                </div>
+                <div className="cp-pagos-resumen-mes__hint">
+                  {statsMes.cantMarcadas} sesión{statsMes.cantMarcadas === 1 ? '' : 'es'} marcada{statsMes.cantMarcadas === 1 ? '' : 's'}
+                </div>
+              </div>
+              <div className="cp-pagos-resumen-mes__card cp-pagos-resumen-mes__card--debe">
+                <div className="cp-pagos-resumen-mes__label">Pendiente de cobro</div>
+                <div className="cp-pagos-resumen-mes__value">
+                  {formatoARS.format(statsMes.totalDebe)}
+                </div>
+                <div className="cp-pagos-resumen-mes__hint">sesiones que aún deben</div>
+              </div>
+            </>
+          )}
         </div>
-        <div className="cp-stat">
-          <div className="cp-stat__label">Comisión ConsulPay</div>
-          <div className="cp-stat__value">{formatoARS.format(stats.totalComision)}</div>
-          <div className="cp-stat__hint">descontada antes de acreditar</div>
-        </div>
-        <div className="cp-stat">
-          <div className="cp-stat__label">Cargo Mercado Pago</div>
-          <div className="cp-stat__value">{formatoARS.format(stats.totalFeeMP)}</div>
-          <div className="cp-stat__hint">tarifa que cobra MP por procesar</div>
-        </div>
-        <div className="cp-stat cp-stat--debido">
-          <div className="cp-stat__label">En proceso</div>
-          <div className="cp-stat__value">{stats.pendientes}</div>
-          <div className="cp-stat__hint">pago{stats.pendientes === 1 ? '' : 's'} esperando confirmación</div>
-        </div>
+
+        {stats.pagosSinFeeDetails > 0 && (filtroCanal === 'mp' || filtroCanal === 'ambos') && (
+          <p className="cp-pagos-nota-asterisco">
+            * Hay {stats.pagosSinFeeDetails} pago{stats.pagosSinFeeDetails === 1 ? '' : 's'} sin desglose
+            completo de cargos de Mercado Pago. El total es aproximado.
+          </p>
+        )}
       </div>
 
       {stats.pagosSinFeeDetails > 0 && (

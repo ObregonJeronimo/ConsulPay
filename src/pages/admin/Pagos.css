@@ -430,3 +430,97 @@
     font-size: 20px;
   }
 }
+
+/* ============================================================
+   Toggle canal de cobro (Pagos manuales / MP / Ambos)
+   ============================================================ */
+.cp-pagos-canal-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cp-space-4);
+}
+
+.cp-pagos-canal-toggle {
+  display: inline-flex;
+  align-items: center;
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  padding: 3px;
+  gap: 2px;
+}
+
+.cp-pagos-canal-btn {
+  padding: 7px 16px;
+  border: none;
+  border-radius: calc(var(--cp-radius-md) - 2px);
+  background: transparent;
+  color: var(--cp-text-muted);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms, color 120ms;
+  white-space: nowrap;
+}
+
+.cp-pagos-canal-btn:hover:not(.cp-pagos-canal-btn--active) {
+  background: var(--cp-surface-hover);
+  color: var(--cp-text);
+}
+
+.cp-pagos-canal-btn--active {
+  background: var(--cp-bg);
+  color: var(--cp-text);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+/* Cards del resumen: grid dinamico segun cuantas cards hay */
+.cp-pagos-resumen-mes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--cp-space-4);
+}
+
+.cp-pagos-resumen-mes__card {
+  flex: 1;
+  min-width: 160px;
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-lg);
+  padding: var(--cp-space-4) var(--cp-space-5);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Variante marcado: borde verde suave */
+.cp-pagos-resumen-mes__card--marcado {
+  border-color: var(--cp-success);
+  background: color-mix(in srgb, var(--cp-success-bg) 50%, var(--cp-surface));
+}
+
+.cp-pagos-resumen-mes__card--marcado .cp-pagos-resumen-mes__value {
+  color: var(--cp-success);
+}
+
+@media (max-width: 640px) {
+  .cp-pagos-canal-toggle {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .cp-pagos-canal-btn {
+    flex: 1;
+    text-align: center;
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+
+  .cp-pagos-resumen-mes__card {
+    min-width: calc(50% - var(--cp-space-2));
+  }
+
+  .cp-pagos-resumen-mes__card--total {
+    min-width: 100%;
+  }
+}
