@@ -388,8 +388,8 @@ export default function Sesiones() {
           </p>
           <SelectorMes mes={mes} setMes={setMes} />
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'stretch' }}>
+          <div style={{ display: 'flex', gap: 10 }}>
             <Button
               variant="secondary"
               onClick={() => setCargaRapidaOpen(true)}
@@ -411,7 +411,6 @@ export default function Sesiones() {
             type="button"
             onClick={() => setPagarMesOpen(true)}
             disabled={!hayPrereqs}
-            style={{ width: '100%' }}
           >
             Marcar mes como pagado
           </Button>

@@ -442,6 +442,9 @@
 /* ============================================================
    Mobile (<=640px)
    ============================================================ */
+/* ============================================================
+   Mobile (<=640px)
+   ============================================================ */
 @media (max-width: 640px) {
   .cp-cr-modal {
     max-width: 100% !important;
@@ -507,18 +510,29 @@
     width: 52px;
   }
 
+  /* Items del picker con z-index por encima del indicador */
   .cp-cr-picker__item {
     height: 30px;
     font-size: 14px;
+    position: relative;
+    z-index: 2;
   }
 
   .cp-cr-picker__item--sel {
     font-size: 16px;
+    font-weight: 700;
+    color: var(--cp-accent);
   }
 
   .cp-cr-picker__fade-top,
   .cp-cr-picker__fade-bot {
     height: 28px;
+    z-index: 3;
+  }
+
+  /* El indicador va detrás de los items */
+  .cp-cr-picker__sel-indicator {
+    z-index: 1;
   }
 
   .cp-cr-picker__list {
