@@ -391,7 +391,8 @@ service cloud.firestore {
         && (request.resource.data.tipo == 'crear'
             || request.resource.data.tipo == 'modificar'
             || request.resource.data.tipo == 'eliminar'
-            || request.resource.data.tipo == 'liquidar_monto');
+            || request.resource.data.tipo == 'liquidar_monto'
+            || request.resource.data.tipo == 'carga_rapida');
 
       allow update: if esSuperadmin()
         || (esAdminDe(resource.data.consultorioId)
