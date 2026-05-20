@@ -5,6 +5,7 @@ import Button from '../../components/ui/Button.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
 
 import { useAuth } from '../../hooks/useAuth.js';
+import { useOverlayClose } from '../../hooks/useOverlayClose.js';
 import {
   ESTADOS_SOLICITUD_SESION,
   formatoARS,
