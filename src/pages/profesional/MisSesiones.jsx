@@ -519,7 +519,7 @@ function SolicitudesPanel({ solicitudes, mapaPacientes, totalPendientes }) {
         </h3>
       </div>
       <div className="cp-solicitudes-panel__list">
-        {solicitudesParaMostrar.map((s) => {
+        {solicitudes.map((s) => {
           const esCargaRapida = s.tipo === TIPOS_SOLICITUD_SESION.CARGA_RAPIDA;
           const pac = !esCargaRapida && (s.payloadPropuesto?.pacienteId
             ? mapaPacientes[s.payloadPropuesto.pacienteId]
