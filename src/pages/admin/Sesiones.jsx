@@ -304,10 +304,22 @@ export default function Sesiones() {
 
   async function handleTogglePagado(sesion) {
     if (sesion.estadoPago === ESTADOS_PAGO_SESION.DEBIDO) {
-      // Pedir quién recibió antes de marcar como pagada
-      setQuienRecibioSesion(sesion);
+      if (admins.length === 1) {
+        // Un solo admin → no preguntar, asignar automáticamente
+        const admin = admins[0];
+        try {
+          await marcarSesionPagada(sesion.id, user.uid, {
+            uid: admin.uid,
+            nombre: admin.displayName || admin.email || admin.uid,
+          });
+        } catch (err) {
+          alert(err.message || 'No se pudo cambiar el estado.');
+        }
+      } else {
+        // Más de un admin → preguntar quién recibió
+        setQuienRecibioSesion(sesion);
+      }
     } else {
-      // Revertir a "debe": no necesita saber quién recibió
       try {
         await marcarSesionDebida(sesion.id, user.uid);
       } catch (err) {
@@ -1688,30 +1700,32 @@ export function PagarMesModal({ consultorioId, profesionales, pacientes, mapaPac
                   </div>
                 )}
 
-                {/* ¿Quién recibió? */}
-                <div>
-                  <label className="cp-field__label" style={{ display: 'block', marginBottom: 8 }}>
-                    ¿Quién recibió el dinero?
-                  </label>
-                  <div className="cp-quien-recibio__opciones">
-                    {admins.map((a) => (
-                      <label
-                        key={a.uid}
-                        className={`cp-quien-recibio__opcion ${receptorUid === a.uid ? 'cp-quien-recibio__opcion--active' : ''}`}
-                      >
-                        <input
-                          type="radio"
-                          name="receptor-mes"
-                          value={a.uid}
-                          checked={receptorUid === a.uid}
-                          onChange={() => setReceptorUid(a.uid)}
-                        />
-                        <Avatar initials={(a.displayName || a.email || '?')[0].toUpperCase()} size={28} />
-                        <span>{a.displayName || a.email}</span>
-                      </label>
-                    ))}
+                {/* ¿Quién recibió? — solo si hay más de 1 admin */}
+                {admins.length > 1 && (
+                  <div>
+                    <label className="cp-field__label" style={{ display: 'block', marginBottom: 8 }}>
+                      ¿Quién recibió el dinero?
+                    </label>
+                    <div className="cp-quien-recibio__opciones">
+                      {admins.map((a) => (
+                        <label
+                          key={a.uid}
+                          className={`cp-quien-recibio__opcion ${receptorUid === a.uid ? 'cp-quien-recibio__opcion--active' : ''}`}
+                        >
+                          <input
+                            type="radio"
+                            name="receptor-mes"
+                            value={a.uid}
+                            checked={receptorUid === a.uid}
+                            onChange={() => setReceptorUid(a.uid)}
+                          />
+                          <Avatar initials={(a.displayName || a.email || '?')[0].toUpperCase()} size={28} />
+                          <span>{a.displayName || a.email}</span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
               </>
             )}
 
