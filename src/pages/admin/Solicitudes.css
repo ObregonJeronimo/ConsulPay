@@ -775,3 +775,80 @@
     margin-bottom: 2px;
   }
 }
+
+/* ---- Diff de Carga Rápida ---- */
+.cp-cr-solicitud {
+  background: var(--cp-surface-sunken);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  overflow: hidden;
+  margin-bottom: var(--cp-space-4);
+}
+
+.cp-cr-solicitud__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--cp-bg);
+  border-bottom: 1px solid var(--cp-border);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--cp-text-muted);
+}
+
+.cp-cr-solicitud__total {
+  font-weight: 600;
+  color: var(--cp-text);
+  font-size: 13px;
+}
+
+.cp-cr-solicitud__tabla {
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.cp-cr-solicitud__row {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--cp-border);
+  font-size: 13px;
+}
+
+.cp-cr-solicitud__row:last-child {
+  border-bottom: none;
+}
+
+.cp-cr-solicitud__pac {
+  font-weight: 500;
+  color: var(--cp-text);
+}
+
+.cp-cr-solicitud__meta {
+  color: var(--cp-text-muted);
+  font-size: 12px;
+}
+
+.cp-cr-solicitud__valor {
+  font-weight: 500;
+  text-align: right;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .cp-cr-solicitud__row {
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+  }
+  .cp-cr-solicitud__meta {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .cp-cr-solicitud__valor {
+    grid-row: 1;
+    grid-column: 2;
+  }
+}

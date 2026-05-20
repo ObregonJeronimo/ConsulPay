@@ -116,6 +116,7 @@ function iconoTipo(tipo) {
     case TIPOS_SOLICITUD_SESION.MODIFICAR: return <EditIcon />;
     case TIPOS_SOLICITUD_SESION.ELIMINAR: return <TrashIcon />;
     case TIPOS_SOLICITUD_SESION.LIQUIDAR_MONTO: return <CheckIcon />;
+    case TIPOS_SOLICITUD_SESION.CARGA_RAPIDA: return <span style={{ fontSize: 13 }}>⚡</span>;
     default: return null;
   }
 }
@@ -485,8 +486,9 @@ function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, adminUid, a
             {iconoTipo(solicitud.tipo)}
           </span>
           {' '}
-          {LABELS_TIPO_SOLICITUD[solicitud.tipo]} · {nombrePac}
-          <GroupBadge cantidad={cantidad} />
+          {solicitud.tipo === TIPOS_SOLICITUD_SESION.CARGA_RAPIDA
+            ? `Carga rápida — ${solicitud.payloadPropuesto?.sesiones?.length ?? 0} sesiones`
+            : <>{LABELS_TIPO_SOLICITUD[solicitud.tipo]} · {nombrePac}<GroupBadge cantidad={cantidad} /></>}
         </h2>
 
         {/* Aviso prominente cuando es agrupacion */}
@@ -683,6 +685,10 @@ function tipoColor(tipo) {
 function Diff({ solicitud, pac }) {
   const { tipo, payloadPropuesto, payloadAnterior } = solicitud;
 
+  if (tipo === TIPOS_SOLICITUD_SESION.CARGA_RAPIDA) {
+    return <DiffCargaRapida sesiones={payloadPropuesto?.sesiones ?? []} />;
+  }
+
   if (tipo === TIPOS_SOLICITUD_SESION.CREAR) {
     return <DiffSingle payload={payloadPropuesto} pac={pac} encabezado="Datos propuestos" tono="despues" />;
   }
@@ -692,6 +698,60 @@ function Diff({ solicitud, pac }) {
   }
 
   return <DiffDoble anterior={payloadAnterior} propuesto={payloadPropuesto} pac={pac} />;
+}
+
+function DiffCargaRapida({ sesiones }) {
+  if (!sesiones || sesiones.length === 0) {
+    return <p style={{ color: 'var(--cp-text-faint)', fontSize: 13.5 }}>Sin sesiones en esta solicitud.</p>;
+  }
+
+  const total = sesiones.reduce((acc, s) => acc + (s.valorTotal || 0), 0);
+  const sinValor = sesiones.filter((s) => s.estadoPago === 'pendiente_monto').length;
+
+  return (
+    <div className="cp-cr-solicitud">
+      <div className="cp-cr-solicitud__head">
+        <span className="cp-cr-solicitud__count">
+          {sesiones.length} sesión{sesiones.length === 1 ? '' : 'es'} a registrar
+        </span>
+        {total > 0 && (
+          <span className="cp-cr-solicitud__total">
+            Total: {formatoARS.format(total)}
+          </span>
+        )}
+      </div>
+      <div className="cp-cr-solicitud__tabla">
+        {sesiones.map((s, i) => {
+          const fecha = s.fecha
+            ? (() => {
+                const d = s.fecha.toDate ? s.fecha.toDate() : new Date(s.fecha);
+                return d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })
+                  + ' · ' + d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+              })()
+            : '—';
+          return (
+            <div key={i} className="cp-cr-solicitud__row">
+              <div className="cp-cr-solicitud__pac">{s.pacienteNombre || '—'}</div>
+              <div className="cp-cr-solicitud__meta">
+                {fecha} · {s.metodoPagoNombre}
+                {s.cantidadSesiones > 1 && ` · ×${s.cantidadSesiones}`}
+              </div>
+              <div className="cp-cr-solicitud__valor">
+                {s.estadoPago === 'pendiente_monto'
+                  ? <span style={{ color: 'var(--cp-warning, #b8860b)', fontSize: 12 }}>OS sin liquidar</span>
+                  : formatoARS.format(s.valorTotal || 0)}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {sinValor > 0 && (
+        <div style={{ fontSize: 12.5, color: 'var(--cp-warning, #b8860b)', marginTop: 10 }}>
+          ⚠ {sinValor} sesión{sinValor === 1 ? '' : 'es'} de obra social sin monto aún. Se crearán en estado "A liquidar".
+        </div>
+      )}
+    </div>
+  );
 }
 
 const CAMPOS_DIFF = [

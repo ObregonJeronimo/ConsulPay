@@ -115,18 +115,18 @@ export const ESTADOS_INVITACION = {
    queda pendiente hasta que el admin la apruebe o rechace.
    ============================================================ */
 export const TIPOS_SOLICITUD_SESION = {
-  CREAR: 'crear',                       // Crear una sesion nueva
-  MODIFICAR: 'modificar',               // Modificar una sesion existente
-  ELIMINAR: 'eliminar',                 // Eliminar una sesion
-  LIQUIDAR_MONTO: 'liquidar_monto',     // Cargar el monto de una sesion de obra social que estaba en pendiente_monto
+  CREAR: 'crear',
+  MODIFICAR: 'modificar',
+  ELIMINAR: 'eliminar',
+  LIQUIDAR_MONTO: 'liquidar_monto',
+  CARGA_RAPIDA: 'carga_rapida',   // Carga masiva de sesiones (batch pendiente de aprobacion)
 };
 
 export const ESTADOS_SOLICITUD_SESION = {
-  PENDIENTE: 'pendiente',     // Esperando que el admin la resuelva
-  APROBADA: 'aprobada',       // Admin la acepto y se aplico
-  RECHAZADA: 'rechazada',     // Admin la rechazo (con motivo opcional)
-  OBSOLETA: 'obsoleta',       // La sesion fue modificada/eliminada por otro
-                              //  camino antes de que el admin resolviera
+  PENDIENTE: 'pendiente',
+  APROBADA: 'aprobada',
+  RECHAZADA: 'rechazada',
+  OBSOLETA: 'obsoleta',
 };
 
 export const LABELS_TIPO_SOLICITUD = {
@@ -134,6 +134,7 @@ export const LABELS_TIPO_SOLICITUD = {
   [TIPOS_SOLICITUD_SESION.MODIFICAR]: 'Modificar sesión',
   [TIPOS_SOLICITUD_SESION.ELIMINAR]: 'Eliminar sesión',
   [TIPOS_SOLICITUD_SESION.LIQUIDAR_MONTO]: 'Liquidar monto obra social',
+  [TIPOS_SOLICITUD_SESION.CARGA_RAPIDA]: 'Carga rápida',
 };
 
 /* ============================================================

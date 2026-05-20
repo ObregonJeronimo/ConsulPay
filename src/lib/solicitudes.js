@@ -434,6 +434,37 @@ export async function aprobarSolicitud({
     return;
   }
 
+  if (sol.tipo === TIPOS_SOLICITUD_SESION.CARGA_RAPIDA) {
+    // Crear todas las sesiones del batch en paralelo
+    const sesionesPayload = sol.payloadPropuesto?.sesiones ?? [];
+    const { writeBatch } = await import('firebase/firestore');
+    const batch = writeBatch(db);
+    const ts = serverTimestamp();
+
+    for (const s of sesionesPayload) {
+      const sesRef = doc(collection(db, 'sesiones'));
+      batch.set(sesRef, {
+        ...s,
+        consultorioId,
+        profesionalUid: sol.profesionalUid,
+        estadoPago: s.estadoPago ?? ESTADOS_PAGO_SESION.DEBIDO,
+        createdAt: ts,
+        createdByUid: sol.profesionalUid,
+        updatedAt: ts,
+        updatedByUid: adminUid,
+      });
+    }
+    await batch.commit();
+
+    await actualizarSolicitudResuelta({
+      solicitudId,
+      adminUid,
+      adminNombre,
+      estado: ESTADOS_SOLICITUD_SESION.APROBADA,
+    });
+    return;
+  }
+
   // Para modificar y eliminar necesitamos la sesion actual
   if (!sol.sesionId) {
     throw new Error('La solicitud no tiene sesion asociada.');
@@ -601,6 +632,36 @@ export async function aprobarSolicitud({
   }
 
   throw new Error('Tipo de solicitud desconocido.');
+}
+
+/* ============================================================
+   Solicitar carga rapida (profesional sin edicion directa)
+   ----------------------------------------------------------------
+   Guarda 1 solicitud con el array completo de sesiones a crear.
+   El admin la revisa, aprueba o rechaza como bloque.
+   ============================================================ */
+export async function solicitarCargaRapida({
+  consultorioId,
+  profesionalUid,
+  profesionalNombre,
+  sesiones,
+}) {
+  if (!sesiones || sesiones.length === 0) {
+    throw new Error('No hay sesiones para solicitar.');
+  }
+
+  const ref = await addDoc(collection(db, 'solicitudes_sesion'), {
+    consultorioId,
+    tipo: TIPOS_SOLICITUD_SESION.CARGA_RAPIDA,
+    estado: ESTADOS_SOLICITUD_SESION.PENDIENTE,
+    profesionalUid,
+    profesionalNombre,
+    payloadPropuesto: { sesiones },
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+
+  return ref.id;
 }
 
 /**

@@ -350,11 +350,11 @@ export default function MisSesiones() {
           <SelectorMes mes={mes} setMes={setMes} />
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          {tieneConfianza && (
-            <Button variant="secondary" onClick={() => setCargaRapidaOpen(true)} disabled={!hayPrereqs}>
-              Carga rápida
-            </Button>
-          )}
+          {/* Carga rápida: disponible para todos los profesionales.
+              Sin edición directa → genera solicitud en bloque. */}
+          <Button variant="secondary" onClick={() => setCargaRapidaOpen(true)} disabled={!hayPrereqs}>
+            Carga rápida
+          </Button>
           <Button
             variant="primary"
             icon={<PlusIcon />}
@@ -449,6 +449,8 @@ export default function MisSesiones() {
       {cargaRapidaOpen && (
         <CargaRapidaModal
           esAdmin={false}
+          tieneConfianza={tieneConfianza}
+          profesionalNombre={user?.displayName || user?.email || ''}
           profesionales={[]}
           pacientes={pacientesActivos}
           mapaMetodos={Object.fromEntries(metodos.map((m) => [m.id, m]))}

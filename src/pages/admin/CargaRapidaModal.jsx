@@ -27,6 +27,7 @@ import {
 } from '../../lib/constants.js';
 import { getMetodosPaciente } from '../../lib/pacientes.js';
 import { crearSesion } from '../../lib/sesiones.js';
+import { solicitarCargaRapida } from '../../lib/solicitudes.js';
 
 import './CargaRapida.css';
 
@@ -76,13 +77,15 @@ function filaInicial(paciente, mapaMetodos, esAdmin) {
    ============================================================ */
 export default function CargaRapidaModal({
   esAdmin,
-  profesionales,          // array — solo para admin
-  pacientes,              // todos los pacientes activos del consultorio
+  tieneConfianza = true,        // si es false → genera solicitud en vez de crear
+  profesionalNombre = '',       // nombre del profesional (para la solicitud)
+  profesionales,
+  pacientes,
   mapaMetodos,
-  metodos,                // array de métodos del consultorio
+  metodos,
   consultorioId,
-  profesionalUidFijo,     // uid del profesional logueado (vista prof.)
-  uid,                    // uid del usuario logueado
+  profesionalUidFijo,
+  uid,
   onClose,
 }) {
   const overlayProps = useOverlayClose(onClose);
@@ -179,7 +182,6 @@ export default function CargaRapidaModal({
   async function handleGuardar() {
     const { valido, primeraError } = validar();
     if (!valido) {
-      // Mobile: scroll a la primera fila con error
       if (primeraError && rowRefs.current[primeraError]) {
         rowRefs.current[primeraError].scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
@@ -187,9 +189,45 @@ export default function CargaRapidaModal({
     }
 
     setSubmitting(true);
+
+    // Profesional sin edición directa → genera 1 solicitud con todo el batch
+    if (!esAdmin && !tieneConfianza) {
+      try {
+        const sesionesPayload = filas.map((f) => {
+          const m = metodos.find((x) => x.id === f.metodoPagoId);
+          const esDif = m?.tipo === TIPOS_METODO_PAGO.DIFERIDO;
+          const pac = pacientes.find((p) => p.id === f.pacienteId);
+          return {
+            pacienteId: f.pacienteId,
+            pacienteNombre: pac ? `${pac.apellido || ''} ${pac.nombre || ''}`.trim() : '',
+            fecha: inputValueToDate(f.fechaInput),
+            metodoPagoId: f.metodoPagoId,
+            metodoPagoNombre: m?.nombre || '',
+            metodoPagoTipo: m?.tipo || '',
+            cantidadSesiones: Number(f.cantidad),
+            valorSesion: esDif ? 0 : Number(f.valorSesion),
+            valorTotal: esDif ? 0 : Number(f.valorSesion) * Number(f.cantidad),
+            estadoPago: esDif ? 'pendiente_monto' : 'debido',
+          };
+        });
+        await solicitarCargaRapida({
+          consultorioId,
+          profesionalUid: profesionalUidFijo,
+          profesionalNombre,
+          sesiones: sesionesPayload,
+        });
+        setDone({ ok: filas.map((f) => f.id), errores: [], esSolicitud: true });
+      } catch (err) {
+        setDone({ ok: [], errores: [{ id: 'general', msg: err.message }], esSolicitud: true });
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    // Admin o profesional con edición directa → crear sesiones directamente
     const ok = [];
     const errores = [];
-
     await Promise.all(filas.map(async (f) => {
       try {
         const m = metodos.find((x) => x.id === f.metodoPagoId);
@@ -209,9 +247,8 @@ export default function CargaRapidaModal({
         errores.push({ id: f.id, msg: err.message });
       }
     }));
-
     setSubmitting(false);
-    setDone({ ok, errores });
+    setDone({ ok, errores, esSolicitud: false });
   }
 
   const pasoActual = esAdmin ? paso : paso + 1; // normalizar para render
@@ -644,6 +681,28 @@ function CantidadPicker({ value, onChange }) {
 function PantallaDone({ done, filas, onClose }) {
   const totalOk = done.ok.length;
   const totalErr = done.errores.length;
+
+  if (done.esSolicitud) {
+    return (
+      <div className="cp-modal__form cp-cr-done">
+        <div className="cp-cr-done__icon" style={{ color: totalErr > 0 ? 'var(--cp-danger)' : 'var(--cp-accent)' }}>
+          {totalErr > 0 ? '⚠' : '📋'}
+        </div>
+        <div className="cp-cr-done__titulo">
+          {totalErr > 0
+            ? 'No se pudo enviar la solicitud'
+            : `Solicitud enviada — ${totalOk} sesión${totalOk === 1 ? '' : 'es'}`}
+        </div>
+        <div style={{ fontSize: 13.5, color: 'var(--cp-text-muted)', textAlign: 'center', maxWidth: 320 }}>
+          {totalErr > 0
+            ? done.errores[0]?.msg
+            : 'El administrador recibirá la solicitud y podrá aprobarla o rechazarla. Cuando se apruebe, las sesiones quedarán registradas.'}
+        </div>
+        <Button variant="primary" onClick={onClose}>Cerrar</Button>
+      </div>
+    );
+  }
+
   return (
     <div className="cp-modal__form cp-cr-done">
       <div className="cp-cr-done__icon">{totalErr === 0 ? '✓' : '⚠'}</div>
