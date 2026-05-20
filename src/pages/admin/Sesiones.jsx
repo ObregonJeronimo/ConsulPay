@@ -394,6 +394,7 @@ export default function Sesiones() {
               variant="secondary"
               onClick={() => setCargaRapidaOpen(true)}
               disabled={!hayPrereqs}
+              style={{ flex: 1 }}
             >
               Carga rápida
             </Button>
@@ -402,6 +403,7 @@ export default function Sesiones() {
               icon={<PlusIcon />}
               onClick={() => setEditando('nueva')}
               disabled={!hayPrereqs}
+              style={{ flex: 1 }}
             >
               Registrar sesión
             </Button>
@@ -476,13 +478,6 @@ export default function Sesiones() {
               <option value={ESTADOS_PAGO_SESION.DEBIDO}>Deben</option>
               <option value={ESTADOS_PAGO_SESION.PAGADO}>Pagadas</option>
             </select>
-            <Button
-              variant="secondary"
-              type="button"
-              onClick={() => setPagarMesOpen(true)}
-            >
-              Pagar mes
-            </Button>
           </div>
 
           {loadingSesiones ? (
