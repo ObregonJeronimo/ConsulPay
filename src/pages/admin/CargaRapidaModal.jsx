@@ -127,17 +127,18 @@ export default function CargaRapidaModal({
     if (modo === 'todos') {
       armarFilas(pacientesDelProf);
       setPaso(esAdmin ? 3 : 2);
-    } else {
-      setPacientesElegidos(new Set());
-      setPaso(esAdmin ? 3 : 2);
-      // Esperar a que confirmen la selección
+    } else if (modo === null) {
+      // Volver a los botones de elección
+      setModoSeleccion(null);
     }
+    // Para 'algunos': no avanzamos el paso, PasoModoPacientes
+    // muestra la lista de checkboxes internamente con modoSeleccion === 'algunos'
   }
 
   function handleConfirmarSeleccion() {
     const seleccionados = pacientesDelProf.filter((p) => pacientesElegidos.has(p.id));
     armarFilas(seleccionados);
-    setPaso(esAdmin ? 4 : 3);
+    setPaso(esAdmin ? 3 : 2);
   }
 
   // ---- Editar una fila ----
