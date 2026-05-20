@@ -872,9 +872,16 @@
    En mobile (<=640px) las tablas se convierten en listas compactas.
    Cada fila tiene 3 tds especiales (.cp-td-mobile-*) que solo se
    muestran en mobile. Los tds normales (desktop) se ocultan.
-   El contenido se condensa en 2-3 lineas: nombre/titulo arriba,
-   detalle en el medio, monto/meta abajo.
    ============================================================ */
+
+/* Los tds mobile NUNCA se muestran en desktop — solo en mobile.
+   Esta regla va FUERA del media query para tener mayor especificidad. */
+.cp-td-mobile-main,
+.cp-td-mobile-badge,
+.cp-td-mobile-actions {
+  display: none !important;
+}
+
 @media (max-width: 640px) {
 
   /* Contenedor de la tabla: sin borde, fondo transparente */
@@ -885,8 +892,16 @@
     border-radius: 0;
   }
 
+  /* Cuando el propio wrapper ES el cp-table-wrap */
+  .cp-compact-list.cp-table-wrap {
+    overflow-x: visible;
+    border: none;
+    background: transparent;
+    border-radius: 0;
+  }
+
   .cp-compact-list table {
-    min-width: 0;
+    min-width: 0 !important;
     display: block;
   }
 
@@ -918,12 +933,13 @@
     background: var(--cp-surface-hover);
   }
 
-  /* Ocultar todos los tds normales */
+  /* Ocultar todos los tds normales en mobile */
   .cp-compact-list td {
     display: none !important;
   }
 
-  /* Mostrar solo los tds especiales */
+  /* Mostrar solo los tds especiales — especificidad suficiente
+     para ganar a cualquier regla de la pagina con display:none */
   .cp-compact-list td.cp-td-mobile-main {
     display: flex !important;
     flex: 1;
@@ -966,12 +982,15 @@
     min-width: 0;
   }
 
+  /* Nombre del paciente/profesional: siempre completo, con wrap si hace falta.
+     NO truncar — el nombre es la info mas importante de la fila. Si es muy
+     largo pasa a 2 lineas pero no se corta con ellipsis. */
   .cp-row-mobile__top .cp-prof-name {
     font-size: 13.5px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 180px;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    word-break: break-word;
   }
 
   .cp-row-mobile__mid {
