@@ -918,7 +918,7 @@
   /* Cada fila: flex horizontal compacto */
   .cp-compact-list tr {
     display: flex !important;
-    align-items: center;
+    align-items: flex-start;    /* arriba, para que nombres largos no disloquen badge/menu */
     gap: 10px;
     background: var(--cp-surface);
     border: 1px solid var(--cp-border);
@@ -927,6 +927,8 @@
     min-height: 64px;
     cursor: pointer;
     grid-template-columns: none !important;
+    position: relative;         /* necesario para el dropdown position:absolute del menu */
+    overflow: visible !important; /* que el dropdown no se corte */
   }
 
   .cp-compact-list tr:hover {

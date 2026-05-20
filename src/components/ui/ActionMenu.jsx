@@ -22,7 +22,33 @@ import './ActionMenu.css';
 
 export default function ActionMenu({ items = [], align = 'right' }) {
   const [open, setOpen] = useState(false);
+  const [dropPos, setDropPos] = useState({ top: 0, left: 'auto', right: 'auto' });
   const ref = useRef(null);
+  const triggerRef = useRef(null);
+
+  // Calcular posicion del dropdown al abrir — usa fixed para salir
+  // de cualquier stacking context (tr, tbody, etc.) que pudiera cortar el dropdown.
+  function calcularPosicion() {
+    if (!triggerRef.current) return;
+    const r = triggerRef.current.getBoundingClientRect();
+    const spaceRight = window.innerWidth - r.right;
+    const dropWidth = 180; // min-width del dropdown
+
+    if (align === 'right' || spaceRight < dropWidth) {
+      // Alinear a la derecha del trigger
+      setDropPos({
+        top: r.bottom + 4,
+        right: window.innerWidth - r.right,
+        left: 'auto',
+      });
+    } else {
+      setDropPos({
+        top: r.bottom + 4,
+        left: r.left,
+        right: 'auto',
+      });
+    }
+  }
 
   // Cerrar al clickear afuera
   useEffect(() => {
@@ -50,12 +76,29 @@ export default function ActionMenu({ items = [], align = 'right' }) {
     return () => document.removeEventListener('keydown', handler);
   }, [open]);
 
+  // Recalcular posicion si cambia el scroll o el tamaño
+  useEffect(() => {
+    if (!open) return;
+    function handler() { calcularPosicion(); }
+    window.addEventListener('scroll', handler, true);
+    window.addEventListener('resize', handler);
+    return () => {
+      window.removeEventListener('scroll', handler, true);
+      window.removeEventListener('resize', handler);
+    };
+  }, [open]);
+
   return (
     <div className="cp-action-menu" ref={ref}>
       <button
+        ref={triggerRef}
         type="button"
         className={`cp-action-menu__trigger ${open ? 'cp-action-menu__trigger--open' : ''}`}
-        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!open) calcularPosicion();
+          setOpen((v) => !v);
+        }}
         aria-label="Más acciones"
         aria-expanded={open}
       >
@@ -68,7 +111,12 @@ export default function ActionMenu({ items = [], align = 'right' }) {
 
       {open && (
         <ul
-          className={`cp-action-menu__dropdown cp-action-menu__dropdown--${align}`}
+          className="cp-action-menu__dropdown cp-action-menu__dropdown--fixed"
+          style={{
+            top: dropPos.top,
+            right: dropPos.right,
+            left: dropPos.left,
+          }}
           role="menu"
         >
           {items.map((item, i) => (
