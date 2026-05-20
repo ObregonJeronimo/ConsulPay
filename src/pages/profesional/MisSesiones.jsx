@@ -362,10 +362,8 @@ export default function MisSesiones() {
           </p>
           <SelectorMes mes={mes} setMes={setMes} />
         </div>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          {/* Carga rápida: disponible para todos los profesionales.
-              Sin edición directa → genera solicitud en bloque. */}
-          <Button variant="secondary" onClick={() => setCargaRapidaOpen(true)} disabled={!hayPrereqs}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'stretch' }}>
+          <Button variant="secondary" onClick={() => setCargaRapidaOpen(true)} disabled={!hayPrereqs} style={{ flex: 1 }}>
             Carga rápida
           </Button>
           <Button
@@ -373,6 +371,7 @@ export default function MisSesiones() {
             icon={<PlusIcon />}
             onClick={() => setEditando('nueva')}
             disabled={!hayPrereqs}
+            style={{ flex: 1 }}
           >
             {tieneConfianza ? 'Registrar sesión' : 'Solicitar nueva sesión'}
           </Button>
