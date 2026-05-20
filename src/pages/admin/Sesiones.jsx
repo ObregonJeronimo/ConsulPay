@@ -388,21 +388,32 @@ export default function Sesiones() {
           </p>
           <SelectorMes mes={mes} setMes={setMes} />
         </div>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <Button
+              variant="secondary"
+              onClick={() => setCargaRapidaOpen(true)}
+              disabled={!hayPrereqs}
+            >
+              Carga rápida
+            </Button>
+            <Button
+              variant="primary"
+              icon={<PlusIcon />}
+              onClick={() => setEditando('nueva')}
+              disabled={!hayPrereqs}
+            >
+              Registrar sesión
+            </Button>
+          </div>
           <Button
             variant="secondary"
-            onClick={() => setCargaRapidaOpen(true)}
+            type="button"
+            onClick={() => setPagarMesOpen(true)}
             disabled={!hayPrereqs}
+            style={{ width: '100%' }}
           >
-            Carga rápida
-          </Button>
-          <Button
-            variant="primary"
-            icon={<PlusIcon />}
-            onClick={() => setEditando('nueva')}
-            disabled={!hayPrereqs}
-          >
-            Registrar sesión
+            Marcar mes como pagado
           </Button>
         </div>
       </header>
@@ -1555,6 +1566,10 @@ export function PagarMesModal({ consultorioId, profesionales, pacientes, mapaPac
   async function handlePagar() {
     const admin = admins.find((a) => a.uid === receptorUid);
     if (!admin || sesionesPagables.length === 0) return;
+    // Guardar los valores ANTES del batch porque el live listener
+    // va a actualizar sesiones[] y recalcular sesionesPagables a 0
+    const cantidadPagada = sesionesPagables.length;
+    const totalPagado = totalAPagar;
     setSubmitting(true);
     try {
       await marcarSesionesMesPagadas(
@@ -1562,7 +1577,7 @@ export function PagarMesModal({ consultorioId, profesionales, pacientes, mapaPac
         uid,
         { uid: admin.uid, nombre: admin.displayName || admin.email || admin.uid },
       );
-      setDone(true);
+      setDone({ cantidad: cantidadPagada, total: totalPagado });
     } catch (err) {
       alert(err.message || 'No se pudieron marcar las sesiones como pagadas.');
     } finally {
@@ -1574,7 +1589,7 @@ export function PagarMesModal({ consultorioId, profesionales, pacientes, mapaPac
     <div className="cp-modal-overlay" {...overlayProps}>
       <div className="cp-modal cp-modal--wide" onClick={(e) => e.stopPropagation()}>
         <button className="cp-modal__close" onClick={onClose} aria-label="Cerrar">×</button>
-        <h2 className="cp-modal__title">Pagar mes</h2>
+        <h2 className="cp-modal__title">Marcar mes como pagado</h2>
         <p className="cp-modal__sub">
           Seleccioná un profesional y un mes para ver las sesiones pendientes de pago.
         </p>
@@ -1584,10 +1599,10 @@ export function PagarMesModal({ consultorioId, profesionales, pacientes, mapaPac
             <div className="cp-pagar-mes__done">
               <div style={{ fontSize: 48 }}>✓</div>
               <div style={{ fontWeight: 500, fontSize: 16 }}>
-                {sesionesPagables.length} sesión{sesionesPagables.length === 1 ? '' : 'es'} marcada{sesionesPagables.length === 1 ? '' : 's'} como pagadas
+                {done.cantidad} sesión{done.cantidad === 1 ? '' : 'es'} marcada{done.cantidad === 1 ? '' : 's'} como pagadas
               </div>
               <div style={{ color: 'var(--cp-text-muted)', fontSize: 13.5 }}>
-                Total: {formatoARS.format(totalAPagar)}
+                Total: {formatoARS.format(done.total)}
               </div>
             </div>
             <div className="cp-modal__actions">
