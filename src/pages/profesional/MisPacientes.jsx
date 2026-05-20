@@ -8,7 +8,7 @@ import Spinner from '../../components/ui/Spinner.jsx';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useConsultorio } from '../../hooks/useConsultorio.js';
 import { ESTADOS_PACIENTE, TIPOS_METODO_PAGO, formatoARS } from '../../lib/constants.js';
-import { suscribirPacientesProfesional } from '../../lib/pacientes.js';
+import { getMetodosPaciente, suscribirPacientesProfesional } from '../../lib/pacientes.js';
 
 import './../admin/Pacientes.css';
 
@@ -105,8 +105,10 @@ export default function MisPacientes() {
             </thead>
             <tbody>
               {activos.map((p) => {
-                const metodo = mapaMetodos[p.metodoPagoId];
-                const valor = metodo?.valorSesionDefault ?? 0;
+                const metodosIds = getMetodosPaciente(p);
+                const metodosDelPac = metodosIds.map((id) => mapaMetodos[id]).filter(Boolean);
+                const primerMetodo = metodosDelPac[0];
+                const valor = primerMetodo?.valorSesionDefault ?? 0;
                 return (
                   <tr key={p.id}>
                     <td data-label="Paciente">
@@ -119,10 +121,18 @@ export default function MisPacientes() {
                       </div>
                     </td>
                     <td data-label="Método" style={{ fontSize: 13.5 }}>
-                      {metodo ? (<>{metodo.nombre}{metodo.tipo === 'diferido' && <Badge tone="info" style={{ marginLeft: 6 }}>diferido</Badge>}</>) : <span style={{ color: 'var(--cp-danger)' }}>—</span>}
+                      {metodosDelPac.length === 0
+                        ? <span style={{ color: 'var(--cp-danger)' }}>—</span>
+                        : metodosDelPac.map((m, i) => (
+                            <span key={m.id}>
+                              {i > 0 && <span style={{ color: 'var(--cp-text-faint)', margin: '0 4px' }}>·</span>}
+                              {m.nombre}
+                              {m.tipo === 'diferido' && <Badge tone="info" style={{ marginLeft: 4 }}>diferido</Badge>}
+                            </span>
+                          ))}
                     </td>
                     <td data-label="Valor sesión" className="cp-num">
-                      {metodo?.tipo === TIPOS_METODO_PAGO.DIFERIDO ? (
+                      {primerMetodo?.tipo === TIPOS_METODO_PAGO.DIFERIDO ? (
                         <span style={{ color: 'var(--cp-text-faint)', fontStyle: 'italic', fontSize: 13 }}>Según OS</span>
                       ) : formatoARS.format(valor)}
                     </td>
@@ -138,12 +148,14 @@ export default function MisPacientes() {
                         </div>
                       </div>
                       <div className="cp-row-mobile__mid">
-                        {metodo ? metodo.nombre : 'Sin método'}
+                        {metodosDelPac.length === 0
+                          ? 'Sin método'
+                          : metodosDelPac.map((m) => m.nombre).join(' · ')}
                         {p.obraSocialNumero ? ` · Nº ${p.obraSocialNumero}` : ''}
                       </div>
                       <div className="cp-row-mobile__bot">
                         {p.telefono || p.email || ''}
-                        {metodo?.tipo !== TIPOS_METODO_PAGO.DIFERIDO && ` · ${formatoARS.format(valor)}`}
+                        {primerMetodo?.tipo !== TIPOS_METODO_PAGO.DIFERIDO && primerMetodo && ` · ${formatoARS.format(valor)}`}
                       </div>
                     </td>
                     <td className="cp-td-mobile-badge" />

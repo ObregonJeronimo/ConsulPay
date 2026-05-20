@@ -22,6 +22,7 @@ import {
   archivarPaciente,
   crearPaciente,
   actualizarPaciente,
+  getMetodosPaciente,
   getProfesionalesUids,
   reactivarPaciente,
   suscribirPacientesConsultorio,
@@ -611,8 +612,10 @@ function PacientesTabla({
         <tbody>
           {pacientes.map((p) => {
             const profUids = getProfesionalesUids(p);
-            const metodo = mapaMetodos[p.metodoPagoId];
-            const valor = metodo?.valorSesionDefault ?? 0;
+            const metodosIds = getMetodosPaciente(p);
+            const metodosDelPac = metodosIds.map((id) => mapaMetodos[id]).filter(Boolean);
+            const primerMetodo = metodosDelPac[0];
+            const valor = primerMetodo?.valorSesionDefault ?? 0;
             const profs = profUids.map((uid) => mapaProfesionales[uid]).filter(Boolean);
 
             return (
@@ -634,10 +637,17 @@ function PacientesTabla({
                   <ProfesionalesCelda pacienteUids={profUids} mapaProfesionales={mapaProfesionales} />
                 </td>
                 <td data-label="Método" style={{ fontSize: 13.5 }}>
-                  {metodo ? metodo.nombre : <span style={{ color: 'var(--cp-danger)' }}>Método eliminado</span>}
+                  {metodosDelPac.length === 0
+                    ? <span style={{ color: 'var(--cp-danger)' }}>Sin método</span>
+                    : metodosDelPac.map((m, i) => (
+                        <span key={m.id}>
+                          {i > 0 && <span style={{ color: 'var(--cp-text-faint)', margin: '0 4px' }}>·</span>}
+                          {m.nombre}
+                        </span>
+                      ))}
                 </td>
                 <td data-label="Valor sesión" className="cp-num">
-                  {metodo?.tipo === TIPOS_METODO_PAGO.DIFERIDO ? (
+                  {primerMetodo?.tipo === TIPOS_METODO_PAGO.DIFERIDO ? (
                     <span style={{ color: 'var(--cp-text-faint)', fontStyle: 'italic', fontSize: 13 }}>Según OS</span>
                   ) : (
                     formatoARS.format(valor)
@@ -660,12 +670,14 @@ function PacientesTabla({
                     </div>
                   </div>
                   <div className="cp-row-mobile__mid">
-                    {metodo ? metodo.nombre : 'Sin método'}
+                    {metodosDelPac.length === 0
+                      ? 'Sin método'
+                      : metodosDelPac.map((m) => m.nombre).join(' · ')}
                     {p.obraSocialNumero ? ` · Nº ${p.obraSocialNumero}` : ''}
                   </div>
                   <div className="cp-row-mobile__bot">
                     {profs.length > 0 ? profs.map((pr) => `${pr.nombre || ''} ${pr.apellido || ''}`.trim()).join(', ') : 'Sin profesional'}
-                    {metodo?.tipo !== TIPOS_METODO_PAGO.DIFERIDO && ` · ${formatoARS.format(valor)}`}
+                    {primerMetodo?.tipo !== TIPOS_METODO_PAGO.DIFERIDO && primerMetodo && ` · ${formatoARS.format(valor)}`}
                   </div>
                 </td>
                 <td className="cp-td-mobile-badge" />
