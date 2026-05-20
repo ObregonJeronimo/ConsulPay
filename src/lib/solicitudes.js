@@ -435,27 +435,52 @@ export async function aprobarSolicitud({
   }
 
   if (sol.tipo === TIPOS_SOLICITUD_SESION.CARGA_RAPIDA) {
-    // Crear todas las sesiones del batch en paralelo
     const sesionesPayload = sol.payloadPropuesto?.sesiones ?? [];
-    const { writeBatch } = await import('firebase/firestore');
-    const batch = writeBatch(db);
+
+    // Necesitamos los metodos del consultorio para calcular el split
+    // (porcentajeConsultorio, montoConsultorio, montoProfesional).
+    // Los leemos desde el doc del consultorio.
+    const consSnap = await getDoc(doc(db, 'consultorios', consultorioId));
+    const metodosPago = consSnap.exists()
+      ? (consSnap.data().metodosPagoPaciente ?? [])
+      : [];
+    const mapaMetodos = Object.fromEntries(metodosPago.map((m) => [m.id, m]));
+
+    // Usamos buildSesionData (la funcion pura de sesiones.js) para cada
+    // sesion, así los campos economicos quedan correctos y pasan las rules.
+    const { buildSesionData } = await import('./sesiones.js');
+    const { writeBatch: wb, doc: docFn, collection: colFn } = await import('firebase/firestore');
+    const batch = wb(db);
     const ts = serverTimestamp();
 
     for (const s of sesionesPayload) {
-      const sesRef = doc(collection(db, 'sesiones'));
-      // s.fecha puede ser un Timestamp serializado {seconds, nanoseconds} —
-      // lo convertimos a Timestamp de Firestore para que se guarde correctamente.
-      let fecha = s.fecha;
-      if (fecha && !(typeof fecha.toDate === 'function') && fecha.seconds !== undefined) {
-        const { Timestamp } = await import('firebase/firestore');
-        fecha = new Timestamp(fecha.seconds, fecha.nanoseconds || 0);
+      const metodo = mapaMetodos[s.metodoPagoId];
+      if (!metodo) continue; // metodo eliminado, saltear
+
+      // Convertir fecha serializada a Date
+      let fecha;
+      if (s.fecha?.seconds !== undefined) {
+        fecha = new Date(s.fecha.seconds * 1000);
+      } else if (s.fecha?.toDate) {
+        fecha = s.fecha.toDate();
+      } else {
+        fecha = new Date(s.fecha);
       }
-      batch.set(sesRef, {
-        ...s,
-        fecha,
+
+      const sesionData = buildSesionData({
         consultorioId,
         profesionalUid: sol.profesionalUid,
-        estadoPago: s.estadoPago ?? ESTADOS_PAGO_SESION.DEBIDO,
+        pacienteId: s.pacienteId,
+        fecha,
+        metodo,
+        valorSesion: s.estadoPago === 'pendiente_monto' ? undefined : s.valorSesion,
+        cantidadSesiones: s.cantidadSesiones,
+        notas: null,
+      });
+
+      const sesRef = docFn(colFn(db, 'sesiones'));
+      batch.set(sesRef, {
+        ...sesionData,
         createdAt: ts,
         createdByUid: sol.profesionalUid,
         updatedAt: ts,

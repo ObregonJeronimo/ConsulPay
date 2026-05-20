@@ -99,6 +99,11 @@ export function getCantidadSesiones(sesion) {
  *
  * @throws Error si faltan datos minimos.
  */
+// Exportada para que aprobarSolicitud (solicitudes.js) pueda construir
+// el payload de una sesion con todos los campos calculados correctamente
+// (split, porcentajeConsultorio, etc.) sin duplicar la logica.
+export { armarPayload as buildSesionData };
+
 function armarPayload({
   consultorioId,
   profesionalUid,
