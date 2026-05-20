@@ -452,12 +452,12 @@
     display: none;
   }
 
-  /* Cada fila: card vertical */
+  /* Cada fila: card compacta con grid 2 columnas */
   .cp-cr-fila {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    padding: 14px 16px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 12px;
+    padding: 12px 14px 12px 12px;
     margin: 0 0 8px;
     border: 1px solid var(--cp-border);
     border-radius: var(--cp-radius-md);
@@ -465,34 +465,64 @@
     position: relative;
   }
 
+  /* Paciente: ocupa todo el ancho */
+  .cp-cr-fila__cell--pac {
+    grid-column: 1 / -1;
+    padding-right: 28px; /* espacio para el botón × */
+  }
+
+  /* Botón eliminar: esquina superior derecha */
+  .cp-cr-fila__cell--del {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    grid-column: unset;
+  }
+
+  /* Cantidad: columna derecha, compacta */
+  .cp-cr-fila__cell--cant {
+    display: flex;
+    flex-direction: column;
+  }
+
   .cp-cr-fila__label {
     display: block;
-    font-size: 10.5px;
+    font-size: 10px;
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--cp-text-faint);
-    margin-bottom: 4px;
-  }
-
-  .cp-cr-fila__cell--del {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-  }
-
-  /* Fecha + cantidad en fila horizontal */
-  .cp-cr-fila__cell--fecha-cant {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 12px;
-    align-items: end;
+    margin-bottom: 3px;
   }
 
   .cp-cr-input {
-    height: 40px;
+    height: 38px;
+    font-size: 13.5px;
+    padding: 0 10px;
+  }
+
+  /* Picker de cantidad en mobile: más compacto */
+  .cp-cr-picker {
+    height: 90px;
+    width: 52px;
+  }
+
+  .cp-cr-picker__item {
+    height: 30px;
     font-size: 14px;
-    padding: 0 12px;
+  }
+
+  .cp-cr-picker__item--sel {
+    font-size: 16px;
+  }
+
+  .cp-cr-picker__fade-top,
+  .cp-cr-picker__fade-bot {
+    height: 28px;
+  }
+
+  .cp-cr-picker__list {
+    padding: 30px 0;
   }
 
   /* ¿todos o algunos? en mobile: columna */
