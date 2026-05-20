@@ -8,6 +8,7 @@ import Input from '../../components/ui/Input.jsx';
 import MetodoPagoSelect from '../../components/ui/MetodoPagoSelect.jsx';
 import PacienteAutocomplete from '../../components/ui/PacienteAutocomplete.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
+import CargaRapidaModal from './CargaRapidaModal.jsx';
 
 import { useAuth } from '../../hooks/useAuth.js';
 import { useConsultorio } from '../../hooks/useConsultorio.js';
@@ -146,6 +147,7 @@ export default function Sesiones() {
   const [editando, setEditando] = useState(null);
   const [liquidando, setLiquidando] = useState(null);
   const [pagarMesOpen, setPagarMesOpen] = useState(false);
+  const [cargaRapidaOpen, setCargaRapidaOpen] = useState(false);
   const [quienRecibioSesion, setQuienRecibioSesion] = useState(null); // sesion pendiente de receptor
 
   // Admins del consultorio (dinamicos desde Firestore) para "¿Quién recibió?"
@@ -374,14 +376,23 @@ export default function Sesiones() {
           </p>
           <SelectorMes mes={mes} setMes={setMes} />
         </div>
-        <Button
-          variant="primary"
-          icon={<PlusIcon />}
-          onClick={() => setEditando('nueva')}
-          disabled={!hayPrereqs}
-        >
-          Registrar sesión
-        </Button>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <Button
+            variant="secondary"
+            onClick={() => setCargaRapidaOpen(true)}
+            disabled={!hayPrereqs}
+          >
+            Carga rápida
+          </Button>
+          <Button
+            variant="primary"
+            icon={<PlusIcon />}
+            onClick={() => setEditando('nueva')}
+            disabled={!hayPrereqs}
+          >
+            Registrar sesión
+          </Button>
+        </div>
       </header>
 
       {!hayPrereqs && (
@@ -490,6 +501,19 @@ export default function Sesiones() {
             />
           )}
         </>
+      )}
+
+      {cargaRapidaOpen && (
+        <CargaRapidaModal
+          esAdmin
+          profesionales={profesionalesActivos}
+          pacientes={pacientesActivos}
+          mapaMetodos={Object.fromEntries(metodos.map((m) => [m.id, m]))}
+          metodos={metodos}
+          consultorioId={user.consultorioId}
+          uid={user.uid}
+          onClose={() => setCargaRapidaOpen(false)}
+        />
       )}
 
       {editando && (

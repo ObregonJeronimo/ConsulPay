@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import ActionMenu from '../../components/ui/ActionMenu.jsx';
 import Avatar from '../../components/ui/Avatar.jsx';
+import CargaRapidaModal from '../admin/CargaRapidaModal.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
 
@@ -140,7 +141,8 @@ export default function MisSesiones() {
   const [loadingSesiones, setLoadingSesiones] = useState(true);
 
   const [editando, setEditando] = useState(null); // null | 'nueva' | sesion
-  const [liquidando, setLiquidando] = useState(null); // sesion en pendiente_monto que vamos a liquidar
+  const [liquidando, setLiquidando] = useState(null);
+  const [cargaRapidaOpen, setCargaRapidaOpen] = useState(false);
 
   // Si no tiene confianza, mostramos un banner aclaratorio y las acciones
   // crean solicitudes en lugar de tocar /sesiones/ directamente.
@@ -347,14 +349,21 @@ export default function MisSesiones() {
           </p>
           <SelectorMes mes={mes} setMes={setMes} />
         </div>
-        <Button
-          variant="primary"
-          icon={<PlusIcon />}
-          onClick={() => setEditando('nueva')}
-          disabled={!hayPrereqs}
-        >
-          {tieneConfianza ? 'Registrar sesión' : 'Solicitar nueva sesión'}
-        </Button>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          {tieneConfianza && (
+            <Button variant="secondary" onClick={() => setCargaRapidaOpen(true)} disabled={!hayPrereqs}>
+              Carga rápida
+            </Button>
+          )}
+          <Button
+            variant="primary"
+            icon={<PlusIcon />}
+            onClick={() => setEditando('nueva')}
+            disabled={!hayPrereqs}
+          >
+            {tieneConfianza ? 'Registrar sesión' : 'Solicitar nueva sesión'}
+          </Button>
+        </div>
       </header>
 
       {/* Banner de modo "con aprobacion" */}
@@ -435,6 +444,20 @@ export default function MisSesiones() {
             />
           )}
         </>
+      )}
+
+      {cargaRapidaOpen && (
+        <CargaRapidaModal
+          esAdmin={false}
+          profesionales={[]}
+          pacientes={pacientesActivos}
+          mapaMetodos={Object.fromEntries(metodos.map((m) => [m.id, m]))}
+          metodos={metodos}
+          consultorioId={user.consultorioId}
+          profesionalUidFijo={user.uid}
+          uid={user.uid}
+          onClose={() => setCargaRapidaOpen(false)}
+        />
       )}
 
       {editando && (
