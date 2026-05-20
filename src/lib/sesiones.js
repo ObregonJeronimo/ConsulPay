@@ -275,9 +275,11 @@ export async function eliminarSesion(sesionId) {
 /* ============================================================
    Cambiar estado de pago (solo admin via rules)
    ============================================================ */
-export async function marcarSesionPagada(sesionId, updatedByUid) {
+export async function marcarSesionPagada(sesionId, updatedByUid, receptor = null) {
   await updateDoc(doc(db, 'sesiones', sesionId), {
     estadoPago: ESTADOS_PAGO_SESION.PAGADO,
+    receptorUid: receptor?.uid ?? null,
+    receptorNombre: receptor?.nombre ?? null,
     updatedAt: serverTimestamp(),
     updatedByUid: updatedByUid ?? null,
   });
@@ -286,9 +288,36 @@ export async function marcarSesionPagada(sesionId, updatedByUid) {
 export async function marcarSesionDebida(sesionId, updatedByUid) {
   await updateDoc(doc(db, 'sesiones', sesionId), {
     estadoPago: ESTADOS_PAGO_SESION.DEBIDO,
+    receptorUid: null,
+    receptorNombre: null,
     updatedAt: serverTimestamp(),
     updatedByUid: updatedByUid ?? null,
   });
+}
+
+/* ============================================================
+   Marcar multiples sesiones como pagadas en batch (Pagar mes)
+   ----------------------------------------------------------------
+   Marca todas las sesiones del array como PAGADO con el mismo
+   receptor. Solo opera sobre sesiones en estado DEBIDO — las que
+   estan en PENDIENTE_MONTO (obras sociales sin valor) se ignoran.
+   ============================================================ */
+export async function marcarSesionesMesPagadas(sesionIds, updatedByUid, receptor = null) {
+  if (!sesionIds || sesionIds.length === 0) return 0;
+  const { writeBatch } = await import('firebase/firestore');
+  const batch = writeBatch(db);
+  const ts = serverTimestamp();
+  for (const id of sesionIds) {
+    batch.update(doc(db, 'sesiones', id), {
+      estadoPago: ESTADOS_PAGO_SESION.PAGADO,
+      receptorUid: receptor?.uid ?? null,
+      receptorNombre: receptor?.nombre ?? null,
+      updatedAt: ts,
+      updatedByUid: updatedByUid ?? null,
+    });
+  }
+  await batch.commit();
+  return sesionIds.length;
 }
 
 /* ============================================================

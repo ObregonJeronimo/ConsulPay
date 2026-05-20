@@ -20,7 +20,7 @@ import {
   TIPOS_METODO_PAGO,
 } from '../../lib/constants.js';
 import { suscribirPacientesConsultorio } from '../../lib/pacientes.js';
-import { suscribirProfesionales } from '../../lib/profesionales.js';
+import { suscribirMiembrosConsultorio, suscribirProfesionales } from '../../lib/profesionales.js';
 import {
   calcularSplit,
   crearSesion,
@@ -33,12 +33,12 @@ import {
   liquidarMontoSesion,
   marcarSesionDebida,
   marcarSesionPagada,
+  marcarSesionesMesPagadas,
   nombreDelMes,
   suscribirSesionesConsultorio,
   totalesGlobales,
   validarFechaContraConsultorio,
 } from '../../lib/sesiones.js';
-import { marcarPendientesComoObsoletas } from '../../lib/solicitudes.js';
 
 import './Sesiones.css';
 
@@ -145,6 +145,15 @@ export default function Sesiones() {
 
   const [editando, setEditando] = useState(null);
   const [liquidando, setLiquidando] = useState(null);
+  const [pagarMesOpen, setPagarMesOpen] = useState(false);
+  const [quienRecibioSesion, setQuienRecibioSesion] = useState(null); // sesion pendiente de receptor
+
+  // Admins del consultorio (dinamicos desde Firestore) para "¿Quién recibió?"
+  const [miembros, setMiembros] = useState([]);
+  const admins = useMemo(
+    () => miembros.filter((m) => m.rol === 'admin' || m.esAdminDelConsultorio),
+    [miembros],
+  );
 
   // Si venimos del Dashboard con state { abrirNueva: true }, abrimos
   // el modal de nueva sesion automaticamente y limpiamos el state.
@@ -181,6 +190,11 @@ export default function Sesiones() {
   useEffect(() => {
     if (!user?.consultorioId) return;
     return suscribirProfesionales(user.consultorioId, setProfesionales);
+  }, [user?.consultorioId]);
+
+  useEffect(() => {
+    if (!user?.consultorioId) return;
+    return suscribirMiembrosConsultorio(user.consultorioId, setMiembros);
   }, [user?.consultorioId]);
 
   const profesionalesActivos = useMemo(
@@ -287,14 +301,27 @@ export default function Sesiones() {
   }
 
   async function handleTogglePagado(sesion) {
-    try {
-      if (sesion.estadoPago === ESTADOS_PAGO_SESION.DEBIDO) {
-        await marcarSesionPagada(sesion.id, user.uid);
-      } else {
+    if (sesion.estadoPago === ESTADOS_PAGO_SESION.DEBIDO) {
+      // Pedir quién recibió antes de marcar como pagada
+      setQuienRecibioSesion(sesion);
+    } else {
+      // Revertir a "debe": no necesita saber quién recibió
+      try {
         await marcarSesionDebida(sesion.id, user.uid);
+      } catch (err) {
+        alert(err.message || 'No se pudo cambiar el estado.');
       }
+    }
+  }
+
+  async function handleConfirmarReceptor(receptor) {
+    if (!quienRecibioSesion) return;
+    try {
+      await marcarSesionPagada(quienRecibioSesion.id, user.uid, receptor);
     } catch (err) {
-      alert(err.message || 'No se pudo cambiar el estado.');
+      alert(err.message || 'No se pudo marcar como pagada.');
+    } finally {
+      setQuienRecibioSesion(null);
     }
   }
 
@@ -416,6 +443,13 @@ export default function Sesiones() {
               <option value={ESTADOS_PAGO_SESION.DEBIDO}>Deben</option>
               <option value={ESTADOS_PAGO_SESION.PAGADO}>Pagadas</option>
             </select>
+            <Button
+              variant="secondary"
+              type="button"
+              onClick={() => setPagarMesOpen(true)}
+            >
+              Pagar mes
+            </Button>
           </div>
 
           {loadingSesiones ? (
@@ -479,6 +513,28 @@ export default function Sesiones() {
           esCorreccion={liquidando.estadoPago === ESTADOS_PAGO_SESION.DEBIDO}
           onClose={() => setLiquidando(null)}
           onConfirmar={handleConfirmarLiquidar}
+        />
+      )}
+
+      {quienRecibioSesion && (
+        <QuienRecibioModal
+          admins={admins}
+          sesion={quienRecibioSesion}
+          paciente={mapaPacientes[quienRecibioSesion.pacienteId]}
+          onClose={() => setQuienRecibioSesion(null)}
+          onConfirmar={handleConfirmarReceptor}
+        />
+      )}
+
+      {pagarMesOpen && (
+        <PagarMesModal
+          consultorioId={user.consultorioId}
+          profesionales={profesionalesActivos}
+          pacientes={pacientesActivos}
+          mapaPacientes={mapaPacientes}
+          admins={admins}
+          uid={user.uid}
+          onClose={() => setPagarMesOpen(false)}
         />
       )}
     </div>
@@ -1287,6 +1343,366 @@ export function LiquidarMontoModal({ sesion, paciente, modoSolicitud, esCorrecci
           </div>
         </form>
       </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   Modal "¿Quién recibió el dinero?"
+   ----------------------------------------------------------------
+   Aparece antes de marcar una sesión individual como pagada.
+   Muestra los admins del consultorio como opciones. Al confirmar
+   guarda receptorUid + receptorNombre en la sesión.
+   ============================================================ */
+export function QuienRecibioModal({ admins, sesion, paciente, onClose, onConfirmar }) {
+  const overlayProps = useOverlayClose(onClose);
+  const [receptorUid, setReceptorUid] = useState(admins[0]?.uid ?? '');
+  const [submitting, setSubmitting] = useState(false);
+
+  const nombrePac = paciente
+    ? `${paciente.nombre || ''} ${paciente.apellido || ''}`.trim()
+    : 'Paciente';
+
+  async function handleConfirmar() {
+    const admin = admins.find((a) => a.uid === receptorUid);
+    if (!admin) return;
+    setSubmitting(true);
+    try {
+      await onConfirmar({
+        uid: admin.uid,
+        nombre: admin.displayName || admin.email || admin.uid,
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="cp-modal-overlay" {...overlayProps}>
+      <div className="cp-modal" onClick={(e) => e.stopPropagation()}>
+        <button className="cp-modal__close" onClick={onClose} aria-label="Cerrar">×</button>
+        <h2 className="cp-modal__title">¿Quién recibió el dinero?</h2>
+        <p className="cp-modal__sub">
+          Sesión de <strong>{nombrePac}</strong> · {formatoARS.format(sesion?.montoConsultorio || 0)} para el consultorio
+        </p>
+        <div className="cp-modal__form">
+          <div className="cp-quien-recibio__opciones">
+            {admins.length === 0 ? (
+              <p style={{ color: 'var(--cp-text-muted)', fontSize: 13.5 }}>
+                No hay admins registrados en el consultorio.
+              </p>
+            ) : admins.map((a) => (
+              <label
+                key={a.uid}
+                className={`cp-quien-recibio__opcion ${receptorUid === a.uid ? 'cp-quien-recibio__opcion--active' : ''}`}
+              >
+                <input
+                  type="radio"
+                  name="receptor"
+                  value={a.uid}
+                  checked={receptorUid === a.uid}
+                  onChange={() => setReceptorUid(a.uid)}
+                />
+                <Avatar initials={(a.displayName || a.email || '?')[0].toUpperCase()} size={32} />
+                <span className="cp-quien-recibio__nombre">
+                  {a.displayName || a.email}
+                </span>
+              </label>
+            ))}
+          </div>
+          <div className="cp-modal__actions">
+            <Button type="button" variant="ghost" onClick={onClose} disabled={submitting}>
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={handleConfirmar}
+              disabled={submitting || !receptorUid || admins.length === 0}
+            >
+              {submitting ? <><Spinner size={14} /> Guardando…</> : 'Confirmar'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   Modal "Pagar mes"
+   ----------------------------------------------------------------
+   Permite al admin seleccionar un profesional y un mes, ver el
+   resumen de sesiones por paciente y marcar todas como pagadas
+   de una vez (excepto las de obra social sin valor).
+   ============================================================ */
+export function PagarMesModal({ consultorioId, profesionales, pacientes, mapaPacientes, admins, uid, onClose }) {
+  const overlayProps = useOverlayClose(onClose);
+  const [profUid, setProfUid] = useState('');
+  const [mes, setMes] = useState(() => inicioDeMes(new Date()));
+  const [sesiones, setSesiones] = useState([]);
+  const [loadingSes, setLoadingSes] = useState(false);
+  const [receptorUid, setReceptorUid] = useState(admins[0]?.uid ?? '');
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(false);
+
+  // Cargar sesiones del profesional+mes elegido
+  useEffect(() => {
+    if (!profUid || !consultorioId) { setSesiones([]); return; }
+    setLoadingSes(true);
+    const desde = inicioDeMes(mes);
+    const hasta = finDeMes(mes);
+    const unsub = suscribirSesionesConsultorio(
+      consultorioId,
+      (data) => {
+        setSesiones(data.filter((s) => s.profesionalUid === profUid));
+        setLoadingSes(false);
+      },
+      { desde, hasta },
+    );
+    return unsub;
+  }, [consultorioId, profUid, mes]);
+
+  // Agrupar por paciente
+  const porPaciente = useMemo(() => {
+    const map = {};
+    for (const s of sesiones) {
+      if (!map[s.pacienteId]) map[s.pacienteId] = { sesiones: [] };
+      map[s.pacienteId].sesiones.push(s);
+    }
+    return Object.entries(map).map(([pacienteId, { sesiones: ss }]) => {
+      const pac = mapaPacientes[pacienteId];
+      const debidas = ss.filter((s) => s.estadoPago === ESTADOS_PAGO_SESION.DEBIDO);
+      const aLiquidar = ss.filter((s) => s.estadoPago === ESTADOS_PAGO_SESION.PENDIENTE_MONTO);
+      const pagadas = ss.filter((s) => s.estadoPago === ESTADOS_PAGO_SESION.PAGADO);
+      const totalDebe = debidas.reduce((acc, s) => acc + (s.montoConsultorio || 0), 0);
+      return { pacienteId, pac, debidas, aLiquidar, pagadas, totalDebe };
+    }).filter((r) => r.debidas.length > 0 || r.aLiquidar.length > 0);
+  }, [sesiones, mapaPacientes]);
+
+  const sesionesPagables = useMemo(
+    () => porPaciente.flatMap((r) => r.debidas),
+    [porPaciente],
+  );
+  const totalAPagar = useMemo(
+    () => sesionesPagables.reduce((acc, s) => acc + (s.montoConsultorio || 0), 0),
+    [sesionesPagables],
+  );
+  const totalALiquidar = useMemo(
+    () => porPaciente.reduce((acc, r) => acc + r.aLiquidar.length, 0),
+    [porPaciente],
+  );
+
+  async function handlePagar() {
+    const admin = admins.find((a) => a.uid === receptorUid);
+    if (!admin || sesionesPagables.length === 0) return;
+    setSubmitting(true);
+    try {
+      await marcarSesionesMesPagadas(
+        sesionesPagables.map((s) => s.id),
+        uid,
+        { uid: admin.uid, nombre: admin.displayName || admin.email || admin.uid },
+      );
+      setDone(true);
+    } catch (err) {
+      alert(err.message || 'No se pudieron marcar las sesiones como pagadas.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="cp-modal-overlay" {...overlayProps}>
+      <div className="cp-modal cp-modal--wide" onClick={(e) => e.stopPropagation()}>
+        <button className="cp-modal__close" onClick={onClose} aria-label="Cerrar">×</button>
+        <h2 className="cp-modal__title">Pagar mes</h2>
+        <p className="cp-modal__sub">
+          Seleccioná un profesional y un mes para ver las sesiones pendientes de pago.
+        </p>
+
+        {done ? (
+          <div className="cp-modal__form">
+            <div className="cp-pagar-mes__done">
+              <div style={{ fontSize: 48 }}>✓</div>
+              <div style={{ fontWeight: 500, fontSize: 16 }}>
+                {sesionesPagables.length} sesión{sesionesPagables.length === 1 ? '' : 'es'} marcada{sesionesPagables.length === 1 ? '' : 's'} como pagadas
+              </div>
+              <div style={{ color: 'var(--cp-text-muted)', fontSize: 13.5 }}>
+                Total: {formatoARS.format(totalAPagar)}
+              </div>
+            </div>
+            <div className="cp-modal__actions">
+              <Button variant="primary" onClick={onClose}>Cerrar</Button>
+            </div>
+          </div>
+        ) : (
+          <div className="cp-modal__form">
+            {/* Filtros */}
+            <div className="cp-pagar-mes__filtros">
+              <div style={{ flex: 1 }}>
+                <label className="cp-field__label" style={{ display: 'block', marginBottom: 6 }}>Profesional</label>
+                <select
+                  className="cp-select"
+                  value={profUid}
+                  onChange={(e) => setProfUid(e.target.value)}
+                >
+                  <option value="">Elegir profesional…</option>
+                  {profesionales.map((p) => (
+                    <option key={p.uid} value={p.uid}>{p.displayName || p.email}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="cp-field__label" style={{ display: 'block', marginBottom: 6 }}>Mes</label>
+                <SelectorMesPagarMes mes={mes} setMes={setMes} />
+              </div>
+            </div>
+
+            {/* Lista por paciente */}
+            {!profUid ? (
+              <p style={{ color: 'var(--cp-text-faint)', fontSize: 13.5, textAlign: 'center', padding: '24px 0' }}>
+                Elegí un profesional para ver sus sesiones
+              </p>
+            ) : loadingSes ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}>
+                <Spinner size={20} />
+              </div>
+            ) : porPaciente.length === 0 ? (
+              <p style={{ color: 'var(--cp-text-muted)', fontSize: 13.5, textAlign: 'center', padding: '24px 0' }}>
+                No hay sesiones pendientes en {nombreDelMes(mes)}
+              </p>
+            ) : (
+              <>
+                <div className="cp-pagar-mes__tabla">
+                  <div className="cp-pagar-mes__tabla-head">
+                    <span>Paciente</span>
+                    <span style={{ textAlign: 'center' }}>Sesiones</span>
+                    <span style={{ textAlign: 'right' }}>Total al consultorio</span>
+                  </div>
+                  {porPaciente.map((r) => (
+                    <div key={r.pacienteId} className="cp-pagar-mes__row">
+                      <div className="cp-prof-cell">
+                        <Avatar
+                          initials={r.pac ? `${r.pac.nombre?.[0] || ''}${r.pac.apellido?.[0] || ''}`.toUpperCase() : '?'}
+                          size={28}
+                        />
+                        <div>
+                          <div className="cp-prof-name" style={{ fontSize: 13.5 }}>
+                            {r.pac ? `${r.pac.nombre || ''} ${r.pac.apellido || ''}`.trim() : 'Paciente eliminado'}
+                          </div>
+                          {r.pagadas.length > 0 && (
+                            <div style={{ fontSize: 11.5, color: 'var(--cp-text-faint)' }}>
+                              {r.pagadas.length} ya pagada{r.pagadas.length === 1 ? '' : 's'}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'center' }}>
+                        {r.debidas.length > 0 && (
+                          <span style={{ fontSize: 13.5, fontWeight: 500, color: 'var(--cp-text)' }}>
+                            {r.debidas.length} deben
+                          </span>
+                        )}
+                        {r.aLiquidar.length > 0 && (
+                          <div style={{ fontSize: 11.5, color: 'var(--cp-warning, #b8860b)', marginTop: 2 }}>
+                            {r.aLiquidar.length} sin valor (OS)
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ textAlign: 'right', fontWeight: 500, fontSize: 14 }}>
+                        {r.debidas.length > 0
+                          ? formatoARS.format(r.totalDebe)
+                          : <span style={{ color: 'var(--cp-text-faint)' }}>—</span>}
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Total */}
+                  <div className="cp-pagar-mes__total">
+                    <span>Total a pagar</span>
+                    <span />
+                    <span style={{ textAlign: 'right', fontSize: 18, fontWeight: 600, color: 'var(--cp-success)' }}>
+                      {formatoARS.format(totalAPagar)}
+                    </span>
+                  </div>
+                </div>
+
+                {totalALiquidar > 0 && (
+                  <div className="cp-aviso-diferido">
+                    <div className="cp-aviso-diferido__icon">⚠</div>
+                    <div className="cp-aviso-diferido__body">
+                      <div className="cp-aviso-diferido__title">
+                        {totalALiquidar} sesión{totalALiquidar === 1 ? '' : 'es'} de obra social sin liquidar
+                      </div>
+                      <div className="cp-aviso-diferido__text">
+                        Estas sesiones no tienen valor aún (probablemente la obra social todavía no informó el monto). No se pueden marcar como pagadas hasta que tengan valor. Quedarán pendientes.
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ¿Quién recibió? */}
+                <div>
+                  <label className="cp-field__label" style={{ display: 'block', marginBottom: 8 }}>
+                    ¿Quién recibió el dinero?
+                  </label>
+                  <div className="cp-quien-recibio__opciones">
+                    {admins.map((a) => (
+                      <label
+                        key={a.uid}
+                        className={`cp-quien-recibio__opcion ${receptorUid === a.uid ? 'cp-quien-recibio__opcion--active' : ''}`}
+                      >
+                        <input
+                          type="radio"
+                          name="receptor-mes"
+                          value={a.uid}
+                          checked={receptorUid === a.uid}
+                          onChange={() => setReceptorUid(a.uid)}
+                        />
+                        <Avatar initials={(a.displayName || a.email || '?')[0].toUpperCase()} size={28} />
+                        <span>{a.displayName || a.email}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            <div className="cp-modal__actions">
+              <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
+              {sesionesPagables.length > 0 && (
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={handlePagar}
+                  disabled={submitting || !receptorUid}
+                >
+                  {submitting
+                    ? <><Spinner size={14} /> Procesando…</>
+                    : `Marcar ${sesionesPagables.length} sesión${sesionesPagables.length === 1 ? '' : 'es'} como pagadas`}
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SelectorMesPagarMes({ mes, setMes }) {
+  function anterior() {
+    setMes((m) => { const d = new Date(m); d.setMonth(d.getMonth() - 1); return inicioDeMes(d); });
+  }
+  function siguiente() {
+    setMes((m) => { const d = new Date(m); d.setMonth(d.getMonth() + 1); return inicioDeMes(d); });
+  }
+  const esEsteMes = inicioDeMes(new Date()).getTime() === mes.getTime();
+  return (
+    <div className="cp-mes-selector" style={{ marginTop: 0 }}>
+      <button type="button" className="cp-mes-selector__btn" onClick={anterior}>‹</button>
+      <span className="cp-mes-selector__label">{nombreDelMes(mes)}</span>
+      <button type="button" className="cp-mes-selector__btn" onClick={siguiente} disabled={esEsteMes}>›</button>
     </div>
   );
 }
