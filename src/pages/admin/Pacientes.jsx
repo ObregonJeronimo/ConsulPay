@@ -10,6 +10,7 @@ import Spinner from '../../components/ui/Spinner.jsx';
 
 import { useAuth } from '../../hooks/useAuth.js';
 import { useConsultorio } from '../../hooks/useConsultorio.js';
+import { useOverlayClose } from '../../hooks/useOverlayClose.js';
 import {
   ESTADOS_PACIENTE,
   ESTADOS_USUARIO,
@@ -822,8 +823,10 @@ function PacienteModal({ paciente, profesionales, metodos, onClose, onGuardar })
     }
   }
 
+  const overlayProps = useOverlayClose(onClose);
+
   return (
-    <div className="cp-modal-overlay" onClick={onClose}>
+    <div className="cp-modal-overlay" {...overlayProps}>
       <div className="cp-modal cp-modal--wide" onClick={(e) => e.stopPropagation()}>
         <button className="cp-modal__close" onClick={onClose} aria-label="Cerrar">×</button>
 

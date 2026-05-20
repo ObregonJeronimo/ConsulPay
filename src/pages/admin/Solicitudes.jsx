@@ -433,8 +433,10 @@ function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, adminUid, a
     }
   }
 
+  const overlayProps = useOverlayClose(onClose);
+
   return (
-    <div className="cp-modal-overlay" onClick={onClose}>
+    <div className="cp-modal-overlay" {...overlayProps}>
       <div className="cp-modal cp-modal--wide cp-modal--detalle" onClick={(e) => e.stopPropagation()}>
         <button className="cp-modal__close" onClick={onClose} aria-label="Cerrar">×</button>
 

@@ -339,6 +339,49 @@ export async function liquidarMontoSesion(sesionId, valorLiquidado, updatedByUid
 }
 
 /* ============================================================
+   Editar el monto ya liquidado de una sesion de obra social
+   ----------------------------------------------------------------
+   Solo disponible si la sesion esta en estadoPago='debido' Y el
+   metodoPagoTipo era 'diferido' (fue liquidada antes via
+   liquidarMontoSesion). NO disponible si ya esta pagada.
+
+   Disponible para admin y profesional (sin restriccion de confianza
+   porque no cambia el estadoPago, solo corrige el monto).
+   ============================================================ */
+export async function editarMontoLiquidado(sesionId, valorNuevo, updatedByUid) {
+  const v = Number(valorNuevo);
+  if (!Number.isFinite(v) || v <= 0) {
+    throw new Error('El valor debe ser un número mayor a cero');
+  }
+
+  const ref = doc(db, 'sesiones', sesionId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) throw new Error('La sesión no existe');
+  const data = snap.data();
+
+  if (data.estadoPago === ESTADOS_PAGO_SESION.PAGADO) {
+    throw new Error('No se puede modificar el monto de una sesión ya pagada');
+  }
+  if (data.metodoPagoTipo !== 'diferido') {
+    throw new Error('Solo se puede editar el monto de sesiones de obra social');
+  }
+
+  const cantidad = data.cantidadSesiones || 1;
+  const porcentaje = Number(data.porcentajeConsultorio) || 0;
+  const { montoConsultorio, montoProfesional } = calcularSplit(v, porcentaje);
+  const valorUnitario = cantidad > 0 ? Math.round(v / cantidad) : v;
+
+  await updateDoc(ref, {
+    valorTotal: v,
+    valorSesion: valorUnitario,
+    montoConsultorio,
+    montoProfesional,
+    updatedAt: serverTimestamp(),
+    updatedByUid: updatedByUid ?? null,
+  });
+}
+
+/* ============================================================
    Suscripciones live
    ============================================================ */
 

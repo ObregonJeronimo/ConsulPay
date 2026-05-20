@@ -17,6 +17,7 @@ import {
   suscribirProfesionales,
 } from '../../lib/profesionales.js';
 import { useConsultorio } from '../../hooks/useConsultorio.js';
+import { useOverlayClose } from '../../hooks/useOverlayClose.js';
 
 import './Profesionales.css';
 
@@ -539,8 +540,10 @@ function InvitarModal({ onClose, consultorioId, consultorioNombre }) {
     setResultado(null); setError('');
   }
 
+  const overlayProps = useOverlayClose(onClose);
+
   return (
-    <div className="cp-modal-overlay" onClick={onClose}>
+    <div className="cp-modal-overlay" {...overlayProps}>
       <div className="cp-modal" onClick={(e) => e.stopPropagation()}>
         <button className="cp-modal__close" onClick={onClose} aria-label="Cerrar">×</button>
 

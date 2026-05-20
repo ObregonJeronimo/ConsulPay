@@ -23,6 +23,7 @@ import {
   getCantidadSesiones,
   inicioDeMes,
   nombreDelMes,
+  editarMontoLiquidado,
   liquidarMontoSesion,
   suscribirSesionesProfesional,
   totalesGlobales,
@@ -293,18 +294,25 @@ export default function MisSesiones() {
   async function handleConfirmarLiquidar(valor) {
     if (!liquidando) return;
     try {
-      if (tieneConfianza) {
-        await liquidarMontoSesion(liquidando.id, valor, user.uid);
+      const esPrimeraLiquidacion = liquidando.estadoPago === ESTADOS_PAGO_SESION.PENDIENTE_MONTO;
+      if (esPrimeraLiquidacion) {
+        if (tieneConfianza) {
+          await liquidarMontoSesion(liquidando.id, valor, user.uid);
+        } else {
+          const pac = mapaPacientes[liquidando.pacienteId];
+          await solicitarLiquidarMonto({
+            consultorioId: user.consultorioId,
+            sesionId: liquidando.id,
+            valorLiquidado: valor,
+            profesionalUid: user.uid,
+            profesionalNombre: user.displayName || user.email,
+            pacienteNombre: pac ? nombrePaciente(pac) : 'Paciente',
+          });
+        }
       } else {
-        const pac = mapaPacientes[liquidando.pacienteId];
-        await solicitarLiquidarMonto({
-          consultorioId: user.consultorioId,
-          sesionId: liquidando.id,
-          valorLiquidado: valor,
-          profesionalUid: user.uid,
-          profesionalNombre: user.displayName || user.email,
-          pacienteNombre: pac ? nombrePaciente(pac) : 'Paciente',
-        });
+        // Correccion del monto (sesion ya estaba en debido)
+        // Disponible sin restriccion de confianza para el profesional
+        await editarMontoLiquidado(liquidando.id, valor, user.uid);
       }
       setLiquidando(null);
     } catch (err) {
@@ -449,7 +457,8 @@ export default function MisSesiones() {
         <LiquidarMontoModal
           sesion={liquidando}
           paciente={mapaPacientes[liquidando.pacienteId]}
-          modoSolicitud={!tieneConfianza}
+          modoSolicitud={!tieneConfianza && liquidando.estadoPago === ESTADOS_PAGO_SESION.PENDIENTE_MONTO}
+          esCorreccion={liquidando.estadoPago === ESTADOS_PAGO_SESION.DEBIDO}
           onClose={() => setLiquidando(null)}
           onConfirmar={handleConfirmarLiquidar}
         />
@@ -696,6 +705,15 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, onEdi
                         aria-label="Liquidar monto"
                       >
                         <CheckIcon />
+                      </button>
+                    ) : s.metodoPagoTipo === TIPOS_METODO_PAGO.DIFERIDO && !pagada && !tienePendiente ? (
+                      <button
+                        className="cp-icon-btn"
+                        onClick={() => onLiquidar(s)}
+                        title="Corregir monto liquidado"
+                        aria-label="Corregir monto"
+                      >
+                        <EditIcon />
                       </button>
                     ) : (
                       <>

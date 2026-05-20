@@ -9,6 +9,7 @@ import Spinner from '../../components/ui/Spinner.jsx';
 
 import { useAuth } from '../../hooks/useAuth.js';
 import { useConsultorio } from '../../hooks/useConsultorio.js';
+import { useOverlayClose } from '../../hooks/useOverlayClose.js';
 import {
   ESTADOS_PACIENTE,
   ESTADOS_PAGO_SESION,
@@ -22,6 +23,7 @@ import {
   calcularSplit,
   crearSesion,
   actualizarSesion,
+  editarMontoLiquidado,
   eliminarSesion,
   finDeMes,
   getCantidadSesiones,
@@ -293,7 +295,12 @@ export default function Sesiones() {
   async function handleConfirmarLiquidar(valor) {
     if (!liquidando) return;
     try {
-      await liquidarMontoSesion(liquidando.id, valor, user.uid);
+      if (liquidando.estadoPago === ESTADOS_PAGO_SESION.PENDIENTE_MONTO) {
+        await liquidarMontoSesion(liquidando.id, valor, user.uid);
+      } else {
+        // Ya estaba liquidada (debido) — corregimos el monto
+        await editarMontoLiquidado(liquidando.id, valor, user.uid);
+      }
       setLiquidando(null);
     } catch (err) {
       throw err;
@@ -456,6 +463,7 @@ export default function Sesiones() {
         <LiquidarMontoModal
           sesion={liquidando}
           paciente={mapaPacientes[liquidando.pacienteId]}
+          esCorreccion={liquidando.estadoPago === ESTADOS_PAGO_SESION.DEBIDO}
           onClose={() => setLiquidando(null)}
           onConfirmar={handleConfirmarLiquidar}
         />
@@ -647,6 +655,7 @@ function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, onEditar, o
                 <td className="cp-sesiones-tabla__actions-cell" onClick={(e) => e.stopPropagation()}>
                   <div className="cp-sesiones-tabla__actions">
                     {pendienteMonto ? (
+                      // Sesion de obra social sin monto: mostrar boton liquidar
                       <button
                         className="cp-icon-btn cp-icon-btn--success"
                         onClick={() => onLiquidar(s)}
@@ -654,6 +663,17 @@ function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, onEditar, o
                         aria-label="Liquidar monto"
                       >
                         <CheckIcon />
+                      </button>
+                    ) : s.metodoPagoTipo === TIPOS_METODO_PAGO.DIFERIDO && !pagada ? (
+                      // Sesion de obra social ya liquidada pero no pagada:
+                      // se puede corregir el monto con el boton de editar monto
+                      <button
+                        className="cp-icon-btn"
+                        onClick={() => onLiquidar(s)}
+                        title="Corregir monto liquidado"
+                        aria-label="Corregir monto"
+                      >
+                        <EditIcon />
                       </button>
                     ) : (
                       <button
@@ -868,8 +888,10 @@ export function SesionModal({
     }
   }
 
+  const overlayProps = useOverlayClose(onClose);
+
   return (
-    <div className="cp-modal-overlay" onClick={onClose}>
+    <div className="cp-modal-overlay" {...overlayProps}>
       <div className="cp-modal cp-modal--wide" onClick={(e) => e.stopPropagation()}>
         <button className="cp-modal__close" onClick={onClose} aria-label="Cerrar">×</button>
 
@@ -1063,8 +1085,9 @@ export function SesionModal({
    y al confirmar llama al onConfirmar que internamente actualiza la
    sesion via liquidarMontoSesion().
    ============================================================ */
-export function LiquidarMontoModal({ sesion, paciente, modoSolicitud, onClose, onConfirmar }) {
-  const [valor, setValor] = useState('');
+export function LiquidarMontoModal({ sesion, paciente, modoSolicitud, esCorreccion, onClose, onConfirmar }) {
+  // Si es correccion, pre-llenamos con el monto actual
+  const [valor, setValor] = useState(esCorreccion && sesion?.valorTotal ? String(sesion.valorTotal) : '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -1093,21 +1116,28 @@ export function LiquidarMontoModal({ sesion, paciente, modoSolicitud, onClose, o
     ? `${paciente.nombre || ''} ${paciente.apellido || ''}`.trim() || 'Paciente'
     : 'Paciente eliminado';
 
-  const titulo = modoSolicitud ? 'Solicitar liquidación de monto' : 'Liquidar monto';
+  const titulo = esCorreccion
+    ? 'Corregir monto liquidado'
+    : modoSolicitud ? 'Solicitar liquidación de monto' : 'Liquidar monto';
+
   const labelBoton = submitting
-    ? (modoSolicitud ? 'Enviando…' : 'Liquidando…')
-    : (modoSolicitud ? 'Enviar solicitud' : 'Liquidar');
+    ? (modoSolicitud ? 'Enviando…' : esCorreccion ? 'Guardando…' : 'Liquidando…')
+    : (modoSolicitud ? 'Enviar solicitud' : esCorreccion ? 'Guardar corrección' : 'Liquidar');
+
+  const overlayProps = useOverlayClose(onClose);
 
   return (
-    <div className="cp-modal-overlay" onClick={onClose}>
+    <div className="cp-modal-overlay" {...overlayProps}>
       <div className="cp-modal" onClick={(e) => e.stopPropagation()}>
         <button className="cp-modal__close" onClick={onClose} aria-label="Cerrar">×</button>
 
         <h2 className="cp-modal__title">{titulo}</h2>
         <p className="cp-modal__sub">
-          {modoSolicitud
-            ? `Cargá el monto que liquidó la obra social. La solicitud quedará pendiente hasta que el administrador la apruebe.`
-            : `Cargá el monto que liquidó la obra social ${sesion.metodoPagoNombre} por la sesión de ${nombrePac}${cantidad > 1 ? ` (${cantidad} sesiones)` : ''}.`}
+          {esCorreccion
+            ? `Corregí el monto liquidado por ${sesion.metodoPagoNombre}. Solo disponible mientras la sesión no esté pagada.`
+            : modoSolicitud
+              ? `Cargá el monto que liquidó la obra social. La solicitud quedará pendiente hasta que el administrador la apruebe.`
+              : `Cargá el monto que liquidó la obra social ${sesion.metodoPagoNombre} por la sesión de ${nombrePac}${cantidad > 1 ? ` (${cantidad} sesiones)` : ''}.`}
         </p>
 
         <form className="cp-modal__form" onSubmit={onSubmit}>

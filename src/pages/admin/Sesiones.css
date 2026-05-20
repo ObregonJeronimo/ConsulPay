@@ -13,6 +13,19 @@
   gap: var(--cp-space-6);
 }
 
+/* La tabla de sesiones tiene 9 columnas (fecha, profesional, paciente,
+   metodo, valor, consultorio, profesional, estado, acciones). En
+   resoluciones chicas en desktop el wrap hace scroll horizontal, pero
+   necesitamos un minimo explicito para que las acciones no desaparezcan
+   antes de que el scroll entre en accion. */
+.cp-sesiones .cp-table-wrap {
+  min-width: 0;
+}
+
+.cp-sesiones-tabla.cp-table {
+  min-width: 820px;
+}
+
 /* ============================================================
    Header con selector de mes
    ============================================================ */
