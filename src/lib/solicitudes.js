@@ -443,8 +443,16 @@ export async function aprobarSolicitud({
 
     for (const s of sesionesPayload) {
       const sesRef = doc(collection(db, 'sesiones'));
+      // s.fecha puede ser un Timestamp serializado {seconds, nanoseconds} —
+      // lo convertimos a Timestamp de Firestore para que se guarde correctamente.
+      let fecha = s.fecha;
+      if (fecha && !(typeof fecha.toDate === 'function') && fecha.seconds !== undefined) {
+        const { Timestamp } = await import('firebase/firestore');
+        fecha = new Timestamp(fecha.seconds, fecha.nanoseconds || 0);
+      }
       batch.set(sesRef, {
         ...s,
+        fecha,
         consultorioId,
         profesionalUid: sol.profesionalUid,
         estadoPago: s.estadoPago ?? ESTADOS_PAGO_SESION.DEBIDO,

@@ -705,6 +705,17 @@ function DiffCargaRapida({ sesiones }) {
     return <p style={{ color: 'var(--cp-text-faint)', fontSize: 13.5 }}>Sin sesiones en esta solicitud.</p>;
   }
 
+  // Convierte cualquier formato de fecha a Date nativo sin explotar.
+  // Firestore serializa Timestamps como plain objects {seconds, nanoseconds}
+  // cuando están guardados dentro de un campo mapa/array.
+  function parseFecha(v) {
+    if (!v) return null;
+    if (typeof v.toDate === 'function') return v.toDate();          // Timestamp Firestore
+    if (v.seconds !== undefined) return new Date(v.seconds * 1000); // Timestamp serializado
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
   const total = sesiones.reduce((acc, s) => acc + (s.valorTotal || 0), 0);
   const sinValor = sesiones.filter((s) => s.estadoPago === 'pendiente_monto').length;
 
@@ -722,12 +733,10 @@ function DiffCargaRapida({ sesiones }) {
       </div>
       <div className="cp-cr-solicitud__tabla">
         {sesiones.map((s, i) => {
-          const fecha = s.fecha
-            ? (() => {
-                const d = s.fecha.toDate ? s.fecha.toDate() : new Date(s.fecha);
-                return d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })
-                  + ' · ' + d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-              })()
+          const d = parseFecha(s.fecha);
+          const fecha = d
+            ? d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })
+              + ' · ' + d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
             : '—';
           return (
             <div key={i} className="cp-cr-solicitud__row">
