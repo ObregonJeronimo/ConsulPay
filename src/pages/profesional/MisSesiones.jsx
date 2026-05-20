@@ -211,8 +211,14 @@ export default function MisSesiones() {
 
   // Las 5 ultimas solicitudes resueltas / pendientes para mostrar arriba
   const solicitudesParaMostrar = useMemo(() => {
-    return solicitudes.slice(0, 5);
-  }, [solicitudes]);
+    const desde = inicioDeMes(mes).getTime();
+    const hasta = finDeMes(mes).getTime();
+    return solicitudes.filter((s) => {
+      const t = s.createdAt?.toDate ? s.createdAt.toDate().getTime()
+        : s.createdAt?.seconds ? s.createdAt.seconds * 1000 : 0;
+      return t >= desde && t <= hasta;
+    }).slice(0, 10);
+  }, [solicitudes, mes]);
 
   const solicitudesPendientesCount = useMemo(
     () => solicitudes.filter((s) => s.estado === ESTADOS_SOLICITUD_SESION.PENDIENTE).length,
@@ -513,16 +519,25 @@ function SolicitudesPanel({ solicitudes, mapaPacientes, totalPendientes }) {
         </h3>
       </div>
       <div className="cp-solicitudes-panel__list">
-        {solicitudes.map((s) => {
-          const pac = s.payloadPropuesto?.pacienteId
+        {solicitudesParaMostrar.map((s) => {
+          const esCargaRapida = s.tipo === TIPOS_SOLICITUD_SESION.CARGA_RAPIDA;
+          const pac = !esCargaRapida && (s.payloadPropuesto?.pacienteId
             ? mapaPacientes[s.payloadPropuesto.pacienteId]
-            : (s.payloadAnterior?.pacienteId ? mapaPacientes[s.payloadAnterior.pacienteId] : null);
-          const nombrePac = pac ? nombrePaciente(pac) : 'paciente desconocido';
+            : (s.payloadAnterior?.pacienteId ? mapaPacientes[s.payloadAnterior.pacienteId] : null));
+          const nombrePac = esCargaRapida
+            ? `${s.payloadPropuesto?.sesiones?.length ?? 0} sesiones`
+            : (pac ? nombrePaciente(pac) : '—');
 
-          // Cantidad agrupada (si aplica) para mostrar en el titulo
-          const cantidad = s.payloadPropuesto?.cantidadSesiones
-            ?? s.payloadAnterior?.cantidadSesiones
-            ?? 1;
+          const cantidad = !esCargaRapida
+            ? (s.payloadPropuesto?.cantidadSesiones ?? s.payloadAnterior?.cantidadSesiones ?? 1)
+            : 1;
+
+          // Fecha compacta
+          const fechaRaw = s.createdAt?.toDate ? s.createdAt.toDate()
+            : s.createdAt?.seconds ? new Date(s.createdAt.seconds * 1000) : null;
+          const fechaStr = fechaRaw
+            ? fechaRaw.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })
+            : '';
 
           let icon, badgeClass, badgeText;
           switch (s.estado) {
@@ -553,7 +568,12 @@ function SolicitudesPanel({ solicitudes, mapaPacientes, totalPendientes }) {
               <div className="cp-solicitud-row__main">
                 <div className="cp-solicitud-row__title">
                   {LABELS_TIPO_SOLICITUD[s.tipo]} — {nombrePac}
-                  <GroupBadge cantidad={cantidad} />
+                  {!esCargaRapida && <GroupBadge cantidad={cantidad} />}
+                  {fechaStr && (
+                    <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--cp-text-faint)', fontWeight: 400 }}>
+                      {fechaStr}
+                    </span>
+                  )}
                 </div>
                 {s.estado === ESTADOS_SOLICITUD_SESION.RECHAZADA && s.motivoRechazo && (
                   <div className="cp-solicitud-row__motivo">
