@@ -726,10 +726,6 @@
   .cp-sesiones-tabla__row--pendiente-monto {
     border-left: 3px solid var(--cp-warning, #b8860b);
   }
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
 
   /* Acciones no se muestran en mobile — estan en el menu ⋮ */
   .cp-sesiones-tabla__actions-cell {
