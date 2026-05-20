@@ -351,3 +351,82 @@
     padding: 32px 16px;
   }
 }
+
+/* ============================================================
+   Resumen del mes: cards de ingreso separadas por canal
+   ============================================================ */
+.cp-pagos-resumen-mes {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--cp-space-4);
+  margin-bottom: var(--cp-space-2);
+}
+
+.cp-pagos-resumen-mes__card {
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-lg);
+  padding: var(--cp-space-4) var(--cp-space-5);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Card total: borde más marcado para jerarquía visual */
+.cp-pagos-resumen-mes__card--total {
+  border-color: var(--cp-success);
+  background: color-mix(in srgb, var(--cp-success-bg) 60%, var(--cp-surface));
+}
+
+/* Card pendiente de cobro: borde ámbar */
+.cp-pagos-resumen-mes__card--debe {
+  border-color: var(--cp-warning-border, rgba(220,170,50,0.35));
+  background: var(--cp-warning-bg, rgba(220,170,50,0.06));
+}
+
+.cp-pagos-resumen-mes__label {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--cp-text-faint);
+}
+
+.cp-pagos-resumen-mes__value {
+  font-size: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--cp-text);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.cp-pagos-resumen-mes__card--total .cp-pagos-resumen-mes__value {
+  color: var(--cp-success);
+}
+
+.cp-pagos-resumen-mes__card--debe .cp-pagos-resumen-mes__value {
+  color: var(--cp-warning, #b8860b);
+}
+
+.cp-pagos-resumen-mes__hint {
+  font-size: 12px;
+  color: var(--cp-text-muted);
+}
+
+@media (max-width: 900px) {
+  .cp-pagos-resumen-mes {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .cp-pagos-resumen-mes {
+    grid-template-columns: 1fr;
+    gap: var(--cp-space-3);
+  }
+
+  .cp-pagos-resumen-mes__value {
+    font-size: 20px;
+  }
+}

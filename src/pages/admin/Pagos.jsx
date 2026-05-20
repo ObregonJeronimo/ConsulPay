@@ -5,7 +5,8 @@ import Badge from '../../components/ui/Badge.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
 
 import { useAuth } from '../../hooks/useAuth.js';
-import { formatoARS } from '../../lib/constants.js';
+import { useConsultorio } from '../../hooks/useConsultorio.js';
+import { ESTADOS_PAGO_SESION, formatoARS } from '../../lib/constants.js';
 import {
   labelEstadoPago,
   montoNetoEfectivo,
@@ -14,6 +15,12 @@ import {
   tonoEstadoPago,
 } from '../../lib/pagos.js';
 import { suscribirProfesionales } from '../../lib/profesionales.js';
+import {
+  finDeMes,
+  inicioDeMes,
+  nombreDelMes,
+  suscribirSesionesConsultorio,
+} from '../../lib/sesiones.js';
 
 import './Pagos.css';
 
@@ -51,11 +58,14 @@ function formatoFechaHora(date) {
 export default function PagosAdmin() {
   const { user } = useAuth();
   const consultorioId = user?.consultorioId;
+  const { consultorio } = useConsultorio();
 
   const [pagos, setPagos] = useState([]);
+  const [sesiones, setSesiones] = useState([]);
   const [profesionales, setProfesionales] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filtroEstado, setFiltroEstado] = useState('todos');
+  const [mes, setMes] = useState(() => inicioDeMes(new Date()));
   const [pagoSeleccionado, setPagoSeleccionado] = useState(null);
 
   /* ---- Suscripciones live ---- */
@@ -67,6 +77,14 @@ export default function PagosAdmin() {
       setLoading(false);
     });
   }, [consultorioId]);
+
+  // Sesiones del mes para calcular las marcadas como pagadas manualmente
+  useEffect(() => {
+    if (!consultorioId) return;
+    const desde = inicioDeMes(mes);
+    const hasta = finDeMes(mes);
+    return suscribirSesionesConsultorio(consultorioId, setSesiones, { desde, hasta });
+  }, [consultorioId, mes]);
 
   useEffect(() => {
     if (!consultorioId) return;
@@ -86,9 +104,7 @@ export default function PagosAdmin() {
     return pagos.filter((p) => p.estado === filtroEstado);
   }, [pagos, filtroEstado]);
 
-  // Total recibido = suma de los netos efectivos (incluye descuento de
-  // fee MP si esta disponible). Si no hay fee_details para algun pago,
-  // ese pago contribuye con el monto aproximado (bruto - comision).
+  // Stats de pagos vía MP (todo el historial, igual que antes)
   const stats = useMemo(() => {
     let aprobados = 0;
     let pendientes = 0;
@@ -113,6 +129,26 @@ export default function PagosAdmin() {
     return { aprobados, pendientes, totalRecibido, totalComision, totalFeeMP, pagosSinFeeDetails };
   }, [pagos]);
 
+  // Stats de sesiones marcadas como "Pagadas" manualmente en el mes
+  // (distinto de los pagos MP — estas se marcaron con el botón ✓ sin pasar por MP)
+  const statsMes = useMemo(() => {
+    let totalMarcadas = 0;      // monto que el consultorio recibe de sesiones marcadas
+    let cantMarcadas = 0;
+    let totalDebe = 0;          // lo que todavia deben (sesiones en estado 'debido')
+
+    for (const s of sesiones) {
+      if (s.estadoPago === ESTADOS_PAGO_SESION.PAGADO) {
+        totalMarcadas += s.montoConsultorio || 0;
+        cantMarcadas += 1;
+      } else if (s.estadoPago === ESTADOS_PAGO_SESION.DEBIDO) {
+        totalDebe += s.montoConsultorio || 0;
+      }
+    }
+
+    const totalCombinado = stats.totalRecibido + totalMarcadas;
+    return { totalMarcadas, cantMarcadas, totalDebe, totalCombinado };
+  }, [sesiones, stats.totalRecibido]);
+
   /* ---- Renders ---- */
 
   if (loading && pagos.length === 0) {
@@ -131,15 +167,46 @@ export default function PagosAdmin() {
         <div>
           <h1 className="cp-page-title">Pagos recibidos</h1>
           <p className="cp-page-sub">
-            Pagos de profesionales al consultorio vía Mercado Pago.
+            Pagos MP e ingresos marcados manualmente por el consultorio.
           </p>
         </div>
+        <SelectorMes mes={mes} setMes={setMes} />
       </header>
 
-      {/* Stats */}
+      {/* Resumen del mes: ingresos separados por canal + total */}
+      <div className="cp-pagos-resumen-mes">
+        <div className="cp-pagos-resumen-mes__card cp-pagos-resumen-mes__card--total">
+          <div className="cp-pagos-resumen-mes__label">Total ingresado en {nombreDelMes(mes)}</div>
+          <div className="cp-pagos-resumen-mes__value">{formatoARS.format(statsMes.totalCombinado)}</div>
+          <div className="cp-pagos-resumen-mes__hint">
+            MP + marcado pagado
+          </div>
+        </div>
+        <div className="cp-pagos-resumen-mes__card">
+          <div className="cp-pagos-resumen-mes__label">Vía Mercado Pago</div>
+          <div className="cp-pagos-resumen-mes__value">{formatoARS.format(stats.totalRecibido)}</div>
+          <div className="cp-pagos-resumen-mes__hint">
+            {stats.aprobados} pago{stats.aprobados === 1 ? '' : 's'} aprobado{stats.aprobados === 1 ? '' : 's'}
+          </div>
+        </div>
+        <div className="cp-pagos-resumen-mes__card">
+          <div className="cp-pagos-resumen-mes__label">Marcado como pagado</div>
+          <div className="cp-pagos-resumen-mes__value">{formatoARS.format(statsMes.totalMarcadas)}</div>
+          <div className="cp-pagos-resumen-mes__hint">
+            {statsMes.cantMarcadas} sesión{statsMes.cantMarcadas === 1 ? '' : 'es'} marcada{statsMes.cantMarcadas === 1 ? '' : 's'}
+          </div>
+        </div>
+        <div className="cp-pagos-resumen-mes__card cp-pagos-resumen-mes__card--debe">
+          <div className="cp-pagos-resumen-mes__label">Pendiente de cobro</div>
+          <div className="cp-pagos-resumen-mes__value">{formatoARS.format(statsMes.totalDebe)}</div>
+          <div className="cp-pagos-resumen-mes__hint">sesiones que aún deben</div>
+        </div>
+      </div>
+
+      {/* Stats MP (todo el historial) */}
       <div className="cp-pagos-stats">
         <div className="cp-stat cp-stat--success">
-          <div className="cp-stat__label">Total recibido</div>
+          <div className="cp-stat__label">Total recibido MP (historial)</div>
           <div className="cp-stat__value">{formatoARS.format(stats.totalRecibido)}</div>
           <div className="cp-stat__hint">
             {stats.aprobados} pago{stats.aprobados === 1 ? '' : 's'} aprobado{stats.aprobados === 1 ? '' : 's'}
@@ -154,9 +221,7 @@ export default function PagosAdmin() {
         <div className="cp-stat">
           <div className="cp-stat__label">Cargo Mercado Pago</div>
           <div className="cp-stat__value">{formatoARS.format(stats.totalFeeMP)}</div>
-          <div className="cp-stat__hint">
-            tarifa que cobra MP por procesar
-          </div>
+          <div className="cp-stat__hint">tarifa que cobra MP por procesar</div>
         </div>
         <div className="cp-stat cp-stat--debido">
           <div className="cp-stat__label">En proceso</div>
@@ -432,6 +497,52 @@ function DetallePagoModal({ pago, profesional, onClose }) {
           )}
         </dl>
       </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   Selector de mes — mismo componente que en Sesiones
+   ============================================================ */
+function SelectorMes({ mes, setMes }) {
+  function anterior() {
+    setMes((m) => {
+      const d = new Date(m);
+      d.setMonth(d.getMonth() - 1);
+      return inicioDeMes(d);
+    });
+  }
+  function siguiente() {
+    setMes((m) => {
+      const d = new Date(m);
+      d.setMonth(d.getMonth() + 1);
+      return inicioDeMes(d);
+    });
+  }
+  const esEsteMes = inicioDeMes(new Date()).getTime() === mes.getTime();
+
+  return (
+    <div className="cp-mes-selector">
+      <button
+        type="button"
+        className="cp-mes-selector__btn"
+        onClick={anterior}
+        aria-label="Mes anterior"
+      >
+        ‹
+      </button>
+      <span className="cp-mes-selector__label">
+        {nombreDelMes(mes)}
+      </span>
+      <button
+        type="button"
+        className="cp-mes-selector__btn"
+        onClick={siguiente}
+        disabled={esEsteMes}
+        aria-label="Mes siguiente"
+      >
+        ›
+      </button>
     </div>
   );
 }

@@ -692,7 +692,7 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, onEdi
                   ) : (
                     <span className={`cp-badge ${pagada ? 'cp-badge--pagada' : 'cp-badge--debido'}`}>
                       <span className="cp-badge__dot" />
-                      {pagada ? 'Pagada' : 'Debida'}
+                      {pagada ? 'Pagada' : 'Debe'}
                     </span>
                   )}
                 </td>
@@ -768,7 +768,7 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, onEdi
                     <span className="cp-badge cp-badge--pendiente-monto" style={{ fontSize: 11 }}><span className="cp-badge__dot" />A liquid.</span>
                   ) : (
                     <span className={`cp-badge ${pagada ? 'cp-badge--pagada' : 'cp-badge--debido'}`} style={{ fontSize: 11 }}>
-                      <span className="cp-badge__dot" />{pagada ? 'Pagada' : 'Debida'}
+                      <span className="cp-badge__dot" />{pagada ? 'Pagada' : 'Debe'}
                     </span>
                   )}
                 </td>

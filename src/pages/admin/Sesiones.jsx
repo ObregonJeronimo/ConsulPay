@@ -401,7 +401,7 @@ export default function Sesiones() {
             >
               <option value="todos">Todos los estados</option>
               <option value={ESTADOS_PAGO_SESION.PENDIENTE_MONTO}>A liquidar</option>
-              <option value={ESTADOS_PAGO_SESION.DEBIDO}>Debidas</option>
+              <option value={ESTADOS_PAGO_SESION.DEBIDO}>Deben</option>
               <option value={ESTADOS_PAGO_SESION.PAGADO}>Pagadas</option>
             </select>
           </div>
@@ -649,7 +649,7 @@ function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, onEditar, o
                   ) : (
                     <span className={`cp-badge ${pagada ? 'cp-badge--pagada' : 'cp-badge--debido'}`}>
                       <span className="cp-badge__dot" />
-                      {pagada ? 'Pagada' : 'Debida'}
+                      {pagada ? 'Pagada' : 'Debe'}
                     </span>
                   )}
                 </td>
@@ -677,8 +677,8 @@ function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, onEditar, o
                       <button
                         className={`cp-icon-btn ${pagada ? '' : 'cp-icon-btn--success'}`}
                         onClick={() => onTogglePagado(s)}
-                        title={pagada ? 'Marcar como debida' : 'Marcar como pagada'}
-                        aria-label={pagada ? 'Marcar como debida' : 'Marcar como pagada'}
+                        title={pagada ? 'Marcar como debe' : 'Marcar como pagada'}
+                        aria-label={pagada ? 'Marcar como debe' : 'Marcar como pagada'}
                       >
                         {pagada ? <RevertIcon /> : <CheckIcon />}
                       </button>
@@ -737,7 +737,7 @@ function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, onEditar, o
                   ) : (
                     <span className={`cp-badge ${pagada ? 'cp-badge--pagada' : 'cp-badge--debido'}`} style={{ fontSize: 11 }}>
                       <span className="cp-badge__dot" />
-                      {pagada ? 'Pagada' : 'Debida'}
+                      {pagada ? 'Pagada' : 'Debe'}
                     </span>
                   )}
                 </td>
@@ -753,7 +753,7 @@ function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, onEditar, o
                         icon: <EditIcon />,
                         onClick: () => onLiquidar(s),
                       }] : [{
-                        label: pagada ? 'Marcar debida' : 'Marcar pagada',
+                        label: pagada ? 'Marcar debe' : 'Marcar pagada',
                         icon: pagada ? <RevertIcon /> : <CheckIcon />,
                         onClick: () => onTogglePagado(s),
                       }]),
