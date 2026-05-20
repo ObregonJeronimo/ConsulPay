@@ -370,6 +370,30 @@ export default function PagosAdmin() {
                         {labelEstadoPago(p.estado)}
                       </Badge>
                     </td>
+
+                    {/* Mobile: fila compacta */}
+                    <td className="cp-td-mobile-main">
+                      <div className="cp-row-mobile__top">
+                        <div className="cp-prof-cell">
+                          <Avatar initials={inicialesProfesional(prof)} size={26} />
+                          <div className="cp-prof-name">{nombreVisible(prof)}</div>
+                        </div>
+                      </div>
+                      <div className="cp-row-mobile__mid">
+                        {formatoFechaCorta(p.createdAt)}
+                        {' · '}
+                        {p.sesionesIds?.length || 0} registro{(p.sesionesIds?.length || 0) === 1 ? '' : 's'}
+                      </div>
+                      <div className="cp-row-mobile__bot">
+                        Recibido: {formatoARS.format(montoNetoEfectivo(p))}
+                      </div>
+                    </td>
+                    <td className="cp-td-mobile-badge">
+                      <Badge tone={tonoEstadoPago(p.estado)}>
+                        {labelEstadoPago(p.estado)}
+                      </Badge>
+                    </td>
+                    <td className="cp-td-mobile-actions" />
                   </tr>
                 );
               })}

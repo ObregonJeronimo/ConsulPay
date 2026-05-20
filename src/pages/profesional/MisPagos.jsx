@@ -366,6 +366,28 @@ export default function MisPagos() {
                       <td data-label="Al consultorio" className="cp-num" style={{ color: 'var(--cp-accent)' }}>
                         {formatoARS.format(s.montoConsultorio)}
                       </td>
+
+                      {/* Mobile: fila compacta */}
+                      <td className="cp-td-mobile-main">
+                        <div className="cp-row-mobile__top">
+                          {pac ? (
+                            <div className="cp-prof-cell">
+                              <Avatar initials={inicialesPaciente(pac)} size={26} />
+                              <div className="cp-prof-name">{nombrePaciente(pac)}</div>
+                            </div>
+                          ) : <span style={{ color: 'var(--cp-text-faint)' }}>Paciente eliminado</span>}
+                        </div>
+                        <div className="cp-row-mobile__mid">
+                          {formatoFechaCorta(s.fecha)} · {s.metodoPagoNombre}
+                        </div>
+                        <div className="cp-row-mobile__bot">
+                          Mi parte: {formatoARS.format(s.montoProfesional)}
+                          {' · '}
+                          Consultorio: {formatoARS.format(s.montoConsultorio)}
+                        </div>
+                      </td>
+                      <td className="cp-td-mobile-badge" />
+                      <td className="cp-td-mobile-actions" />
                     </tr>
                   );
                 })}
@@ -400,6 +422,24 @@ export default function MisPagos() {
                         {labelEstadoPago(p.estado)}
                       </Badge>
                     </td>
+
+                    {/* Mobile: fila compacta */}
+                    <td className="cp-td-mobile-main">
+                      <div className="cp-row-mobile__top">
+                        <span style={{ fontWeight: 500 }}>{formatoARS.format(p.montoTotal || 0)}</span>
+                      </div>
+                      <div className="cp-row-mobile__mid">
+                        {formatoFechaCorta(p.createdAt)}
+                        {' · '}
+                        {p.sesionesIds?.length || 0} sesión{(p.sesionesIds?.length || 0) === 1 ? '' : 'es'}
+                      </div>
+                    </td>
+                    <td className="cp-td-mobile-badge">
+                      <Badge tone={tonoEstadoPago(p.estado)}>
+                        {labelEstadoPago(p.estado)}
+                      </Badge>
+                    </td>
+                    <td className="cp-td-mobile-actions" />
                   </tr>
                 ))}
               </tbody>

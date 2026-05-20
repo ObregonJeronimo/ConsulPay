@@ -365,6 +365,46 @@ function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSel
                     Ver detalle
                   </button>
                 </td>
+
+                {/* Mobile: fila compacta */}
+                <td className="cp-td-mobile-main" onClick={() => onSeleccionar(s)}>
+                  <div className="cp-row-mobile__top">
+                    {pac ? (
+                      <div className="cp-prof-cell">
+                        <Avatar initials={inicialesPaciente(pac)} size={26} />
+                        <div className="cp-prof-name">
+                          {nombrePaciente(pac)}
+                          <GroupBadge cantidad={cantidad} />
+                        </div>
+                      </div>
+                    ) : (
+                      <span className={`cp-solicitud-tipo cp-solicitud-tipo--${s.tipo}`}>
+                        {iconoTipo(s.tipo)} {LABELS_TIPO_SOLICITUD[s.tipo]}
+                      </span>
+                    )}
+                  </div>
+                  <div className="cp-row-mobile__mid">
+                    {LABELS_TIPO_SOLICITUD[s.tipo]}
+                    {pac ? ` · ${s.profesionalNombre || nombreProfesional(prof)}` : ''}
+                  </div>
+                  <div className="cp-row-mobile__bot">
+                    {formatoRelativo(s.createdAt)}
+                  </div>
+                </td>
+                <td className="cp-td-mobile-badge">
+                  {badgeEstado(s.estado)}
+                </td>
+                <td className="cp-td-mobile-actions" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    className="cp-action-menu__trigger"
+                    onClick={() => onSeleccionar(s)}
+                    aria-label="Ver detalle"
+                    style={{ fontSize: 12, width: 'auto', padding: '4px 8px' }}
+                  >
+                    →
+                  </button>
+                </td>
               </tr>
             );
           })}
