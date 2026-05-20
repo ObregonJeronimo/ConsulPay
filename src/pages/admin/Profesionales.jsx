@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 
+import ActionMenu from '../../components/ui/ActionMenu.jsx';
 import Avatar from '../../components/ui/Avatar.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -342,66 +343,76 @@ function InvitacionesLista({ invitaciones, onCancelar }) {
    ============================================================ */
 function ProfesionalesTabla({ profesionales, onSuspender, onReactivar, onRetirar }) {
   return (
-    <div className="cp-table-wrap">
+    <div className="cp-compact-list cp-table-wrap">
       <table className="cp-table">
         <thead>
           <tr>
             <th>Profesional</th>
             <th>Email</th>
             <th>Estado</th>
-            {/* Solo mostramos la columna de confianza para activos */}
             {onSuspender && <th>Edición directa</th>}
             <th aria-label="Acciones" />
           </tr>
         </thead>
         <tbody>
-          {profesionales.map((p) => (
-            <tr key={p.uid}>
-              <td data-label="Profesional">
-                <div className="cp-prof-cell">
-                  <Avatar initials={iniciales(p.displayName || p.email)} size={32} />
-                  <div>
-                    <div className="cp-prof-name">{p.displayName || '—'}</div>
-                    <div className="cp-prof-meta">
-                      Se unió {p.createdAt?.toDate && formatoFechaLarga.format(p.createdAt.toDate())}
+          {profesionales.map((p) => {
+            const estadoBadge = p.estado === ESTADOS_USUARIO.ACTIVO ? (
+              <Badge tone="success">Activo</Badge>
+            ) : p.estado === ESTADOS_USUARIO.SUSPENDIDO ? (
+              <Badge tone="danger">Suspendido</Badge>
+            ) : (
+              <Badge tone="warning">Pendiente</Badge>
+            );
+
+            const acciones = [
+              ...(onSuspender ? [{ label: 'Suspender', onClick: () => onSuspender(p.uid) }] : []),
+              ...(onReactivar ? [{ label: 'Reactivar', onClick: () => onReactivar(p.uid) }] : []),
+              ...(onRetirar ? [{ label: 'Retirar', onClick: () => onRetirar(p), danger: true }] : []),
+            ];
+
+            return (
+              <tr key={p.uid}>
+                <td data-label="Profesional">
+                  <div className="cp-prof-cell">
+                    <Avatar initials={iniciales(p.displayName || p.email)} size={32} />
+                    <div>
+                      <div className="cp-prof-name">{p.displayName || '—'}</div>
+                      <div className="cp-prof-meta">
+                        Se unió {p.createdAt?.toDate && formatoFechaLarga.format(p.createdAt.toDate())}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </td>
-              <td data-label="Email" style={{ fontSize: 13.5, color: 'var(--cp-text-muted)' }}>{p.email}</td>
-              <td data-label="Estado">
-                {p.estado === ESTADOS_USUARIO.ACTIVO && <Badge tone="success">Activo</Badge>}
-                {p.estado === ESTADOS_USUARIO.SUSPENDIDO && <Badge tone="danger">Suspendido</Badge>}
-                {p.estado === ESTADOS_USUARIO.PENDIENTE && <Badge tone="warning">Pendiente</Badge>}
-              </td>
-              {onSuspender && (
-                <td data-label="Edición directa">
-                  <ToggleEdicionDirecta profesional={p} />
                 </td>
-              )}
-              <td className="cp-prof-tabla__actions" style={{ textAlign: 'right' }}>
-                {onSuspender && (
-                  <button className="cp-prof-action" onClick={() => onSuspender(p.uid)}>
-                    Suspender
-                  </button>
-                )}
-                {onReactivar && (
-                  <button className="cp-prof-action" onClick={() => onReactivar(p.uid)}>
-                    Reactivar
-                  </button>
-                )}
-                {onRetirar && (
-                  <button
-                    className="cp-prof-action cp-prof-action--danger"
-                    onClick={() => onRetirar(p)}
-                    style={{ marginLeft: 6 }}
-                  >
-                    Retirar
-                  </button>
-                )}
-              </td>
-            </tr>
-          ))}
+                <td data-label="Email" style={{ fontSize: 13.5, color: 'var(--cp-text-muted)' }}>{p.email}</td>
+                <td data-label="Estado">{estadoBadge}</td>
+                {onSuspender && <td data-label="Edición directa"><ToggleEdicionDirecta profesional={p} /></td>}
+                <td className="cp-prof-tabla__actions" style={{ textAlign: 'right' }}>
+                  {onSuspender && <button className="cp-prof-action" onClick={() => onSuspender(p.uid)}>Suspender</button>}
+                  {onReactivar && <button className="cp-prof-action" onClick={() => onReactivar(p.uid)}>Reactivar</button>}
+                  {onRetirar && <button className="cp-prof-action cp-prof-action--danger" onClick={() => onRetirar(p)} style={{ marginLeft: 6 }}>Retirar</button>}
+                </td>
+
+                {/* Mobile: fila compacta */}
+                <td className="cp-td-mobile-main">
+                  <div className="cp-row-mobile__top">
+                    <div className="cp-prof-cell">
+                      <Avatar initials={iniciales(p.displayName || p.email)} size={26} />
+                      <div className="cp-prof-name">{p.displayName || '—'}</div>
+                    </div>
+                  </div>
+                  <div className="cp-row-mobile__mid">{p.email}</div>
+                  <div className="cp-row-mobile__bot">
+                    {p.createdAt?.toDate ? `Desde ${formatoFechaLarga.format(p.createdAt.toDate())}` : ''}
+                    {onSuspender ? ` · Ed. directa: ${p.permitirEdicionSesiones ? 'Sí' : 'No'}` : ''}
+                  </div>
+                </td>
+                <td className="cp-td-mobile-badge">{estadoBadge}</td>
+                <td className="cp-td-mobile-actions" onClick={(e) => e.stopPropagation()}>
+                  {acciones.length > 0 && <ActionMenu items={acciones} />}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

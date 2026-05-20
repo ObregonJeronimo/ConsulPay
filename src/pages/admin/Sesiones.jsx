@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 
+import ActionMenu from '../../components/ui/ActionMenu.jsx';
 import Avatar from '../../components/ui/Avatar.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Input from '../../components/ui/Input.jsx';
@@ -561,7 +562,7 @@ export function GroupBadge({ cantidad }) {
    ============================================================ */
 function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, onEditar, onEliminar, onTogglePagado, onLiquidar }) {
   return (
-    <div className="cp-table-wrap">
+    <div className="cp-compact-list cp-table-wrap">
       <table className="cp-table cp-sesiones-tabla">
         <thead>
           <tr>
@@ -655,7 +656,6 @@ function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, onEditar, o
                 <td className="cp-sesiones-tabla__actions-cell" onClick={(e) => e.stopPropagation()}>
                   <div className="cp-sesiones-tabla__actions">
                     {pendienteMonto ? (
-                      // Sesion de obra social sin monto: mostrar boton liquidar
                       <button
                         className="cp-icon-btn cp-icon-btn--success"
                         onClick={() => onLiquidar(s)}
@@ -665,8 +665,6 @@ function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, onEditar, o
                         <CheckIcon />
                       </button>
                     ) : s.metodoPagoTipo === TIPOS_METODO_PAGO.DIFERIDO && !pagada ? (
-                      // Sesion de obra social ya liquidada pero no pagada:
-                      // se puede corregir el monto con el boton de editar monto
                       <button
                         className="cp-icon-btn"
                         onClick={() => onLiquidar(s)}
@@ -702,6 +700,67 @@ function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, onEditar, o
                       <TrashIcon />
                     </button>
                   </div>
+                </td>
+
+                {/* ── Mobile-only tds: fila compacta tipo lista ─────────
+                    En mobile (<=640px) ocultamos todos los tds de arriba
+                    y mostramos estos 3 que forman la fila compacta. */}
+                <td className="cp-td-mobile-main" onClick={() => onEditar(s)}>
+                  <div className="cp-row-mobile__top">
+                    {pac ? (
+                      <div className="cp-prof-cell">
+                        <Avatar initials={inicialesPaciente(pac)} size={26} />
+                        <div className="cp-prof-name">
+                          {nombrePaciente(pac)}
+                          {cantidad > 1 && <GroupBadge cantidad={cantidad} />}
+                        </div>
+                      </div>
+                    ) : <span style={{ color: 'var(--cp-text-faint)' }}>Paciente eliminado</span>}
+                  </div>
+                  <div className="cp-row-mobile__mid">
+                    {f.dia} {f.hora}
+                    {' · '}
+                    {prof ? nombreProfesional(prof) : '—'}
+                  </div>
+                  <div className="cp-row-mobile__bot">
+                    {s.metodoPagoNombre}
+                    {!pendienteMonto && ` · ${formatoARS.format(s.valorTotal)}`}
+                    {!pendienteMonto && s.montoProfesional !== s.valorTotal && ` (prof: ${formatoARS.format(s.montoProfesional)})`}
+                  </div>
+                </td>
+                <td className="cp-td-mobile-badge">
+                  {pendienteMonto ? (
+                    <span className="cp-badge cp-badge--pendiente-monto" style={{ fontSize: 11 }}>
+                      <span className="cp-badge__dot" />
+                      A liquidar
+                    </span>
+                  ) : (
+                    <span className={`cp-badge ${pagada ? 'cp-badge--pagada' : 'cp-badge--debido'}`} style={{ fontSize: 11 }}>
+                      <span className="cp-badge__dot" />
+                      {pagada ? 'Pagada' : 'Debida'}
+                    </span>
+                  )}
+                </td>
+                <td className="cp-td-mobile-actions" onClick={(e) => e.stopPropagation()}>
+                  <ActionMenu
+                    items={[
+                      ...(pendienteMonto ? [{
+                        label: 'Liquidar monto',
+                        icon: <CheckIcon />,
+                        onClick: () => onLiquidar(s),
+                      }] : s.metodoPagoTipo === TIPOS_METODO_PAGO.DIFERIDO && !pagada ? [{
+                        label: 'Corregir monto',
+                        icon: <EditIcon />,
+                        onClick: () => onLiquidar(s),
+                      }] : [{
+                        label: pagada ? 'Marcar debida' : 'Marcar pagada',
+                        icon: pagada ? <RevertIcon /> : <CheckIcon />,
+                        onClick: () => onTogglePagado(s),
+                      }]),
+                      { label: 'Editar', icon: <EditIcon />, onClick: () => onEditar(s) },
+                      { label: 'Eliminar', icon: <TrashIcon />, onClick: () => onEliminar(s), danger: true },
+                    ]}
+                  />
                 </td>
               </tr>
             );

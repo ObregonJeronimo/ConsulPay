@@ -303,7 +303,7 @@ function EmptyState({ tab }) {
    ============================================================ */
 function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSeleccionar }) {
   return (
-    <div className="cp-table-wrap">
+    <div className="cp-compact-list cp-table-wrap">
       <table className="cp-table cp-solicitudes-tabla">
         <thead>
           <tr>

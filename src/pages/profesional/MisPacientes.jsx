@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 
+import ActionMenu from '../../components/ui/ActionMenu.jsx';
 import Avatar from '../../components/ui/Avatar.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
@@ -91,7 +92,7 @@ export default function MisPacientes() {
           </p>
         </div>
       ) : (
-        <div className="cp-table-wrap">
+        <div className="cp-compact-list cp-table-wrap">
           <table className="cp-table cp-pacientes-table">
             <thead>
               <tr>
@@ -113,37 +114,40 @@ export default function MisPacientes() {
                         <Avatar initials={iniciales(p.nombre, p.apellido)} size={32} />
                         <div>
                           <div className="cp-prof-name">{nombreCompleto(p)}</div>
-                          <div className="cp-prof-meta">
-                            {p.dni ? `DNI ${p.dni}` : ''}
-                          </div>
+                          <div className="cp-prof-meta">{p.dni ? `DNI ${p.dni}` : ''}</div>
                         </div>
                       </div>
                     </td>
                     <td data-label="Método" style={{ fontSize: 13.5 }}>
-                      {metodo ? (
-                        <>
-                          {metodo.nombre}
-                          {metodo.tipo === 'diferido' && (
-                            <Badge tone="info" style={{ marginLeft: 6 }}>diferido</Badge>
-                          )}
-                        </>
-                      ) : <span style={{ color: 'var(--cp-danger)' }}>—</span>}
+                      {metodo ? (<>{metodo.nombre}{metodo.tipo === 'diferido' && <Badge tone="info" style={{ marginLeft: 6 }}>diferido</Badge>}</>) : <span style={{ color: 'var(--cp-danger)' }}>—</span>}
                     </td>
                     <td data-label="Valor sesión" className="cp-num">
                       {metodo?.tipo === TIPOS_METODO_PAGO.DIFERIDO ? (
-                        <span style={{ color: 'var(--cp-text-faint)', fontStyle: 'italic', fontSize: 13 }}>
-                          Según OS
-                        </span>
-                      ) : (
-                        formatoARS.format(valor)
-                      )}
+                        <span style={{ color: 'var(--cp-text-faint)', fontStyle: 'italic', fontSize: 13 }}>Según OS</span>
+                      ) : formatoARS.format(valor)}
                     </td>
-                    <td data-label="Obra social Nº" style={{ fontSize: 13, color: 'var(--cp-text-muted)' }}>
-                      {p.obraSocialNumero || '—'}
+                    <td data-label="Obra social Nº" style={{ fontSize: 13, color: 'var(--cp-text-muted)' }}>{p.obraSocialNumero || '—'}</td>
+                    <td data-label="Contacto" style={{ fontSize: 13, color: 'var(--cp-text-muted)' }}>{p.telefono || p.email || '—'}</td>
+
+                    {/* Mobile: fila compacta (solo lectura, sin acciones) */}
+                    <td className="cp-td-mobile-main">
+                      <div className="cp-row-mobile__top">
+                        <div className="cp-prof-cell">
+                          <Avatar initials={iniciales(p.nombre, p.apellido)} size={26} />
+                          <div className="cp-prof-name">{nombreCompleto(p)}</div>
+                        </div>
+                      </div>
+                      <div className="cp-row-mobile__mid">
+                        {metodo ? metodo.nombre : 'Sin método'}
+                        {p.obraSocialNumero ? ` · Nº ${p.obraSocialNumero}` : ''}
+                      </div>
+                      <div className="cp-row-mobile__bot">
+                        {p.telefono || p.email || ''}
+                        {metodo?.tipo !== TIPOS_METODO_PAGO.DIFERIDO && ` · ${formatoARS.format(valor)}`}
+                      </div>
                     </td>
-                    <td data-label="Contacto" style={{ fontSize: 13, color: 'var(--cp-text-muted)' }}>
-                      {p.telefono || p.email || '—'}
-                    </td>
+                    <td className="cp-td-mobile-badge" />
+                    <td className="cp-td-mobile-actions" />
                   </tr>
                 );
               })}

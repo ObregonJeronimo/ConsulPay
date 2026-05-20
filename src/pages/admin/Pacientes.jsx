@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
+import ActionMenu from '../../components/ui/ActionMenu.jsx';
 import Avatar from '../../components/ui/Avatar.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -595,7 +596,7 @@ function PacientesTabla({
   onArchivar,
 }) {
   return (
-    <div className="cp-table-wrap">
+    <div className="cp-compact-list cp-table-wrap">
       <table className="cp-table cp-pacientes-table">
         <thead>
           <tr>
@@ -612,6 +613,7 @@ function PacientesTabla({
             const profUids = getProfesionalesUids(p);
             const metodo = mapaMetodos[p.metodoPagoId];
             const valor = metodo?.valorSesionDefault ?? 0;
+            const profs = profUids.map((uid) => mapaProfesionales[uid]).filter(Boolean);
 
             return (
               <tr key={p.id}>
@@ -619,9 +621,7 @@ function PacientesTabla({
                   <div className="cp-prof-cell">
                     <Avatar initials={iniciales(p.nombre, p.apellido)} size={32} />
                     <div>
-                      <div className="cp-prof-name">
-                        {nombreCompleto(p)}
-                      </div>
+                      <div className="cp-prof-name">{nombreCompleto(p)}</div>
                       <div className="cp-prof-meta">
                         {p.dni ? `DNI ${p.dni}` : ''}
                         {p.dni && p.telefono ? ' · ' : ''}
@@ -631,19 +631,14 @@ function PacientesTabla({
                   </div>
                 </td>
                 <td data-label="Profesional/es" style={{ fontSize: 13.5 }}>
-                  <ProfesionalesCelda
-                    pacienteUids={profUids}
-                    mapaProfesionales={mapaProfesionales}
-                  />
+                  <ProfesionalesCelda pacienteUids={profUids} mapaProfesionales={mapaProfesionales} />
                 </td>
                 <td data-label="Método" style={{ fontSize: 13.5 }}>
                   {metodo ? metodo.nombre : <span style={{ color: 'var(--cp-danger)' }}>Método eliminado</span>}
                 </td>
                 <td data-label="Valor sesión" className="cp-num">
                   {metodo?.tipo === TIPOS_METODO_PAGO.DIFERIDO ? (
-                    <span style={{ color: 'var(--cp-text-faint)', fontStyle: 'italic', fontSize: 13 }}>
-                      Según OS
-                    </span>
+                    <span style={{ color: 'var(--cp-text-faint)', fontStyle: 'italic', fontSize: 13 }}>Según OS</span>
                   ) : (
                     formatoARS.format(valor)
                   )}
@@ -652,21 +647,33 @@ function PacientesTabla({
                   {p.obraSocialNumero || '—'}
                 </td>
                 <td className="cp-pacientes-table__actions" style={{ textAlign: 'right' }}>
-                  <button
-                    className="cp-prof-action"
-                    onClick={() => onEditar(p)}
-                    title="Editar"
-                  >
-                    <EditIcon />
-                  </button>
-                  <button
-                    className="cp-prof-action"
-                    onClick={() => onArchivar(p)}
-                    style={{ marginLeft: 6 }}
-                    title="Archivar"
-                  >
-                    <ArchiveIcon />
-                  </button>
+                  <button className="cp-prof-action" onClick={() => onEditar(p)} title="Editar"><EditIcon /></button>
+                  <button className="cp-prof-action" onClick={() => onArchivar(p)} style={{ marginLeft: 6 }} title="Archivar"><ArchiveIcon /></button>
+                </td>
+
+                {/* Mobile: fila compacta */}
+                <td className="cp-td-mobile-main" onClick={() => onEditar(p)}>
+                  <div className="cp-row-mobile__top">
+                    <div className="cp-prof-cell">
+                      <Avatar initials={iniciales(p.nombre, p.apellido)} size={26} />
+                      <div className="cp-prof-name">{nombreCompleto(p)}</div>
+                    </div>
+                  </div>
+                  <div className="cp-row-mobile__mid">
+                    {metodo ? metodo.nombre : 'Sin método'}
+                    {p.obraSocialNumero ? ` · Nº ${p.obraSocialNumero}` : ''}
+                  </div>
+                  <div className="cp-row-mobile__bot">
+                    {profs.length > 0 ? profs.map((pr) => `${pr.nombre || ''} ${pr.apellido || ''}`.trim()).join(', ') : 'Sin profesional'}
+                    {metodo?.tipo !== TIPOS_METODO_PAGO.DIFERIDO && ` · ${formatoARS.format(valor)}`}
+                  </div>
+                </td>
+                <td className="cp-td-mobile-badge" />
+                <td className="cp-td-mobile-actions" onClick={(e) => e.stopPropagation()}>
+                  <ActionMenu items={[
+                    { label: 'Editar', icon: <EditIcon />, onClick: () => onEditar(p) },
+                    { label: 'Archivar', icon: <ArchiveIcon />, onClick: () => onArchivar(p), danger: true },
+                  ]} />
                 </td>
               </tr>
             );

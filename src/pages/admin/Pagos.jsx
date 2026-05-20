@@ -193,7 +193,7 @@ export default function PagosAdmin() {
           </p>
         </div>
       ) : (
-        <div className="cp-table-wrap">
+        <div className="cp-compact-list cp-table-wrap">
           <table className="cp-table">
             <thead>
               <tr>

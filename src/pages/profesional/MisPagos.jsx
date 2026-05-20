@@ -317,7 +317,7 @@ export default function MisPagos() {
               </button>
             )}
           </div>
-          <div className="cp-table-wrap">
+          <div className="cp-compact-list cp-table-wrap">
             <table className="cp-table cp-debe-tabla">
               <thead>
                 <tr>
@@ -379,7 +379,7 @@ export default function MisPagos() {
       {pagosFiltrados.length > 0 && (
         <section className="cp-historial-section">
           <h2 className="cp-historial-section__title">Historial de pagos</h2>
-          <div className="cp-table-wrap">
+          <div className="cp-compact-list cp-table-wrap">
             <table className="cp-table">
               <thead>
                 <tr>
