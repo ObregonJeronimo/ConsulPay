@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 import ActionMenu from '../../components/ui/ActionMenu.jsx';
 import Avatar from '../../components/ui/Avatar.jsx';
@@ -143,7 +144,18 @@ export default function Sesiones() {
   const [filtroEstado, setFiltroEstado] = useState('todos');
 
   const [editando, setEditando] = useState(null);
-  const [liquidando, setLiquidando] = useState(null);  // sesion a la que vamos a cargarle el monto
+  const [liquidando, setLiquidando] = useState(null);
+
+  // Si venimos del Dashboard con state { abrirNueva: true }, abrimos
+  // el modal de nueva sesion automaticamente y limpiamos el state.
+  const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (location.state?.abrirNueva) {
+      setEditando('nueva');
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state?.abrirNueva]);  // sesion a la que vamos a cargarle el monto
 
   useEffect(() => {
     if (!user?.consultorioId) return;
@@ -802,9 +814,33 @@ export function SesionModal({
   const esNueva = !sesion;
 
   const [profesionalUid, setProfesionalUid] = useState(
-    sesion?.profesionalUid ?? profesionalUidFijo ?? profesionales[0]?.uid ?? ''
+    sesion?.profesionalUid ?? profesionalUidFijo ?? (esNueva ? '' : profesionales[0]?.uid ?? '')
   );
   const [pacienteId, setPacienteId] = useState(sesion?.pacienteId ?? '');
+
+  // Pacientes filtrados por el profesional seleccionado (solo en alta nueva).
+  // Un paciente "pertenece" a un profesional si su profesionalesUids incluye
+  // ese uid (campo array en Firestore). Si no hay profesional elegido, no
+  // mostramos pacientes. Si es edicion, mostramos todos (no bloqueamos).
+  const pacientesFiltrados = useMemo(() => {
+    if (!esNueva) return pacientes;
+    if (!profesionalUid) return [];
+    return pacientes.filter((p) => {
+      const uids = p.profesionalesUids || (p.profesionalUid ? [p.profesionalUid] : []);
+      return uids.includes(profesionalUid);
+    });
+  }, [pacientes, profesionalUid, esNueva]);
+
+  // Al cambiar el profesional en alta nueva, limpiar el paciente seleccionado
+  // (porque el paciente anterior puede no pertenecer al nuevo profesional).
+  const handleCambiarProfesional = (uid) => {
+    setProfesionalUid(uid);
+    if (esNueva) {
+      setPacienteId('');
+      setMetodoId('');
+      setValorSesion('');
+    }
+  };
   const [fechaInput, setFechaInput] = useState(() => {
     if (sesion?.fecha) {
       const d = sesion.fecha.toDate ? sesion.fecha.toDate() : new Date(sesion.fecha);
@@ -966,7 +1002,7 @@ export function SesionModal({
               <select
                 className="cp-select"
                 value={profesionalUid}
-                onChange={(e) => setProfesionalUid(e.target.value)}
+                onChange={(e) => handleCambiarProfesional(e.target.value)}
                 required
               >
                 <option value="" disabled>Elegir profesional…</option>
@@ -980,14 +1016,25 @@ export function SesionModal({
           <div>
             <label className="cp-field__label" style={{ display: 'block', marginBottom: 6 }}>
               Paciente
+              {esAdmin && esNueva && !profesionalUid && (
+                <span style={{ color: 'var(--cp-text-faint)', fontWeight: 400, marginLeft: 8, fontSize: 12 }}>
+                  — elegí un profesional primero
+                </span>
+              )}
+              {esAdmin && esNueva && profesionalUid && pacientesFiltrados.length === 0 && (
+                <span style={{ color: 'var(--cp-warning, #b8860b)', fontWeight: 400, marginLeft: 8, fontSize: 12 }}>
+                  — este profesional no tiene pacientes asignados
+                </span>
+              )}
             </label>
             <PacienteAutocomplete
-              pacientes={pacientes}
+              pacientes={pacientesFiltrados}
               value={pacienteId}
               onChange={setPacienteId}
               profesionalUid={profesionalUid}
-              placeholder="Ingrese DNI o nombre"
+              placeholder={esAdmin && esNueva && !profesionalUid ? 'Elegí un profesional primero' : 'Ingrese DNI o nombre'}
               required
+              disabled={esAdmin && esNueva && !profesionalUid}
             />
           </div>
 

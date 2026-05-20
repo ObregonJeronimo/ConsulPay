@@ -177,7 +177,7 @@ export default function Dashboard() {
             )}
           </p>
         </div>
-        <Link to="/admin/sesiones/nueva">
+        <Link to="/admin/sesiones" state={{ abrirNueva: true }}>
           <Button variant="primary" icon={<PlusIcon />}>
             Registrar sesión
           </Button>
