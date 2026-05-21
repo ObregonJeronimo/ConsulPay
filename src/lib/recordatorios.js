@@ -193,7 +193,6 @@ export async function toggleActivoRecordatorio(recordatorioId, activo) {
 async function generarInstancias(recordatorioId, { consultorioId, titulo, descripcion, destinatarios, ciclo }) {
   const batch = writeBatch(db);
   const ahora = new Date();
-  const proximaEn = calcularProximaAparicion(ciclo, ahora);
 
   for (const profesionalUid of destinatarios) {
     const ref = doc(collection(db, 'recordatorios_instancias'));
@@ -207,7 +206,8 @@ async function generarInstancias(recordatorioId, { consultorioId, titulo, descri
       creadaEn: Timestamp.fromDate(ahora),
       aceptadaEn: null,
       expiraEn: null,
-      proximaEn: Timestamp.fromDate(proximaEn),
+      // proximaEn = ahora → aparece inmediatamente al profesional
+      proximaEn: Timestamp.fromDate(ahora),
     });
   }
   await batch.commit();
@@ -297,6 +297,16 @@ export function suscribirInstanciasProfesional(profesionalUid, consultorioId, ca
     const list = snap.docs
       .map((d) => ({ id: d.id, ...d.data() }))
       .filter((inst) => {
+        if (inst.estado === 'pendiente') {
+          // Solo mostrar si ya llegó la fecha de aparición
+          const proxima = inst.proximaEn?.toDate
+            ? inst.proximaEn.toDate()
+            : inst.proximaEn?.seconds
+              ? new Date(inst.proximaEn.seconds * 1000)
+              : null;
+          // Si no tiene proximaEn, mostrar siempre (instancia inicial)
+          if (proxima && proxima > ahora) return false;
+        }
         // Ocultar si ya expiró (aceptado hace más de 15 días)
         if (inst.expiraEn) {
           const expira = inst.expiraEn.toDate ? inst.expiraEn.toDate() : new Date(inst.expiraEn.seconds * 1000);
