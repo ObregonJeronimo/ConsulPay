@@ -36,6 +36,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   onSnapshot,
   query,
   serverTimestamp,
@@ -86,8 +87,7 @@ export function calcularProximaAparicion(ciclo, desde = new Date()) {
       return d;
     }
     case TIPOS_CICLO.DIA_DEL_MES: {
-      const dia = Math.min(28, Math.max(1, ciclo.dia ?? 1));
-      // Avanzar al próximo mes en ese día
+      const dia = Math.min(31, Math.max(1, ciclo.dia ?? 1));
       d.setMonth(d.getMonth() + 1);
       d.setDate(dia);
       return d;
@@ -202,11 +202,11 @@ async function generarInstancias(recordatorioId, { consultorioId, titulo, descri
       profesionalUid,
       titulo,
       descripcion,
+      ciclo,                              // snapshot — necesario para generar la siguiente instancia al aceptar
       estado: 'pendiente',
       creadaEn: Timestamp.fromDate(ahora),
       aceptadaEn: null,
       expiraEn: null,
-      // proximaEn = ahora → aparece inmediatamente al profesional
       proximaEn: Timestamp.fromDate(ahora),
     });
   }
@@ -218,7 +218,7 @@ async function generarInstancias(recordatorioId, { consultorioId, titulo, descri
  * Se marca como aceptada y se calcula expiraEn (+15 días).
  * También genera la siguiente instancia según el ciclo del recordatorio padre.
  */
-export async function aceptarInstancia(instanciaId, instancia, ciclo) {
+export async function aceptarInstancia(instanciaId, instancia, cicloArg) {
   const ahora = new Date();
   const expiraEn = new Date(ahora);
   expiraEn.setDate(expiraEn.getDate() + DIAS_EXPIRACION);
@@ -229,7 +229,15 @@ export async function aceptarInstancia(instanciaId, instancia, ciclo) {
     expiraEn: Timestamp.fromDate(expiraEn),
   });
 
-  // Generar la siguiente instancia si el recordatorio sigue activo
+  // Determinar el ciclo: primero del snapshot de la instancia,
+  // si no existe (instancias viejas pre-fix) leer del doc padre.
+  let ciclo = cicloArg ?? instancia.ciclo ?? null;
+  if (!ciclo && instancia.recordatorioId) {
+    const padreSnap = await getDoc(doc(db, 'recordatorios', instancia.recordatorioId));
+    if (padreSnap.exists()) ciclo = padreSnap.data().ciclo ?? null;
+  }
+
+  // Generar la siguiente instancia si hay ciclo
   if (ciclo) {
     const proximaEn = calcularProximaAparicion(ciclo, ahora);
     await addDoc(collection(db, 'recordatorios_instancias'), {
@@ -238,6 +246,7 @@ export async function aceptarInstancia(instanciaId, instancia, ciclo) {
       profesionalUid: instancia.profesionalUid,
       titulo: instancia.titulo,
       descripcion: instancia.descripcion,
+      ciclo,
       estado: 'pendiente',
       creadaEn: Timestamp.fromDate(ahora),
       aceptadaEn: null,
