@@ -2671,10 +2671,25 @@ function RecordatorioModal({ recordatorio, profesionales, consultorioId, adminUi
             {tipoCiclo === TIPOS_CICLO.DIA_DEL_MES && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{ fontSize: 13.5, color: 'var(--cp-text-muted)' }}>El día</span>
-                <input type="number" className="cp-input" value={diaDelMes}
-                  onChange={(e) => setDiaDelMes(e.target.value)} min="1" max="28"
-                  style={{ width: 70, textAlign: 'center' }} />
-                <span style={{ fontSize: 13.5, color: 'var(--cp-text-muted)' }}>de cada mes</span>
+                <input
+                  type="number"
+                  className="cp-input"
+                  value={diaDelMes}
+                  onChange={(e) => setDiaDelMes(e.target.value)}
+                  onKeyDown={(e) => {
+                    // Bloquear punto, coma, e, +, -
+                    if (['.', ',', 'e', 'E', '+', '-'].includes(e.key)) e.preventDefault();
+                  }}
+                  onBlur={(e) => {
+                    const v = Math.min(31, Math.max(1, parseInt(e.target.value) || 1));
+                    setDiaDelMes(String(v));
+                  }}
+                  min="1"
+                  max="31"
+                  step="1"
+                  style={{ width: 70, textAlign: 'center' }}
+                />
+                <span style={{ fontSize: 13.5, color: 'var(--cp-text-muted)' }}>de cada mes (máx. 31)</span>
               </div>
             )}
           </div>
@@ -2703,17 +2718,24 @@ function RecordatorioModal({ recordatorio, profesionales, consultorioId, adminUi
               </div>
 
               {modoDestinatarios === 'individual' ? (
-                <select
-                  className="cp-select"
-                  style={{ width: '100%' }}
-                  value={[...destinatariosElegidos][0] ?? ''}
-                  onChange={(e) => setDestinatariosElegidos(new Set(e.target.value ? [e.target.value] : []))}
-                >
-                  <option value="">Elegir profesional…</option>
-                  {profesionales.map((p) => (
-                    <option key={p.uid} value={p.uid}>{p.displayName || p.email}</option>
-                  ))}
-                </select>
+                <div className="cp-rec-prof-lista">
+                  {profesionales.map((p) => {
+                    const sel = [...destinatariosElegidos][0] === p.uid;
+                    return (
+                      <label key={p.uid} className={`cp-rec-prof-item ${sel ? 'cp-rec-prof-item--sel' : ''}`}>
+                        <input
+                          type="radio"
+                          name="destinatario-individual"
+                          checked={sel}
+                          onChange={() => setDestinatariosElegidos(new Set([p.uid]))}
+                        />
+                        <Avatar initials={(p.displayName || p.email || '?')[0].toUpperCase()} size={32} />
+                        <span className="cp-rec-prof-item__nombre">{p.displayName || p.email}</span>
+                        <span className="cp-rec-prof-item__check">{sel ? '✓' : ''}</span>
+                      </label>
+                    );
+                  })}
+                </div>
               ) : (
                 <div className="cp-rec-prof-lista">
                   {profesionales.map((p) => {

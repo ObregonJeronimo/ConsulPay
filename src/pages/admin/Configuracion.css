@@ -2088,3 +2088,8 @@
   background: color-mix(in srgb, var(--cp-accent) 15%, transparent);
   flex-shrink: 0;
 }
+
+/* Radio oculto en lista individual (mismo estilo que checkbox en multiple) */
+.cp-rec-prof-item input[type="radio"] {
+  display: none;
+}
