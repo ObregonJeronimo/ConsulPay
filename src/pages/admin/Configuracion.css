@@ -2063,6 +2063,18 @@
   background: var(--cp-accent-bg);
 }
 
+/* En touch (mobile) desactivar el hover — queda pegado después de tocar */
+@media (hover: none) {
+  .cp-rec-prof-item:hover {
+    border-color: var(--cp-border);
+    background: var(--cp-surface);
+  }
+  .cp-rec-prof-item--sel:hover {
+    border-color: var(--cp-accent);
+    background: var(--cp-accent-bg);
+  }
+}
+
 .cp-rec-prof-item--sel {
   border-color: var(--cp-accent);
   background: var(--cp-accent-bg);
