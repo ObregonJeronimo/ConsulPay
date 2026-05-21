@@ -208,11 +208,18 @@ export default function MiPanel() {
             )}
           </button>
           {recordatoriosOpen && (
-            <PanelRecordatorios
-              instancias={instancias}
-              uid={user.uid}
-              onClose={() => setRecordatoriosOpen(false)}
-            />
+            <>
+              {/* Overlay semitransparente — solo en mobile */}
+              <div
+                className="cp-recordatorios-backdrop"
+                onClick={() => setRecordatoriosOpen(false)}
+              />
+              <PanelRecordatorios
+                instancias={instancias}
+                uid={user.uid}
+                onClose={() => setRecordatoriosOpen(false)}
+              />
+            </>
           )}
         </div>
       </header>
