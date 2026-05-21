@@ -317,3 +317,203 @@
     font-size: 13px !important;
   }
 }
+
+/* ============================================================
+   Botón de recordatorios en el header del panel
+   ============================================================ */
+.cp-panel__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.cp-recordatorios-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  border: 1.5px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  background: var(--cp-surface);
+  color: var(--cp-text);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  position: relative;
+  transition: border-color 120ms, background 120ms;
+  white-space: nowrap;
+}
+
+.cp-recordatorios-btn:hover {
+  border-color: var(--cp-accent);
+  background: var(--cp-accent-bg);
+}
+
+.cp-recordatorios-btn--activo {
+  border-color: var(--cp-accent);
+  background: var(--cp-accent-bg);
+}
+
+.cp-recordatorios-btn__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: var(--cp-accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 9px;
+}
+
+/* ============================================================
+   Panel desplegable
+   ============================================================ */
+.cp-panel-recordatorios {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 200;
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-lg);
+  box-shadow: 0 12px 32px -4px rgba(0,0,0,0.14), 0 3px 10px -3px rgba(0,0,0,0.08);
+  animation: cp-menu-in 150ms var(--cp-ease) both;
+  overflow: hidden;
+}
+
+.cp-panel-recordatorios__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--cp-border);
+}
+
+.cp-panel-recordatorios__titulo {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--cp-text);
+}
+
+.cp-panel-recordatorios__close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--cp-text-faint);
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.cp-panel-recordatorios__close:hover {
+  color: var(--cp-text);
+}
+
+.cp-panel-recordatorios__empty {
+  padding: 28px 16px;
+  text-align: center;
+  font-size: 13.5px;
+  color: var(--cp-text-muted);
+}
+
+.cp-panel-recordatorios__lista {
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.cp-panel-recordatorios__item {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--cp-border);
+}
+
+.cp-panel-recordatorios__item:last-child {
+  border-bottom: none;
+}
+
+.cp-panel-recordatorios__item--pendiente {
+  background: color-mix(in srgb, var(--cp-accent-bg) 40%, var(--cp-surface));
+}
+
+.cp-panel-recordatorios__item--aceptado {
+  opacity: 0.7;
+}
+
+.cp-panel-recordatorios__item-titulo {
+  font-weight: 500;
+  font-size: 13.5px;
+  color: var(--cp-text);
+  margin-bottom: 3px;
+}
+
+.cp-panel-recordatorios__item-desc {
+  font-size: 12.5px;
+  color: var(--cp-text-muted);
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.cp-panel-recordatorios__item-expira {
+  font-size: 11.5px;
+  color: var(--cp-text-faint);
+  margin-top: 3px;
+}
+
+.cp-panel-recordatorios__aceptar {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 14px;
+  border: 1px solid var(--cp-accent);
+  border-radius: var(--cp-radius-sm);
+  background: transparent;
+  color: var(--cp-accent);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms;
+}
+
+.cp-panel-recordatorios__aceptar:hover {
+  background: var(--cp-accent);
+  color: #fff;
+}
+
+.cp-panel-recordatorios__sep {
+  height: 1px;
+  background: var(--cp-border);
+  margin: 4px 0;
+}
+
+.cp-panel-recordatorios__seccion-label {
+  padding: 6px 16px 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--cp-text-faint);
+}
+
+@media (max-width: 640px) {
+  .cp-panel-recordatorios {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-width: 100%;
+    border-radius: var(--cp-radius-lg) var(--cp-radius-lg) 0 0;
+    max-height: 70vh;
+  }
+
+  .cp-panel-recordatorios__lista {
+    max-height: calc(70vh - 60px);
+  }
+}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import Spinner from '../../components/ui/Spinner.jsx';
@@ -7,6 +7,10 @@ import { useAuth } from '../../hooks/useAuth.js';
 import { useConsultorio } from '../../hooks/useConsultorio.js';
 import { ESTADOS_PAGO_SESION, formatoARS } from '../../lib/constants.js';
 import { suscribirPacientesProfesional } from '../../lib/pacientes.js';
+import {
+  aceptarInstancia,
+  suscribirInstanciasProfesional,
+} from '../../lib/recordatorios.js';
 import {
   finDeMes,
   getCantidadSesiones,
@@ -79,8 +83,10 @@ export default function MiPanel() {
 
   const [sesiones, setSesiones] = useState([]);
   const [pacientes, setPacientes] = useState([]);
+  const [instancias, setInstancias] = useState([]);
   const [loadingSesiones, setLoadingSesiones] = useState(true);
   const [loadingPacientes, setLoadingPacientes] = useState(true);
+  const [recordatoriosOpen, setRecordatoriosOpen] = useState(false);
 
   // El mes en curso para mostrar "Sesiones de [mes]" e ingresos del mes.
   // Se calcula una sola vez al montar — si el user deja la pagina abierta
@@ -89,6 +95,11 @@ export default function MiPanel() {
   const mesActual = useMemo(() => inicioDeMes(new Date()), []);
 
   /* ---- Suscripciones live ---- */
+
+  useEffect(() => {
+    if (!user?.uid || !user?.consultorioId) return;
+    return suscribirInstanciasProfesional(user.uid, user.consultorioId, setInstancias);
+  }, [user?.uid, user?.consultorioId]);
 
   useEffect(() => {
     if (!user?.uid || !user?.consultorioId) {
@@ -172,14 +183,38 @@ export default function MiPanel() {
     <div className="cp-panel">
       {/* ---- Header con saludo personalizado ---- */}
       <header className="cp-panel__header">
-        <h1 className="cp-panel__title">
-          Hola, {user?.displayName || 'profesional'}
-        </h1>
-        <p className="cp-panel__sub">
-          {consultorio?.nombre
-            ? `Resumen de tu actividad en ${consultorio.nombre}.`
-            : 'Resumen de tu actividad.'}
-        </p>
+        <div>
+          <h1 className="cp-panel__title">
+            Hola, {user?.displayName || 'profesional'}
+          </h1>
+          <p className="cp-panel__sub">
+            {consultorio?.nombre
+              ? `Resumen de tu actividad en ${consultorio.nombre}.`
+              : 'Resumen de tu actividad.'}
+          </p>
+        </div>
+        <div style={{ position: 'relative' }}>
+          <button
+            type="button"
+            className={`cp-recordatorios-btn ${instancias.filter((i) => i.estado === 'pendiente').length > 0 ? 'cp-recordatorios-btn--activo' : ''}`}
+            onClick={() => setRecordatoriosOpen((v) => !v)}
+          >
+            <BellIcon />
+            <span>Recordatorios</span>
+            {instancias.filter((i) => i.estado === 'pendiente').length > 0 && (
+              <span className="cp-recordatorios-btn__badge">
+                {instancias.filter((i) => i.estado === 'pendiente').length}
+              </span>
+            )}
+          </button>
+          {recordatoriosOpen && (
+            <PanelRecordatorios
+              instancias={instancias}
+              uid={user.uid}
+              onClose={() => setRecordatoriosOpen(false)}
+            />
+          )}
+        </div>
       </header>
 
       {/* ---- Cards de stats ---- */}
@@ -317,4 +352,103 @@ function Card({ icon, label, value, hint, tone = 'default', to, ctaLabel, mono =
     );
   }
   return card;
+}
+
+/* ============================================================
+   Botón e ícono de recordatorios
+   ============================================================ */
+function BellIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
+  );
+}
+
+/* ============================================================
+   Panel desplegable de recordatorios
+   ============================================================ */
+function PanelRecordatorios({ instancias, uid, onClose }) {
+  const ref = useRef(null);
+
+  // Cerrar al click afuera
+  useEffect(() => {
+    function handler(e) {
+      if (ref.current && !ref.current.contains(e.target)) onClose();
+    }
+    document.addEventListener('mousedown', handler);
+    document.addEventListener('touchstart', handler);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('touchstart', handler);
+    };
+  }, [onClose]);
+
+  const pendientes = instancias.filter((i) => i.estado === 'pendiente');
+  const aceptados = instancias.filter((i) => i.estado === 'aceptado');
+
+  async function handleAceptar(inst) {
+    // El ciclo viene en la instancia como snapshot; si no, pasamos null
+    await aceptarInstancia(inst.id, inst, inst.ciclo ?? null);
+  }
+
+  return (
+    <div ref={ref} className="cp-panel-recordatorios">
+      <div className="cp-panel-recordatorios__header">
+        <span className="cp-panel-recordatorios__titulo">Recordatorios y avisos</span>
+        <button type="button" className="cp-panel-recordatorios__close" onClick={onClose} aria-label="Cerrar">×</button>
+      </div>
+
+      {instancias.length === 0 ? (
+        <div className="cp-panel-recordatorios__empty">
+          No hay recordatorios activos 🎉
+        </div>
+      ) : (
+        <div className="cp-panel-recordatorios__lista">
+          {pendientes.map((inst) => (
+            <div key={inst.id} className="cp-panel-recordatorios__item cp-panel-recordatorios__item--pendiente">
+              <div className="cp-panel-recordatorios__item-titulo">{inst.titulo}</div>
+              {inst.descripcion && (
+                <div className="cp-panel-recordatorios__item-desc">{inst.descripcion}</div>
+              )}
+              <button
+                type="button"
+                className="cp-panel-recordatorios__aceptar"
+                onClick={() => handleAceptar(inst)}
+              >
+                ✓ Aceptar
+              </button>
+            </div>
+          ))}
+          {aceptados.length > 0 && (
+            <>
+              {pendientes.length > 0 && <div className="cp-panel-recordatorios__sep" />}
+              <div className="cp-panel-recordatorios__seccion-label">Vistos recientemente</div>
+              {aceptados.map((inst) => {
+                const expira = inst.expiraEn?.toDate
+                  ? inst.expiraEn.toDate()
+                  : inst.expiraEn?.seconds
+                    ? new Date(inst.expiraEn.seconds * 1000)
+                    : null;
+                const diasRestantes = expira
+                  ? Math.max(0, Math.ceil((expira - new Date()) / (1000 * 60 * 60 * 24)))
+                  : null;
+                return (
+                  <div key={inst.id} className="cp-panel-recordatorios__item cp-panel-recordatorios__item--aceptado">
+                    <div className="cp-panel-recordatorios__item-titulo">{inst.titulo}</div>
+                    {diasRestantes !== null && (
+                      <div className="cp-panel-recordatorios__item-expira">
+                        Desaparece en {diasRestantes} día{diasRestantes === 1 ? '' : 's'}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }

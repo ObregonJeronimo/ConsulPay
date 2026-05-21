@@ -32,6 +32,15 @@ import {
   obtenerUrlConexionMP,
 } from '../../lib/mpIntegracion.js';
 import { suscribirMiembrosConsultorio } from '../../lib/profesionales.js';
+import {
+  aceptarInstancia,
+  crearRecordatorio,
+  actualizarRecordatorio,
+  eliminarRecordatorio,
+  labelCiclo,
+  suscribirRecordatoriosConsultorio,
+  TIPOS_CICLO,
+} from '../../lib/recordatorios.js';
 import { comisionDeConsultorio } from '../../lib/superadmin.js';
 import {
   cancelarSuscripcionPro,
@@ -196,6 +205,12 @@ export default function Configuracion() {
             )}
           </button>
         )}
+        <button
+          className={`cp-tab ${tab === 'recordatorios' ? 'cp-tab--active' : ''}`}
+          onClick={() => intentarCambiarTab('recordatorios')}
+        >
+          Recordatorios
+        </button>
       </div>
 
       {tab === 'datos' && (
@@ -235,6 +250,13 @@ export default function Configuracion() {
           consultorio={consultorio}
           searchParams={searchParams}
           onLimpiarParams={() => setSearchParams({})}
+        />
+      )}
+
+      {tab === 'recordatorios' && (
+        <TabRecordatorios
+          consultorioId={user.consultorioId}
+          adminUid={user.uid}
         />
       )}
     </div>
@@ -2392,5 +2414,356 @@ function CancelarProModal({ currentPeriodEnd, onCancelar, onConfirmar, submittin
         </div>
       </div>
     </div>
+  );
+}
+
+/* ============================================================
+   Tab Recordatorios y avisos
+   ============================================================ */
+function TabRecordatorios({ consultorioId, adminUid }) {
+  const [recordatorios, setRecordatorios] = useState([]);
+  const [miembros, setMiembros] = useState([]);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editando, setEditando] = useState(null); // null | recordatorio
+
+  const profesionalesActivos = useMemo(
+    () => miembros.filter((m) => m.rol === 'profesional' && m.estado === 'activo'),
+    [miembros],
+  );
+
+  useEffect(() => {
+    return suscribirRecordatoriosConsultorio(consultorioId, setRecordatorios);
+  }, [consultorioId]);
+
+  useEffect(() => {
+    return suscribirMiembrosConsultorio(consultorioId, setMiembros);
+  }, [consultorioId]);
+
+  async function handleEliminar(r) {
+    if (!confirm(`¿Eliminar "${r.titulo}"? Las instancias ya enviadas seguirán visibles hasta que expiren.`)) return;
+    await eliminarRecordatorio(r.id);
+  }
+
+  return (
+    <div className="cp-tab-recordatorios">
+      <div className="cp-tab-recordatorios__header">
+        <div>
+          <h2 className="cp-section-title">Recordatorios y avisos</h2>
+          <p className="cp-section-sub">
+            Creá recordatorios periódicos para uno o varios profesionales. Se mostrarán en su dashboard.
+          </p>
+        </div>
+        <Button variant="primary" icon={<PlusIcon />} onClick={() => { setEditando(null); setModalOpen(true); }}>
+          Nuevo recordatorio
+        </Button>
+      </div>
+
+      {recordatorios.length === 0 ? (
+        <div className="cp-empty-state">
+          <p>No hay recordatorios configurados todavía.</p>
+        </div>
+      ) : (
+        <div className="cp-recordatorios-lista">
+          {recordatorios.map((r) => {
+            const profs = (r.destinatarios || [])
+              .map((uid) => miembros.find((m) => m.uid === uid))
+              .filter(Boolean);
+            return (
+              <div key={r.id} className={`cp-recordatorio-card ${!r.activo ? 'cp-recordatorio-card--inactivo' : ''}`}>
+                <div className="cp-recordatorio-card__body">
+                  <div className="cp-recordatorio-card__titulo">{r.titulo}</div>
+                  {r.descripcion && (
+                    <div className="cp-recordatorio-card__desc">{r.descripcion}</div>
+                  )}
+                  <div className="cp-recordatorio-card__meta">
+                    <span>🔁 {labelCiclo(r.ciclo)}</span>
+                    <span>·</span>
+                    <span>
+                      {profs.length === 0
+                        ? 'Sin destinatarios'
+                        : profs.length === 1
+                          ? (profs[0].displayName || profs[0].email)
+                          : `${profs.length} profesionales`}
+                    </span>
+                    {!r.activo && <span className="cp-badge cp-badge--obsoleta">Inactivo</span>}
+                  </div>
+                </div>
+                <div className="cp-recordatorio-card__actions">
+                  <button
+                    className="cp-icon-btn"
+                    onClick={() => { setEditando(r); setModalOpen(true); }}
+                    title="Editar"
+                  >
+                    <EditIcon />
+                  </button>
+                  <button
+                    className="cp-icon-btn cp-icon-btn--danger"
+                    onClick={() => handleEliminar(r)}
+                    title="Eliminar"
+                  >
+                    <TrashIcon />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {modalOpen && (
+        <RecordatorioModal
+          recordatorio={editando}
+          profesionales={profesionalesActivos}
+          consultorioId={consultorioId}
+          adminUid={adminUid}
+          onClose={() => setModalOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ---- Modal crear/editar recordatorio ---- */
+function RecordatorioModal({ recordatorio, profesionales, consultorioId, adminUid, onClose }) {
+  const overlayProps = useOverlayClose(onClose);
+  const esNuevo = !recordatorio;
+
+  const [titulo, setTitulo] = useState(recordatorio?.titulo ?? '');
+  const [descripcion, setDescripcion] = useState(recordatorio?.descripcion ?? '');
+  const [tipoCiclo, setTipoCiclo] = useState(recordatorio?.ciclo?.tipo ?? TIPOS_CICLO.SEMANAL);
+  const [cadaN, setCadaN] = useState(String(recordatorio?.ciclo?.cada ?? 1));
+  const [diaDelMes, setDiaDelMes] = useState(String(recordatorio?.ciclo?.dia ?? 1));
+  const [modoDestinatarios, setModoDestinatarios] = useState(
+    () => recordatorio ? (recordatorio.destinatarios?.length > 1 ? 'multiple' : 'individual') : 'individual',
+  );
+  const [destinatariosElegidos, setDestinatariosElegidos] = useState(
+    new Set(recordatorio?.destinatarios ?? []),
+  );
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  function toggleDestinatario(uid) {
+    setDestinatariosElegidos((prev) => {
+      const next = new Set(prev);
+      if (next.has(uid)) next.delete(uid);
+      else next.add(uid);
+      return next;
+    });
+  }
+
+  function buildCiclo() {
+    switch (tipoCiclo) {
+      case TIPOS_CICLO.SEMANAL: return { tipo: TIPOS_CICLO.SEMANAL, cada: Math.max(1, Number(cadaN) || 1) };
+      case TIPOS_CICLO.QUINCENAL: return { tipo: TIPOS_CICLO.QUINCENAL };
+      case TIPOS_CICLO.MENSUAL: return { tipo: TIPOS_CICLO.MENSUAL, cada: Math.max(1, Number(cadaN) || 1) };
+      case TIPOS_CICLO.DIA_DEL_MES: return { tipo: TIPOS_CICLO.DIA_DEL_MES, dia: Math.min(28, Math.max(1, Number(diaDelMes) || 1)) };
+      default: return { tipo: TIPOS_CICLO.SEMANAL, cada: 1 };
+    }
+  }
+
+  async function onSubmit(e) {
+    e.preventDefault();
+    setError('');
+    if (!titulo.trim()) { setError('El título es obligatorio.'); return; }
+    if (destinatariosElegidos.size === 0) { setError('Elegí al menos un profesional.'); return; }
+
+    setSubmitting(true);
+    try {
+      if (esNuevo) {
+        await crearRecordatorio({
+          consultorioId,
+          titulo,
+          descripcion,
+          destinatarios: [...destinatariosElegidos],
+          ciclo: buildCiclo(),
+          creadoPorUid: adminUid,
+        });
+      } else {
+        await actualizarRecordatorio(recordatorio.id, {
+          titulo,
+          descripcion,
+          ciclo: buildCiclo(),
+        });
+      }
+      onClose();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="cp-modal-overlay" {...overlayProps}>
+      <div className="cp-modal cp-modal--wide" onClick={(e) => e.stopPropagation()}>
+        <button className="cp-modal__close" onClick={onClose} aria-label="Cerrar">×</button>
+        <h2 className="cp-modal__title">{esNuevo ? 'Nuevo recordatorio' : 'Editar recordatorio'}</h2>
+        <p className="cp-modal__sub">
+          {esNuevo
+            ? 'El recordatorio aparecerá en el dashboard del profesional según la frecuencia configurada.'
+            : 'Los cambios aplican a las próximas instancias generadas.'}
+        </p>
+
+        <form className="cp-modal__form" onSubmit={onSubmit}>
+          <Input
+            label="Título"
+            value={titulo}
+            onChange={(e) => setTitulo(e.target.value)}
+            placeholder="Ej: Cargar sesiones de la semana"
+            required
+          />
+
+          <div>
+            <label className="cp-field__label" style={{ display: 'block', marginBottom: 6 }}>
+              Descripción <span style={{ color: 'var(--cp-text-faint)', fontWeight: 400 }}>(opcional)</span>
+            </label>
+            <textarea
+              className="cp-input"
+              value={descripcion}
+              onChange={(e) => setDescripcion(e.target.value)}
+              placeholder="Detalles del recordatorio…"
+              rows={3}
+              style={{ resize: 'vertical' }}
+            />
+          </div>
+
+          {/* Frecuencia */}
+          <div>
+            <label className="cp-field__label" style={{ display: 'block', marginBottom: 6 }}>Frecuencia</label>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
+              {[
+                { value: TIPOS_CICLO.SEMANAL, label: 'Semanal' },
+                { value: TIPOS_CICLO.QUINCENAL, label: 'Quincenal' },
+                { value: TIPOS_CICLO.MENSUAL, label: 'Mensual' },
+                { value: TIPOS_CICLO.DIA_DEL_MES, label: 'Día del mes' },
+              ].map((op) => (
+                <label key={op.value} style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '7px 14px', border: `1.5px solid ${tipoCiclo === op.value ? 'var(--cp-accent)' : 'var(--cp-border)'}`,
+                  borderRadius: 'var(--cp-radius-md)', cursor: 'pointer', fontSize: 13.5,
+                  background: tipoCiclo === op.value ? 'var(--cp-accent-bg)' : 'transparent',
+                }}>
+                  <input type="radio" name="ciclo" value={op.value} checked={tipoCiclo === op.value}
+                    onChange={() => setTipoCiclo(op.value)} style={{ display: 'none' }} />
+                  {op.label}
+                </label>
+              ))}
+            </div>
+
+            {(tipoCiclo === TIPOS_CICLO.SEMANAL) && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 13.5, color: 'var(--cp-text-muted)' }}>Cada</span>
+                <input type="number" className="cp-input" value={cadaN}
+                  onChange={(e) => setCadaN(e.target.value)} min="1" max="52"
+                  style={{ width: 70, textAlign: 'center' }} />
+                <span style={{ fontSize: 13.5, color: 'var(--cp-text-muted)' }}>semana{Number(cadaN) === 1 ? '' : 's'}</span>
+              </div>
+            )}
+            {tipoCiclo === TIPOS_CICLO.MENSUAL && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 13.5, color: 'var(--cp-text-muted)' }}>Cada</span>
+                <input type="number" className="cp-input" value={cadaN}
+                  onChange={(e) => setCadaN(e.target.value)} min="1" max="12"
+                  style={{ width: 70, textAlign: 'center' }} />
+                <span style={{ fontSize: 13.5, color: 'var(--cp-text-muted)' }}>mes{Number(cadaN) === 1 ? '' : 'es'}</span>
+              </div>
+            )}
+            {tipoCiclo === TIPOS_CICLO.DIA_DEL_MES && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 13.5, color: 'var(--cp-text-muted)' }}>El día</span>
+                <input type="number" className="cp-input" value={diaDelMes}
+                  onChange={(e) => setDiaDelMes(e.target.value)} min="1" max="28"
+                  style={{ width: 70, textAlign: 'center' }} />
+                <span style={{ fontSize: 13.5, color: 'var(--cp-text-muted)' }}>de cada mes</span>
+              </div>
+            )}
+          </div>
+
+          {/* Destinatarios — solo al crear */}
+          {esNuevo && (
+            <div>
+              <label className="cp-field__label" style={{ display: 'block', marginBottom: 8 }}>Destinatarios</label>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                {[
+                  { value: 'individual', label: 'Individual' },
+                  { value: 'multiple', label: 'Varios profesionales' },
+                ].map((op) => (
+                  <label key={op.value} style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '7px 14px', border: `1.5px solid ${modoDestinatarios === op.value ? 'var(--cp-accent)' : 'var(--cp-border)'}`,
+                    borderRadius: 'var(--cp-radius-md)', cursor: 'pointer', fontSize: 13.5,
+                    background: modoDestinatarios === op.value ? 'var(--cp-accent-bg)' : 'transparent',
+                  }}>
+                    <input type="radio" name="modo" value={op.value} checked={modoDestinatarios === op.value}
+                      onChange={() => { setModoDestinatarios(op.value); setDestinatariosElegidos(new Set()); }}
+                      style={{ display: 'none' }} />
+                    {op.label}
+                  </label>
+                ))}
+              </div>
+
+              {modoDestinatarios === 'individual' ? (
+                <select
+                  className="cp-select"
+                  value={[...destinatariosElegidos][0] ?? ''}
+                  onChange={(e) => setDestinatariosElegidos(new Set(e.target.value ? [e.target.value] : []))}
+                >
+                  <option value="">Elegir profesional…</option>
+                  {profesionales.map((p) => (
+                    <option key={p.uid} value={p.uid}>{p.displayName || p.email}</option>
+                  ))}
+                </select>
+              ) : (
+                <div className="cp-cr-pac-lista">
+                  {profesionales.map((p) => {
+                    const sel = destinatariosElegidos.has(p.uid);
+                    return (
+                      <label key={p.uid} className={`cp-cr-pac-item ${sel ? 'cp-cr-pac-item--sel' : ''}`}>
+                        <input type="checkbox" checked={sel} onChange={() => toggleDestinatario(p.uid)} />
+                        <Avatar initials={(p.displayName || p.email || '?')[0].toUpperCase()} size={28} />
+                        <span className="cp-cr-pac-item__nombre">{p.displayName || p.email}</span>
+                        {sel && <span className="cp-cr-pac-item__check">✓</span>}
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {error && <p style={{ color: 'var(--cp-danger)', fontSize: 13 }}>{error}</p>}
+
+          <div className="cp-modal__actions">
+            <Button type="button" variant="ghost" onClick={onClose} disabled={submitting}>Cancelar</Button>
+            <Button type="submit" variant="primary" disabled={submitting}>
+              {submitting ? <><Spinner size={14} /> Guardando…</> : (esNuevo ? 'Crear recordatorio' : 'Guardar cambios')}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
+function EditIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+    </svg>
+  );
+}
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+      <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4h6v2" />
+    </svg>
   );
 }

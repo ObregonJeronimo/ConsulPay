@@ -1943,3 +1943,91 @@
     justify-content: center;
   }
 }
+
+/* ============================================================
+   Tab Recordatorios
+   ============================================================ */
+.cp-tab-recordatorios {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cp-space-6);
+}
+
+.cp-tab-recordatorios__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.cp-recordatorios-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cp-recordatorio-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  transition: background 120ms;
+}
+
+.cp-recordatorio-card:hover {
+  background: var(--cp-surface-hover);
+}
+
+.cp-recordatorio-card--inactivo {
+  opacity: 0.6;
+}
+
+.cp-recordatorio-card__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.cp-recordatorio-card__titulo {
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--cp-text);
+  margin-bottom: 3px;
+}
+
+.cp-recordatorio-card__desc {
+  font-size: 13px;
+  color: var(--cp-text-muted);
+  margin-bottom: 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cp-recordatorio-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--cp-text-faint);
+  flex-wrap: wrap;
+}
+
+.cp-recordatorio-card__actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.cp-empty-state {
+  padding: 40px;
+  text-align: center;
+  color: var(--cp-text-muted);
+  font-size: 14px;
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+}

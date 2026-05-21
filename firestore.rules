@@ -464,6 +464,56 @@ service cloud.firestore {
     }
 
     // ============================================================
+    //  /recordatorios/{recordatorioId}
+    // ============================================================
+    match /recordatorios/{recordatorioId} {
+      allow read: if esSuperadmin()
+        || esAdminDe(resource.data.consultorioId)
+        || (esProfesionalDe(resource.data.consultorioId)
+            && request.auth.uid in resource.data.destinatarios)
+        || (esProfesionalDe(resource.data.consultorioId)
+            && resource.data.creadoPorUid == request.auth.uid);
+
+      allow create: if esSuperadmin()
+        || esAdminDe(request.resource.data.consultorioId)
+        || (esProfesionalDe(request.resource.data.consultorioId)
+            && request.resource.data.creadoPorUid == request.auth.uid
+            && request.resource.data.destinatarios == [request.auth.uid]);
+
+      allow update: if esSuperadmin()
+        || esAdminDe(resource.data.consultorioId)
+        || (esProfesionalDe(resource.data.consultorioId)
+            && resource.data.creadoPorUid == request.auth.uid);
+
+      allow delete: if esSuperadmin()
+        || esAdminDe(resource.data.consultorioId)
+        || (esProfesionalDe(resource.data.consultorioId)
+            && resource.data.creadoPorUid == request.auth.uid);
+    }
+
+    // ============================================================
+    //  /recordatorios_instancias/{instanciaId}
+    // ============================================================
+    match /recordatorios_instancias/{instanciaId} {
+      allow read: if esSuperadmin()
+        || esAdminDe(resource.data.consultorioId)
+        || (esProfesionalDe(resource.data.consultorioId)
+            && resource.data.profesionalUid == request.auth.uid);
+
+      allow create: if esSuperadmin()
+        || esAdminDe(request.resource.data.consultorioId)
+        || esProfesionalDe(request.resource.data.consultorioId);
+
+      allow update: if esSuperadmin()
+        || esAdminDe(resource.data.consultorioId)
+        || (esProfesionalDe(resource.data.consultorioId)
+            && resource.data.profesionalUid == request.auth.uid);
+
+      allow delete: if esSuperadmin()
+        || esAdminDe(resource.data.consultorioId);
+    }
+
+    // ============================================================
     //  Todo lo demas: bloqueado.
     // ============================================================
   }
