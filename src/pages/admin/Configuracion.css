@@ -2031,3 +2031,60 @@
   border: 1px solid var(--cp-border);
   border-radius: var(--cp-radius-md);
 }
+
+/* ---- Lista de profesionales para selección múltiple en RecordatorioModal ---- */
+.cp-rec-prof-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.cp-rec-prof-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1.5px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 120ms, background 120ms;
+  background: var(--cp-surface);
+}
+
+.cp-rec-prof-item input[type="checkbox"] {
+  display: none;
+}
+
+.cp-rec-prof-item:hover {
+  border-color: var(--cp-accent);
+  background: var(--cp-accent-bg);
+}
+
+.cp-rec-prof-item--sel {
+  border-color: var(--cp-accent);
+  background: var(--cp-accent-bg);
+}
+
+.cp-rec-prof-item__nombre {
+  flex: 1;
+  font-size: 14px;
+  color: var(--cp-text);
+  font-weight: 500;
+}
+
+.cp-rec-prof-item__check {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cp-accent);
+  background: color-mix(in srgb, var(--cp-accent) 15%, transparent);
+  flex-shrink: 0;
+}

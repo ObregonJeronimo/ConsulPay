@@ -2623,7 +2623,7 @@ function RecordatorioModal({ recordatorio, profesionales, consultorioId, adminUi
               onChange={(e) => setDescripcion(e.target.value)}
               placeholder="Detalles del recordatorio…"
               rows={3}
-              style={{ resize: 'vertical' }}
+              style={{ resize: 'vertical', width: '100%', boxSizing: 'border-box' }}
             />
           </div>
 
@@ -2705,6 +2705,7 @@ function RecordatorioModal({ recordatorio, profesionales, consultorioId, adminUi
               {modoDestinatarios === 'individual' ? (
                 <select
                   className="cp-select"
+                  style={{ width: '100%' }}
                   value={[...destinatariosElegidos][0] ?? ''}
                   onChange={(e) => setDestinatariosElegidos(new Set(e.target.value ? [e.target.value] : []))}
                 >
@@ -2714,15 +2715,15 @@ function RecordatorioModal({ recordatorio, profesionales, consultorioId, adminUi
                   ))}
                 </select>
               ) : (
-                <div className="cp-cr-pac-lista">
+                <div className="cp-rec-prof-lista">
                   {profesionales.map((p) => {
                     const sel = destinatariosElegidos.has(p.uid);
                     return (
-                      <label key={p.uid} className={`cp-cr-pac-item ${sel ? 'cp-cr-pac-item--sel' : ''}`}>
+                      <label key={p.uid} className={`cp-rec-prof-item ${sel ? 'cp-rec-prof-item--sel' : ''}`}>
                         <input type="checkbox" checked={sel} onChange={() => toggleDestinatario(p.uid)} />
-                        <Avatar initials={(p.displayName || p.email || '?')[0].toUpperCase()} size={28} />
-                        <span className="cp-cr-pac-item__nombre">{p.displayName || p.email}</span>
-                        {sel && <span className="cp-cr-pac-item__check">✓</span>}
+                        <Avatar initials={(p.displayName || p.email || '?')[0].toUpperCase()} size={32} />
+                        <span className="cp-rec-prof-item__nombre">{p.displayName || p.email}</span>
+                        <span className="cp-rec-prof-item__check">{sel ? '✓' : ''}</span>
                       </label>
                     );
                   })}
