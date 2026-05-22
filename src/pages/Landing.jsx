@@ -321,7 +321,7 @@ function Precios() {
             </div>
 
             <div className="lp-price-card__price">
-              <span className="lp-price-card__amount">$50.000</span>
+              <span className="lp-price-card__amount">$100.000</span>
               <span className="lp-price-card__period">/ 30 días</span>
             </div>
 

@@ -2053,7 +2053,7 @@ function TabPlan({ consultorio, searchParams, onLimpiarParams }) {
       {/* Modales */}
       {openContratar && (
         <ContratarProModal
-          precio={sub?.transactionAmount || 50000}
+          precio={sub?.transactionAmount || 100000}
           consultorio={consultorio}
           onCancelar={() => setOpenContratar(false)}
           onConfirmar={handleContratar}
@@ -2223,11 +2223,11 @@ function ComparativaPlanes({ consultorio }) {
     : 0.5;
 
   // Punto de equilibrio: a partir de qué facturación mensual de pagos
-  // ya conviene pasarse a Pro. Resolvemos: 50000 = (free - pro)% * X / 100
-  //   => X = 50000 * 100 / (free - pro)
+  // ya conviene pasarse a Pro. Resolvemos: 100000 = (free - pro)% * X / 100
+  //   => X = 100000 * 100 / (free - pro)
   const diferenciaPct = comisionFree - comisionPro;
   const puntoEquilibrio = diferenciaPct > 0
-    ? 50000 * 100 / diferenciaPct
+    ? 100000 * 100 / diferenciaPct
     : null;
 
   return (
@@ -2247,7 +2247,7 @@ function ComparativaPlanes({ consultorio }) {
           <div className="cp-plan-compare__card-name">
             Pro <span className="cp-plan-card__badge">RECOMENDADO</span>
           </div>
-          <div className="cp-plan-compare__price">{formatoARS.format(50000)}/mes</div>
+          <div className="cp-plan-compare__price">{formatoARS.format(100000)}/mes</div>
           <ul className="cp-plan-compare__list">
             <li><strong>Comisión {comisionPro}%</strong> sobre el valor total de cada sesión</li>
             <li>Acceso completo al consultorio</li>

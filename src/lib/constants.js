@@ -43,7 +43,7 @@ export const COMISION_POR_PLAN = {
   // ULTRA es por consultorio, no tiene default global.
 };
 
-export const PRECIO_MENSUALIDAD_PAGO = 50000; // ARS
+export const PRECIO_MENSUALIDAD_PAGO = 100000; // ARS
 
 /* ============================================================
    Estados de consultorio
