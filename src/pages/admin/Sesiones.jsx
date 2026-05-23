@@ -774,24 +774,28 @@ function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, onEditar, o
                       >
                         <CheckIcon />
                       </button>
-                    ) : s.metodoPagoTipo === TIPOS_METODO_PAGO.DIFERIDO && !pagada ? (
-                      <button
-                        className="cp-icon-btn"
-                        onClick={() => onLiquidar(s)}
-                        title="Corregir monto liquidado"
-                        aria-label="Corregir monto"
-                      >
-                        <EditIcon />
-                      </button>
                     ) : (
-                      <button
-                        className={`cp-icon-btn ${pagada ? '' : 'cp-icon-btn--success'}`}
-                        onClick={() => onTogglePagado(s)}
-                        title={pagada ? 'Marcar como debe' : 'Marcar como pagada'}
-                        aria-label={pagada ? 'Marcar como debe' : 'Marcar como pagada'}
-                      >
-                        {pagada ? <RevertIcon /> : <CheckIcon />}
-                      </button>
+                      <>
+                        {/* Sesión diferida ya liquidada: mostrar ✓ para marcar pagada + lápiz para corregir monto */}
+                        {s.metodoPagoTipo === TIPOS_METODO_PAGO.DIFERIDO && !pagada && (
+                          <button
+                            className="cp-icon-btn"
+                            onClick={() => onLiquidar(s)}
+                            title="Corregir monto liquidado"
+                            aria-label="Corregir monto"
+                          >
+                            <EditIcon />
+                          </button>
+                        )}
+                        <button
+                          className={`cp-icon-btn ${pagada ? '' : 'cp-icon-btn--success'}`}
+                          onClick={() => onTogglePagado(s)}
+                          title={pagada ? 'Marcar como debe' : 'Marcar como pagada'}
+                          aria-label={pagada ? 'Marcar como debe' : 'Marcar como pagada'}
+                        >
+                          {pagada ? <RevertIcon /> : <CheckIcon />}
+                        </button>
+                      </>
                     )}
                     <button
                       className="cp-icon-btn"
@@ -858,15 +862,18 @@ function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, onEditar, o
                         label: 'Liquidar monto',
                         icon: <CheckIcon />,
                         onClick: () => onLiquidar(s),
-                      }] : s.metodoPagoTipo === TIPOS_METODO_PAGO.DIFERIDO && !pagada ? [{
-                        label: 'Corregir monto',
-                        icon: <EditIcon />,
-                        onClick: () => onLiquidar(s),
-                      }] : [{
-                        label: pagada ? 'Marcar debe' : 'Marcar pagada',
-                        icon: pagada ? <RevertIcon /> : <CheckIcon />,
-                        onClick: () => onTogglePagado(s),
-                      }]),
+                      }] : [
+                        ...(s.metodoPagoTipo === TIPOS_METODO_PAGO.DIFERIDO && !pagada ? [{
+                          label: 'Corregir monto',
+                          icon: <EditIcon />,
+                          onClick: () => onLiquidar(s),
+                        }] : []),
+                        {
+                          label: pagada ? 'Marcar debe' : 'Marcar pagada',
+                          icon: pagada ? <RevertIcon /> : <CheckIcon />,
+                          onClick: () => onTogglePagado(s),
+                        },
+                      ]),
                       { label: 'Editar', icon: <EditIcon />, onClick: () => onEditar(s) },
                       { label: 'Eliminar', icon: <TrashIcon />, onClick: () => onEliminar(s), danger: true },
                     ]}
