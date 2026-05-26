@@ -498,6 +498,30 @@ export async function aprobarSolicitud({
     return;
   }
 
+  if (sol.tipo === TIPOS_SOLICITUD_SESION.CREAR_PACIENTE) {
+    const datos = sol.payloadPropuesto?.datosPaciente ?? {};
+    const { crearPaciente } = await import('./pacientes.js');
+    await crearPaciente({
+      consultorioId,
+      profesionalesUids: [sol.profesionalUid],
+      nombre: datos.nombre,
+      apellido: datos.apellido,
+      dni: datos.dni || null,
+      telefono: datos.telefono || null,
+      email: datos.email || null,
+      metodosPagoIds: datos.metodosPagoIds || [],
+      notas: datos.notas || null,
+      createdByUid: adminUid,
+    });
+    await actualizarSolicitudResuelta({
+      solicitudId,
+      adminUid,
+      adminNombre,
+      estado: ESTADOS_SOLICITUD_SESION.APROBADA,
+    });
+    return;
+  }
+
   // Para modificar y eliminar necesitamos la sesion actual
   if (!sol.sesionId) {
     throw new Error('La solicitud no tiene sesion asociada.');
@@ -665,6 +689,32 @@ export async function aprobarSolicitud({
   }
 
   throw new Error('Tipo de solicitud desconocido.');
+}
+
+/* ============================================================
+   Solicitar creación de paciente (profesional con permiso)
+   ============================================================ */
+export async function solicitarCrearPaciente({
+  consultorioId,
+  profesionalUid,
+  profesionalNombre,
+  datosPaciente,
+}) {
+  if (!datosPaciente?.nombre?.trim()) throw new Error('El nombre es obligatorio');
+  if (!datosPaciente?.apellido?.trim()) throw new Error('El apellido es obligatorio');
+  if (!datosPaciente?.metodosPagoIds?.length) throw new Error('Seleccioná al menos un método de pago');
+
+  const ref = await addDoc(collection(db, 'solicitudes_sesion'), {
+    consultorioId,
+    tipo: TIPOS_SOLICITUD_SESION.CREAR_PACIENTE,
+    estado: ESTADOS_SOLICITUD_SESION.PENDIENTE,
+    profesionalUid,
+    profesionalNombre,
+    payloadPropuesto: { datosPaciente },
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return ref.id;
 }
 
 /* ============================================================

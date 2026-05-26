@@ -236,6 +236,21 @@ export default function Pacientes() {
   const activosTotal = pacientesActivos.length;
   const archivadosTotal = pacientesArchivados.length;
 
+  // Stats: cantidad de pacientes activos por método (sin duplicar)
+  // Un paciente con 2 métodos cuenta 1 vez en cada método
+  const statsPorMetodo = useMemo(() => {
+    const conteo = {};
+    for (const p of pacientesActivos) {
+      const ids = getMetodosPaciente(p);
+      for (const id of ids) {
+        conteo[id] = (conteo[id] || 0) + 1;
+      }
+    }
+    return metodos.map((m) => ({ metodo: m, cantidad: conteo[m.id] || 0 }))
+      .filter((s) => s.cantidad > 0)
+      .sort((a, b) => b.cantidad - a.cantidad);
+  }, [pacientesActivos, metodos]);
+
   async function handleGuardar(data) {
     setError('');
     try {
@@ -334,6 +349,19 @@ export default function Pacientes() {
 
       {pacientes.length > 0 && (
         <>
+          {/* Stats por método de pago */}
+          {statsPorMetodo.length > 0 && (
+            <div className="cp-pac-stats">
+              {statsPorMetodo.map(({ metodo, cantidad }) => (
+                <div key={metodo.id} className="cp-pac-stat">
+                  <div className="cp-pac-stat__label">{metodo.nombre}</div>
+                  <div className="cp-pac-stat__value">{cantidad}</div>
+                  <div className="cp-pac-stat__hint">paciente{cantidad === 1 ? '' : 's'}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
           <FiltrosBar
             busqueda={busqueda}
             setBusqueda={setBusqueda}

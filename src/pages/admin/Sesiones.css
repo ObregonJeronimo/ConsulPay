@@ -962,3 +962,26 @@
     display: none;
   }
 }
+
+/* ---- Liquidar masivo ---- */
+.cp-liquidar-masivo__lista {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  overflow: hidden;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.cp-liquidar-masivo__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--cp-border);
+}
+
+.cp-liquidar-masivo__row:last-child {
+  border-bottom: none;
+}

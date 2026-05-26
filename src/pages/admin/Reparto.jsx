@@ -5,8 +5,14 @@ import Button from '../../components/ui/Button.jsx';
 
 import { useAuth } from '../../hooks/useAuth.js';
 import { useConsultorio } from '../../hooks/useConsultorio.js';
-import { formatoARS } from '../../lib/constants.js';
-import { suscribirProfesionales } from '../../lib/profesionales.js';
+import { ESTADOS_PAGO_SESION, formatoARS } from '../../lib/constants.js';
+import { suscribirMiembrosConsultorio, suscribirProfesionales } from '../../lib/profesionales.js';
+import {
+  finDeMes,
+  inicioDeMes,
+  nombreDelMes,
+  suscribirSesionesConsultorio,
+} from '../../lib/sesiones.js';
 import {
   ESTADOS_COMPENSACION,
   cerrarCiclo,
@@ -69,6 +75,23 @@ export default function RepartoEntreSocias() {
   const [profesionales, setProfesionales] = useState([]);
   const [compensaciones, setCompensaciones] = useState([]);
   const [loadingComps, setLoadingComps] = useState(true);
+  const [miembros, setMiembros] = useState([]);
+  const [mes, setMes] = useState(() => inicioDeMes(new Date()));
+  const [sesiones, setSesiones] = useState([]);
+
+  // Cargar miembros (admins para mostrar en el reparto)
+  useEffect(() => {
+    if (!consultorio?.id) return;
+    return suscribirMiembrosConsultorio(consultorio.id, setMiembros);
+  }, [consultorio?.id]);
+
+  // Sesiones del mes para pagos manuales
+  useEffect(() => {
+    if (!consultorio?.id) return;
+    const desde = inicioDeMes(mes);
+    const hasta = finDeMes(mes);
+    return suscribirSesionesConsultorio(consultorio.id, setSesiones, { desde, hasta });
+  }, [consultorio?.id, mes]);
 
   // Cargar profesionales (para mostrar nombres de admins en lugar de UIDs)
   useEffect(() => {
@@ -149,6 +172,15 @@ export default function RepartoEntreSocias() {
           mapAdminsByUid={mapAdminsByUid}
         />
       )}
+
+      <RepartoPagosManuales
+        sesiones={sesiones}
+        profesionales={profesionales}
+        miembros={miembros}
+        mes={mes}
+        setMes={setMes}
+        consultorioId={consultorio.id}
+      />
 
       <section className="cp-reparto__historial">
         <header className="cp-reparto__section-head">
@@ -568,6 +600,177 @@ function Linea({ label, value, subtle }) {
     <div className={`cp-slot-linea ${subtle ? 'cp-slot-linea--subtle' : ''}`}>
       <span>{label}</span>
       <span>{value}</span>
+    </div>
+  );
+}
+
+/* ============================================================
+   Sección: Reparto de pagos manuales (marcados con receptor)
+   Muestra cuánto cobró cada admin en el mes seleccionado,
+   desglosado por profesional, con filtro de mes.
+   ============================================================ */
+function RepartoPagosManuales({ sesiones, profesionales, miembros, mes, setMes, consultorioId }) {
+  const admins = useMemo(
+    () => miembros.filter((m) => m.rol === 'admin' || m.esAdminDelConsultorio),
+    [miembros],
+  );
+
+  const mapaProfesionales = useMemo(
+    () => Object.fromEntries(profesionales.map((p) => [p.uid, p])),
+    [profesionales],
+  );
+
+  // Sesiones pagadas con receptor registrado
+  const sesionesConReceptor = useMemo(
+    () => sesiones.filter((s) => s.estadoPago === ESTADOS_PAGO_SESION.PAGADO && s.receptorUid),
+    [sesiones],
+  );
+
+  // Agrupar por receptor (admin)
+  const porReceptor = useMemo(() => {
+    const map = {};
+    for (const s of sesionesConReceptor) {
+      const uid = s.receptorUid;
+      if (!map[uid]) map[uid] = { uid, nombre: s.receptorNombre || uid, sesiones: [], total: 0 };
+      map[uid].sesiones.push(s);
+      map[uid].total += s.montoConsultorio || 0;
+    }
+    return Object.values(map).sort((a, b) => b.total - a.total);
+  }, [sesionesConReceptor]);
+
+  // Detalle expandible por admin → por profesional
+  const [expandido, setExpandido] = useState(null);
+
+  const totalMes = porReceptor.reduce((acc, r) => acc + r.total, 0);
+  const sinReceptor = sesiones.filter(
+    (s) => s.estadoPago === ESTADOS_PAGO_SESION.PAGADO && !s.receptorUid,
+  ).length;
+
+  return (
+    <section className="cp-reparto__manuales">
+      <header className="cp-reparto__section-head">
+        <div>
+          <h2 className="cp-reparto__section-title">Pagos manuales cobrados</h2>
+          <p className="cp-reparto__section-sub">
+            Sesiones marcadas como pagadas con la opción "¿Quién recibió?".
+            Filtrá por mes para ver cuánto cobró cada administrador.
+          </p>
+        </div>
+        <SelectorMesReparto mes={mes} setMes={setMes} />
+      </header>
+
+      {/* Cards resumen por admin */}
+      <div className="cp-reparto__admins-grid">
+        {admins.map((admin) => {
+          const datos = porReceptor.find((r) => r.uid === admin.uid);
+          const total = datos?.total ?? 0;
+          const cant = datos?.sesiones?.length ?? 0;
+          const pct = totalMes > 0 ? Math.round(total / totalMes * 100) : 0;
+          return (
+            <div
+              key={admin.uid}
+              className={`cp-reparto__admin-card ${expandido === admin.uid ? 'cp-reparto__admin-card--active' : ''}`}
+              onClick={() => setExpandido((v) => v === admin.uid ? null : admin.uid)}
+            >
+              <div className="cp-reparto__admin-name">{admin.displayName || admin.email}</div>
+              <div className="cp-reparto__admin-total">{formatoARS.format(total)}</div>
+              <div className="cp-reparto__admin-meta">
+                {cant} sesión{cant === 1 ? '' : 'es'} · {pct}% del mes
+              </div>
+              {/* Barra de progreso */}
+              <div className="cp-reparto__admin-bar">
+                <div className="cp-reparto__admin-bar-fill" style={{ width: `${pct}%` }} />
+              </div>
+            </div>
+          );
+        })}
+        {admins.length === 0 && (
+          <div style={{ color: 'var(--cp-text-muted)', fontSize: 13.5 }}>
+            No hay admins registrados.
+          </div>
+        )}
+      </div>
+
+      {/* Total del mes */}
+      {totalMes > 0 && (
+        <div className="cp-reparto__manuales-total">
+          Total cobrado en {nombreDelMes(mes)}: <strong>{formatoARS.format(totalMes)}</strong>
+          {sinReceptor > 0 && (
+            <span style={{ marginLeft: 12, fontSize: 12, color: 'var(--cp-warning, #b8860b)' }}>
+              ⚠ {sinReceptor} sesión{sinReceptor === 1 ? '' : 'es'} sin receptor registrado
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Detalle expandido por admin */}
+      {expandido && (() => {
+        const datos = porReceptor.find((r) => r.uid === expandido);
+        if (!datos || !datos.sesiones.length) return (
+          <div className="cp-reparto__detalle">
+            <p style={{ color: 'var(--cp-text-muted)', fontSize: 13.5 }}>Sin cobros en {nombreDelMes(mes)}.</p>
+          </div>
+        );
+
+        // Agrupar por profesional
+        const porProf = {};
+        for (const s of datos.sesiones) {
+          const uid = s.profesionalUid;
+          if (!porProf[uid]) porProf[uid] = { sesiones: [], total: 0 };
+          porProf[uid].sesiones.push(s);
+          porProf[uid].total += s.montoConsultorio || 0;
+        }
+
+        return (
+          <div className="cp-reparto__detalle">
+            <div className="cp-reparto__detalle-titulo">
+              Detalle de cobros — {datos.nombre}
+            </div>
+            {Object.entries(porProf).map(([profUid, { sesiones: ss, total }]) => {
+              const prof = mapaProfesionales[profUid];
+              const nombreProf = prof?.displayName || prof?.email || ss[0]?.profesionalNombre || profUid;
+              return (
+                <div key={profUid} className="cp-reparto__detalle-row">
+                  <div className="cp-reparto__detalle-prof">{nombreProf}</div>
+                  <div className="cp-reparto__detalle-info">
+                    {ss.length} sesión{ss.length === 1 ? '' : 'es'}
+                  </div>
+                  <div className="cp-reparto__detalle-monto">{formatoARS.format(total)}</div>
+                </div>
+              );
+            })}
+            <div className="cp-reparto__detalle-total">
+              <span>Total</span>
+              <span />
+              <span>{formatoARS.format(datos.total)}</span>
+            </div>
+          </div>
+        );
+      })()}
+
+      {sesionesConReceptor.length === 0 && (
+        <div className="cp-reparto__empty">
+          No hay pagos manuales registrados en {nombreDelMes(mes)}.
+          Al marcar sesiones como pagadas indicando quién recibió, aparecen acá.
+        </div>
+      )}
+    </section>
+  );
+}
+
+function SelectorMesReparto({ mes, setMes }) {
+  function anterior() {
+    setMes((m) => { const d = new Date(m); d.setMonth(d.getMonth() - 1); return inicioDeMes(d); });
+  }
+  function siguiente() {
+    setMes((m) => { const d = new Date(m); d.setMonth(d.getMonth() + 1); return inicioDeMes(d); });
+  }
+  const esEsteMes = inicioDeMes(new Date()).getTime() === mes.getTime();
+  return (
+    <div className="cp-mes-selector">
+      <button type="button" className="cp-mes-selector__btn" onClick={anterior}>‹</button>
+      <span className="cp-mes-selector__label">{nombreDelMes(mes)}</span>
+      <button type="button" className="cp-mes-selector__btn" onClick={siguiente} disabled={esEsteMes}>›</button>
     </div>
   );
 }

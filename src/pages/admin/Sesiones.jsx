@@ -149,6 +149,7 @@ export default function Sesiones() {
   const [liquidando, setLiquidando] = useState(null);
   const [pagarMesOpen, setPagarMesOpen] = useState(false);
   const [cargaRapidaOpen, setCargaRapidaOpen] = useState(false);
+  const [liquidarMasivoOpen, setLiquidarMasivoOpen] = useState(false);
   const [quienRecibioSesion, setQuienRecibioSesion] = useState(null); // sesion pendiente de receptor
 
   // Admins del consultorio (dinamicos desde Firestore) para "¿Quién recibió?"
@@ -417,6 +418,14 @@ export default function Sesiones() {
           >
             Marcar mes como pagado
           </Button>
+          <Button
+            variant="secondary"
+            type="button"
+            onClick={() => setLiquidarMasivoOpen(true)}
+            disabled={!hayPrereqs}
+          >
+            Liquidar sesiones OS
+          </Button>
         </div>
       </header>
 
@@ -565,6 +574,16 @@ export default function Sesiones() {
           paciente={mapaPacientes[quienRecibioSesion.pacienteId]}
           onClose={() => setQuienRecibioSesion(null)}
           onConfirmar={handleConfirmarReceptor}
+        />
+      )}
+
+      {liquidarMasivoOpen && (
+        <LiquidarMasivoModal
+          consultorioId={user.consultorioId}
+          profesionales={profesionalesActivos}
+          mapaPacientes={mapaPacientes}
+          uid={user.uid}
+          onClose={() => setLiquidarMasivoOpen(false)}
         />
       )}
 
@@ -1785,6 +1804,171 @@ function SelectorMesPagarMes({ mes, setMes }) {
       <button type="button" className="cp-mes-selector__btn" onClick={anterior}>‹</button>
       <span className="cp-mes-selector__label">{nombreDelMes(mes)}</span>
       <button type="button" className="cp-mes-selector__btn" onClick={siguiente} disabled={esEsteMes}>›</button>
+    </div>
+  );
+}
+
+/* ============================================================
+   Modal: Liquidar masivo — cargar montos de obras sociales
+   Seleccioná profesional + mes, aparecen las sesiones
+   pendiente_monto para liquidar una por una con su monto.
+   ============================================================ */
+export function LiquidarMasivoModal({ consultorioId, profesionales, mapaPacientes, uid, onClose }) {
+  const overlayProps = useOverlayClose(onClose);
+  const [profUid, setProfUid] = useState('');
+  const [mes, setMes] = useState(() => inicioDeMes(new Date()));
+  const [sesiones, setSesiones] = useState([]);
+  const [loadingSes, setLoadingSes] = useState(false);
+  const [montos, setMontos] = useState({}); // sesionId → string
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(null);
+
+  useEffect(() => {
+    if (!profUid || !consultorioId) { setSesiones([]); return; }
+    setLoadingSes(true);
+    const desde = inicioDeMes(mes);
+    const hasta = finDeMes(mes);
+    const unsub = suscribirSesionesConsultorio(
+      consultorioId,
+      (data) => {
+        const pendientes = data.filter(
+          (s) => s.profesionalUid === profUid && s.estadoPago === ESTADOS_PAGO_SESION.PENDIENTE_MONTO,
+        );
+        setSesiones(pendientes);
+        setLoadingSes(false);
+      },
+      { desde, hasta },
+    );
+    return unsub;
+  }, [consultorioId, profUid, mes]);
+
+  async function handleGuardar() {
+    const aLiquidar = sesiones.filter((s) => {
+      const v = Number(montos[s.id]);
+      return v > 0;
+    });
+    if (!aLiquidar.length) return;
+
+    setSubmitting(true);
+    let ok = 0;
+    const errores = [];
+    await Promise.all(aLiquidar.map(async (s) => {
+      try {
+        await liquidarMontoSesion(s.id, Number(montos[s.id]), uid);
+        ok++;
+      } catch (err) {
+        errores.push({ id: s.id, msg: err.message });
+      }
+    }));
+    setSubmitting(false);
+    setDone({ ok, errores });
+  }
+
+  const hayMontosCompletos = sesiones.some((s) => Number(montos[s.id]) > 0);
+
+  return (
+    <div className="cp-modal-overlay" {...overlayProps}>
+      <div className="cp-modal cp-modal--wide" onClick={(e) => e.stopPropagation()}>
+        <button className="cp-modal__close" onClick={onClose} aria-label="Cerrar">×</button>
+        <h2 className="cp-modal__title">Liquidar sesiones de obra social</h2>
+        <p className="cp-modal__sub">
+          Cargá el monto de las sesiones que todavía no tienen valor. Podés liquidar las que tengas y dejar el resto para después.
+        </p>
+
+        {done ? (
+          <div className="cp-modal__form" style={{ textAlign: 'center', padding: '24px 0' }}>
+            <div style={{ fontSize: 40 }}>{done.errores.length === 0 ? '✓' : '⚠'}</div>
+            <div style={{ fontWeight: 500, fontSize: 16, margin: '8px 0' }}>
+              {done.ok} sesión{done.ok === 1 ? '' : 'es'} liquidada{done.ok === 1 ? '' : 's'}
+            </div>
+            {done.errores.length > 0 && (
+              <div style={{ color: 'var(--cp-danger)', fontSize: 13 }}>
+                {done.errores.length} con error
+              </div>
+            )}
+            <div className="cp-modal__actions" style={{ justifyContent: 'center', marginTop: 16 }}>
+              <Button variant="primary" onClick={onClose}>Cerrar</Button>
+            </div>
+          </div>
+        ) : (
+          <div className="cp-modal__form">
+            {/* Filtros */}
+            <div className="cp-pagar-mes__filtros">
+              <div style={{ flex: 1 }}>
+                <label className="cp-field__label" style={{ display: 'block', marginBottom: 6 }}>Profesional</label>
+                <select className="cp-select" value={profUid} onChange={(e) => setProfUid(e.target.value)}>
+                  <option value="">Elegir profesional…</option>
+                  {profesionales.map((p) => (
+                    <option key={p.uid} value={p.uid}>{p.displayName || p.email}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="cp-field__label" style={{ display: 'block', marginBottom: 6 }}>Mes</label>
+                <SelectorMesPagarMes mes={mes} setMes={setMes} />
+              </div>
+            </div>
+
+            {!profUid ? (
+              <p style={{ color: 'var(--cp-text-faint)', fontSize: 13.5, textAlign: 'center', padding: '20px 0' }}>
+                Elegí un profesional
+              </p>
+            ) : loadingSes ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: 24 }}>
+                <Spinner size={20} />
+              </div>
+            ) : sesiones.length === 0 ? (
+              <p style={{ color: 'var(--cp-text-muted)', fontSize: 13.5, textAlign: 'center', padding: '20px 0' }}>
+                No hay sesiones pendientes de liquidar en {nombreDelMes(mes)}
+              </p>
+            ) : (
+              <div className="cp-liquidar-masivo__lista">
+                {sesiones.map((s) => {
+                  const pac = mapaPacientes[s.pacienteId];
+                  const nombre = pac ? `${pac.apellido || ''} ${pac.nombre || ''}`.trim() : (s.pacienteNombre || '—');
+                  return (
+                    <div key={s.id} className="cp-liquidar-masivo__row">
+                      <div className="cp-prof-cell" style={{ flex: 1 }}>
+                        <Avatar initials={pac ? `${(pac.apellido||'')[0]}${(pac.nombre||'')[0]}`.toUpperCase() : '?'} size={28} />
+                        <div>
+                          <div style={{ fontSize: 13.5, fontWeight: 500 }}>{nombre}</div>
+                          <div style={{ fontSize: 12, color: 'var(--cp-text-muted)' }}>
+                            {s.metodoPagoNombre}
+                            {s.cantidadSesiones > 1 && ` · ×${s.cantidadSesiones}`}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 13, color: 'var(--cp-text-muted)' }}>$</span>
+                        <input
+                          type="number"
+                          className="cp-input"
+                          placeholder="Monto"
+                          value={montos[s.id] || ''}
+                          onChange={(e) => setMontos((prev) => ({ ...prev, [s.id]: e.target.value }))}
+                          min="1"
+                          step="any"
+                          style={{ width: 110, textAlign: 'right' }}
+                          onKeyDown={(e) => [',', 'e', 'E'].includes(e.key) && e.preventDefault()}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="cp-modal__actions">
+              <Button type="button" variant="ghost" onClick={onClose} disabled={submitting}>Cancelar</Button>
+              {hayMontosCompletos && (
+                <Button type="button" variant="primary" onClick={handleGuardar} disabled={submitting}>
+                  {submitting ? <><Spinner size={14} /> Guardando…</> : `Liquidar ${sesiones.filter((s) => Number(montos[s.id]) > 0).length} sesión${sesiones.filter((s) => Number(montos[s.id]) > 0).length === 1 ? '' : 'es'}`}
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

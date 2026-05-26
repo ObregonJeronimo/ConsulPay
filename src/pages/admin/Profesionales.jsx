@@ -16,6 +16,7 @@ import {
   cambiarEstadoProfesional,
   retirarProfesional,
   setPermitirEdicionSesiones,
+  setPermitirCargaPacientes,
   suscribirProfesionales,
 } from '../../lib/profesionales.js';
 import { useConsultorio } from '../../hooks/useConsultorio.js';
@@ -352,6 +353,7 @@ function ProfesionalesTabla({ profesionales, onSuspender, onReactivar, onRetirar
             <th>Email</th>
             <th>Estado</th>
             {onSuspender && <th>Edición directa</th>}
+            {onSuspender && <th>Carga pacientes</th>}
             <th aria-label="Acciones" />
           </tr>
         </thead>
@@ -366,18 +368,21 @@ function ProfesionalesTabla({ profesionales, onSuspender, onReactivar, onRetirar
             );
 
             const acciones = [
-              // Edicion directa: solo si hay onSuspender (tab Activos).
-              // Muestra el estado actual y al elegirlo lo invierte.
               ...(onSuspender ? [{
                 label: p.permitirEdicionSesiones
                   ? 'Desactivar edición directa'
                   : 'Activar edición directa',
                 onClick: async () => {
-                  try {
-                    await setPermitirEdicionSesiones(p.uid, !p.permitirEdicionSesiones);
-                  } catch (err) {
-                    alert('No se pudo cambiar la configuración. Intentá de nuevo.');
-                  }
+                  try { await setPermitirEdicionSesiones(p.uid, !p.permitirEdicionSesiones); }
+                  catch { alert('No se pudo cambiar la configuración.'); }
+                },
+              }, {
+                label: p.permitirCargaPacientes
+                  ? 'Desactivar carga de pacientes'
+                  : 'Activar carga de pacientes',
+                onClick: async () => {
+                  try { await setPermitirCargaPacientes(p.uid, !p.permitirCargaPacientes); }
+                  catch { alert('No se pudo cambiar la configuración.'); }
                 },
               }] : []),
               ...(onSuspender ? [{ label: 'Suspender', onClick: () => onSuspender(p.uid) }] : []),
@@ -401,6 +406,7 @@ function ProfesionalesTabla({ profesionales, onSuspender, onReactivar, onRetirar
                 <td data-label="Email" style={{ fontSize: 13.5, color: 'var(--cp-text-muted)' }}>{p.email}</td>
                 <td data-label="Estado">{estadoBadge}</td>
                 {onSuspender && <td data-label="Edición directa"><ToggleEdicionDirecta profesional={p} /></td>}
+                {onSuspender && <td data-label="Carga pacientes"><ToggleCargaPacientes profesional={p} /></td>}
                 <td className="cp-prof-tabla__actions" style={{ textAlign: 'right' }}>
                   {onSuspender && <button className="cp-prof-action" onClick={() => onSuspender(p.uid)}>Suspender</button>}
                   {onReactivar && <button className="cp-prof-action" onClick={() => onReactivar(p.uid)}>Reactivar</button>}
@@ -490,6 +496,43 @@ function ProfesionalesTablaRetirados({ profesionales }) {
 /* ============================================================
    Toggle inline para "Edicion directa de sesiones"
    ============================================================ */
+function ToggleCargaPacientes({ profesional }) {
+  const [updating, setUpdating] = useState(false);
+  const activo = !!profesional.permitirCargaPacientes;
+
+  async function onToggle() {
+    if (updating) return;
+    setUpdating(true);
+    try {
+      await setPermitirCargaPacientes(profesional.uid, !activo);
+    } catch (err) {
+      alert('No se pudo cambiar la configuración. Intentá de nuevo.');
+    } finally {
+      setUpdating(false);
+    }
+  }
+
+  return (
+    <div className="cp-edicion-directa" title={activo
+      ? 'El profesional puede solicitar crear nuevos pacientes.'
+      : 'El profesional no puede solicitar nuevos pacientes.'}>
+      <button
+        type="button"
+        className={`cc-toggle ${activo ? 'cc-toggle--on' : ''}`}
+        onClick={onToggle}
+        disabled={updating}
+        aria-pressed={activo}
+        aria-label={activo ? 'Desactivar carga de pacientes' : 'Activar carga de pacientes'}
+      >
+        <span className="cc-toggle__thumb" />
+      </button>
+      <span className="cp-edicion-directa__label">
+        {activo ? 'Sí' : 'No'}
+      </span>
+    </div>
+  );
+}
+
 function ToggleEdicionDirecta({ profesional }) {
   const [updating, setUpdating] = useState(false);
   const activo = !!profesional.permitirEdicionSesiones;

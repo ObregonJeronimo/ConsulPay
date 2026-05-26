@@ -111,6 +111,12 @@ export async function setPermitirEdicionSesiones(uid, valor) {
   });
 }
 
+export async function setPermitirCargaPacientes(uid, valor) {
+  await updateDoc(doc(db, 'usuarios', uid), {
+    permitirCargaPacientes: !!valor,
+  });
+}
+
 /* ============================================================
    Retiro del consultorio (M4)
    ----------------------------------------------------------------
