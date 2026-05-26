@@ -1657,45 +1657,47 @@ export function PagarMesModal({ consultorioId, profesionales, pacientes, mapaPac
                     <span style={{ textAlign: 'center' }}>Sesiones</span>
                     <span style={{ textAlign: 'right' }}>Total al consultorio</span>
                   </div>
-                  {porPaciente.map((r) => (
-                    <div key={r.pacienteId} className="cp-pagar-mes__row">
-                      <div className="cp-prof-cell">
-                        <Avatar
-                          initials={r.pac ? `${r.pac.nombre?.[0] || ''}${r.pac.apellido?.[0] || ''}`.toUpperCase() : '?'}
-                          size={28}
-                        />
-                        <div>
-                          <div className="cp-prof-name" style={{ fontSize: 13.5 }}>
-                            {r.pac ? `${r.pac.nombre || ''} ${r.pac.apellido || ''}`.trim() : (r.pacienteNombre || r.pacienteId || '—')}
+                  <div className="cp-pagar-mes__filas">
+                    {porPaciente.map((r) => (
+                      <div key={r.pacienteId} className="cp-pagar-mes__row">
+                        <div className="cp-prof-cell">
+                          <Avatar
+                            initials={r.pac ? `${r.pac.nombre?.[0] || ''}${r.pac.apellido?.[0] || ''}`.toUpperCase() : '?'}
+                            size={28}
+                          />
+                          <div>
+                            <div className="cp-prof-name" style={{ fontSize: 13.5 }}>
+                              {r.pac ? `${r.pac.nombre || ''} ${r.pac.apellido || ''}`.trim() : (r.pacienteNombre || r.pacienteId || '—')}
+                            </div>
+                            {r.pagadas.length > 0 && (
+                              <div style={{ fontSize: 11.5, color: 'var(--cp-text-faint)' }}>
+                                {r.pagadas.length} ya pagada{r.pagadas.length === 1 ? '' : 's'}
+                              </div>
+                            )}
                           </div>
-                          {r.pagadas.length > 0 && (
-                            <div style={{ fontSize: 11.5, color: 'var(--cp-text-faint)' }}>
-                              {r.pagadas.length} ya pagada{r.pagadas.length === 1 ? '' : 's'}
+                        </div>
+                        <div style={{ textAlign: 'center' }}>
+                          {r.debidas.length > 0 && (
+                            <span style={{ fontSize: 13.5, fontWeight: 500, color: 'var(--cp-text)' }}>
+                              {r.debidas.length} deben
+                            </span>
+                          )}
+                          {r.aLiquidar.length > 0 && (
+                            <div style={{ fontSize: 11.5, color: 'var(--cp-warning, #b8860b)', marginTop: 2 }}>
+                              {r.aLiquidar.length} sin valor (OS)
                             </div>
                           )}
                         </div>
+                        <div style={{ textAlign: 'right', fontWeight: 500, fontSize: 14 }}>
+                          {r.debidas.length > 0
+                            ? formatoARS.format(r.totalDebe)
+                            : <span style={{ color: 'var(--cp-text-faint)' }}>—</span>}
+                        </div>
                       </div>
-                      <div style={{ textAlign: 'center' }}>
-                        {r.debidas.length > 0 && (
-                          <span style={{ fontSize: 13.5, fontWeight: 500, color: 'var(--cp-text)' }}>
-                            {r.debidas.length} deben
-                          </span>
-                        )}
-                        {r.aLiquidar.length > 0 && (
-                          <div style={{ fontSize: 11.5, color: 'var(--cp-warning, #b8860b)', marginTop: 2 }}>
-                            {r.aLiquidar.length} sin valor (OS)
-                          </div>
-                        )}
-                      </div>
-                      <div style={{ textAlign: 'right', fontWeight: 500, fontSize: 14 }}>
-                        {r.debidas.length > 0
-                          ? formatoARS.format(r.totalDebe)
-                          : <span style={{ color: 'var(--cp-text-faint)' }}>—</span>}
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
 
-                  {/* Total */}
+                  {/* Total fijo fuera del scroll */}
                   <div className="cp-pagar-mes__total">
                     <span>Total a pagar</span>
                     <span />

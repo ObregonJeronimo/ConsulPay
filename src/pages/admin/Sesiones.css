@@ -880,6 +880,8 @@
   border: 1px solid var(--cp-border);
   border-radius: var(--cp-radius-md);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .cp-pagar-mes__tabla-head {
@@ -894,6 +896,14 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--cp-text-faint);
+  flex-shrink: 0;
+}
+
+/* Área scrolleable con los pacientes */
+.cp-pagar-mes__filas {
+  max-height: 260px;
+  overflow-y: auto;
+  flex: 1;
 }
 
 .cp-pagar-mes__row {
@@ -909,6 +919,7 @@
   border-bottom: none;
 }
 
+/* Total fijo fuera del scroll, pegado al borde inferior de la tabla */
 .cp-pagar-mes__total {
   display: grid;
   grid-template-columns: 1fr 100px 140px;
@@ -920,6 +931,7 @@
   font-size: 13px;
   font-weight: 600;
   color: var(--cp-text-muted);
+  flex-shrink: 0;
 }
 
 .cp-pagar-mes__done {
