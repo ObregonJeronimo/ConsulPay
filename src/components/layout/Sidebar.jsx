@@ -192,9 +192,6 @@ export default function Sidebar() {
           <div className="cp-sidebar__label">Mi cuenta</div>
           <NavItem to="/mi-panel" end icon={<Icon.Home />}>Resumen</NavItem>
           <NavItem to="/mi-panel/pacientes" icon={<Icon.UserPlus />}>Mis pacientes</NavItem>
-          {user?.permitirCargaPacientes && (
-            <NavItem to="/mi-panel/pacientes/nuevo" icon={<Icon.UserPlus />}>Cargar paciente</NavItem>
-          )}
           <NavItem to="/mi-panel/sesiones" icon={<Icon.Calendar />}>Mis sesiones</NavItem>
           <NavItem to="/mi-panel/pagos" icon={<Icon.Wallet />}>Mis pagos</NavItem>
         </nav>
