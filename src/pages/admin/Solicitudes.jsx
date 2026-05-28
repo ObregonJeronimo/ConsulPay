@@ -745,16 +745,12 @@ function DiffCrearPaciente({ datos, mapaMetodos }) {
 
   return (
     <div className="cp-diff">
-      <table className="cp-diff__tabla">
-        <tbody>
-          {filas.map(({ label, valor }) => (
-            <tr key={label}>
-              <td className="cp-diff__campo">{label.toUpperCase()}</td>
-              <td className="cp-diff__valor cp-diff__valor--despues">{valor}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {filas.map(({ label, valor }) => (
+        <div key={label} className="cp-diff__row cp-diff__row--single">
+          <div className="cp-diff__campo">{label.toUpperCase()}</div>
+          <div className="cp-diff__valor cp-diff__valor--despues">{valor}</div>
+        </div>
+      ))}
     </div>
   );
 }
