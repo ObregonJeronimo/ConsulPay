@@ -6,6 +6,7 @@ import Button from '../../components/ui/Button.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
 
 import { useAuth } from '../../hooks/useAuth.js';
+import { useConsultorio } from '../../hooks/useConsultorio.js';
 import { useOverlayClose } from '../../hooks/useOverlayClose.js';
 import {
   ESTADOS_SOLICITUD_SESION,
@@ -150,6 +151,12 @@ function badgeEstado(estado) {
    ============================================================ */
 export default function Solicitudes() {
   const { user } = useAuth();
+  const { consultorio } = useConsultorio();
+  const mapaMetodos = useMemo(() => {
+    const m = {};
+    for (const met of consultorio?.metodosPagoPaciente ?? []) m[met.id] = met;
+    return m;
+  }, [consultorio]);
   const [solicitudes, setSolicitudes] = useState([]);
   const [pacientes, setPacientes] = useState([]);
   const [profesionales, setProfesionales] = useState([]);
@@ -261,6 +268,7 @@ export default function Solicitudes() {
           solicitud={seleccionada}
           mapaPacientes={mapaPacientes}
           mapaProfesionales={mapaProfesionales}
+          mapaMetodos={mapaMetodos}
           adminUid={user.uid}
           adminNombre={user.displayName || user.email}
           consultorioId={user.consultorioId}
@@ -435,7 +443,7 @@ function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSel
    Muestra prominentemente el badge ×N en el titulo cuando aplica
    para que el admin vea claramente que esta aprobando un grupo.
    ============================================================ */
-function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, adminUid, adminNombre, consultorioId, onClose }) {
+function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, mapaMetodos, adminUid, adminNombre, consultorioId, onClose }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [mostrandoMotivo, setMostrandoMotivo] = useState(false);
@@ -530,7 +538,7 @@ function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, adminUid, a
         </div>
 
         {/* Diff segun el tipo */}
-        <Diff solicitud={solicitud} pac={pac} />
+        <Diff solicitud={solicitud} pac={pac} mapaMetodos={mapaMetodos} />
 
         {/* Avisos para estados no pendientes */}
         {solicitud.estado === ESTADOS_SOLICITUD_SESION.OBSOLETA && (
@@ -698,11 +706,15 @@ function tipoColor(tipo) {
    Agregamos cantidadSesiones y valorSesion a CAMPOS_DIFF para que
    el admin vea esos datos al revisar.
    ============================================================ */
-function Diff({ solicitud, pac }) {
+function Diff({ solicitud, pac, mapaMetodos }) {
   const { tipo, payloadPropuesto, payloadAnterior } = solicitud;
 
   if (tipo === TIPOS_SOLICITUD_SESION.CARGA_RAPIDA) {
     return <DiffCargaRapida sesiones={payloadPropuesto?.sesiones ?? []} />;
+  }
+
+  if (tipo === TIPOS_SOLICITUD_SESION.CREAR_PACIENTE) {
+    return <DiffCrearPaciente datos={payloadPropuesto?.datosPaciente ?? {}} mapaMetodos={mapaMetodos} />;
   }
 
   if (tipo === TIPOS_SOLICITUD_SESION.CREAR) {
@@ -714,6 +726,43 @@ function Diff({ solicitud, pac }) {
   }
 
   return <DiffDoble anterior={payloadAnterior} propuesto={payloadPropuesto} pac={pac} />;
+}
+
+function DiffCrearPaciente({ datos, mapaMetodos }) {
+  const filas = [
+    { label: 'Apellido y nombre', valor: `${datos.apellido || ''} ${datos.nombre || ''}`.trim() || '—' },
+    { label: 'DNI', valor: datos.dni || '—' },
+    { label: 'Teléfono', valor: datos.telefono || '—' },
+    { label: 'Email', valor: datos.email || '—' },
+    {
+      label: 'Métodos de pago',
+      valor: (datos.metodosPagoIds || [])
+        .map((id) => mapaMetodos?.[id]?.nombre || id)
+        .join(', ') || '—',
+    },
+    { label: 'Notas internas', valor: datos.notas || '—' },
+  ];
+
+  return (
+    <div className="cp-diff">
+      <table className="cp-diff__tabla">
+        <thead>
+          <tr>
+            <th />
+            <th className="cp-diff__col-despues">Datos del paciente</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filas.map(({ label, valor }) => (
+            <tr key={label}>
+              <td className="cp-diff__campo">{label.toUpperCase()}</td>
+              <td className="cp-diff__valor cp-diff__valor--despues">{valor}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 function DiffCargaRapida({ sesiones }) {
