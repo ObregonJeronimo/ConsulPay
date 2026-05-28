@@ -746,12 +746,6 @@ function DiffCrearPaciente({ datos, mapaMetodos }) {
   return (
     <div className="cp-diff">
       <table className="cp-diff__tabla">
-        <thead>
-          <tr>
-            <th />
-            <th className="cp-diff__col-despues">Datos del paciente</th>
-          </tr>
-        </thead>
         <tbody>
           {filas.map(({ label, valor }) => (
             <tr key={label}>
