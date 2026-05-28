@@ -31,6 +31,12 @@ import './Sesiones.css';
 /* ============================================================
    Iconos
    ============================================================ */
+const UserIcon = () => (
+  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+    <circle cx="12" cy="7" r="4" />
+  </svg>
+);
 const ClockIcon = () => (
   <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="10" />
@@ -119,6 +125,7 @@ function iconoTipo(tipo) {
     case TIPOS_SOLICITUD_SESION.ELIMINAR: return <TrashIcon />;
     case TIPOS_SOLICITUD_SESION.LIQUIDAR_MONTO: return <CheckIcon />;
     case TIPOS_SOLICITUD_SESION.CARGA_RAPIDA: return <span style={{ fontSize: 13 }}>⚡</span>;
+    case TIPOS_SOLICITUD_SESION.CREAR_PACIENTE: return <UserIcon />;
     default: return null;
   }
 }
@@ -323,8 +330,11 @@ function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSel
             const prof = mapaProfesionales[s.profesionalUid];
             const pacienteId = s.payloadPropuesto?.pacienteId || s.payloadAnterior?.pacienteId;
             const pac = pacienteId ? mapaPacientes[pacienteId] : null;
+            // Para crear_paciente el nombre viene en el payload, no en mapaPacientes
+            const nombrePacDesdePayload = s.tipo === TIPOS_SOLICITUD_SESION.CREAR_PACIENTE
+              ? `${s.payloadPropuesto?.datosPaciente?.apellido || ''} ${s.payloadPropuesto?.datosPaciente?.nombre || ''}`.trim()
+              : null;
             const resuelta = s.estado !== ESTADOS_SOLICITUD_SESION.PENDIENTE;
-            // Cantidad: la del propuesto si existe, sino la del anterior, sino 1
             const cantidad = cantidadDePayload(s.payloadPropuesto || s.payloadAnterior);
 
             return (
@@ -343,7 +353,9 @@ function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSel
                   {s.profesionalNombre || nombreProfesional(prof)}
                 </td>
                 <td data-label="Paciente">
-                  {pac ? (
+                  {nombrePacDesdePayload ? (
+                    <span style={{ fontSize: 13.5, fontWeight: 500 }}>{nombrePacDesdePayload}</span>
+                  ) : pac ? (
                     <div className="cp-prof-cell">
                       <Avatar initials={inicialesPaciente(pac)} size={28} />
                       <div className="cp-prof-name" style={{ fontSize: 13.5 }}>
@@ -434,7 +446,9 @@ function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, adminUid, a
 
   const pacienteId = solicitud.payloadPropuesto?.pacienteId || solicitud.payloadAnterior?.pacienteId;
   const pac = pacienteId ? mapaPacientes[pacienteId] : null;
-  const nombrePac = nombrePaciente(pac) || 'paciente';
+  const nombrePac = solicitud.tipo === TIPOS_SOLICITUD_SESION.CREAR_PACIENTE
+    ? `${solicitud.payloadPropuesto?.datosPaciente?.apellido || ''} ${solicitud.payloadPropuesto?.datosPaciente?.nombre || ''}`.trim() || 'Nuevo paciente'
+    : (nombrePaciente(pac) || 'paciente');
 
   // Cantidad para el titulo
   const cantidad = cantidadDePayload(solicitud.payloadPropuesto || solicitud.payloadAnterior);
