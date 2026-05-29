@@ -317,7 +317,6 @@ function Precios() {
 
             <div className="lp-price-card__top">
               <div className="lp-price-card__name">Pago</div>
-              <div className="lp-price-card__tagline">Menor comisión para consultorios activos</div>
             </div>
 
             <div className="lp-price-card__price">
@@ -330,9 +329,6 @@ function Precios() {
               <li><CheckIcon /> Integración con Mercado Pago y Ualá</li>
               <li><CheckIcon /> Split automático de pagos</li>
               <li><CheckIcon /> Soporte prioritario</li>
-              <li className="lp-price-card__highlight">
-                <CheckIcon /> <strong>0.5%</strong> comisión ConsulPay sobre el valor total de cada sesión
-              </li>
             </ul>
 
             <Link to="/crear-consultorio" className="lp-btn lp-btn--primary lp-btn--full">
@@ -341,12 +337,7 @@ function Precios() {
           </div>
         </div>
 
-        <p className="lp-pricing__note">
-          La comisión de ConsulPay se calcula sobre el valor total inicial de cada
-          sesión (lo que paga el paciente). Mercado Pago, además, aplica su propia
-          comisión por procesar el cobro. Todos los porcentajes se descuentan
-          automáticamente de cada transacción.
-        </p>
+        {/* Nota de comisión oculta — se comunica directamente al cliente */}
       </div>
     </section>
   );
