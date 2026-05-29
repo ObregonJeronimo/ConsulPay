@@ -93,7 +93,7 @@ function Hero() {
           </div>
 
           <h1 className="lp-hero__title">
-            La plata del <em>consultorio</em>,
+            El dinero del <em>consultorio</em>,
             <br />
             al día. <span className="lp-hero__title-alt">Siempre.</span>
           </h1>
