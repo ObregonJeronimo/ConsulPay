@@ -824,17 +824,6 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, puede
                       </button>
                     ) : (
                       <>
-                        {/* Botón marcar pagada — solo si tiene permiso y sesión está en debe */}
-                        {puedeMarcarPagadas && !pagada && !tienePendiente && (
-                          <button
-                            className="cp-icon-btn cp-icon-btn--success"
-                            onClick={() => onTogglePagado(s)}
-                            title="Solicitar marcar como pagada"
-                            aria-label="Marcar pagada"
-                          >
-                            <CheckIcon />
-                          </button>
-                        )}
                         <button
                           className="cp-icon-btn"
                           onClick={() => onEditar(s)}
@@ -898,9 +887,6 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, puede
                       label: 'Liquidar monto', icon: <CheckIcon />, onClick: () => onLiquidar(s),
                     }] : s.metodoPagoTipo === TIPOS_METODO_PAGO.DIFERIDO && !pagada && !tienePendiente ? [{
                       label: 'Corregir monto', icon: <EditIcon />, onClick: () => onLiquidar(s),
-                    }] : []),
-                    ...(puedeMarcarPagadas && !pagada && !tienePendiente && !pendienteMonto ? [{
-                      label: 'Solicitar marcar pagada', icon: <CheckIcon />, onClick: () => onTogglePagado(s),
                     }] : []),
                     { label: 'Editar', icon: <EditIcon />, onClick: () => onEditar(s), disabled: accionesDisabled },
                     ...(!pagada ? [{ label: 'Eliminar', icon: <TrashIcon />, onClick: () => onEliminar(s), danger: true, disabled: tienePendiente }] : []),

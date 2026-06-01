@@ -17,7 +17,15 @@ import {
   tonoEstadoPago,
 } from '../../lib/pagos.js';
 import { calcularDeudaProfesional, retirarProfesional } from '../../lib/profesionales.js';
-import { suscribirSesionesProfesional } from '../../lib/sesiones.js';
+import {
+  finDeMes,
+  inicioDeMes,
+  nombreDelMes,
+  suscribirSesionesProfesional,
+} from '../../lib/sesiones.js';
+import {
+  solicitarMarcarPagada,
+} from '../../lib/solicitudes.js';
 
 import './MisPagos.css';
 
@@ -49,14 +57,17 @@ export default function MisPagos() {
   const [pacientes, setPacientes] = useState([]);
   const [pagos, setPagos] = useState([]);
   const [loadingSesiones, setLoadingSesiones] = useState(true);
+  const [mes, setMes] = useState(() => inicioDeMes(new Date()));
 
-  // Set de sesionId que el profesional eligio pagar (puede ser
-  // todas las debidas o un subset).
   const [seleccionadas, setSeleccionadas] = useState(new Set());
   const [modoSeleccion, setModoSeleccion] = useState(false);
+  const [modoSeleccionManual, setModoSeleccionManual] = useState(false);
+  const [seleccionadasManual, setSeleccionadasManual] = useState(new Set());
 
   const [iniciando, setIniciando] = useState(false);
+  const [enviandoSolicitud, setEnviandoSolicitud] = useState(false);
   const [error, setError] = useState('');
+  const [solicitudOk, setSolicitudOk] = useState(false);
 
   // Modal de salir del consultorio. Vive aca (movido desde MiPanel)
   // porque tiene sentido mantenerlo cerca de la pagina donde se ve
@@ -97,9 +108,19 @@ export default function MisPagos() {
 
   /* ---- Calculos derivados ---- */
 
+  const sesionesDelMes = useMemo(() => {
+    const desde = inicioDeMes(mes).getTime();
+    const hasta = finDeMes(mes).getTime();
+    return sesiones.filter((s) => {
+      const t = s.fecha?.toDate ? s.fecha.toDate().getTime()
+        : s.fecha?.seconds ? s.fecha.seconds * 1000 : 0;
+      return t >= desde && t <= hasta;
+    });
+  }, [sesiones, mes]);
+
   const sesionesDebidas = useMemo(
-    () => sesiones.filter((s) => s.estadoPago === ESTADOS_PAGO_SESION.DEBIDO),
-    [sesiones],
+    () => sesionesDelMes.filter((s) => s.estadoPago === ESTADOS_PAGO_SESION.DEBIDO),
+    [sesionesDelMes],
   );
 
   const deudaTotal = useMemo(
@@ -208,6 +229,40 @@ export default function MisPagos() {
   }
 
   const mpDeshabilitado = !consultorio?.mpIntegrado;
+  const puedeMarcarPagadas = !!user?.permitirMarcarPagadas;
+
+  async function handlePagarManual(sesionIds) {
+    if (!sesionIds?.length || !puedeMarcarPagadas) return;
+    setEnviandoSolicitud(true);
+    setSolicitudOk(false);
+    try {
+      await Promise.all(sesionIds.map((id) => {
+        const s = sesiones.find((x) => x.id === id);
+        if (!s) return;
+        const pac = mapaPacientes[s.pacienteId];
+        return solicitarMarcarPagada({
+          consultorioId: user.consultorioId,
+          profesionalUid: user.uid,
+          profesionalNombre: user.displayName || user.email || '',
+          sesionId: id,
+          sesionSnapshot: {
+            pacienteNombre: pac ? nombrePaciente(pac) : (s.pacienteNombre || ''),
+            fecha: s.fecha,
+            metodoPagoNombre: s.metodoPagoNombre || '',
+            valorTotal: s.valorTotal || 0,
+          },
+          receptor: { uid: user.uid, nombre: user.displayName || user.email || user.uid },
+        });
+      }));
+      setSolicitudOk(true);
+      setModoSeleccionManual(false);
+      setSeleccionadasManual(new Set());
+    } catch (err) {
+      setError(err.message || 'No se pudo enviar la solicitud.');
+    } finally {
+      setEnviandoSolicitud(false);
+    }
+  }
 
   return (
     <div className="cp-mis-pagos">
@@ -233,68 +288,104 @@ export default function MisPagos() {
         </div>
       )}
 
-      {/* Card de deuda actual + boton pagar */}
-      <section className="cp-deuda-card">
-        <div className="cp-deuda-card__main">
-          <div className="cp-deuda-card__label">
-            {modoSeleccion ? 'Total a pagar' : 'Deuda actual con el consultorio'}
-          </div>
-          <div className="cp-deuda-card__monto">
+      {/* Selector de mes */}
+      <div className="cp-mispagos-mes">
+        <button className="cp-mes-selector__btn" onClick={() => setMes((m) => { const d = new Date(m); d.setMonth(d.getMonth() - 1); return inicioDeMes(d); })}>‹</button>
+        <span className="cp-mes-selector__label">{nombreDelMes(mes)}</span>
+        <button className="cp-mes-selector__btn" onClick={() => setMes((m) => { const d = new Date(m); d.setMonth(d.getMonth() + 1); return inicioDeMes(d); })} disabled={inicioDeMes(new Date()).getTime() === mes.getTime()}>›</button>
+      </div>
+
+      {/* Recuadro 1: Mercado Pago */}
+      <section className={`cp-pagos-recuadro ${mpDeshabilitado ? 'cp-pagos-recuadro--disabled' : ''}`}>
+        <div className="cp-pagos-recuadro__header">
+          <span className="cp-pagos-recuadro__titulo">Pagos con Mercado Pago</span>
+          {mpDeshabilitado && (
+            <span className="cp-pagos-recuadro__badge-off">Pagos online deshabilitados</span>
+          )}
+        </div>
+        <div className="cp-pagos-recuadro__body">
+          <div className="cp-deuda-card__monto" style={{ marginBottom: 6 }}>
             {formatoARS.format(modoSeleccion ? subtotalSeleccionado : deudaTotal)}
           </div>
-          <div className="cp-deuda-card__hint">
+          <div className="cp-deuda-card__hint" style={{ marginBottom: 16 }}>
             {sesionesDebidas.length === 0
-              ? 'No tenés sesiones pendientes de pago. ¡Estás al día!'
+              ? 'No tenés sesiones pendientes en este mes'
               : modoSeleccion
                 ? seleccionadas.size === 0
-                  ? `Elegí cuáles de las ${sesionesDebidas.length} sesión${sesionesDebidas.length === 1 ? '' : 'es'} debida${sesionesDebidas.length === 1 ? '' : 's'} querés pagar`
-                  : `${seleccionadas.size} de ${sesionesDebidas.length} sesión${seleccionadas.size === 1 ? '' : 'es'} seleccionada${seleccionadas.size === 1 ? '' : 's'}`
-                : `${sesionesDebidas.length} sesión${sesionesDebidas.length === 1 ? '' : 'es'} debida${sesionesDebidas.length === 1 ? '' : 's'}`}
+                  ? `Elegí cuáles de las ${sesionesDebidas.length} sesiones`
+                  : `${seleccionadas.size} de ${sesionesDebidas.length} seleccionadas`
+                : `${sesionesDebidas.length} sesión${sesionesDebidas.length === 1 ? '' : 'es'} pendiente${sesionesDebidas.length === 1 ? '' : 's'}`}
           </div>
-        </div>
-        {sesionesDebidas.length > 0 && (
-          <div className="cp-deuda-card__actions">
-            {!modoSeleccion ? (
-              <>
-                {sesionesDebidas.length > 1 && (
-                  <Button
-                    variant="secondary"
-                    onClick={entrarModoSeleccion}
-                    disabled={mpDeshabilitado || iniciando}
-                  >
-                    Elegir cuáles pagar
+          {sesionesDebidas.length > 0 && (
+            <div className="cp-pagos-recuadro__actions">
+              {!modoSeleccion ? (
+                <>
+                  {sesionesDebidas.length > 1 && (
+                    <Button variant="secondary" onClick={entrarModoSeleccion} disabled={mpDeshabilitado || iniciando}>
+                      Elegir cuáles pagar
+                    </Button>
+                  )}
+                  <Button variant="primary" onClick={handlePagar} disabled={mpDeshabilitado || iniciando}>
+                    {iniciando ? <><Spinner size={14} /> Redirigiendo…</> : `Pagar ${formatoARS.format(deudaTotal)}`}
                   </Button>
-                )}
-                <Button
-                  variant="primary"
-                  onClick={handlePagar}
-                  disabled={mpDeshabilitado || iniciando}
-                >
-                  {iniciando
-                    ? <><Spinner size={14} /> Redirigiendo a Mercado Pago…</>
-                    : `Pagar ${formatoARS.format(deudaTotal)}`}
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button variant="secondary" onClick={salirModoSeleccion} disabled={iniciando}>
-                  Cancelar
-                </Button>
-                <Button
-                  variant="primary"
-                  onClick={handlePagar}
-                  disabled={mpDeshabilitado || iniciando || seleccionadas.size === 0}
-                >
-                  {iniciando
-                    ? <><Spinner size={14} /> Redirigiendo…</>
-                    : seleccionadas.size === 0
-                      ? 'Elegí sesiones primero'
-                      : `Pagar ${formatoARS.format(subtotalSeleccionado)}`}
-                </Button>
-              </>
-            )}
+                </>
+              ) : (
+                <>
+                  <Button variant="secondary" onClick={salirModoSeleccion} disabled={iniciando}>Cancelar</Button>
+                  <Button variant="primary" onClick={handlePagar} disabled={mpDeshabilitado || iniciando || seleccionadas.size === 0}>
+                    {iniciando ? <><Spinner size={14} /> Redirigiendo…</> : seleccionadas.size === 0 ? 'Elegí sesiones' : `Pagar ${formatoARS.format(subtotalSeleccionado)}`}
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Recuadro 2: Pagos manuales */}
+      <section className={`cp-pagos-recuadro ${!puedeMarcarPagadas ? 'cp-pagos-recuadro--disabled' : ''}`}>
+        <div className="cp-pagos-recuadro__header">
+          <span className="cp-pagos-recuadro__titulo">Pagos manuales</span>
+          {!puedeMarcarPagadas && (
+            <span className="cp-pagos-recuadro__badge-off">Sin permiso para marcar pagadas</span>
+          )}
+        </div>
+        <div className="cp-pagos-recuadro__body">
+          <div className="cp-deuda-card__hint" style={{ marginBottom: 16 }}>
+            {sesionesDebidas.length === 0
+              ? 'No hay sesiones pendientes en este mes'
+              : solicitudOk
+                ? '✓ Solicitud enviada al administrador'
+                : modoSeleccionManual
+                  ? seleccionadasManual.size === 0
+                    ? `Elegí cuáles de las ${sesionesDebidas.length} sesiones`
+                    : `${seleccionadasManual.size} de ${sesionesDebidas.length} seleccionadas`
+                  : `Marcar ${sesionesDebidas.length} sesión${sesionesDebidas.length === 1 ? '' : 'es'} como pagadas manualmente`}
           </div>
-        )}
+          {sesionesDebidas.length > 0 && !solicitudOk && (
+            <div className="cp-pagos-recuadro__actions">
+              {!modoSeleccionManual ? (
+                <>
+                  {sesionesDebidas.length > 1 && (
+                    <Button variant="secondary" onClick={() => setModoSeleccionManual(true)} disabled={!puedeMarcarPagadas || enviandoSolicitud}>
+                      Elegir cuáles pagar
+                    </Button>
+                  )}
+                  <Button variant="primary" onClick={() => handlePagarManual(sesionesDebidas.map((s) => s.id))} disabled={!puedeMarcarPagadas || enviandoSolicitud}>
+                    {enviandoSolicitud ? <><Spinner size={14} /> Enviando…</> : `Solicitar pagar ${formatoARS.format(deudaTotal)}`}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button variant="secondary" onClick={() => { setModoSeleccionManual(false); setSeleccionadasManual(new Set()); }} disabled={enviandoSolicitud}>Cancelar</Button>
+                  <Button variant="primary" onClick={() => handlePagarManual([...seleccionadasManual])} disabled={!puedeMarcarPagadas || enviandoSolicitud || seleccionadasManual.size === 0}>
+                    {enviandoSolicitud ? <><Spinner size={14} /> Enviando…</> : seleccionadasManual.size === 0 ? 'Elegí sesiones' : `Solicitar pagar ${seleccionadasManual.size}`}
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </section>
 
       {/* Lista de sesiones debidas */}
@@ -305,14 +396,23 @@ export default function MisPagos() {
       ) : sesionesDebidas.length > 0 && (
         <section className="cp-debe-section">
           <div className="cp-debe-section__head">
-            <h2 className="cp-debe-section__title">Sesiones a pagar</h2>
-            {modoSeleccion && (
+            <h2 className="cp-debe-section__title">Sesiones a pagar — {nombreDelMes(mes)}</h2>
+            {(modoSeleccion || modoSeleccionManual) && (
               <button
                 type="button"
                 className="cp-debe-section__select-all"
-                onClick={toggleSeleccionarTodas}
+                onClick={() => {
+                  if (modoSeleccion) toggleSeleccionarTodas();
+                  else {
+                    setSeleccionadasManual((prev) =>
+                      prev.size === sesionesDebidas.length
+                        ? new Set()
+                        : new Set(sesionesDebidas.map((s) => s.id))
+                    );
+                  }
+                }}
               >
-                {seleccionadas.size === sesionesDebidas.length
+                {(modoSeleccion ? seleccionadas : seleccionadasManual).size === sesionesDebidas.length
                   ? 'Deseleccionar todas'
                   : 'Seleccionar todas'}
               </button>
@@ -322,7 +422,7 @@ export default function MisPagos() {
             <table className="cp-table cp-debe-tabla">
               <thead>
                 <tr>
-                  {modoSeleccion && <th aria-label="Seleccionar" style={{ width: 40 }} />}
+                  {(modoSeleccion || modoSeleccionManual) && <th aria-label="Seleccionar" style={{ width: 40 }} />}
                   <th>Fecha</th>
                   <th>Paciente</th>
                   <th>Método</th>
@@ -337,16 +437,21 @@ export default function MisPagos() {
                   return (
                     <tr
                       key={s.id}
-                      className={modoSeleccion && seleccionada ? 'cp-debe-tabla__row--selected' : ''}
-                      onClick={modoSeleccion ? () => toggleSesion(s.id) : undefined}
-                      style={modoSeleccion ? { cursor: 'pointer' } : undefined}
+                      className={(modoSeleccion && seleccionada) || (modoSeleccionManual && seleccionadasManual.has(s.id)) ? 'cp-debe-tabla__row--selected' : ''}
+                      onClick={modoSeleccion ? () => toggleSesion(s.id) : modoSeleccionManual ? () => setSeleccionadasManual((prev) => { const n = new Set(prev); n.has(s.id) ? n.delete(s.id) : n.add(s.id); return n; }) : undefined}
+                      style={(modoSeleccion || modoSeleccionManual) ? { cursor: 'pointer' } : undefined}
                     >
                       {modoSeleccion && (
                         <td>
+                          <input type="checkbox" checked={seleccionada} onChange={() => toggleSesion(s.id)} onClick={(e) => e.stopPropagation()} />
+                        </td>
+                      )}
+                      {modoSeleccionManual && (
+                        <td>
                           <input
                             type="checkbox"
-                            checked={seleccionada}
-                            onChange={() => toggleSesion(s.id)}
+                            checked={seleccionadasManual.has(s.id)}
+                            onChange={() => setSeleccionadasManual((prev) => { const n = new Set(prev); n.has(s.id) ? n.delete(s.id) : n.add(s.id); return n; })}
                             onClick={(e) => e.stopPropagation()}
                           />
                         </td>
