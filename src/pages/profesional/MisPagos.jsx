@@ -280,14 +280,6 @@ export default function MisPagos() {
         <div className="cp-config-error" role="alert">{error}</div>
       )}
 
-      {mpDeshabilitado && (
-        <div className="cp-mp-deshabilitado">
-          <strong>Pagos online deshabilitados.</strong>{' '}
-          El consultorio todavía no vinculó su cuenta de Mercado Pago.
-          {' '}Contactá al dueño del consultorio para que active los pagos.
-        </div>
-      )}
-
       {/* Selector de mes */}
       <div className="cp-mispagos-mes">
         <button className="cp-mes-selector__btn" onClick={() => setMes((m) => { const d = new Date(m); d.setMonth(d.getMonth() - 1); return inicioDeMes(d); })}>‹</button>
