@@ -26,6 +26,7 @@ import {
   finDeMes,
   getCantidadSesiones,
   inicioDeMes,
+  marcarSesionDebida,
   nombreDelMes,
   editarMontoLiquidado,
   liquidarMontoSesion,
@@ -37,6 +38,8 @@ import {
   solicitarCrearSesion,
   solicitarEliminarSesion,
   solicitarLiquidarMonto,
+  solicitarMarcarPagada,
+  solicitarLiquidarOSSesion,
   solicitarModificarSesion,
   suscribirSolicitudesDelProfesional,
 } from '../../lib/solicitudes.js';
@@ -154,6 +157,7 @@ export default function MisSesiones() {
   // Si no tiene confianza, mostramos un banner aclaratorio y las acciones
   // crean solicitudes en lugar de tocar /sesiones/ directamente.
   const tieneConfianza = !!user?.permitirEdicionSesiones;
+  const puedeMarcarPagadas = !!user?.permitirMarcarPagadas;
 
   // Suscripciones
   useEffect(() => {
@@ -314,6 +318,21 @@ export default function MisSesiones() {
       if (esPrimeraLiquidacion) {
         if (tieneConfianza) {
           await liquidarMontoSesion(liquidando.id, valor, user.uid);
+        } else if (puedeMarcarPagadas) {
+          // Tiene permiso de marcar pagadas → solicita liquidación OS
+          const pac = mapaPacientes[liquidando.pacienteId];
+          await solicitarLiquidarOSSesion({
+            consultorioId: user.consultorioId,
+            sesionId: liquidando.id,
+            monto: valor,
+            profesionalUid: user.uid,
+            profesionalNombre: user.displayName || user.email || '',
+            sesionSnapshot: {
+              pacienteNombre: pac ? nombrePaciente(pac) : (liquidando.pacienteNombre || ''),
+              fecha: liquidando.fecha,
+              metodoPagoNombre: liquidando.metodoPagoNombre || '',
+            },
+          });
         } else {
           const pac = mapaPacientes[liquidando.pacienteId];
           await solicitarLiquidarMonto({
@@ -326,8 +345,6 @@ export default function MisSesiones() {
           });
         }
       } else {
-        // Correccion del monto (sesion ya estaba en debido)
-        // Disponible sin restriccion de confianza para el profesional
         await editarMontoLiquidado(liquidando.id, valor, user.uid);
       }
       setLiquidando(null);
@@ -336,7 +353,43 @@ export default function MisSesiones() {
     }
   }
 
-  /* ---- Renders ---- */
+  // Marcar sesión como pagada / revertir a debe
+  async function handleTogglePagado(sesion) {
+    if (sesion.estadoPago === ESTADOS_PAGO_SESION.PAGADO) {
+      // Revertir a debe — solo con edición directa (no tiene sentido solicitar reversión)
+      if (!tieneConfianza) {
+        alert('No tenés permiso para revertir el estado de pago. Contactá al administrador.');
+        return;
+      }
+      try {
+        await marcarSesionDebida(sesion.id, user.uid);
+      } catch (err) {
+        alert(err.message || 'No se pudo cambiar el estado.');
+      }
+      return;
+    }
+    // Marcar como pagada — genera solicitud si tiene permiso
+    if (!puedeMarcarPagadas) return;
+    const pac = mapaPacientes[sesion.pacienteId];
+    const receptor = { uid: user.uid, nombre: user.displayName || user.email || user.uid };
+    try {
+      await solicitarMarcarPagada({
+        consultorioId: user.consultorioId,
+        profesionalUid: user.uid,
+        profesionalNombre: user.displayName || user.email || '',
+        sesionId: sesion.id,
+        sesionSnapshot: {
+          pacienteNombre: pac ? nombrePaciente(pac) : (sesion.pacienteNombre || ''),
+          fecha: sesion.fecha,
+          metodoPagoNombre: sesion.metodoPagoNombre || '',
+          valorTotal: sesion.valorTotal || 0,
+        },
+        receptor,
+      });
+    } catch (err) {
+      alert(err.message || 'No se pudo enviar la solicitud.');
+    }
+  }
 
   if (loadingConsultorio) {
     return (
@@ -450,9 +503,11 @@ export default function MisSesiones() {
               sesiones={sesiones}
               mapaPacientes={mapaPacientes}
               sesionesConPendiente={sesionesConPendiente}
+              puedeMarcarPagadas={puedeMarcarPagadas}
               onEditar={(s) => setEditando(s)}
               onEliminar={handleEliminar}
               onLiquidar={handleAbrirLiquidar}
+              onTogglePagado={handleTogglePagado}
             />
           )}
         </>
@@ -643,7 +698,7 @@ function StatsProfesional({ stats, yaPagado }) {
    Las acciones quedan deshabilitadas si la sesion ya fue pagada o
    si tiene una solicitud pendiente.
    ============================================================ */
-function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, onEditar, onEliminar, onLiquidar }) {
+function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, puedeMarcarPagadas, onEditar, onEliminar, onLiquidar, onTogglePagado }) {
   return (
     <DualScrollTable className="cp-compact-list">
       <table className="cp-table cp-sesiones-tabla">
@@ -769,6 +824,17 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, onEdi
                       </button>
                     ) : (
                       <>
+                        {/* Botón marcar pagada — solo si tiene permiso y sesión está en debe */}
+                        {puedeMarcarPagadas && !pagada && !tienePendiente && (
+                          <button
+                            className="cp-icon-btn cp-icon-btn--success"
+                            onClick={() => onTogglePagado(s)}
+                            title="Solicitar marcar como pagada"
+                            aria-label="Marcar pagada"
+                          >
+                            <CheckIcon />
+                          </button>
+                        )}
                         <button
                           className="cp-icon-btn"
                           onClick={() => onEditar(s)}
@@ -833,8 +899,10 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, onEdi
                     }] : s.metodoPagoTipo === TIPOS_METODO_PAGO.DIFERIDO && !pagada && !tienePendiente ? [{
                       label: 'Corregir monto', icon: <EditIcon />, onClick: () => onLiquidar(s),
                     }] : []),
+                    ...(puedeMarcarPagadas && !pagada && !tienePendiente && !pendienteMonto ? [{
+                      label: 'Solicitar marcar pagada', icon: <CheckIcon />, onClick: () => onTogglePagado(s),
+                    }] : []),
                     { label: 'Editar', icon: <EditIcon />, onClick: () => onEditar(s), disabled: accionesDisabled },
-                    // Pagada: el profesional no puede eliminar, solo el admin
                     ...(!pagada ? [{ label: 'Eliminar', icon: <TrashIcon />, onClick: () => onEliminar(s), danger: true, disabled: tienePendiente }] : []),
                   ]} />
                 </td>

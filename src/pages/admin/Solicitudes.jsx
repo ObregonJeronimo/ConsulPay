@@ -127,6 +127,8 @@ function iconoTipo(tipo) {
     case TIPOS_SOLICITUD_SESION.LIQUIDAR_MONTO: return <CheckIcon />;
     case TIPOS_SOLICITUD_SESION.CARGA_RAPIDA: return <span style={{ fontSize: 13 }}>⚡</span>;
     case TIPOS_SOLICITUD_SESION.CREAR_PACIENTE: return <UserIcon />;
+    case TIPOS_SOLICITUD_SESION.MARCAR_PAGADA: return <CheckIcon />;
+    case TIPOS_SOLICITUD_SESION.LIQUIDAR_OS: return <EditIcon />;
     default: return null;
   }
 }
@@ -717,6 +719,14 @@ function Diff({ solicitud, pac, mapaMetodos }) {
     return <DiffCrearPaciente datos={payloadPropuesto?.datosPaciente ?? {}} mapaMetodos={mapaMetodos} />;
   }
 
+  if (tipo === TIPOS_SOLICITUD_SESION.MARCAR_PAGADA) {
+    return <DiffMarcarPagada payload={payloadPropuesto} />;
+  }
+
+  if (tipo === TIPOS_SOLICITUD_SESION.LIQUIDAR_OS) {
+    return <DiffLiquidarOS payload={payloadPropuesto} />;
+  }
+
   if (tipo === TIPOS_SOLICITUD_SESION.CREAR) {
     return <DiffSingle payload={payloadPropuesto} pac={pac} encabezado="Datos propuestos" tono="despues" />;
   }
@@ -726,6 +736,46 @@ function Diff({ solicitud, pac, mapaMetodos }) {
   }
 
   return <DiffDoble anterior={payloadAnterior} propuesto={payloadPropuesto} pac={pac} />;
+}
+
+function DiffMarcarPagada({ payload }) {
+  const snap = payload?.sesionSnapshot ?? {};
+  const receptor = payload?.receptor;
+  const filas = [
+    { label: 'Paciente', valor: snap.pacienteNombre || '—' },
+    { label: 'Método', valor: snap.metodoPagoNombre || '—' },
+    { label: 'Total', valor: snap.valorTotal != null ? formatoARS.format(snap.valorTotal) : '—' },
+    { label: 'Receptor', valor: receptor?.nombre || '—' },
+  ];
+  return (
+    <div className="cp-diff">
+      {filas.map(({ label, valor }) => (
+        <div key={label} className="cp-diff__row cp-diff__row--single">
+          <div className="cp-diff__campo">{label.toUpperCase()}</div>
+          <div className="cp-diff__valor cp-diff__valor--despues">{valor}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DiffLiquidarOS({ payload }) {
+  const snap = payload?.sesionSnapshot ?? {};
+  const filas = [
+    { label: 'Paciente', valor: snap.pacienteNombre || '—' },
+    { label: 'Método', valor: snap.metodoPagoNombre || '—' },
+    { label: 'Monto a liquidar', valor: payload?.monto != null ? formatoARS.format(payload.monto) : '—' },
+  ];
+  return (
+    <div className="cp-diff">
+      {filas.map(({ label, valor }) => (
+        <div key={label} className="cp-diff__row cp-diff__row--single">
+          <div className="cp-diff__campo">{label.toUpperCase()}</div>
+          <div className="cp-diff__valor cp-diff__valor--despues">{valor}</div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function DiffCrearPaciente({ datos, mapaMetodos }) {

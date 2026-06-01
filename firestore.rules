@@ -393,7 +393,9 @@ service cloud.firestore {
             || request.resource.data.tipo == 'eliminar'
             || request.resource.data.tipo == 'liquidar_monto'
             || request.resource.data.tipo == 'carga_rapida'
-            || request.resource.data.tipo == 'crear_paciente');
+            || request.resource.data.tipo == 'crear_paciente'
+            || request.resource.data.tipo == 'marcar_pagada'
+            || request.resource.data.tipo == 'liquidar_os');
 
       allow update: if esSuperadmin()
         || (esAdminDe(resource.data.consultorioId)

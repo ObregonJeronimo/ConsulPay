@@ -498,6 +498,21 @@ export async function aprobarSolicitud({
     return;
   }
 
+  if (sol.tipo === TIPOS_SOLICITUD_SESION.MARCAR_PAGADA) {
+    const { marcarSesionPagada } = await import('./sesiones.js');
+    const receptor = sol.payloadPropuesto?.receptor ?? { uid: adminUid, nombre: adminNombre };
+    await marcarSesionPagada(sol.sesionId, adminUid, receptor);
+    await actualizarSolicitudResuelta({ solicitudId, adminUid, adminNombre, estado: ESTADOS_SOLICITUD_SESION.APROBADA });
+    return;
+  }
+
+  if (sol.tipo === TIPOS_SOLICITUD_SESION.LIQUIDAR_OS) {
+    const { liquidarMontoSesion } = await import('./sesiones.js');
+    await liquidarMontoSesion(sol.sesionId, sol.payloadPropuesto?.monto, adminUid);
+    await actualizarSolicitudResuelta({ solicitudId, adminUid, adminNombre, estado: ESTADOS_SOLICITUD_SESION.APROBADA });
+    return;
+  }
+
   if (sol.tipo === TIPOS_SOLICITUD_SESION.CREAR_PACIENTE) {
     const datos = sol.payloadPropuesto?.datosPaciente ?? {};
     const { crearPaciente } = await import('./pacientes.js');
@@ -689,6 +704,57 @@ export async function aprobarSolicitud({
   }
 
   throw new Error('Tipo de solicitud desconocido.');
+}
+
+/* ============================================================
+   Solicitar marcar sesión como pagada
+   ============================================================ */
+export async function solicitarMarcarPagada({
+  consultorioId,
+  profesionalUid,
+  profesionalNombre,
+  sesionId,
+  sesionSnapshot,   // { pacienteNombre, fecha, metodoPagoNombre, valorTotal }
+  receptor,         // { uid, nombre } — quién recibió el dinero
+}) {
+  const ref = await addDoc(collection(db, 'solicitudes_sesion'), {
+    consultorioId,
+    tipo: TIPOS_SOLICITUD_SESION.MARCAR_PAGADA,
+    estado: ESTADOS_SOLICITUD_SESION.PENDIENTE,
+    profesionalUid,
+    profesionalNombre,
+    sesionId,
+    payloadPropuesto: { sesionSnapshot, receptor },
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return ref.id;
+}
+
+/* ============================================================
+   Solicitar liquidar monto de obra social
+   ============================================================ */
+export async function solicitarLiquidarOSSesion({
+  consultorioId,
+  profesionalUid,
+  profesionalNombre,
+  sesionId,
+  sesionSnapshot,   // { pacienteNombre, fecha, metodoPagoNombre }
+  monto,
+}) {
+  if (!monto || Number(monto) <= 0) throw new Error('El monto debe ser mayor a 0');
+  const ref = await addDoc(collection(db, 'solicitudes_sesion'), {
+    consultorioId,
+    tipo: TIPOS_SOLICITUD_SESION.LIQUIDAR_OS,
+    estado: ESTADOS_SOLICITUD_SESION.PENDIENTE,
+    profesionalUid,
+    profesionalNombre,
+    sesionId,
+    payloadPropuesto: { sesionSnapshot, monto: Number(monto) },
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return ref.id;
 }
 
 /* ============================================================

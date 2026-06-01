@@ -17,6 +17,7 @@ import {
   retirarProfesional,
   setPermitirEdicionSesiones,
   setPermitirCargaPacientes,
+  setPermitirMarcarPagadas,
   suscribirProfesionales,
 } from '../../lib/profesionales.js';
 import { useConsultorio } from '../../hooks/useConsultorio.js';
@@ -354,6 +355,7 @@ function ProfesionalesTabla({ profesionales, onSuspender, onReactivar, onRetirar
             <th>Estado</th>
             {onSuspender && <th>Edición directa</th>}
             {onSuspender && <th>Carga pacientes</th>}
+            {onSuspender && <th>Marcar pagadas</th>}
             <th aria-label="Acciones" />
           </tr>
         </thead>
@@ -384,6 +386,14 @@ function ProfesionalesTabla({ profesionales, onSuspender, onReactivar, onRetirar
                   try { await setPermitirCargaPacientes(p.uid, !p.permitirCargaPacientes); }
                   catch { alert('No se pudo cambiar la configuración.'); }
                 },
+              }, {
+                label: p.permitirMarcarPagadas
+                  ? 'Desactivar marcar pagadas'
+                  : 'Activar marcar pagadas',
+                onClick: async () => {
+                  try { await setPermitirMarcarPagadas(p.uid, !p.permitirMarcarPagadas); }
+                  catch { alert('No se pudo cambiar la configuración.'); }
+                },
               }] : []),
               ...(onSuspender ? [{ label: 'Suspender', onClick: () => onSuspender(p.uid) }] : []),
               ...(onReactivar ? [{ label: 'Reactivar', onClick: () => onReactivar(p.uid) }] : []),
@@ -407,6 +417,7 @@ function ProfesionalesTabla({ profesionales, onSuspender, onReactivar, onRetirar
                 <td data-label="Estado">{estadoBadge}</td>
                 {onSuspender && <td data-label="Edición directa"><ToggleEdicionDirecta profesional={p} /></td>}
                 {onSuspender && <td data-label="Carga pacientes"><ToggleCargaPacientes profesional={p} /></td>}
+                {onSuspender && <td data-label="Marcar pagadas"><ToggleMarcarPagadas profesional={p} /></td>}
                 <td className="cp-prof-tabla__actions" style={{ textAlign: 'right' }}>
                   {onSuspender && <button className="cp-prof-action" onClick={() => onSuspender(p.uid)}>Suspender</button>}
                   {onReactivar && <button className="cp-prof-action" onClick={() => onReactivar(p.uid)}>Reactivar</button>}
@@ -496,6 +507,39 @@ function ProfesionalesTablaRetirados({ profesionales }) {
 /* ============================================================
    Toggle inline para "Edicion directa de sesiones"
    ============================================================ */
+function ToggleMarcarPagadas({ profesional }) {
+  const [updating, setUpdating] = useState(false);
+  const activo = !!profesional.permitirMarcarPagadas;
+
+  async function onToggle() {
+    if (updating) return;
+    setUpdating(true);
+    try {
+      await setPermitirMarcarPagadas(profesional.uid, !activo);
+    } catch {
+      alert('No se pudo cambiar la configuración.');
+    } finally {
+      setUpdating(false);
+    }
+  }
+
+  return (
+    <div className="cp-edicion-directa">
+      <button
+        type="button"
+        className={`cc-toggle ${activo ? 'cc-toggle--on' : ''}`}
+        onClick={onToggle}
+        disabled={updating}
+        aria-pressed={activo}
+        aria-label={activo ? 'Desactivar marcar pagadas' : 'Activar marcar pagadas'}
+      >
+        <span className="cc-toggle__thumb" />
+      </button>
+      <span className="cp-edicion-directa__label">{activo ? 'Sí' : 'No'}</span>
+    </div>
+  );
+}
+
 function ToggleCargaPacientes({ profesional }) {
   const [updating, setUpdating] = useState(false);
   const activo = !!profesional.permitirCargaPacientes;

@@ -119,8 +119,10 @@ export const TIPOS_SOLICITUD_SESION = {
   MODIFICAR: 'modificar',
   ELIMINAR: 'eliminar',
   LIQUIDAR_MONTO: 'liquidar_monto',
-  CARGA_RAPIDA: 'carga_rapida',   // Carga masiva de sesiones (batch pendiente de aprobacion)
-  CREAR_PACIENTE: 'crear_paciente', // Solicitud del profesional para crear un nuevo paciente
+  CARGA_RAPIDA: 'carga_rapida',
+  CREAR_PACIENTE: 'crear_paciente',
+  MARCAR_PAGADA: 'marcar_pagada',
+  LIQUIDAR_OS: 'liquidar_os',
 };
 
 export const ESTADOS_SOLICITUD_SESION = {
@@ -137,6 +139,8 @@ export const LABELS_TIPO_SOLICITUD = {
   [TIPOS_SOLICITUD_SESION.LIQUIDAR_MONTO]: 'Liquidar monto obra social',
   [TIPOS_SOLICITUD_SESION.CARGA_RAPIDA]: 'Carga rápida',
   [TIPOS_SOLICITUD_SESION.CREAR_PACIENTE]: 'Nuevo paciente',
+  [TIPOS_SOLICITUD_SESION.MARCAR_PAGADA]: 'Marcar como pagada',
+  [TIPOS_SOLICITUD_SESION.LIQUIDAR_OS]: 'Liquidar obra social',
 };
 
 /* ============================================================
