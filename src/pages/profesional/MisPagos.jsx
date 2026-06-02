@@ -8,7 +8,7 @@ import Spinner from '../../components/ui/Spinner.jsx';
 
 import { useAuth } from '../../hooks/useAuth.js';
 import { useConsultorio } from '../../hooks/useConsultorio.js';
-import { ESTADOS_PAGO_SESION, formatoARS } from '../../lib/constants.js';
+import { ESTADOS_PAGO_SESION, ESTADOS_SOLICITUD_SESION, TIPOS_SOLICITUD_SESION, formatoARS } from '../../lib/constants.js';
 import { suscribirPacientesProfesional } from '../../lib/pacientes.js';
 import {
   iniciarPagoAlConsultorio,
@@ -25,6 +25,7 @@ import {
 } from '../../lib/sesiones.js';
 import {
   solicitarMarcarPagada,
+  suscribirSolicitudesDelProfesional,
 } from '../../lib/solicitudes.js';
 
 import './MisPagos.css';
@@ -56,6 +57,7 @@ export default function MisPagos() {
   const [sesiones, setSesiones] = useState([]);
   const [pacientes, setPacientes] = useState([]);
   const [pagos, setPagos] = useState([]);
+  const [solicitudes, setSolicitudes] = useState([]);
   const [loadingSesiones, setLoadingSesiones] = useState(true);
   const [mes, setMes] = useState(() => inicioDeMes(new Date()));
 
@@ -67,7 +69,6 @@ export default function MisPagos() {
   const [iniciando, setIniciando] = useState(false);
   const [enviandoSolicitud, setEnviandoSolicitud] = useState(false);
   const [error, setError] = useState('');
-  const [solicitudOk, setSolicitudOk] = useState(false);
 
   // Modal de salir del consultorio. Vive aca (movido desde MiPanel)
   // porque tiene sentido mantenerlo cerca de la pagina donde se ve
@@ -93,6 +94,11 @@ export default function MisPagos() {
   useEffect(() => {
     if (!user?.uid || !user?.consultorioId) return;
     return suscribirPacientesProfesional(user.uid, user.consultorioId, setPacientes);
+  }, [user?.uid, user?.consultorioId]);
+
+  useEffect(() => {
+    if (!user?.uid || !user?.consultorioId) return;
+    return suscribirSolicitudesDelProfesional(user.consultorioId, user.uid, setSolicitudes);
   }, [user?.uid, user?.consultorioId]);
 
   useEffect(() => {
@@ -228,13 +234,26 @@ export default function MisPagos() {
     );
   }
 
-  const mpDeshabilitado = !consultorio?.mpIntegrado;
+  // Solicitudes de marcar_pagada pendientes en este mes — realtime
+  // Cuando el admin rechaza, esto se actualiza solo sin refresh.
+  const hayPendienteManual = useMemo(() => {
+    const desde = inicioDeMes(mes).getTime();
+    const hasta = finDeMes(mes).getTime();
+    return solicitudes.some((s) =>
+      s.tipo === TIPOS_SOLICITUD_SESION.MARCAR_PAGADA &&
+      s.estado === ESTADOS_SOLICITUD_SESION.PENDIENTE &&
+      (() => {
+        const t = s.createdAt?.toDate ? s.createdAt.toDate().getTime()
+          : s.createdAt?.seconds ? s.createdAt.seconds * 1000 : 0;
+        return t >= desde && t <= hasta;
+      })()
+    );
+  }, [solicitudes, mes]);
   const puedeMarcarPagadas = !!user?.permitirMarcarPagadas;
 
   async function handlePagarManual(sesionIds) {
     if (!sesionIds?.length || !puedeMarcarPagadas) return;
     setEnviandoSolicitud(true);
-    setSolicitudOk(false);
     try {
       await Promise.all(sesionIds.map((id) => {
         const s = sesiones.find((x) => x.id === id);
@@ -250,11 +269,13 @@ export default function MisPagos() {
             fecha: s.fecha,
             metodoPagoNombre: s.metodoPagoNombre || '',
             valorTotal: s.valorTotal || 0,
+            porcentajeConsultorio: s.porcentajeConsultorio ?? null,
+            montoConsultorio: s.montoConsultorio ?? null,
+            montoProfesional: s.montoProfesional ?? null,
           },
           receptor: { uid: user.uid, nombre: user.displayName || user.email || user.uid },
         });
       }));
-      setSolicitudOk(true);
       setModoSeleccionManual(false);
       setSeleccionadasManual(new Set());
     } catch (err) {
@@ -346,15 +367,15 @@ export default function MisPagos() {
           <div className="cp-deuda-card__hint" style={{ marginBottom: 16 }}>
             {sesionesDebidas.length === 0
               ? 'No hay sesiones pendientes en este mes'
-              : solicitudOk
-                ? '✓ Solicitud enviada al administrador'
+              : hayPendienteManual
+                ? '📋 Solicitud pendiente de aprobación por el administrador'
                 : modoSeleccionManual
                   ? seleccionadasManual.size === 0
                     ? `Elegí cuáles de las ${sesionesDebidas.length} sesiones`
                     : `${seleccionadasManual.size} de ${sesionesDebidas.length} seleccionadas`
                   : `Marcar ${sesionesDebidas.length} sesión${sesionesDebidas.length === 1 ? '' : 'es'} como pagadas manualmente`}
           </div>
-          {sesionesDebidas.length > 0 && !solicitudOk && (
+          {sesionesDebidas.length > 0 && !hayPendienteManual && (
             <div className="cp-pagos-recuadro__actions">
               {!modoSeleccionManual ? (
                 <>

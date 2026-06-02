@@ -741,10 +741,17 @@ function Diff({ solicitud, pac, mapaMetodos }) {
 function DiffMarcarPagada({ payload }) {
   const snap = payload?.sesionSnapshot ?? {};
   const receptor = payload?.receptor;
+  const total = snap.valorTotal ?? 0;
+  const pct = snap.porcentajeConsultorio ?? null;
+  const montoConsultorio = snap.montoConsultorio ?? (pct != null ? Math.round(total * pct / 100) : null);
+  const montoProfesional = snap.montoProfesional ?? (montoConsultorio != null ? total - montoConsultorio : null);
+
   const filas = [
     { label: 'Paciente', valor: snap.pacienteNombre || '—' },
     { label: 'Método', valor: snap.metodoPagoNombre || '—' },
-    { label: 'Total', valor: snap.valorTotal != null ? formatoARS.format(snap.valorTotal) : '—' },
+    { label: 'Total sesión', valor: total != null ? formatoARS.format(total) : '—' },
+    ...(montoConsultorio != null ? [{ label: `Al consultorio${pct != null ? ` (${pct}%)` : ''}`, valor: formatoARS.format(montoConsultorio) }] : []),
+    ...(montoProfesional != null ? [{ label: 'Al profesional', valor: formatoARS.format(montoProfesional) }] : []),
     { label: 'Receptor', valor: receptor?.nombre || '—' },
   ];
   return (
