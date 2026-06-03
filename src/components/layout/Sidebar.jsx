@@ -111,12 +111,9 @@ export default function Sidebar() {
   const { consultorio } = useConsultorio();
 
   const esSuperadmin = user?.rol === ROLES.SUPERADMIN;
-  const esAdmin = user?.rol === ROLES.ADMIN;
-
-  // El item "Reparto" solo aparece cuando hay 2 admins en el consultorio
-  // (que es la condicion para que aplique el flow multi-admin con doble
-  // cuenta MP). Si solo hay 1, esa pagina no tiene contenido para mostrar.
-  const mostrarReparto = esAdmin && (consultorio?.adminUids?.length || 0) >= 2;
+  const esCoadmin = user?.rol === ROLES.COADMIN;
+  const esAdmin = user?.rol === ROLES.ADMIN || esCoadmin;
+  const mostrarReparto = (user?.rol === ROLES.ADMIN) && (consultorio?.adminUids?.length || 0) >= 2;
 
   // Conteo live de solicitudes pendientes (solo para admin).
   // Suscribimos siempre que sea admin con consultorioId; el unsub es seguro
