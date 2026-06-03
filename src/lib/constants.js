@@ -8,6 +8,7 @@
 export const ROLES = {
   SUPERADMIN: 'superadmin',   // Jero + Thiago, operadores de la plataforma
   ADMIN: 'admin',             // Dueño de un consultorio
+  COADMIN: 'coadmin',         // Co-admin: mismos permisos que admin, sin reparto
   PROFESIONAL: 'profesional', // Profesional invitado a un consultorio
 };
 

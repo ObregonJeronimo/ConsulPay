@@ -183,6 +183,71 @@ export async function promoverAAdmin({ consultorioId, callerUid, nuevoUid }) {
 }
 
 /**
+ * Promueve un profesional a coadmin del consultorio.
+ * El coadmin tiene los mismos permisos que admin en la UI pero:
+ *  - NO se agrega a adminUids (no participa del reparto ni de "quién recibió")
+ *  - Solo el admin dueño puede promover a coadmin
+ *  - El coadmin NO puede promover a otros a coadmin
+ */
+export async function promoverACoadmin({ consultorioId, callerUid, nuevoUid }) {
+  if (!consultorioId) throw new Error('consultorioId requerido');
+  if (!callerUid) throw new Error('callerUid requerido');
+  if (!nuevoUid) throw new Error('nuevoUid requerido');
+  if (callerUid === nuevoUid) throw new Error('No podés promoverte a vos mismo.');
+
+  const consRef = doc(db, 'consultorios', consultorioId);
+  const userRef = doc(db, 'usuarios', nuevoUid);
+
+  await runTransaction(db, async (tx) => {
+    const consSnap = await tx.get(consRef);
+    const userSnap = await tx.get(userRef);
+
+    const consData = consSnap.exists() ? consSnap.data() : null;
+    validarCallerEsAdmin(consData, callerUid);
+
+    if (!userSnap.exists()) throw new Error('El usuario no existe.');
+    const userData = userSnap.data();
+
+    if (userData.consultorioId !== consultorioId) {
+      throw new Error('El usuario no pertenece a este consultorio.');
+    }
+    if (userData.estado !== ESTADOS_USUARIO.ACTIVO) {
+      throw new Error('El usuario no está activo.');
+    }
+    if (userData.rol === ROLES.COADMIN) {
+      throw new Error('Este usuario ya es coadmin.');
+    }
+    if (userData.rol === ROLES.ADMIN) {
+      throw new Error('Este usuario ya es admin.');
+    }
+
+    // Solo cambia el rol — NO toca adminUids
+    tx.update(userRef, { rol: ROLES.COADMIN });
+  });
+}
+
+/**
+ * Revierte un coadmin a profesional.
+ */
+export async function revertirCoadmin({ consultorioId, callerUid, uidCoadmin }) {
+  if (callerUid === uidCoadmin) throw new Error('No podés revertirte a vos mismo.');
+
+  const consRef = doc(db, 'consultorios', consultorioId);
+  const userRef = doc(db, 'usuarios', uidCoadmin);
+
+  await runTransaction(db, async (tx) => {
+    const consSnap = await tx.get(consRef);
+    validarCallerEsAdmin(consSnap.data(), callerUid);
+
+    const userSnap = await tx.get(userRef);
+    if (!userSnap.exists() || userSnap.data().rol !== ROLES.COADMIN) {
+      throw new Error('El usuario no es coadmin.');
+    }
+    tx.update(userRef, { rol: ROLES.PROFESIONAL });
+  });
+}
+
+/**
  * Remueve a un admin del consultorio.
  *
  * Casos cubiertos:

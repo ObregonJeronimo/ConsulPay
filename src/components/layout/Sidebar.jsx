@@ -133,9 +133,11 @@ export default function Sidebar() {
   const nombre = user?.displayName || user?.email?.split('@')[0] || 'Usuario';
   const rolLabel = esSuperadmin
     ? 'Superadmin · ConsulPay'
-    : esAdmin
-      ? 'Admin · Consultorio'
-      : 'Profesional';
+    : esCoadmin
+      ? 'Co-admin · Consultorio'
+      : esAdmin
+        ? 'Admin · Consultorio'
+        : 'Profesional';
 
   return (
     <aside className="cp-sidebar">

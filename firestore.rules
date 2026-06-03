@@ -27,6 +27,16 @@ service cloud.firestore {
       return tengoDoc() && miUsuario().rol == 'admin';
     }
 
+    function esCoadmin() {
+      return tengoDoc() && miUsuario().rol == 'coadmin';
+    }
+
+    // Helper: es admin O coadmin del consultorio
+    function esAdminOCoadminDe(consultorioIdDelRecurso) {
+      return (esAdminDe(consultorioIdDelRecurso) || esCoadmin())
+        && miUsuario().consultorioId == consultorioIdDelRecurso;
+    }
+
     function esProfesional() {
       return tengoDoc() && miUsuario().rol == 'profesional';
     }
@@ -265,13 +275,16 @@ service cloud.firestore {
     match /pacientes/{pacienteId} {
       allow read: if esSuperadmin()
         || esAdminDe(resource.data.consultorioId)
+        || (esCoadmin() && miUsuario().consultorioId == resource.data.consultorioId)
         || (esProfesionalDe(resource.data.consultorioId)
             && request.auth.uid in resource.data.profesionalesUids);
 
       allow create: if esSuperadmin()
-        || esAdminDe(request.resource.data.consultorioId);
+        || esAdminDe(request.resource.data.consultorioId)
+        || (esCoadmin() && miUsuario().consultorioId == request.resource.data.consultorioId);
 
-      allow update: if (esSuperadmin() || esAdminDe(resource.data.consultorioId))
+      allow update: if (esSuperadmin() || esAdminDe(resource.data.consultorioId)
+        || (esCoadmin() && miUsuario().consultorioId == resource.data.consultorioId))
         && request.resource.data.consultorioId == resource.data.consultorioId;
 
       allow delete: if esSuperadmin() || esAdminDe(resource.data.consultorioId);
@@ -320,6 +333,7 @@ service cloud.firestore {
     match /sesiones/{sesionId} {
       allow read: if esSuperadmin()
         || esAdminDe(resource.data.consultorioId)
+        || (esCoadmin() && miUsuario().consultorioId == resource.data.consultorioId)
         || (esProfesionalDe(resource.data.consultorioId)
             && resource.data.profesionalUid == request.auth.uid);
 
@@ -383,6 +397,7 @@ service cloud.firestore {
 
       allow read: if esSuperadmin()
         || esAdminDe(resource.data.consultorioId)
+        || (esCoadmin() && miUsuario().consultorioId == resource.data.consultorioId)
         || esProfesionalDe(resource.data.consultorioId);
 
       allow create: if esProfesionalDe(request.resource.data.consultorioId)
@@ -398,7 +413,7 @@ service cloud.firestore {
             || request.resource.data.tipo == 'liquidar_os');
 
       allow update: if esSuperadmin()
-        || (esAdminDe(resource.data.consultorioId)
+        || ((esAdminDe(resource.data.consultorioId) || (esCoadmin() && miUsuario().consultorioId == resource.data.consultorioId))
             && request.resource.data.consultorioId == resource.data.consultorioId
             && request.resource.data.profesionalUid == resource.data.profesionalUid
             && request.resource.data.tipo == resource.data.tipo
@@ -434,6 +449,7 @@ service cloud.firestore {
     match /pagos_consultorio/{pagoId} {
       allow read: if esSuperadmin()
         || esAdminDe(resource.data.consultorioId)
+        || (esCoadmin() && miUsuario().consultorioId == resource.data.consultorioId)
         || (esProfesionalDe(resource.data.consultorioId)
             && resource.data.profesionalUid == request.auth.uid);
 
@@ -472,6 +488,7 @@ service cloud.firestore {
     match /recordatorios/{recordatorioId} {
       allow read: if esSuperadmin()
         || esAdminDe(resource.data.consultorioId)
+        || (esCoadmin() && miUsuario().consultorioId == resource.data.consultorioId)
         || (esProfesionalDe(resource.data.consultorioId)
             && request.auth.uid in resource.data.destinatarios)
         || (esProfesionalDe(resource.data.consultorioId)
@@ -500,6 +517,7 @@ service cloud.firestore {
     match /recordatorios_instancias/{instanciaId} {
       allow read: if esSuperadmin()
         || esAdminDe(resource.data.consultorioId)
+        || (esCoadmin() && miUsuario().consultorioId == resource.data.consultorioId)
         || (esProfesionalDe(resource.data.consultorioId)
             && resource.data.profesionalUid == request.auth.uid);
 

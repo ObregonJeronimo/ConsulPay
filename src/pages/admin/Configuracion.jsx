@@ -17,7 +17,7 @@ import {
   TIPOS_METODO_PAGO,
 } from '../../lib/constants.js';
 import {
-  promoverAAdmin,
+  promoverACoadmin,
   removerAdmin,
   transferirOwnership,
 } from '../../lib/admins.js';
@@ -1024,23 +1024,15 @@ function TabAdministradores({ consultorio, callerUid }) {
     try {
       const profesional = mapMiembros[profesionalAPromover];
       const nombre = profesional ? nombreVisible(profesional) : 'el profesional';
-      await promoverAAdmin({
+      await promoverACoadmin({
         consultorioId: consultorio.id,
         callerUid,
         nuevoUid: profesionalAPromover,
       });
-      setOkMsg(`${nombre} fue promovido a administrador.`);
+      setOkMsg(`${nombre} fue promovido a co-administrador.`);
       setProfesionalAPromover('');
     } catch (err) {
-      // Caso especial: si ya hay 2 admins, mostramos un mensaje mas
-      // suave indicando que es un limite en evolucion, no un error.
-      const esLimiteAdmins = err.message?.includes('máximo de 2 administradores')
-        || err.message?.includes('máximo de');
-      if (esLimiteAdmins) {
-        setError('No puede haber más de 2 administradores en un consultorio. Estamos trabajando en ello…');
-      } else {
-        setError(err.message || 'No se pudo promover.');
-      }
+      setError(err.message || 'No se pudo promover.');
     } finally {
       setSubmitting(false);
     }
@@ -1160,8 +1152,9 @@ function TabAdministradores({ consultorio, callerUid }) {
       <hr className="cp-admins-divider" />
 
       <div className="cp-admins-promote">
-        <h3 className="cp-admins-promote__title">Promover a un profesional a administrador</h3>
+        <h3 className="cp-admins-promote__title">Promover un profesional a co-administrador</h3>
         <p className="cp-admins-promote__hint">
+          El co-admin tiene acceso completo al panel igual que el admin, pero no participa del reparto ni de pagos.
           Solo aparecen los profesionales activos del consultorio. Si querés invitar a alguien
           de afuera, primero invítalo como profesional desde la sección de Profesionales.
         </p>
@@ -1191,7 +1184,7 @@ function TabAdministradores({ consultorio, callerUid }) {
               onClick={handlePromover}
               disabled={!profesionalAPromover || submitting}
             >
-              {submitting && accion === null ? 'Promoviendo…' : 'Promover a admin'}
+              {submitting && accion === null ? 'Promoviendo…' : 'Promover a co-admin'}
             </Button>
           </div>
         )}

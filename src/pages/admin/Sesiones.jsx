@@ -156,6 +156,7 @@ export default function Sesiones() {
   const [miembros, setMiembros] = useState([]);
   const admins = useMemo(
     () => miembros.filter((m) => m.rol === 'admin' || m.esAdminDelConsultorio),
+    // Nota: coadmin (rol='coadmin') queda excluido del reparto y de "¿Quién recibió?"
     [miembros],
   );
 
