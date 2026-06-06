@@ -1,0 +1,78 @@
+/* ============================================================
+   Selector de receptor para MARCAR_PAGADA
+   ============================================================ */
+.cp-receptor-selector {
+  margin-top: var(--cp-space-4);
+  padding: var(--cp-space-3) 0;
+  border-top: 1px solid var(--cp-border);
+}
+
+.cp-receptor-selector__label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--cp-text-muted);
+  margin-bottom: 4px;
+}
+
+.cp-receptor-selector__hint {
+  font-size: 12.5px;
+  color: var(--cp-text-faint);
+  margin: 0 0 12px;
+  line-height: 1.5;
+}
+
+.cp-receptor-selector__opciones {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cp-receptor-opcion {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--cp-surface);
+  border: 1.5px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--cp-text);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 120ms, background 120ms;
+}
+
+.cp-receptor-opcion:hover {
+  border-color: var(--cp-accent);
+}
+
+.cp-receptor-opcion--sel {
+  border-color: var(--cp-accent);
+  background: var(--cp-accent-bg);
+}
+
+.cp-receptor-opcion__nombre {
+  flex: 1;
+  font-weight: 500;
+}
+
+.cp-receptor-opcion__check {
+  color: var(--cp-accent);
+  font-weight: 700;
+  font-size: 16px;
+}
+
+/* En mobile el selector toma todo el ancho del modal */
+@media (max-width: 640px) {
+  .cp-receptor-selector__opciones {
+    gap: 6px;
+  }
+  .cp-receptor-opcion {
+    padding: 10px 12px;
+  }
+}
