@@ -27,6 +27,7 @@ import {
 
 import { GroupBadge } from './Sesiones.jsx';
 import './Solicitudes.css';
+import './Solicitudes.receptor.css';
 import './Sesiones.css';
 
 /* ============================================================
@@ -202,7 +203,6 @@ export default function Solicitudes() {
   }, [profesionales]);
 
   // Lista de admins reales del consultorio (excluye coadmin del reparto).
-  // Si el array está vacío por algún motivo, fallback al user actual.
   const admins = useMemo(
     () => miembros.filter((m) => m.rol === 'admin' || m.esAdminDelConsultorio),
     [miembros],
@@ -291,9 +291,6 @@ export default function Solicitudes() {
   );
 }
 
-/* ============================================================
-   Empty states
-   ============================================================ */
 function EmptyState({ tab }) {
   if (tab === 'pendientes') {
     return (
@@ -325,9 +322,6 @@ function EmptyState({ tab }) {
   );
 }
 
-/* ============================================================
-   Tabla
-   ============================================================ */
 function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSeleccionar }) {
   return (
     <DualScrollTable className="cp-compact-list">
@@ -446,23 +440,17 @@ function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSel
   );
 }
 
-/* ============================================================
-   Modal de detalle
-   ============================================================ */
 function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, mapaMetodos, admins, adminUid, adminNombre, consultorioId, onClose }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [mostrandoMotivo, setMostrandoMotivo] = useState(false);
   const [motivo, setMotivo] = useState('');
 
-  // Para MARCAR_PAGADA: receptor del dinero (admin elegido).
-  // Se inicializa con el primer admin disponible o el admin actual.
   const [receptorUid, setReceptorUid] = useState(() => {
     if (admins && admins.length > 0) return admins[0].uid;
     return adminUid;
   });
 
-  // Reajusta el receptor cuando llega la lista de admins (carga async).
   useEffect(() => {
     if (admins && admins.length > 0 && !admins.find((a) => a.uid === receptorUid)) {
       setReceptorUid(admins[0].uid);
@@ -485,7 +473,6 @@ function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, mapaMetodos
     setError('');
     setSubmitting(true);
     try {
-      // Para MARCAR_PAGADA, pasamos el receptor elegido como override.
       const payload = {
         solicitudId: solicitud.id,
         adminUid,
@@ -567,7 +554,6 @@ function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, mapaMetodos
 
         <Diff solicitud={solicitud} pac={pac} mapaMetodos={mapaMetodos} />
 
-        {/* Selector de receptor — solo para MARCAR_PAGADA pendiente */}
         {esMarcarPagada && esPendiente && (
           <div className="cp-receptor-selector">
             <label className="cp-receptor-selector__label">
@@ -699,9 +685,6 @@ function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, mapaMetodos
   );
 }
 
-/* ============================================================
-   HistorialPanel
-   ============================================================ */
 function HistorialPanel({ consultorioId, solicitudId }) {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -727,9 +710,7 @@ function HistorialPanel({ consultorioId, solicitudId }) {
     );
   }
 
-  if (logs.length === 0) {
-    return null;
-  }
+  if (logs.length === 0) return null;
 
   return (
     <div className="cp-historial">
@@ -764,9 +745,6 @@ function tipoColor(tipo) {
   }
 }
 
-/* ============================================================
-   Diff
-   ============================================================ */
 function Diff({ solicitud, pac, mapaMetodos }) {
   const { tipo, payloadPropuesto, payloadAnterior } = solicitud;
 
