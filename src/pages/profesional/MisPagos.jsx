@@ -70,9 +70,6 @@ export default function MisPagos() {
   const [enviandoSolicitud, setEnviandoSolicitud] = useState(false);
   const [error, setError] = useState('');
 
-  // Modal de salir del consultorio. Vive aca (movido desde MiPanel)
-  // porque tiene sentido mantenerlo cerca de la pagina donde se ve
-  // la deuda — el modal valida que no haya deuda antes de dejar salir.
   const [openSalir, setOpenSalir] = useState(false);
 
   /* ---- Suscripciones live ---- */
@@ -134,9 +131,6 @@ export default function MisPagos() {
     [sesionesDebidas],
   );
 
-  // Subtotal de las sesiones seleccionadas en modo selectivo.
-  // Si no hay seleccion, vale 0 (UX: muestra explicitamente que no hay
-  // nada elegido, en vez de mostrar la deuda total que confunde).
   const subtotalSeleccionado = useMemo(() => {
     if (!modoSeleccion) return deudaTotal;
     return sesionesDebidas
@@ -144,9 +138,6 @@ export default function MisPagos() {
       .reduce((acc, s) => acc + (s.montoConsultorio || 0), 0);
   }, [modoSeleccion, seleccionadas, sesionesDebidas, deudaTotal]);
 
-  // sesiones a pagar:
-  //  - modoSeleccion off: todas las debidas
-  //  - modoSeleccion on:  las elegidas (puede ser []  si nada esta marcado)
   const sesionesIdsParaPagar = useMemo(() => {
     if (modoSeleccion) {
       return sesionesDebidas
@@ -159,6 +150,25 @@ export default function MisPagos() {
   const pagosFiltrados = useMemo(() => {
     return pagos.filter((p) => p.estado !== 'rechazado' || p.mpPaymentId);
   }, [pagos]);
+
+  // Realtime: solicitudes de marcar_pagada pendientes en el mes actual.
+  // TODOS los useMemo/useState/useEffect deben ir ANTES de cualquier return.
+  const hayPendienteManual = useMemo(() => {
+    const desde = inicioDeMes(mes).getTime();
+    const hasta = finDeMes(mes).getTime();
+    return solicitudes.some((s) =>
+      s.tipo === TIPOS_SOLICITUD_SESION.MARCAR_PAGADA &&
+      s.estado === ESTADOS_SOLICITUD_SESION.PENDIENTE &&
+      (() => {
+        const t = s.createdAt?.toDate ? s.createdAt.toDate().getTime()
+          : s.createdAt?.seconds ? s.createdAt.seconds * 1000 : 0;
+        return t >= desde && t <= hasta;
+      })()
+    );
+  }, [solicitudes, mes]);
+
+  const puedeMarcarPagadas = !!user?.permitirMarcarPagadas;
+  const mpDeshabilitado = !consultorio?.mpIntegrado;
 
   /* ---- Handlers ---- */
 
@@ -179,9 +189,6 @@ export default function MisPagos() {
     }
   }
 
-  // UX: arrancamos con 0 sesiones marcadas para que el user elija
-  // explicitamente. Antes arrancabamos con todas marcadas, lo cual era
-  // raro (ya hay un boton "Pagar deuda total" para eso).
   function entrarModoSeleccion() {
     setModoSeleccion(true);
     setSeleccionadas(new Set());
@@ -210,7 +217,6 @@ export default function MisPagos() {
         consultorioId: user.consultorioId,
         sesionesIds: sesionesIdsParaPagar,
       });
-      // Si llega acá sin redireccion fue raro
     } catch (err) {
       setIniciando(false);
       const detalleMP = err.detalle?.detalleMP;
@@ -220,38 +226,6 @@ export default function MisPagos() {
       }
       setError(mensaje);
     }
-  }
-
-  /* ---- Renders ---- */
-
-  // Solicitudes de marcar_pagada pendientes en este mes — realtime
-  // Cuando el admin rechaza, esto se actualiza solo sin refresh.
-  // IMPORTANTE: este useMemo debe estar ANTES de cualquier return condicional
-  // para no violar las reglas de hooks de React.
-  const hayPendienteManual = useMemo(() => {
-    const desde = inicioDeMes(mes).getTime();
-    const hasta = finDeMes(mes).getTime();
-    return solicitudes.some((s) =>
-      s.tipo === TIPOS_SOLICITUD_SESION.MARCAR_PAGADA &&
-      s.estado === ESTADOS_SOLICITUD_SESION.PENDIENTE &&
-      (() => {
-        const t = s.createdAt?.toDate ? s.createdAt.toDate().getTime()
-          : s.createdAt?.seconds ? s.createdAt.seconds * 1000 : 0;
-        return t >= desde && t <= hasta;
-      })()
-    );
-  }, [solicitudes, mes]);
-  const puedeMarcarPagadas = !!user?.permitirMarcarPagadas;
-  const mpDeshabilitado = !consultorio?.mpIntegrado;
-
-  if (loadingConsultorio) {
-    return (
-      <div className="cp-mis-pagos">
-        <div style={{ padding: 60, display: 'flex', justifyContent: 'center' }}>
-          <Spinner size={24} />
-        </div>
-      </div>
-    );
   }
 
   async function handlePagarManual(sesionIds) {
@@ -286,6 +260,18 @@ export default function MisPagos() {
     } finally {
       setEnviandoSolicitud(false);
     }
+  }
+
+  /* ---- Render ---- */
+
+  if (loadingConsultorio) {
+    return (
+      <div className="cp-mis-pagos">
+        <div style={{ padding: 60, display: 'flex', justifyContent: 'center' }}>
+          <Spinner size={24} />
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -371,7 +357,7 @@ export default function MisPagos() {
             {sesionesDebidas.length === 0
               ? 'No hay sesiones pendientes en este mes'
               : hayPendienteManual
-                ? '📋 Solicitud pendiente de aprobación por el administrador'
+                ? 'Solicitud pendiente de aprobación por el administrador'
                 : modoSeleccionManual
                   ? seleccionadasManual.size === 0
                     ? `Elegí cuáles de las ${sesionesDebidas.length} sesiones`
@@ -570,18 +556,6 @@ export default function MisPagos() {
         </section>
       )}
 
-      {/*
-        ---- Seccion "Cuenta" al pie ----
-        Discreta, separada del flujo principal. Incluye el boton de
-        salir del consultorio, que antes vivia en el Resumen.
-        Lo movimos aca porque:
-        1. Tiene sentido cerca de la deuda (el modal valida deuda
-           antes de dejar salir).
-        2. Mantiene el Resumen limpio enfocado solo en datos del
-           trabajo del profesional.
-        3. Es una accion destructiva poco frecuente, asi que va
-           al final con visualmente menos peso.
-      */}
       {openSalir && (
         <SalirConsultorioModal
           consultorioId={user.consultorioId}
@@ -589,9 +563,6 @@ export default function MisPagos() {
           uid={user.uid}
           onCancelar={() => setOpenSalir(false)}
           onCompletado={async () => {
-            // Despues de retirarse, cerramos sesion para que la guardia
-            // no muestre el panel "fantasma" mientras el AuthContext
-            // detecta el cambio.
             await signOut();
           }}
         />
@@ -602,15 +573,6 @@ export default function MisPagos() {
 
 /* ============================================================
    Modal de auto-retiro
-   ----------------------------------------------------------------
-   Movido aca desde MiPanel.jsx. Logica identica a la version
-   anterior:
-   1. Al abrir, calcula la deuda del profesional con el consultorio.
-   2. Si tiene deuda > 0: muestra aviso bloqueante con cantidad y total
-      formateado, y desactiva el boton de salir. El profesional debe
-      saldar primero (o pedir al admin que lo retire por su lado).
-   3. Si no tiene deuda: muestra mensaje OK y boton 'Salir del consultorio'.
-   4. Al confirmar: llama a retirarProfesional con esAutoRetiro=true.
    ============================================================ */
 function SalirConsultorioModal({ consultorioId, consultorioNombre, uid, onCancelar, onCompletado }) {
   const [deuda, setDeuda] = useState(null);
@@ -630,8 +592,6 @@ function SalirConsultorioModal({ consultorioId, consultorioNombre, uid, onCancel
       } catch (err) {
         if (!cancelado) {
           console.error('Error calculando deuda:', err);
-          // Si no podemos leer la deuda, no la usamos como bloqueo —
-          // el caller maneja el error. Pero el boton queda habilitado.
           setDeuda({ cantidad: 0, total: 0 });
           setCargandoDeuda(false);
         }
@@ -651,8 +611,6 @@ function SalirConsultorioModal({ consultorioId, consultorioNombre, uid, onCancel
       });
       onCompletado();
     } catch (err) {
-      // Si la deuda volvio a aparecer entre el render del modal y el
-      // submit (race condition rara), el error trae codigoDeuda.
       setError(err.message || 'No se pudo salir del consultorio.');
       setSubmitting(false);
     }
