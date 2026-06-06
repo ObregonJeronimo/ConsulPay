@@ -242,6 +242,7 @@ export default function MisPagos() {
     );
   }, [solicitudes, mes]);
   const puedeMarcarPagadas = !!user?.permitirMarcarPagadas;
+  const mpDeshabilitado = !consultorio?.mpIntegrado;
 
   if (loadingConsultorio) {
     return (
