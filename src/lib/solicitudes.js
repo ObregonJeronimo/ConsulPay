@@ -1,30 +1,5 @@
 /**
  * Servicio de solicitudes de modificacion de sesiones (Fase B)
- *
- * Cuando un profesional NO tiene confianza (permitirEdicionSesiones
- * = false en su doc de usuario), sus acciones sobre sesiones no se
- * ejecutan directamente sino que crean una solicitud que el admin
- * debe resolver.
- *
- * SOPORTA SESIONES AGRUPADAS: el payloadPropuesto y payloadAnterior
- * incluyen cantidadSesiones y valorSesion (ver lib/sesiones.js).
- *
- * Modelo:
- *   solicitudes_sesion/{solicitudId}
- *     consultorioId, profesionalUid (quien la pidio),
- *     profesionalNombre (snapshot),
- *     tipo: 'crear' | 'modificar' | 'eliminar',
- *     sesionId: null si tipo=crear (hasta que se aprueba),
- *               id de la sesion existente si tipo=modificar/eliminar,
- *     payloadPropuesto: para crear es la sesion completa,
- *                       para modificar es el nuevo set de campos,
- *                       para eliminar es null,
- *     payloadAnterior: snapshot de la sesion al momento de pedir
- *                      (para detectar si quedo obsoleta y para mostrar
- *                       el diff al admin),
- *     estado: 'pendiente' | 'aprobada' | 'rechazada' | 'obsoleta',
- *     motivoRechazo: string | null,
- *     createdAt, resolvedAt, resolvedByUid, resolvedByNombre
  */
 
 import {
@@ -54,9 +29,6 @@ import { escribirLog } from './logs.js';
 
 /* ============================================================
    Helpers de descripcion humana
-   ----------------------------------------------------------------
-   Para que los logs y el detalle del modal muestren textos claros,
-   centralizamos aca el armado de la "descripcion" de cada evento.
    ============================================================ */
 
 function descPaciente(pacienteNombre) {
@@ -64,7 +36,6 @@ function descPaciente(pacienteNombre) {
 }
 
 function descCantidad(cantidad) {
-  // Si es 1 o undefined, no agregamos nada (es el caso "normal")
   const c = Number(cantidad);
   if (!Number.isFinite(c) || c <= 1) return '';
   return ` (${c} sesiones agrupadas)`;
@@ -86,13 +57,6 @@ function describirSolicitudCreada(solicitud, pacienteNombre, cantidadSesiones) {
   }
 }
 
-/* ============================================================
-   Validacion: solo una solicitud activa por sesion
-   ----------------------------------------------------------------
-   Antes de crear una solicitud sobre una sesion existente, chequea
-   que no haya otra pendiente para esa misma sesion. Si la hay,
-   lanza error.
-   ============================================================ */
 async function validarNoHayPendienteParaSesion(consultorioId, sesionId) {
   const q = query(
     collection(db, 'solicitudes_sesion'),
@@ -111,24 +75,11 @@ async function validarNoHayPendienteParaSesion(consultorioId, sesionId) {
   }
 }
 
-/* ============================================================
-   Crear solicitud
-   ----------------------------------------------------------------
-   Cada tipo (crear/modificar/eliminar) tiene su propia funcion
-   exportada para que el caller no se equivoque pasando un payload
-   que no corresponde al tipo.
-   ============================================================ */
-
-/**
- * Solicitar crear una sesion. El payloadPropuesto contiene los
- * mismos campos que se le pasarian a crearSesion(), ya con el split
- * calculado.
- */
 export async function solicitarCrearSesion({
   consultorioId,
   profesionalUid,
   profesionalNombre,
-  pacienteNombre,    // solo para el log
+  pacienteNombre,
   payloadPropuesto,
 }) {
   const ref = await addDoc(collection(db, 'solicitudes_sesion'), {
@@ -167,12 +118,6 @@ export async function solicitarCrearSesion({
   return ref.id;
 }
 
-/**
- * Solicitar modificar una sesion existente.
- * payloadPropuesto = nuevos valores deseados (con split ya calculado).
- * payloadAnterior  = snapshot de la sesion al momento de la solicitud
- *                    (lo agarramos automaticamente leyendo la sesion).
- */
 export async function solicitarModificarSesion({
   consultorioId,
   sesionId,
@@ -183,7 +128,6 @@ export async function solicitarModificarSesion({
 }) {
   await validarNoHayPendienteParaSesion(consultorioId, sesionId);
 
-  // Tomamos snapshot del estado actual para el diff
   const snap = await getDoc(doc(db, 'sesiones', sesionId));
   if (!snap.exists()) {
     throw new Error('La sesión que querés modificar ya no existe.');
@@ -226,9 +170,6 @@ export async function solicitarModificarSesion({
   return ref.id;
 }
 
-/**
- * Solicitar eliminar una sesion.
- */
 export async function solicitarEliminarSesion({
   consultorioId,
   sesionId,
@@ -280,21 +221,6 @@ export async function solicitarEliminarSesion({
   return ref.id;
 }
 
-/**
- * Solicitar liquidar el monto de una sesion en pendiente_monto (obra social).
- * Solo se usa cuando el profesional NO tiene edicion directa.
- *
- * payloadPropuesto incluye:
- *   - valorLiquidado: el total que dijo la obra social
- *   - valorSesion / valorTotal / montoConsultorio / montoProfesional ya
- *     calculados en cliente para que el admin vea el preview en el modal
- *     de la solicitud y no tenga que recalcular.
- *
- * Cuando el admin aprueba, el aprobador llama a la misma logica de
- * liquidarMontoSesion (recalcula y graba). El payload guardado sirve
- * de auditoria pero la liquidacion final usa los datos guardados en el
- * doc de sesion en el momento de la aprobacion.
- */
 export async function solicitarLiquidarMonto({
   consultorioId,
   sesionId,
@@ -320,7 +246,6 @@ export async function solicitarLiquidarMonto({
     throw new Error('El valor liquidado debe ser un número mayor a cero');
   }
 
-  // Calculamos el preview del split usando el % guardado en la sesion
   const cantidad = Number(payloadAnterior.cantidadSesiones) || 1;
   const porcentaje = Number(payloadAnterior.porcentajeConsultorio) || 0;
   const montoConsultorio = Math.round((v * porcentaje) / 100);
@@ -377,19 +302,19 @@ export async function solicitarLiquidarMonto({
    ============================================================ */
 
 /**
- * Aprobar una solicitud: aplica el cambio sobre /sesiones/ y marca la
- * solicitud como aprobada. Antes de aplicar, verifica que la sesion
- * referenciada no haya sido modificada/eliminada por otro lado: si
- * lo fue, marca la solicitud como obsoleta y NO aplica nada.
+ * Aprobar una solicitud.
  *
- * Esta funcion debe llamarse desde el admin (las rules lo aseguran).
+ * Para MARCAR_PAGADA: el receptorOverride permite al admin elegir
+ * a quién asignar el dinero recibido. Si no se pasa, usa el receptor
+ * que vino en la solicitud (que es el profesional que solicitó, lo cual
+ * normalmente no es el correcto — por eso siempre conviene pasar override).
  */
 export async function aprobarSolicitud({
   solicitudId,
   adminUid,
   adminNombre,
+  receptorOverride,  // { uid, nombre } opcional — solo para MARCAR_PAGADA
 }) {
-  // Releemos la solicitud por si cambio
   const solSnap = await getDoc(doc(db, 'solicitudes_sesion', solicitudId));
   if (!solSnap.exists()) throw new Error('La solicitud ya no existe.');
   const sol = { id: solSnap.id, ...solSnap.data() };
@@ -401,14 +326,13 @@ export async function aprobarSolicitud({
   const consultorioId = sol.consultorioId;
 
   if (sol.tipo === TIPOS_SOLICITUD_SESION.CREAR) {
-    // Crear la sesion con el payload propuesto + auditoria
     const sesionRef = await addDoc(collection(db, 'sesiones'), {
       ...sol.payloadPropuesto,
       estadoPago: ESTADOS_PAGO_SESION.DEBIDO,
       createdAt: serverTimestamp(),
-      createdByUid: sol.profesionalUid,  // creador real es el profesional
+      createdByUid: sol.profesionalUid,
       updatedAt: serverTimestamp(),
-      updatedByUid: adminUid,            // pero el aprobador es el admin
+      updatedByUid: adminUid,
     });
 
     await actualizarSolicitudResuelta({
@@ -437,17 +361,12 @@ export async function aprobarSolicitud({
   if (sol.tipo === TIPOS_SOLICITUD_SESION.CARGA_RAPIDA) {
     const sesionesPayload = sol.payloadPropuesto?.sesiones ?? [];
 
-    // Necesitamos los metodos del consultorio para calcular el split
-    // (porcentajeConsultorio, montoConsultorio, montoProfesional).
-    // Los leemos desde el doc del consultorio.
     const consSnap = await getDoc(doc(db, 'consultorios', consultorioId));
     const metodosPago = consSnap.exists()
       ? (consSnap.data().metodosPagoPaciente ?? [])
       : [];
     const mapaMetodos = Object.fromEntries(metodosPago.map((m) => [m.id, m]));
 
-    // Usamos buildSesionData (la funcion pura de sesiones.js) para cada
-    // sesion, así los campos economicos quedan correctos y pasan las rules.
     const { buildSesionData } = await import('./sesiones.js');
     const { writeBatch: wb, doc: docFn, collection: colFn } = await import('firebase/firestore');
     const batch = wb(db);
@@ -455,9 +374,8 @@ export async function aprobarSolicitud({
 
     for (const s of sesionesPayload) {
       const metodo = mapaMetodos[s.metodoPagoId];
-      if (!metodo) continue; // metodo eliminado, saltear
+      if (!metodo) continue;
 
-      // Convertir fecha serializada a Date
       let fecha;
       if (s.fecha?.seconds !== undefined) {
         fecha = new Date(s.fecha.seconds * 1000);
@@ -500,7 +418,10 @@ export async function aprobarSolicitud({
 
   if (sol.tipo === TIPOS_SOLICITUD_SESION.MARCAR_PAGADA) {
     const { marcarSesionPagada } = await import('./sesiones.js');
-    const receptor = sol.payloadPropuesto?.receptor ?? { uid: adminUid, nombre: adminNombre };
+    // Prioridad del receptor: override del admin > snapshot en la solicitud > admin actual
+    const receptor = receptorOverride
+      || sol.payloadPropuesto?.receptor
+      || { uid: adminUid, nombre: adminNombre };
     await marcarSesionPagada(sol.sesionId, adminUid, receptor);
     await actualizarSolicitudResuelta({ solicitudId, adminUid, adminNombre, estado: ESTADOS_SOLICITUD_SESION.APROBADA });
     return;
@@ -537,13 +458,11 @@ export async function aprobarSolicitud({
     return;
   }
 
-  // Para modificar y eliminar necesitamos la sesion actual
   if (!sol.sesionId) {
     throw new Error('La solicitud no tiene sesion asociada.');
   }
   const sesActualSnap = await getDoc(doc(db, 'sesiones', sol.sesionId));
 
-  // Caso obsoleto: la sesion ya no existe
   if (!sesActualSnap.exists()) {
     await actualizarSolicitudResuelta({
       solicitudId,
@@ -566,7 +485,6 @@ export async function aprobarSolicitud({
 
   const sesActual = { id: sesActualSnap.id, ...sesActualSnap.data() };
 
-  // Caso obsoleto: la sesion fue modificada despues de la solicitud
   if (haySesionDivergente(sol.payloadAnterior, sesActual)) {
     await actualizarSolicitudResuelta({
       solicitudId,
@@ -630,7 +548,7 @@ export async function aprobarSolicitud({
 
     await escribirLog({
       consultorioId,
-      sesionId: null,  // ya no existe
+      sesionId: null,
       solicitudId,
       tipo: TIPOS_LOG_SESION.SOLICITUD_APROBADA,
       actorUid: adminUid,
@@ -644,9 +562,6 @@ export async function aprobarSolicitud({
   }
 
   if (sol.tipo === TIPOS_SOLICITUD_SESION.LIQUIDAR_MONTO) {
-    // Verificacion extra: la sesion sigue en pendiente_monto.
-    // Si ya fue liquidada por otro lado (por ej. el admin lo hizo
-    // manualmente despues), marcamos obsoleta.
     if (sesActual.estadoPago !== ESTADOS_PAGO_SESION.PENDIENTE_MONTO) {
       await actualizarSolicitudResuelta({
         solicitudId,
@@ -667,10 +582,6 @@ export async function aprobarSolicitud({
       throw new Error('Esta sesión ya fue liquidada. La solicitud queda obsoleta.');
     }
 
-    // Aplicamos los valores del payloadPropuesto. Como la solicitud
-    // guarda el valorLiquidado original, podemos recalcular si quisieramos
-    // pero los valores ya estan calculados al momento de pedirla y
-    // el porcentaje del metodo no cambia (snapshot guardado en la sesion).
     await updateDoc(doc(db, 'sesiones', sol.sesionId), {
       valorTotal: sol.payloadPropuesto.valorTotal,
       valorSesion: sol.payloadPropuesto.valorSesion,
@@ -714,8 +625,8 @@ export async function solicitarMarcarPagada({
   profesionalUid,
   profesionalNombre,
   sesionId,
-  sesionSnapshot,   // { pacienteNombre, fecha, metodoPagoNombre, valorTotal }
-  receptor,         // { uid, nombre } — quién recibió el dinero
+  sesionSnapshot,
+  receptor,
 }) {
   const ref = await addDoc(collection(db, 'solicitudes_sesion'), {
     consultorioId,
@@ -731,15 +642,12 @@ export async function solicitarMarcarPagada({
   return ref.id;
 }
 
-/* ============================================================
-   Solicitar liquidar monto de obra social
-   ============================================================ */
 export async function solicitarLiquidarOSSesion({
   consultorioId,
   profesionalUid,
   profesionalNombre,
   sesionId,
-  sesionSnapshot,   // { pacienteNombre, fecha, metodoPagoNombre }
+  sesionSnapshot,
   monto,
 }) {
   if (!monto || Number(monto) <= 0) throw new Error('El monto debe ser mayor a 0');
@@ -757,9 +665,6 @@ export async function solicitarLiquidarOSSesion({
   return ref.id;
 }
 
-/* ============================================================
-   Solicitar creación de paciente (profesional con permiso)
-   ============================================================ */
 export async function solicitarCrearPaciente({
   consultorioId,
   profesionalUid,
@@ -783,12 +688,6 @@ export async function solicitarCrearPaciente({
   return ref.id;
 }
 
-/* ============================================================
-   Solicitar carga rapida (profesional sin edicion directa)
-   ----------------------------------------------------------------
-   Guarda 1 solicitud con el array completo de sesiones a crear.
-   El admin la revisa, aprueba o rechaza como bloque.
-   ============================================================ */
 export async function solicitarCargaRapida({
   consultorioId,
   profesionalUid,
@@ -813,15 +712,6 @@ export async function solicitarCargaRapida({
   return ref.id;
 }
 
-/**
- * Detecta si la sesion actual es divergente del snapshot que tenia la
- * solicitud al momento de pedirse. Comparamos los campos significativos
- * (los economicos y los de identidad). Cambios cosmeticos como notas
- * o updatedAt no cuentan.
- *
- * Incluye cantidadSesiones y valorSesion porque cambios en estos
- * tambien hacen que la solicitud quede obsoleta.
- */
 function haySesionDivergente(snapshot, actual) {
   if (!snapshot || !actual) return true;
   const camposClave = [
@@ -837,20 +727,15 @@ function haySesionDivergente(snapshot, actual) {
   for (const k of camposClave) {
     if (snapshot[k] !== actual[k]) return true;
   }
-  // cantidadSesiones y valorSesion: comparar con backwards compat (1 / 0)
   const cant1 = Number(snapshot.cantidadSesiones) || 1;
   const cant2 = Number(actual.cantidadSesiones) || 1;
   if (cant1 !== cant2) return true;
-  // Fecha viene como Timestamp; comparamos en ms
   const f1 = snapshot.fecha?.toMillis ? snapshot.fecha.toMillis() : snapshot.fecha?.seconds;
   const f2 = actual.fecha?.toMillis ? actual.fecha.toMillis() : actual.fecha?.seconds;
   if (f1 !== f2) return true;
   return false;
 }
 
-/**
- * Rechazar una solicitud sin aplicar cambios. Motivo es opcional.
- */
 export async function rechazarSolicitud({
   solicitudId,
   adminUid,
@@ -889,14 +774,6 @@ export async function rechazarSolicitud({
   });
 }
 
-/* ============================================================
-   Marcar solicitudes pendientes como obsoletas
-   ----------------------------------------------------------------
-   Esta funcion la llama el frontend desde la accion DIRECTA del admin
-   sobre una sesion (modificar/eliminar). Antes de hacer el cambio
-   directo, busca solicitudes pendientes para esa misma sesion y las
-   marca como obsoletas, con su log correspondiente.
-   ============================================================ */
 export async function marcarPendientesComoObsoletas({
   consultorioId,
   sesionId,
@@ -937,9 +814,6 @@ export async function marcarPendientesComoObsoletas({
   }
 }
 
-/* ============================================================
-   Helper interno: actualizar campos comunes al resolver
-   ============================================================ */
 async function actualizarSolicitudResuelta({
   solicitudId,
   adminUid,
@@ -959,14 +833,6 @@ async function actualizarSolicitudResuelta({
   await updateDoc(doc(db, 'solicitudes_sesion', solicitudId), update);
 }
 
-/* ============================================================
-   Suscripciones live
-   ============================================================ */
-
-/**
- * Solicitudes pendientes del consultorio (vista admin).
- * Para el badge en el sidebar y la bandeja de /admin/solicitudes.
- */
 export function suscribirSolicitudesPendientes(consultorioId, callback) {
   if (!consultorioId) {
     callback([]);
@@ -986,10 +852,6 @@ export function suscribirSolicitudesPendientes(consultorioId, callback) {
   });
 }
 
-/**
- * TODAS las solicitudes del consultorio (incluye resueltas).
- * Para la pagina /admin/solicitudes con tabs "Pendientes / Resueltas".
- */
 export function suscribirTodasSolicitudes(consultorioId, callback) {
   if (!consultorioId) {
     callback([]);
@@ -1008,10 +870,6 @@ export function suscribirTodasSolicitudes(consultorioId, callback) {
   });
 }
 
-/**
- * Solicitudes hechas por un profesional (vista profesional).
- * Para que vea su propio historial: pendientes, aprobadas, rechazadas.
- */
 export function suscribirSolicitudesDelProfesional(consultorioId, profesionalUid, callback) {
   if (!consultorioId || !profesionalUid) {
     callback([]);
@@ -1031,18 +889,6 @@ export function suscribirSolicitudesDelProfesional(consultorioId, profesionalUid
   });
 }
 
-/* ============================================================
-   Helper: armar payload propuesto desde un input "humano"
-   ----------------------------------------------------------------
-   Las solicitudes guardan el mismo formato que las sesiones (con
-   split calculado y todo) para que aprobar sea solo un updateDoc o
-   addDoc directo, sin recalcular nada en el momento de aprobar.
-
-   Acepta:
-   - valorSesion + cantidadSesiones (recomendado): valor unitario *
-     cantidad = total
-   - valorTotal directo (legacy): se usa tal cual, cantidadSesiones=1
-   ============================================================ */
 export function armarPayloadParaSolicitud({
   consultorioId,
   profesionalUid,
