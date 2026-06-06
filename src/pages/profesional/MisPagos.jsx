@@ -224,18 +224,10 @@ export default function MisPagos() {
 
   /* ---- Renders ---- */
 
-  if (loadingConsultorio) {
-    return (
-      <div className="cp-mis-pagos">
-        <div style={{ padding: 60, display: 'flex', justifyContent: 'center' }}>
-          <Spinner size={24} />
-        </div>
-      </div>
-    );
-  }
-
   // Solicitudes de marcar_pagada pendientes en este mes — realtime
   // Cuando el admin rechaza, esto se actualiza solo sin refresh.
+  // IMPORTANTE: este useMemo debe estar ANTES de cualquier return condicional
+  // para no violar las reglas de hooks de React.
   const hayPendienteManual = useMemo(() => {
     const desde = inicioDeMes(mes).getTime();
     const hasta = finDeMes(mes).getTime();
@@ -250,6 +242,16 @@ export default function MisPagos() {
     );
   }, [solicitudes, mes]);
   const puedeMarcarPagadas = !!user?.permitirMarcarPagadas;
+
+  if (loadingConsultorio) {
+    return (
+      <div className="cp-mis-pagos">
+        <div style={{ padding: 60, display: 'flex', justifyContent: 'center' }}>
+          <Spinner size={24} />
+        </div>
+      </div>
+    );
+  }
 
   async function handlePagarManual(sesionIds) {
     if (!sesionIds?.length || !puedeMarcarPagadas) return;
