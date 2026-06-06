@@ -18,7 +18,7 @@ import {
 } from '../../lib/constants.js';
 import { suscribirLogsDeSolicitud } from '../../lib/logs.js';
 import { suscribirPacientesConsultorio } from '../../lib/pacientes.js';
-import { suscribirProfesionales } from '../../lib/profesionales.js';
+import { suscribirMiembrosConsultorio, suscribirProfesionales } from '../../lib/profesionales.js';
 import {
   aprobarSolicitud,
   rechazarSolicitud,
@@ -110,10 +110,6 @@ function formatoRelativo(date) {
   return d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
 }
 
-/**
- * Devuelve la cantidad de sesiones agrupadas que indica un payload
- * (con backwards compat: sin cantidadSesiones se interpreta como 1).
- */
 function cantidadDePayload(payload) {
   const c = Number(payload?.cantidadSesiones);
   return Number.isFinite(c) && c >= 1 ? Math.floor(c) : 1;
@@ -162,6 +158,7 @@ export default function Solicitudes() {
   const [solicitudes, setSolicitudes] = useState([]);
   const [pacientes, setPacientes] = useState([]);
   const [profesionales, setProfesionales] = useState([]);
+  const [miembros, setMiembros] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [tab, setTab] = useState('pendientes');
@@ -187,6 +184,11 @@ export default function Solicitudes() {
     return suscribirProfesionales(user.consultorioId, setProfesionales);
   }, [user?.consultorioId]);
 
+  useEffect(() => {
+    if (!user?.consultorioId) return;
+    return suscribirMiembrosConsultorio(user.consultorioId, setMiembros);
+  }, [user?.consultorioId]);
+
   const mapaPacientes = useMemo(() => {
     const m = {};
     for (const p of pacientes) m[p.id] = p;
@@ -198,6 +200,13 @@ export default function Solicitudes() {
     for (const p of profesionales) m[p.uid] = p;
     return m;
   }, [profesionales]);
+
+  // Lista de admins reales del consultorio (excluye coadmin del reparto).
+  // Si el array está vacío por algún motivo, fallback al user actual.
+  const admins = useMemo(
+    () => miembros.filter((m) => m.rol === 'admin' || m.esAdminDelConsultorio),
+    [miembros],
+  );
 
   const pendientes = useMemo(
     () => solicitudes.filter((s) => s.estado === ESTADOS_SOLICITUD_SESION.PENDIENTE),
@@ -271,6 +280,7 @@ export default function Solicitudes() {
           mapaPacientes={mapaPacientes}
           mapaProfesionales={mapaProfesionales}
           mapaMetodos={mapaMetodos}
+          admins={admins}
           adminUid={user.uid}
           adminNombre={user.displayName || user.email}
           consultorioId={user.consultorioId}
@@ -317,9 +327,6 @@ function EmptyState({ tab }) {
 
 /* ============================================================
    Tabla
-   ----------------------------------------------------------------
-   Muestra el badge ×N al lado del paciente cuando la solicitud
-   representa un grupo de sesiones (ej: 8 sesiones del mes).
    ============================================================ */
 function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSeleccionar }) {
   return (
@@ -340,10 +347,11 @@ function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSel
             const prof = mapaProfesionales[s.profesionalUid];
             const pacienteId = s.payloadPropuesto?.pacienteId || s.payloadAnterior?.pacienteId;
             const pac = pacienteId ? mapaPacientes[pacienteId] : null;
-            // Para crear_paciente el nombre viene en el payload, no en mapaPacientes
             const nombrePacDesdePayload = s.tipo === TIPOS_SOLICITUD_SESION.CREAR_PACIENTE
               ? `${s.payloadPropuesto?.datosPaciente?.apellido || ''} ${s.payloadPropuesto?.datosPaciente?.nombre || ''}`.trim()
-              : null;
+              : s.tipo === TIPOS_SOLICITUD_SESION.MARCAR_PAGADA || s.tipo === TIPOS_SOLICITUD_SESION.LIQUIDAR_OS
+                ? s.payloadPropuesto?.sesionSnapshot?.pacienteNombre || ''
+                : null;
             const resuelta = s.estado !== ESTADOS_SOLICITUD_SESION.PENDIENTE;
             const cantidad = cantidadDePayload(s.payloadPropuesto || s.payloadAnterior);
 
@@ -391,7 +399,6 @@ function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSel
                   </button>
                 </td>
 
-                {/* Mobile: fila compacta */}
                 <td className="cp-td-mobile-main" onClick={() => onSeleccionar(s)}>
                   <div className="cp-row-mobile__top">
                     {pac ? (
@@ -440,38 +447,58 @@ function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSel
 }
 
 /* ============================================================
-   Modal de detalle con diff antes/despues + historial
-   ----------------------------------------------------------------
-   Muestra prominentemente el badge ×N en el titulo cuando aplica
-   para que el admin vea claramente que esta aprobando un grupo.
+   Modal de detalle
    ============================================================ */
-function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, mapaMetodos, adminUid, adminNombre, consultorioId, onClose }) {
+function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, mapaMetodos, admins, adminUid, adminNombre, consultorioId, onClose }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [mostrandoMotivo, setMostrandoMotivo] = useState(false);
   const [motivo, setMotivo] = useState('');
 
+  // Para MARCAR_PAGADA: receptor del dinero (admin elegido).
+  // Se inicializa con el primer admin disponible o el admin actual.
+  const [receptorUid, setReceptorUid] = useState(() => {
+    if (admins && admins.length > 0) return admins[0].uid;
+    return adminUid;
+  });
+
+  // Reajusta el receptor cuando llega la lista de admins (carga async).
+  useEffect(() => {
+    if (admins && admins.length > 0 && !admins.find((a) => a.uid === receptorUid)) {
+      setReceptorUid(admins[0].uid);
+    }
+  }, [admins]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const esPendiente = solicitud.estado === ESTADOS_SOLICITUD_SESION.PENDIENTE;
+  const esMarcarPagada = solicitud.tipo === TIPOS_SOLICITUD_SESION.MARCAR_PAGADA;
   const prof = mapaProfesionales[solicitud.profesionalUid];
 
   const pacienteId = solicitud.payloadPropuesto?.pacienteId || solicitud.payloadAnterior?.pacienteId;
   const pac = pacienteId ? mapaPacientes[pacienteId] : null;
   const nombrePac = solicitud.tipo === TIPOS_SOLICITUD_SESION.CREAR_PACIENTE
     ? `${solicitud.payloadPropuesto?.datosPaciente?.apellido || ''} ${solicitud.payloadPropuesto?.datosPaciente?.nombre || ''}`.trim() || 'Nuevo paciente'
-    : (nombrePaciente(pac) || 'paciente');
+    : (nombrePaciente(pac) || solicitud.payloadPropuesto?.sesionSnapshot?.pacienteNombre || 'paciente');
 
-  // Cantidad para el titulo
   const cantidad = cantidadDePayload(solicitud.payloadPropuesto || solicitud.payloadAnterior);
 
   async function handleAprobar() {
     setError('');
     setSubmitting(true);
     try {
-      await aprobarSolicitud({
+      // Para MARCAR_PAGADA, pasamos el receptor elegido como override.
+      const payload = {
         solicitudId: solicitud.id,
         adminUid,
         adminNombre,
-      });
+      };
+      if (esMarcarPagada) {
+        const adminElegido = admins.find((a) => a.uid === receptorUid);
+        payload.receptorOverride = {
+          uid: receptorUid,
+          nombre: adminElegido?.displayName || adminElegido?.email || receptorUid,
+        };
+      }
+      await aprobarSolicitud(payload);
       onClose();
     } catch (err) {
       setError(err.message || 'No se pudo aprobar la solicitud.');
@@ -517,7 +544,6 @@ function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, mapaMetodos
             : <>{LABELS_TIPO_SOLICITUD[solicitud.tipo]} · {nombrePac}<GroupBadge cantidad={cantidad} /></>}
         </h2>
 
-        {/* Aviso prominente cuando es agrupacion */}
         {cantidad > 1 && esPendiente && (
           <div className="cp-detalle-aviso" style={{ background: 'var(--cp-accent-bg)', color: 'var(--cp-accent-dark)', marginBottom: 14 }}>
             <InfoIcon />
@@ -539,10 +565,49 @@ function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, mapaMetodos
           <div style={{ marginTop: 6 }}>{badgeEstado(solicitud.estado)}</div>
         </div>
 
-        {/* Diff segun el tipo */}
         <Diff solicitud={solicitud} pac={pac} mapaMetodos={mapaMetodos} />
 
-        {/* Avisos para estados no pendientes */}
+        {/* Selector de receptor — solo para MARCAR_PAGADA pendiente */}
+        {esMarcarPagada && esPendiente && (
+          <div className="cp-receptor-selector">
+            <label className="cp-receptor-selector__label">
+              ¿Quién recibió el dinero?
+            </label>
+            <p className="cp-receptor-selector__hint">
+              Elegí cuál de los administradores cobró este pago. Al aprobar la solicitud,
+              el dinero se asigna a esa persona.
+            </p>
+            {admins && admins.length > 0 ? (
+              <div className="cp-receptor-selector__opciones">
+                {admins.map((admin) => {
+                  const sel = receptorUid === admin.uid;
+                  return (
+                    <button
+                      key={admin.uid}
+                      type="button"
+                      className={`cp-receptor-opcion ${sel ? 'cp-receptor-opcion--sel' : ''}`}
+                      onClick={() => setReceptorUid(admin.uid)}
+                    >
+                      <Avatar
+                        initials={(admin.displayName || admin.email || '?')[0].toUpperCase()}
+                        size={28}
+                      />
+                      <div className="cp-receptor-opcion__nombre">
+                        {admin.displayName || admin.email}
+                      </div>
+                      {sel && <span className="cp-receptor-opcion__check">✓</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ color: 'var(--cp-text-faint)', fontSize: 13 }}>
+                No hay administradores cargados. El pago se asignará a vos.
+              </div>
+            )}
+          </div>
+        )}
+
         {solicitud.estado === ESTADOS_SOLICITUD_SESION.OBSOLETA && (
           <div className="cp-detalle-aviso">
             <InfoIcon />
@@ -577,7 +642,6 @@ function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, mapaMetodos
           </div>
         )}
 
-        {/* Form de motivo de rechazo */}
         {esPendiente && mostrandoMotivo && (
           <div className="cp-rechazo-form">
             <label className="cp-rechazo-form__label">
@@ -596,10 +660,8 @@ function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, mapaMetodos
 
         {error && <div className="cp-modal__error" style={{ marginTop: 12 }}>{error}</div>}
 
-        {/* Historial de auditoria (Fase C.2) */}
         <HistorialPanel consultorioId={consultorioId} solicitudId={solicitud.id} />
 
-        {/* Acciones */}
         <div className="cp-modal__actions">
           {esPendiente ? (
             <>
@@ -638,7 +700,7 @@ function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, mapaMetodos
 }
 
 /* ============================================================
-   HistorialPanel — muestra los logs de auditoria de la solicitud
+   HistorialPanel
    ============================================================ */
 function HistorialPanel({ consultorioId, solicitudId }) {
   const [logs, setLogs] = useState([]);
@@ -704,9 +766,6 @@ function tipoColor(tipo) {
 
 /* ============================================================
    Diff
-   ----------------------------------------------------------------
-   Agregamos cantidadSesiones y valorSesion a CAMPOS_DIFF para que
-   el admin vea esos datos al revisar.
    ============================================================ */
 function Diff({ solicitud, pac, mapaMetodos }) {
   const { tipo, payloadPropuesto, payloadAnterior } = solicitud;
@@ -740,7 +799,6 @@ function Diff({ solicitud, pac, mapaMetodos }) {
 
 function DiffMarcarPagada({ payload }) {
   const snap = payload?.sesionSnapshot ?? {};
-  const receptor = payload?.receptor;
   const total = snap.valorTotal ?? 0;
   const pct = snap.porcentajeConsultorio ?? null;
   const montoConsultorio = snap.montoConsultorio ?? (pct != null ? Math.round(total * pct / 100) : null);
@@ -752,7 +810,6 @@ function DiffMarcarPagada({ payload }) {
     { label: 'Total sesión', valor: total != null ? formatoARS.format(total) : '—' },
     ...(montoConsultorio != null ? [{ label: `Al consultorio${pct != null ? ` (${pct}%)` : ''}`, valor: formatoARS.format(montoConsultorio) }] : []),
     ...(montoProfesional != null ? [{ label: 'Al profesional', valor: formatoARS.format(montoProfesional) }] : []),
-    { label: 'Receptor', valor: receptor?.nombre || '—' },
   ];
   return (
     <div className="cp-diff">
@@ -817,13 +874,10 @@ function DiffCargaRapida({ sesiones }) {
     return <p style={{ color: 'var(--cp-text-faint)', fontSize: 13.5 }}>Sin sesiones en esta solicitud.</p>;
   }
 
-  // Convierte cualquier formato de fecha a Date nativo sin explotar.
-  // Firestore serializa Timestamps como plain objects {seconds, nanoseconds}
-  // cuando están guardados dentro de un campo mapa/array.
   function parseFecha(v) {
     if (!v) return null;
-    if (typeof v.toDate === 'function') return v.toDate();          // Timestamp Firestore
-    if (v.seconds !== undefined) return new Date(v.seconds * 1000); // Timestamp serializado
+    if (typeof v.toDate === 'function') return v.toDate();
+    if (v.seconds !== undefined) return new Date(v.seconds * 1000);
     const d = new Date(v);
     return isNaN(d.getTime()) ? null : d;
   }
@@ -891,7 +945,6 @@ function valorFormateado(payload, key) {
   if (!payload) return null;
   const v = payload[key];
   if (v == null || v === '') {
-    // Para cantidadSesiones: si no esta definido, mostramos "1" (default)
     if (key === 'cantidadSesiones') return '1';
     return null;
   }
@@ -931,7 +984,6 @@ function compararValor(a, b, key) {
     return ma === mb;
   }
   if (key === 'cantidadSesiones') {
-    // Backwards compat: undefined o null se trata como 1
     const na = Number(a) || 1;
     const nb = Number(b) || 1;
     return na === nb;
