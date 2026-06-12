@@ -5,7 +5,7 @@
  *  - Cargando → spinner
  *  - Sin sesión → a la landing pública (/inicio)
  *  - Superadmin → /super
- *  - Admin → /admin
+ *  - Admin o Coadmin → /admin
  *  - Profesional activo → /mi-panel
  *  - Profesional pendiente/suspendido → /pendiente
  */
@@ -34,7 +34,7 @@ export default function RootRedirect() {
 
   if (!user) return <Navigate to="/inicio" replace />;
   if (user.rol === ROLES.SUPERADMIN) return <Navigate to="/super" replace />;
-  if (user.rol === ROLES.ADMIN) return <Navigate to="/admin" replace />;
+  if (user.rol === ROLES.ADMIN || user.rol === ROLES.COADMIN) return <Navigate to="/admin" replace />;
   if (user.estado !== ESTADOS_USUARIO.ACTIVO) return <Navigate to="/pendiente" replace />;
   return <Navigate to="/mi-panel" replace />;
 }
