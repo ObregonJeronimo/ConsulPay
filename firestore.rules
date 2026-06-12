@@ -31,12 +31,6 @@ service cloud.firestore {
       return tengoDoc() && miUsuario().rol == 'coadmin';
     }
 
-    // Helper: es admin O coadmin del consultorio
-    function esAdminOCoadminDe(consultorioIdDelRecurso) {
-      return (esAdminDe(consultorioIdDelRecurso) || esCoadmin())
-        && miUsuario().consultorioId == consultorioIdDelRecurso;
-    }
-
     function esProfesional() {
       return tengoDoc() && miUsuario().rol == 'profesional';
     }
@@ -45,6 +39,25 @@ service cloud.firestore {
       return esAdmin()
         && miUsuario().consultorioId == consultorioIdDelRecurso
         && request.auth.uid in get(/databases/$(database)/documents/consultorios/$(consultorioIdDelRecurso)).data.adminUids;
+    }
+
+    function esCoadminDe(consultorioIdDelRecurso) {
+      return esCoadmin() && miUsuario().consultorioId == consultorioIdDelRecurso;
+    }
+
+    // Staff del consultorio: admin o coadmin del mismo consultorio.
+    // Se usa para todas las operaciones operativas (sesiones, pacientes,
+    // logs, recordatorios, etc). El coadmin tiene los mismos permisos
+    // de operacion que el admin; solo se diferencia en que no participa
+    // del reparto de dinero (eso se maneja por feature, no por rules).
+    //
+    // IMPORTANTE: para tocar el array adminUids del consultorio o
+    // promover/demover roles en /usuarios, se sigue exigiendo esAdminDe()
+    // estricto. Esos son los unicos casos donde el coadmin NO equivale
+    // al admin.
+    function esStaffDe(consultorioIdDelRecurso) {
+      return esAdminDe(consultorioIdDelRecurso)
+        || esCoadminDe(consultorioIdDelRecurso);
     }
 
     function esProfesionalDe(consultorioIdDelRecurso) {
@@ -60,19 +73,7 @@ service cloud.firestore {
         || request.resource.data.consultorioId != resource.data.consultorioId;
     }
 
-    /**
-     * Compara un campo del recurso request vs resource. Si el campo NO existe
-     * en el resource, considera que el request tampoco debe definirlo (o que
-     * sea null). Este helper sirve para campos opcionales nuevos como
-     * comisionFree, comisionPro, puedeVerPlanPro — que pueden no estar en
-     * docs viejos.
-     *
-     * Uso: campoNoCambia('comisionFree')  ->  el admin no puede modificarlo
-     */
     function campoNoCambia(name) {
-      // Si NINGUNO de los dos lo tiene, OK.
-      // Si AMBOS lo tienen, deben ser iguales.
-      // Si solo uno lo tiene, NO permitir el cambio (cambio implicito).
       return (
         (!(name in request.resource.data) && !(name in resource.data))
         || (name in request.resource.data && name in resource.data
@@ -85,34 +86,44 @@ service cloud.firestore {
     // ============================================================
     match /usuarios/{uid} {
 
+      // Read: superadmin, dueno, o staff del mismo consultorio.
+      // El coadmin necesita leer la lista de profesionales y los datos
+      // de cualquier miembro del consultorio para que la UI funcione.
       allow read: if esSuperadmin()
         || esDueno(uid)
-        || (esAdmin() && resource.data.consultorioId == miUsuario().consultorioId);
+        || ((esAdmin() || esCoadmin()) && resource.data.consultorioId == miUsuario().consultorioId);
 
       allow create: if esDueno(uid)
         && request.resource.data.rol == 'profesional'
         && request.resource.data.estado == 'pendiente'
         && request.resource.data.consultorioId == null;
 
+      // Update: superadmin, admin del consultorio (cualquier campo),
+      // coadmin del consultorio (sin tocar rol/consultorioId), o el
+      // propio dueno con sus propias restricciones.
+      // La promocion entre roles SOLO la puede hacer el admin estricto
+      // (no el coadmin) para evitar que un coadmin se autopromueva.
       allow update: if esSuperadmin()
         || (esAdmin()
             && resource.data.consultorioId == miUsuario().consultorioId
             && request.resource.data.rol == resource.data.rol
             && request.resource.data.consultorioId == resource.data.consultorioId)
-        // Promocion / democion entre 'profesional' y 'admin' por parte de
-        // otro admin del MISMO consultorio. Solo se puede:
-        //   - cambiar rol entre 'profesional' y 'admin' (no a otros)
-        //   - mantener el consultorioId
-        //   - mantener el estado (no se puede activar/retirar a la vez)
-        // El otro lado de la promocion (agregar al adminUids del consultorio)
-        // se valida en la rule de /consultorios. Si una falla, la transaction
-        // entera falla (atomicidad).
+        // Coadmin: puede editar campos operativos de miembros del consultorio
+        // (permisos, displayName, etc.) PERO no puede tocar rol ni
+        // consultorioId — esos quedan reservados al admin.
+        || (esCoadmin()
+            && resource.data.consultorioId == miUsuario().consultorioId
+            && request.resource.data.rol == resource.data.rol
+            && request.resource.data.consultorioId == resource.data.consultorioId
+            && request.auth.uid != uid)
+        // Promocion / democion entre 'profesional' y 'admin' / 'coadmin'
+        // por parte de otro ADMIN del mismo consultorio.
         || (esAdmin()
             && resource.data.consultorioId == miUsuario().consultorioId
             && request.resource.data.consultorioId == resource.data.consultorioId
             && request.resource.data.estado == resource.data.estado
-            && resource.data.rol in ['profesional', 'admin']
-            && request.resource.data.rol in ['profesional', 'admin']
+            && resource.data.rol in ['profesional', 'admin', 'coadmin']
+            && request.resource.data.rol in ['profesional', 'admin', 'coadmin']
             && request.auth.uid != uid)
         || (esDueno(uid)
             && !intentaEscalarPrivilegios()
@@ -142,8 +153,12 @@ service cloud.firestore {
     // ============================================================
     match /consultorios/{consultorioId} {
 
+      // Read: superadmin, staff del consultorio (admin o coadmin), o
+      // profesional del consultorio. El coadmin necesita leer el doc
+      // del consultorio para que funcione la pagina de Configuracion,
+      // los metodos de pago, etc.
       allow read: if esSuperadmin()
-        || (esAdmin() && miUsuario().consultorioId == consultorioId)
+        || ((esAdmin() || esCoadmin()) && miUsuario().consultorioId == consultorioId)
         || (esProfesional() && miUsuario().consultorioId == consultorioId);
 
       allow create: if estaAutenticado()
@@ -153,43 +168,26 @@ service cloud.firestore {
         && request.resource.data.estado == 'activo';
 
       /*
-        Update del consultorio. Casos validos:
+        Update del consultorio.
 
-        1. SUPERADMIN — puede tocar cualquier cosa.
+        - SUPERADMIN puede tocar cualquier cosa.
+        - ADMIN del consultorio: edita campos basicos y puede modificar
+          adminUids / ownerUid (transferencia de ownership).
+        - COADMIN del consultorio: edita campos basicos PERO no puede
+          tocar adminUids, ownerUid ni los campos blindados (plan,
+          comisiones, MP config, etc).
 
-        2. ADMIN del consultorio — puede:
-           a. Editar campos basicos (nombre, direccion, metodos de pago,
-              CBU, etc.) sin tocar campos sensibles ni admins.
-           b. Modificar el array adminUids (agregar nuevos admins o
-              remover existentes), siempre que:
-              - El ownerUid se mantenga sin cambios (transferencia
-                de ownership es un caso separado).
-              - El nuevo adminUids siga conteniendo al ownerUid.
-              - El nuevo adminUids no quede vacio.
-
-        3. OWNER del consultorio (ownerUid actual) — ademas de lo anterior,
-           puede transferir ownership cambiando ownerUid, siempre que el
-           nuevo owner este en el adminUids resultante.
-
-        Campos siempre blindados (solo superadmin / backend los toca):
+        Campos siempre blindados (admin tampoco los puede tocar; solo
+        superadmin / backend):
            - plan, planVenceEn
-           - comisionConsulpay (legacy, mantener para backwards compat)
-           - comisionFree, comisionPro (nuevos, controlados por superadmin)
-           - puedeVerPlanPro (controla si pueden contratar Plan Pro)
+           - comisionConsulpay, comisionFree, comisionPro, comisionUltra
+           - puedeVerPlanPro, puedeVerPlanUltra
            - mpIntegrado, mpConfig, ualaIntegrado, ualaConfig
-           - mpConfigs (NUEVO: slots primary/secondary, escrito por backend)
-           - repartoActivado, repartoIniciaEn, repartoActivadoEn
-             (NUEVO: estado del reparto multi-admin, controlado por backend)
-           - estado
-           - subscription (escrito por backend cuando se contrata/cancela Pro)
+           - mpConfigs, repartoActivado, repartoIniciaEn, repartoActivadoEn
+           - estado, subscription
       */
       allow update: if esSuperadmin()
         || (esAdminDe(consultorioId)
-            // Campos siempre blindados — usamos campoNoCambia para todos
-            // para que funcione tambien con docs viejos que no tengan algunos
-            // de estos campos definidos. campoNoCambia maneja los 3 casos:
-            // ambos sin definir, ambos definidos e iguales, o uno solo
-            // definido (rechaza).
             && campoNoCambia('plan')
             && campoNoCambia('planVenceEn')
             && campoNoCambia('comisionConsulpay')
@@ -199,8 +197,6 @@ service cloud.firestore {
             && campoNoCambia('puedeVerPlanPro')
             && campoNoCambia('puedeVerPlanUltra')
             && campoNoCambia('subscription')
-            // Campos del nuevo modelo de reparto multi-admin
-            // (escritos solo por backend via Admin SDK, que bypassea rules)
             && campoNoCambia('mpConfigs')
             && campoNoCambia('repartoActivado')
             && campoNoCambia('repartoIniciaEn')
@@ -210,14 +206,6 @@ service cloud.firestore {
             && campoNoCambia('ualaIntegrado')
             && campoNoCambia('ualaConfig')
             && campoNoCambia('estado')
-            // Reglas sobre owner y admins:
-            //   - ownerUid siempre debe estar en adminUids
-            //   - adminUids no puede quedar vacio (>= 1)
-            //   - adminUids no puede tener mas de 2 admins (limite duro
-            //     del flow de "reparto entre administradores" — ver
-            //     src/lib/admins.js constante MAX_ADMINS_POR_CONSULTORIO)
-            //   - El owner actual puede ser cambiado solo si el caller
-            //     es el owner viejo (transferencia de ownership)
             && (
               (request.resource.data.ownerUid == resource.data.ownerUid
                 && request.resource.data.ownerUid in request.resource.data.adminUids
@@ -228,26 +216,38 @@ service cloud.firestore {
                 && request.resource.data.ownerUid in request.resource.data.adminUids
                 && request.resource.data.adminUids.size() >= 1
                 && request.resource.data.adminUids.size() <= 2)
-            ));
+            ))
+        // Coadmin: mismas restricciones que admin EXCEPTO que tampoco
+        // puede tocar adminUids ni ownerUid (esos son responsabilidad
+        // del admin / owner).
+        || (esCoadminDe(consultorioId)
+            && campoNoCambia('plan')
+            && campoNoCambia('planVenceEn')
+            && campoNoCambia('comisionConsulpay')
+            && campoNoCambia('comisionFree')
+            && campoNoCambia('comisionPro')
+            && campoNoCambia('comisionUltra')
+            && campoNoCambia('puedeVerPlanPro')
+            && campoNoCambia('puedeVerPlanUltra')
+            && campoNoCambia('subscription')
+            && campoNoCambia('mpConfigs')
+            && campoNoCambia('repartoActivado')
+            && campoNoCambia('repartoIniciaEn')
+            && campoNoCambia('repartoActivadoEn')
+            && campoNoCambia('mpIntegrado')
+            && campoNoCambia('mpConfig')
+            && campoNoCambia('ualaIntegrado')
+            && campoNoCambia('ualaConfig')
+            && campoNoCambia('estado')
+            && campoNoCambia('adminUids')
+            && campoNoCambia('ownerUid'));
 
       allow delete: if esSuperadmin();
 
-      // ============================================================
-      //  /consultorios/{consultorioId}/compensaciones/{idCiclo}
-      //  ----------------------------------------------------------------
-      //  Documentos de compensacion del flow "reparto entre socias"
-      //  (multi-admin). Cada doc representa el calculo de un ciclo
-      //  (15 al 14 del mes siguiente) con la diferencia entre lo que
-      //  cobro cada admin.
-      //
-      //  - Lectura: admins del consultorio + superadmin
-      //  - Escritura (create/update/delete): SOLO backend (Admin SDK
-      //    bypassea rules). Las acciones de marcar transferida /
-      //    confirmar recibida pasan por /api/mp/compensaciones.
-      // ============================================================
+      // Compensaciones: solo backend escribe; staff lee.
       match /compensaciones/{idCiclo} {
-        allow read: if esSuperadmin() || esAdminDe(consultorioId);
-        allow write: if false;  // solo backend
+        allow read: if esSuperadmin() || esStaffDe(consultorioId);
+        allow write: if false;
       }
     }
 
@@ -261,12 +261,12 @@ service cloud.firestore {
       allow create: if false;
 
       allow update: if esSuperadmin()
-        || esAdminDe(resource.data.consultorioId)
+        || esStaffDe(resource.data.consultorioId)
         || (estaAutenticado()
             && request.auth.token.email == resource.data.email
             && request.resource.data.estado == 'aceptada');
 
-      allow delete: if esSuperadmin() || esAdminDe(resource.data.consultorioId);
+      allow delete: if esSuperadmin() || esStaffDe(resource.data.consultorioId);
     }
 
     // ============================================================
@@ -274,20 +274,17 @@ service cloud.firestore {
     // ============================================================
     match /pacientes/{pacienteId} {
       allow read: if esSuperadmin()
-        || esAdminDe(resource.data.consultorioId)
-        || (esCoadmin() && miUsuario().consultorioId == resource.data.consultorioId)
+        || esStaffDe(resource.data.consultorioId)
         || (esProfesionalDe(resource.data.consultorioId)
             && request.auth.uid in resource.data.profesionalesUids);
 
       allow create: if esSuperadmin()
-        || esAdminDe(request.resource.data.consultorioId)
-        || (esCoadmin() && miUsuario().consultorioId == request.resource.data.consultorioId);
+        || esStaffDe(request.resource.data.consultorioId);
 
-      allow update: if (esSuperadmin() || esAdminDe(resource.data.consultorioId)
-        || (esCoadmin() && miUsuario().consultorioId == resource.data.consultorioId))
+      allow update: if (esSuperadmin() || esStaffDe(resource.data.consultorioId))
         && request.resource.data.consultorioId == resource.data.consultorioId;
 
-      allow delete: if esSuperadmin() || esAdminDe(resource.data.consultorioId);
+      allow delete: if esSuperadmin() || esStaffDe(resource.data.consultorioId);
     }
 
     // ============================================================
@@ -314,10 +311,6 @@ service cloud.firestore {
           && data.montoProfesional is number;
     }
 
-    // Una sesion en pendiente_monto (obra social sin valor liquidado)
-    // tiene valorTotal=0, montoConsultorio=0, montoProfesional=0. Es
-    // coherente trivialmente (0*N/100=0). No exigimos sesionSplitEsCoherente
-    // ni el chequeo del split tradicional para este estado.
     function sesionPendienteMontoValida(data) {
       return data.estadoPago == 'pendiente_monto'
           && data.valorTotal == 0
@@ -332,15 +325,12 @@ service cloud.firestore {
 
     match /sesiones/{sesionId} {
       allow read: if esSuperadmin()
-        || esAdminDe(resource.data.consultorioId)
-        || (esCoadmin() && miUsuario().consultorioId == resource.data.consultorioId)
+        || esStaffDe(resource.data.consultorioId)
         || (esProfesionalDe(resource.data.consultorioId)
             && resource.data.profesionalUid == request.auth.uid);
 
-      // Crear: estadoPago debe ser 'debido' (caso normal) o 'pendiente_monto'
-      // (cuando se crea con metodo diferido sin valor cargado).
       allow create: if (esSuperadmin()
-        || esAdminDe(request.resource.data.consultorioId)
+        || esStaffDe(request.resource.data.consultorioId)
         || (profesionalTieneConfianza()
             && esProfesionalDe(request.resource.data.consultorioId)
             && request.resource.data.profesionalUid == request.auth.uid))
@@ -352,21 +342,13 @@ service cloud.firestore {
           sesionPendienteMontoValida(request.resource.data)
         );
 
-      // Update: tres casos validos
-      //   1. Cambio normal con split coherente y estadoPago == 'debido' o 'pagado'
-      //   2. Sesion sigue en 'pendiente_monto' (no se cambio nada economico)
-      //   3. Transicion 'pendiente_monto' -> 'debido' con nuevo valor liquidado
-      //      (sesionSplitEsCoherente ya valida que el split sea coherente)
-      // El profesional sin confianza no puede hacer transicion 'pendiente_monto' -> 'debido'
-      // directamente porque su rule lo restringe a estadoPago igual al previo.
       allow update: if (esSuperadmin()
-        || esAdminDe(resource.data.consultorioId)
+        || esStaffDe(resource.data.consultorioId)
         || (profesionalTieneConfianza()
             && esProfesionalDe(resource.data.consultorioId)
             && resource.data.profesionalUid == request.auth.uid
             && request.resource.data.profesionalUid == resource.data.profesionalUid
             && request.resource.data.consultorioId == resource.data.consultorioId
-            // El profesional no puede cambiar quién recibió el dinero
             && campoNoCambia('receptorUid')
             && campoNoCambia('receptorNombre')
             && (request.resource.data.estadoPago == resource.data.estadoPago
@@ -384,7 +366,7 @@ service cloud.firestore {
         );
 
       allow delete: if esSuperadmin()
-        || esAdminDe(resource.data.consultorioId)
+        || esStaffDe(resource.data.consultorioId)
         || (profesionalTieneConfianza()
             && esProfesionalDe(resource.data.consultorioId)
             && resource.data.profesionalUid == request.auth.uid);
@@ -396,8 +378,7 @@ service cloud.firestore {
     match /solicitudes_sesion/{solicitudId} {
 
       allow read: if esSuperadmin()
-        || esAdminDe(resource.data.consultorioId)
-        || (esCoadmin() && miUsuario().consultorioId == resource.data.consultorioId)
+        || esStaffDe(resource.data.consultorioId)
         || esProfesionalDe(resource.data.consultorioId);
 
       allow create: if esProfesionalDe(request.resource.data.consultorioId)
@@ -413,7 +394,7 @@ service cloud.firestore {
             || request.resource.data.tipo == 'liquidar_os');
 
       allow update: if esSuperadmin()
-        || ((esAdminDe(resource.data.consultorioId) || (esCoadmin() && miUsuario().consultorioId == resource.data.consultorioId))
+        || (esStaffDe(resource.data.consultorioId)
             && request.resource.data.consultorioId == resource.data.consultorioId
             && request.resource.data.profesionalUid == resource.data.profesionalUid
             && request.resource.data.tipo == resource.data.tipo
@@ -430,13 +411,13 @@ service cloud.firestore {
     match /logs_sesion/{logId} {
 
       allow read: if esSuperadmin()
-        || esAdminDe(resource.data.consultorioId)
+        || esStaffDe(resource.data.consultorioId)
         || esProfesionalDe(resource.data.consultorioId);
 
       allow create: if estaAutenticado()
         && request.resource.data.actorUid == request.auth.uid
         && (esSuperadmin()
-            || esAdminDe(request.resource.data.consultorioId)
+            || esStaffDe(request.resource.data.consultorioId)
             || esProfesionalDe(request.resource.data.consultorioId));
 
       allow update: if false;
@@ -448,8 +429,7 @@ service cloud.firestore {
     // ============================================================
     match /pagos_consultorio/{pagoId} {
       allow read: if esSuperadmin()
-        || esAdminDe(resource.data.consultorioId)
-        || (esCoadmin() && miUsuario().consultorioId == resource.data.consultorioId)
+        || esStaffDe(resource.data.consultorioId)
         || (esProfesionalDe(resource.data.consultorioId)
             && resource.data.profesionalUid == request.auth.uid);
 
@@ -463,7 +443,7 @@ service cloud.firestore {
     // ============================================================
     match /pagos_mensualidad/{pagoId} {
       allow read: if esSuperadmin()
-        || esAdminDe(resource.data.consultorioId);
+        || esStaffDe(resource.data.consultorioId);
       allow write: if false;
     }
 
@@ -487,26 +467,25 @@ service cloud.firestore {
     // ============================================================
     match /recordatorios/{recordatorioId} {
       allow read: if esSuperadmin()
-        || esAdminDe(resource.data.consultorioId)
-        || (esCoadmin() && miUsuario().consultorioId == resource.data.consultorioId)
+        || esStaffDe(resource.data.consultorioId)
         || (esProfesionalDe(resource.data.consultorioId)
             && request.auth.uid in resource.data.destinatarios)
         || (esProfesionalDe(resource.data.consultorioId)
             && resource.data.creadoPorUid == request.auth.uid);
 
       allow create: if esSuperadmin()
-        || esAdminDe(request.resource.data.consultorioId)
+        || esStaffDe(request.resource.data.consultorioId)
         || (esProfesionalDe(request.resource.data.consultorioId)
             && request.resource.data.creadoPorUid == request.auth.uid
             && request.resource.data.destinatarios == [request.auth.uid]);
 
       allow update: if esSuperadmin()
-        || esAdminDe(resource.data.consultorioId)
+        || esStaffDe(resource.data.consultorioId)
         || (esProfesionalDe(resource.data.consultorioId)
             && resource.data.creadoPorUid == request.auth.uid);
 
       allow delete: if esSuperadmin()
-        || esAdminDe(resource.data.consultorioId)
+        || esStaffDe(resource.data.consultorioId)
         || (esProfesionalDe(resource.data.consultorioId)
             && resource.data.creadoPorUid == request.auth.uid);
     }
@@ -516,22 +495,21 @@ service cloud.firestore {
     // ============================================================
     match /recordatorios_instancias/{instanciaId} {
       allow read: if esSuperadmin()
-        || esAdminDe(resource.data.consultorioId)
-        || (esCoadmin() && miUsuario().consultorioId == resource.data.consultorioId)
+        || esStaffDe(resource.data.consultorioId)
         || (esProfesionalDe(resource.data.consultorioId)
             && resource.data.profesionalUid == request.auth.uid);
 
       allow create: if esSuperadmin()
-        || esAdminDe(request.resource.data.consultorioId)
+        || esStaffDe(request.resource.data.consultorioId)
         || esProfesionalDe(request.resource.data.consultorioId);
 
       allow update: if esSuperadmin()
-        || esAdminDe(resource.data.consultorioId)
+        || esStaffDe(resource.data.consultorioId)
         || (esProfesionalDe(resource.data.consultorioId)
             && resource.data.profesionalUid == request.auth.uid);
 
       allow delete: if esSuperadmin()
-        || esAdminDe(resource.data.consultorioId);
+        || esStaffDe(resource.data.consultorioId);
     }
 
     // ============================================================
