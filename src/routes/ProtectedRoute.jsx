@@ -6,11 +6,13 @@
  * JERARQUÍA DE ROLES:
  *   superadmin — puede entrar a cualquier ruta protegida (vos y Thiago)
  *   admin      — acceso a rutas admin del consultorio
+ *   coadmin    — mismos permisos que admin para acceso (sin reparto)
  *   profesional — acceso a rutas profesional (requiere estado=activo)
  *
  * Props:
  *   requireRole: uno de 'superadmin' | 'admin' | 'profesional'.
  *                Superadmin pasa por cualquier requireRole.
+ *                Coadmin pasa cuando requireRole es 'admin'.
  *   requireActivo: si true, exige estado=activo. (default: true)
  */
 
@@ -42,16 +44,6 @@ export default function ProtectedRoute({ requireRole, requireActivo = true }) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
-  /*
-    Estado 'retirado': el usuario ya no forma parte del consultorio.
-    Lo redirigimos a /pendiente (que detecta el estado y muestra
-    el mensaje apropiado: 'Acceso al consultorio cerrado').
-
-    Lo chequeamos ANTES del corte por rol porque queremos que aplique
-    a cualquier rol (admin retirado, profesional retirado, etc.). El
-    superadmin no entra a este caso porque su flujo no permite
-    retirarse.
-  */
   if (user.rol !== ROLES.SUPERADMIN && user.estado === ESTADOS_USUARIO.RETIRADO) {
     return <Navigate to="/pendiente" replace />;
   }
@@ -61,8 +53,11 @@ export default function ProtectedRoute({ requireRole, requireActivo = true }) {
     return <Outlet />;
   }
 
-  // Admin: acceso libre a cualquier ruta admin (independiente de estado)
-  if (user.rol === ROLES.ADMIN) {
+  // Admin y Coadmin: acceso libre a cualquier ruta admin.
+  // El coadmin tiene los mismos permisos de acceso que el admin; solo se
+  // excluye del reparto de dinero (eso se maneja en el feature respectivo,
+  // no acá en routing).
+  if (user.rol === ROLES.ADMIN || user.rol === ROLES.COADMIN) {
     if (requireRole && requireRole !== ROLES.ADMIN) {
       return <Navigate to="/admin" replace />;
     }
