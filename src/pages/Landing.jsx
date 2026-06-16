@@ -88,10 +88,6 @@ function Hero() {
 
       <div className="lp-hero__inner">
         <div className="lp-hero__text">
-          <div className="lp-hero__eyebrow">
-            <span className="lp-hero__dot" /> Sistema de gestión para consultorios
-          </div>
-
           <h1 className="lp-hero__title">
             El dinero del <em>consultorio</em>,
             <br />
@@ -115,10 +111,6 @@ function Hero() {
               Ver cómo funciona
             </a>
           </div>
-
-          <p className="lp-hero__signature">
-            Hecho en Córdoba, Argentina · {new Date().getFullYear()}
-          </p>
         </div>
 
         <HeroCard />
@@ -128,15 +120,104 @@ function Hero() {
 }
 
 /* ------------------------------------------------------------
-   Card "viviente" del hero con números animados
+   Card "viviente" del hero — cicla entre meses con datos distintos.
+   Un cursor falso se desliza al selector de mes y "hace click",
+   y todos los datos (números, barras, profesionales) cambian.
    ------------------------------------------------------------ */
+
+// Datos de cada mes. El ciclo recorre este array en loop.
+const MESES_DEMO = [
+  {
+    mes: 'enero · 2026',
+    porCobrar: 312400,
+    cobrado: 845600,
+    sesiones: 218,
+    profesionales: 8,
+    barras: [38, 44, 41, 52, 49, 61],
+    equipo: [
+      { nombre: 'Lucía Fernández', rubro: 'Fonoaudiología', monto: 184200 },
+      { nombre: 'Martín Gómez', rubro: 'Kinesiología', monto: 156800 },
+      { nombre: 'Sofía Ramírez', rubro: 'Psicología', monto: 142500 },
+    ],
+  },
+  {
+    mes: 'febrero · 2026',
+    porCobrar: 398100,
+    cobrado: 967300,
+    sesiones: 264,
+    profesionales: 9,
+    barras: [42, 50, 47, 58, 55, 68],
+    equipo: [
+      { nombre: 'Martín Gómez', rubro: 'Kinesiología', monto: 201400 },
+      { nombre: 'Lucía Fernández', rubro: 'Fonoaudiología', monto: 178900 },
+      { nombre: 'Diego Suárez', rubro: 'Nutrición', monto: 134600 },
+    ],
+  },
+  {
+    mes: 'marzo · 2026',
+    porCobrar: 441700,
+    cobrado: 1102500,
+    sesiones: 301,
+    profesionales: 11,
+    barras: [40, 53, 49, 62, 67, 74],
+    equipo: [
+      { nombre: 'Sofía Ramírez', rubro: 'Psicología', monto: 223100 },
+      { nombre: 'Martín Gómez', rubro: 'Kinesiología', monto: 198700 },
+      { nombre: 'Valentina Ruiz', rubro: 'Psicopedagogía', monto: 167300 },
+    ],
+  },
+  {
+    mes: 'abril · 2026',
+    porCobrar: 485200,
+    cobrado: 1237800,
+    sesiones: 347,
+    profesionales: 12,
+    barras: [45, 58, 52, 67, 73, 82],
+    equipo: [
+      { nombre: 'Lucía Fernández', rubro: 'Fonoaudiología', monto: 248600 },
+      { nombre: 'Sofía Ramírez', rubro: 'Psicología', monto: 231900 },
+      { nombre: 'Martín Gómez', rubro: 'Kinesiología', monto: 215400 },
+    ],
+  },
+];
+
 function HeroCard() {
+  const [idx, setIdx] = useState(0);
+  const [swapping, setSwapping] = useState(false);
+
+  useEffect(() => {
+    // Cada ciclo: mover cursor (swapping=true) → cambiar mes → soltar.
+    const DURACION = 3400;
+    const id = setInterval(() => {
+      setSwapping(true);
+      // pequeño delay para simular el "click" del cursor antes de cambiar datos
+      setTimeout(() => {
+        setIdx((i) => (i + 1) % MESES_DEMO.length);
+        setSwapping(false);
+      }, 520);
+    }, DURACION);
+    return () => clearInterval(id);
+  }, []);
+
+  const data = MESES_DEMO[idx];
+
   return (
     <div className="lp-hero-card" aria-hidden="true">
+      {/* Cursor falso que se desliza al selector de mes */}
+      <div className={`lp-hero-card__cursor ${swapping ? 'lp-hero-card__cursor--active' : ''}`}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path d="M5 3l4.5 16 2.5-6.5L18.5 10 5 3z" fill="var(--cp-text)" stroke="var(--cp-surface)" strokeWidth="1.2" strokeLinejoin="round" />
+        </svg>
+      </div>
+
       <div className="lp-hero-card__top">
         <div>
           <div className="lp-hero-card__label">Resumen del mes</div>
-          <div className="lp-hero-card__title">abril · 2026</div>
+          <div className={`lp-hero-card__title lp-hero-card__monthtab ${swapping ? 'lp-hero-card__monthtab--press' : ''}`}>
+            <span className="lp-hero-card__monthtab-arrow">‹</span>
+            <span key={data.mes} className="lp-hero-card__monthlabel">{data.mes}</span>
+            <span className="lp-hero-card__monthtab-arrow">›</span>
+          </div>
         </div>
         <div className="lp-hero-card__pill">
           <span className="lp-hero-card__pulse" /> En vivo
@@ -144,33 +225,44 @@ function HeroCard() {
       </div>
 
       <div className="lp-hero-card__metrics">
-        <Counter
-          label="Por cobrar"
-          target={485200}
-          formatter={(n) => formatoARS.format(n)}
-        />
-        <Counter
-          label="Cobrado"
-          target={1237800}
-          formatter={(n) => formatoARS.format(n)}
-        />
-        <Counter label="Sesiones" target={347} />
-        <Counter label="Profesionales" target={12} />
+        <Counter label="Por cobrar" value={data.porCobrar} formatter={(n) => formatoARS.format(n)} />
+        <Counter label="Cobrado" value={data.cobrado} formatter={(n) => formatoARS.format(n)} />
+        <Counter label="Sesiones" value={data.sesiones} />
+        <Counter label="Profesionales" value={data.profesionales} />
       </div>
 
       <div className="lp-hero-card__chart">
-        {[45, 58, 52, 67, 73, 82].map((h, i) => (
+        {data.barras.map((h, i) => (
           <div
             key={i}
-            className={`lp-hero-card__bar ${i === 5 ? 'lp-hero-card__bar--active' : ''}`}
-            style={{ height: `${h}%`, animationDelay: `${600 + i * 80}ms` }}
+            className={`lp-hero-card__bar ${i === data.barras.length - 1 ? 'lp-hero-card__bar--active' : ''}`}
+            style={{ height: `${h}%` }}
           />
         ))}
       </div>
 
+      {/* Mini-tabla de profesionales */}
+      <div className="lp-hero-card__team">
+        <div className="lp-hero-card__team-label">Profesionales</div>
+        <div className="lp-hero-card__team-list">
+          {data.equipo.map((p) => (
+            <div className="lp-hero-card__team-row" key={p.nombre + data.mes}>
+              <span className="lp-hero-card__team-avatar">
+                {p.nombre.split(' ').map((w) => w[0]).join('').slice(0, 2)}
+              </span>
+              <span className="lp-hero-card__team-name">{p.nombre}</span>
+              <span className="lp-hero-card__team-rubro">{p.rubro}</span>
+              <span className="lp-hero-card__team-monto">{formatoARS.format(p.monto)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div className="lp-hero-card__foot">
         <div className="lp-hero-card__dots">
-          <span /><span /><span />
+          {MESES_DEMO.map((_, i) => (
+            <span key={i} className={i === idx ? 'lp-hero-card__dot--on' : ''} />
+          ))}
         </div>
         <div className="lp-hero-card__url">consulpay.com/admin</div>
       </div>
@@ -178,32 +270,32 @@ function HeroCard() {
   );
 }
 
-/* Contador animado desde 0 hasta target */
-function Counter({ label, target, formatter = (n) => String(n) }) {
-  const [value, setValue] = useState(0);
-  const startedRef = useRef(false);
+/* Contador que hace tween suave al cambiar de value */
+function Counter({ label, value, formatter = (n) => String(n) }) {
+  const [display, setDisplay] = useState(value);
+  const fromRef = useRef(value);
 
   useEffect(() => {
-    if (startedRef.current) return;
-    startedRef.current = true;
-
-    const duration = 1400;
+    const from = fromRef.current;
+    const to = value;
+    if (from === to) return;
+    const duration = 800;
     const start = performance.now();
     const step = (now) => {
       const progress = Math.min((now - start) / duration, 1);
-      // easeOutCubic
       const eased = 1 - Math.pow(1 - progress, 3);
-      setValue(Math.round(target * eased));
+      setDisplay(Math.round(from + (to - from) * eased));
       if (progress < 1) requestAnimationFrame(step);
+      else fromRef.current = to;
     };
     const id = requestAnimationFrame(step);
     return () => cancelAnimationFrame(id);
-  }, [target]);
+  }, [value]);
 
   return (
     <div className="lp-hero-card__metric">
       <div className="lp-hero-card__metric-label">{label}</div>
-      <div className="lp-hero-card__metric-value">{formatter(value)}</div>
+      <div className="lp-hero-card__metric-value">{formatter(display)}</div>
     </div>
   );
 }
@@ -381,7 +473,7 @@ function Footer() {
         </div>
 
         <div className="lp-footer__text">
-          Gestión simple para consultorios · Córdoba, Argentina · {new Date().getFullYear()}
+          © {new Date().getFullYear()} ConsulPay · Todos los derechos reservados
         </div>
 
         <div className="lp-footer__links">
