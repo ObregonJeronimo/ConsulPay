@@ -424,7 +424,7 @@
   display: flex;
   align-items: flex-end;
   gap: 6px;
-  height: 60px;
+  height: 56px;
   margin-top: 18px;
 }
 
@@ -432,12 +432,129 @@
   flex: 1;
   background: var(--cp-accent-bg);
   border-radius: 3px 3px 0 0;
-  opacity: 0;
-  animation: lp-bar-rise 700ms var(--cp-ease) forwards;
   transform-origin: bottom center;
+  transition: height 700ms var(--cp-ease), background 400ms var(--cp-ease);
 }
 
 .lp-hero-card__bar--active { background: var(--cp-accent); }
+
+/* ---- Cursor falso que se desliza al selector de mes ---- */
+.lp-hero-card__cursor {
+  position: absolute;
+  top: 46px;
+  left: 150px;
+  z-index: 5;
+  opacity: 0;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 4px rgba(28, 27, 23, 0.25));
+  transition: opacity 300ms var(--cp-ease), transform 480ms var(--cp-ease);
+  transform: translate(8px, 8px) scale(1);
+}
+
+.lp-hero-card__cursor--active {
+  opacity: 1;
+  transform: translate(0, 0) scale(0.86);
+}
+
+/* ---- Selector de mes (tab clickeable) ---- */
+.lp-hero-card__monthtab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px;
+  border-radius: var(--cp-radius-md);
+  transition: background 200ms var(--cp-ease), transform 200ms var(--cp-ease);
+}
+
+.lp-hero-card__monthtab--press {
+  background: var(--cp-accent-bg);
+  transform: scale(0.97);
+}
+
+.lp-hero-card__monthtab-arrow {
+  font-size: 16px;
+  color: var(--cp-text-faint);
+  line-height: 1;
+}
+
+.lp-hero-card__monthlabel {
+  display: inline-block;
+  min-width: 118px;
+  text-align: center;
+  animation: lp-month-in 500ms var(--cp-ease) both;
+}
+
+/* ---- Mini-tabla de profesionales ---- */
+.lp-hero-card__team {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--cp-border);
+}
+
+.lp-hero-card__team-label {
+  font-size: 11px;
+  color: var(--cp-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+
+.lp-hero-card__team-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lp-hero-card__team-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  animation: lp-month-in 500ms var(--cp-ease) both;
+}
+
+.lp-hero-card__team-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--cp-accent-bg);
+  color: var(--cp-accent-dark);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.lp-hero-card__team-name {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--cp-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 110px;
+}
+
+.lp-hero-card__team-rubro {
+  font-size: 11px;
+  color: var(--cp-text-muted);
+  padding: 2px 8px;
+  background: var(--cp-bg);
+  border-radius: var(--cp-radius-pill);
+  white-space: nowrap;
+}
+
+.lp-hero-card__team-monto {
+  margin-left: auto;
+  font-family: var(--cp-font-mono);
+  font-size: 11.5px;
+  color: var(--cp-text);
+  font-weight: 500;
+  white-space: nowrap;
+}
 
 .lp-hero-card__foot {
   margin-top: 18px;
@@ -458,6 +575,13 @@
   height: 8px;
   border-radius: 50%;
   background: var(--cp-border-strong);
+  transition: background 300ms var(--cp-ease), width 300ms var(--cp-ease);
+}
+
+.lp-hero-card__dots .lp-hero-card__dot--on {
+  background: var(--cp-accent);
+  width: 18px;
+  border-radius: 4px;
 }
 
 .lp-hero-card__url {
@@ -479,6 +603,13 @@
     max-width: 440px;
     margin: 0 auto;
     width: 100%;
+  }
+  /* El cursor falso solo tiene sentido en desktop */
+  .lp-hero-card__cursor {
+    display: none;
+  }
+  .lp-hero-card__team-name {
+    max-width: 90px;
   }
 }
 
@@ -903,4 +1034,9 @@
 @keyframes lp-pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50%      { opacity: 0.5; transform: scale(1.4); }
+}
+
+@keyframes lp-month-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
