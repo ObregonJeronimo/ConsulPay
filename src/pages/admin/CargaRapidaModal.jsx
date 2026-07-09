@@ -469,7 +469,15 @@ function TablaFilas({ filas, pacientes, metodos, mapaMetodos, esAdmin, rowRefs, 
 
       <div className="cp-cr-footer">
         <span className="cp-cr-footer__count">
-          {filas.length} sesión{filas.length === 1 ? '' : 'es'} a registrar
+          {(() => {
+            const totalPacientes = filas.length;
+            const totalSesiones = filas.reduce((acc, f) => acc + (Number(f.cantidad) || 0), 0);
+            const grupos = filas.filter((f) => (Number(f.cantidad) || 0) > 1).length;
+            const partePacientes = `${totalPacientes} paciente${totalPacientes === 1 ? '' : 's'} seleccionado${totalPacientes === 1 ? '' : 's'}`;
+            const parteSesiones = `${totalSesiones} sesión${totalSesiones === 1 ? '' : 'es'} en total`;
+            const parteGrupos = grupos > 0 ? ` (${grupos} grupo${grupos === 1 ? '' : 's'} de sesiones)` : '';
+            return `${partePacientes} · ${parteSesiones}${parteGrupos}`;
+          })()}
         </span>
         <div className="cp-cr-footer__actions">
           <Button type="button" variant="ghost" onClick={onClose} disabled={submitting}>
@@ -478,7 +486,10 @@ function TablaFilas({ filas, pacientes, metodos, mapaMetodos, esAdmin, rowRefs, 
           <Button type="button" variant="primary" onClick={onGuardar} disabled={submitting || filas.length === 0}>
             {submitting
               ? <><Spinner size={14} /> Guardando…</>
-              : `Guardar ${filas.length} sesión${filas.length === 1 ? '' : 'es'}`}
+              : (() => {
+                  const totalSesiones = filas.reduce((acc, f) => acc + (Number(f.cantidad) || 0), 0);
+                  return `Guardar ${totalSesiones} sesión${totalSesiones === 1 ? '' : 'es'}`;
+                })()}
           </Button>
         </div>
       </div>
