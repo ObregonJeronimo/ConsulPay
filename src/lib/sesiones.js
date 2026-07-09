@@ -481,6 +481,26 @@ export function suscribirSesionesConsultorio(consultorioId, callback, filtros = 
 }
 
 /**
+ * Suscribe a TODAS las sesiones pagadas del consultorio (sin filtro de mes).
+ * Se usa para el registro de ingresos por mes, que agrupa por fechaPago
+ * (no por la fecha de la sesión). El agrupamiento se hace en el cliente.
+ */
+export function suscribirSesionesPagadas(consultorioId, callback) {
+  const q = query(
+    collection(db, 'sesiones'),
+    where('consultorioId', '==', consultorioId),
+    where('estadoPago', '==', ESTADOS_PAGO_SESION.PAGADO),
+  );
+  return onSnapshot(q, (snap) => {
+    const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    callback(list);
+  }, (err) => {
+    console.error('Error en suscripción de sesiones pagadas:', err);
+    callback([]);
+  });
+}
+
+/**
  * Sesiones de un profesional dentro de su consultorio.
  *
  * IMPORTANTE: filtramos por AMBOS campos (consultorioId + profesionalUid)
