@@ -314,6 +314,7 @@ export async function aprobarSolicitud({
   adminUid,
   adminNombre,
   receptorOverride,  // { uid, nombre } opcional — solo para MARCAR_PAGADA
+  fechaPagoOverride, // Date opcional — solo para MARCAR_PAGADA (cuándo se pagó)
 }) {
   const solSnap = await getDoc(doc(db, 'solicitudes_sesion', solicitudId));
   if (!solSnap.exists()) throw new Error('La solicitud ya no existe.');
@@ -422,7 +423,9 @@ export async function aprobarSolicitud({
     const receptor = receptorOverride
       || sol.payloadPropuesto?.receptor
       || { uid: adminUid, nombre: adminNombre };
-    await marcarSesionPagada(sol.sesionId, adminUid, receptor);
+    // Fecha de pago: la que eligió el admin al aprobar (override) o ahora
+    const fechaPago = fechaPagoOverride instanceof Date ? fechaPagoOverride : null;
+    await marcarSesionPagada(sol.sesionId, adminUid, receptor, fechaPago);
     await actualizarSolicitudResuelta({ solicitudId, adminUid, adminNombre, estado: ESTADOS_SOLICITUD_SESION.APROBADA });
     return;
   }
