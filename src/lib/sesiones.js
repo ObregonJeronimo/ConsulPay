@@ -281,12 +281,19 @@ export async function eliminarSesion(sesionId) {
 
 /* ============================================================
    Cambiar estado de pago (solo admin via rules)
+   ----------------------------------------------------------------
+   fechaPago (opcional): Date en que efectivamente se pagó. Permite
+   registrar pagos con fecha anterior a hoy (ej: cargar el 8 de julio
+   un pago que entró el 3). Si no se pasa, se usa la fecha actual del
+   servidor. El campo fechaPago es la base del registro de ingresos
+   por mes (se agrupa por esta fecha, no por updatedAt).
    ============================================================ */
-export async function marcarSesionPagada(sesionId, updatedByUid, receptor = null) {
+export async function marcarSesionPagada(sesionId, updatedByUid, receptor = null, fechaPago = null) {
   await updateDoc(doc(db, 'sesiones', sesionId), {
     estadoPago: ESTADOS_PAGO_SESION.PAGADO,
     receptorUid: receptor?.uid ?? null,
     receptorNombre: receptor?.nombre ?? null,
+    fechaPago: fechaPago instanceof Date ? Timestamp.fromDate(fechaPago) : serverTimestamp(),
     updatedAt: serverTimestamp(),
     updatedByUid: updatedByUid ?? null,
   });
@@ -297,6 +304,31 @@ export async function marcarSesionDebida(sesionId, updatedByUid) {
     estadoPago: ESTADOS_PAGO_SESION.DEBIDO,
     receptorUid: null,
     receptorNombre: null,
+    fechaPago: null,
+    updatedAt: serverTimestamp(),
+    updatedByUid: updatedByUid ?? null,
+  });
+}
+
+/* ============================================================
+   Editar la fecha de pago de una sesión ya pagada (ajuste a mano)
+   ----------------------------------------------------------------
+   Permite corregir cuándo entró un pago, para que el registro de
+   ingresos por mes lo ubique en el período correcto. Solo opera
+   sobre sesiones ya pagadas.
+   ============================================================ */
+export async function editarFechaPago(sesionId, nuevaFecha, updatedByUid) {
+  if (!(nuevaFecha instanceof Date) || isNaN(nuevaFecha.getTime())) {
+    throw new Error('La fecha de pago no es válida');
+  }
+  const ref = doc(db, 'sesiones', sesionId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) throw new Error('La sesión no existe');
+  if (snap.data().estadoPago !== ESTADOS_PAGO_SESION.PAGADO) {
+    throw new Error('Solo se puede editar la fecha de pago de una sesión ya pagada');
+  }
+  await updateDoc(ref, {
+    fechaPago: Timestamp.fromDate(nuevaFecha),
     updatedAt: serverTimestamp(),
     updatedByUid: updatedByUid ?? null,
   });
@@ -309,16 +341,18 @@ export async function marcarSesionDebida(sesionId, updatedByUid) {
    receptor. Solo opera sobre sesiones en estado DEBIDO — las que
    estan en PENDIENTE_MONTO (obras sociales sin valor) se ignoran.
    ============================================================ */
-export async function marcarSesionesMesPagadas(sesionIds, updatedByUid, receptor = null) {
+export async function marcarSesionesMesPagadas(sesionIds, updatedByUid, receptor = null, fechaPago = null) {
   if (!sesionIds || sesionIds.length === 0) return 0;
   const { writeBatch } = await import('firebase/firestore');
   const batch = writeBatch(db);
   const ts = serverTimestamp();
+  const tsPago = fechaPago instanceof Date ? Timestamp.fromDate(fechaPago) : ts;
   for (const id of sesionIds) {
     batch.update(doc(db, 'sesiones', id), {
       estadoPago: ESTADOS_PAGO_SESION.PAGADO,
       receptorUid: receptor?.uid ?? null,
       receptorNombre: receptor?.nombre ?? null,
+      fechaPago: tsPago,
       updatedAt: ts,
       updatedByUid: updatedByUid ?? null,
     });
