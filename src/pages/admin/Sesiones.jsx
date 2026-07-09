@@ -126,6 +126,14 @@ function dateAInputValue(d) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+// Igual que dateAInputValue pero solo día (para <input type="date">)
+function dateAInputValueDia(d) {
+  if (!d) return '';
+  const date = d instanceof Date ? d : new Date(d);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
 /* ============================================================
    Pagina principal
    ============================================================ */
@@ -331,10 +339,10 @@ export default function Sesiones() {
     }
   }
 
-  async function handleConfirmarReceptor(receptor) {
+  async function handleConfirmarReceptor(receptor, fechaPago) {
     if (!quienRecibioSesion) return;
     try {
-      await marcarSesionPagada(quienRecibioSesion.id, user.uid, receptor);
+      await marcarSesionPagada(quienRecibioSesion.id, user.uid, receptor, fechaPago ?? null);
     } catch (err) {
       alert(err.message || 'No se pudo marcar como pagada.');
     } finally {
@@ -1451,6 +1459,7 @@ export function LiquidarMontoModal({ sesion, paciente, modoSolicitud, esCorrecci
 export function QuienRecibioModal({ admins, sesion, paciente, onClose, onConfirmar }) {
   const overlayProps = useOverlayClose(onClose);
   const [receptorUid, setReceptorUid] = useState(admins[0]?.uid ?? '');
+  const [fechaPagoInput, setFechaPagoInput] = useState(() => dateAInputValueDia(new Date()));
   const [submitting, setSubmitting] = useState(false);
 
   const nombrePac = paciente
@@ -1460,12 +1469,13 @@ export function QuienRecibioModal({ admins, sesion, paciente, onClose, onConfirm
   async function handleConfirmar() {
     const admin = admins.find((a) => a.uid === receptorUid);
     if (!admin) return;
+    const fechaPago = fechaPagoInput ? new Date(fechaPagoInput + 'T12:00:00') : new Date();
     setSubmitting(true);
     try {
       await onConfirmar({
         uid: admin.uid,
         nombre: admin.displayName || admin.email || admin.uid,
-      });
+      }, fechaPago);
     } finally {
       setSubmitting(false);
     }
@@ -1504,6 +1514,21 @@ export function QuienRecibioModal({ admins, sesion, paciente, onClose, onConfirm
               </label>
             ))}
           </div>
+          <div>
+            <label className="cp-field__label" style={{ display: 'block', marginBottom: 6 }}>
+              ¿Cuándo se pagó?
+            </label>
+            <input
+              className="cp-input"
+              type="date"
+              value={fechaPagoInput}
+              max={dateAInputValueDia(new Date())}
+              onChange={(e) => setFechaPagoInput(e.target.value)}
+            />
+            <div className="cp-hint" style={{ fontSize: 12, color: 'var(--cp-text-muted)', marginTop: 5 }}>
+              Por defecto es hoy. Podés poner una fecha anterior si el pago entró otro día.
+            </div>
+          </div>
           <div className="cp-modal__actions">
             <Button type="button" variant="ghost" onClick={onClose} disabled={submitting}>
               Cancelar
@@ -1537,6 +1562,7 @@ export function PagarMesModal({ consultorioId, profesionales, pacientes, mapaPac
   const [sesiones, setSesiones] = useState([]);
   const [loadingSes, setLoadingSes] = useState(false);
   const [receptorUid, setReceptorUid] = useState(admins[0]?.uid ?? '');
+  const [fechaPagoInput, setFechaPagoInput] = useState(() => dateAInputValueDia(new Date()));
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
 
@@ -1594,12 +1620,14 @@ export function PagarMesModal({ consultorioId, profesionales, pacientes, mapaPac
     // va a actualizar sesiones[] y recalcular sesionesPagables a 0
     const cantidadPagada = sesionesPagables.length;
     const totalPagado = totalAPagar;
+    const fechaPago = fechaPagoInput ? new Date(fechaPagoInput + 'T12:00:00') : new Date();
     setSubmitting(true);
     try {
       await marcarSesionesMesPagadas(
         sesionesPagables.map((s) => s.id),
         uid,
         { uid: admin.uid, nombre: admin.displayName || admin.email || admin.uid },
+        fechaPago,
       );
       setDone({ cantidad: cantidadPagada, total: totalPagado });
     } catch (err) {
@@ -1764,6 +1792,24 @@ export function PagarMesModal({ consultorioId, profesionales, pacientes, mapaPac
                           <span>{a.displayName || a.email}</span>
                         </label>
                       ))}
+                    </div>
+                  </div>
+                )}
+                {/* ¿Cuándo se pagó? — siempre visible si hay sesiones pagables */}
+                {sesionesPagables.length > 0 && (
+                  <div>
+                    <label className="cp-field__label" style={{ display: 'block', marginBottom: 6 }}>
+                      ¿Cuándo se pagó?
+                    </label>
+                    <input
+                      className="cp-input"
+                      type="date"
+                      value={fechaPagoInput}
+                      max={dateAInputValueDia(new Date())}
+                      onChange={(e) => setFechaPagoInput(e.target.value)}
+                    />
+                    <div className="cp-hint" style={{ fontSize: 12, color: 'var(--cp-text-muted)', marginTop: 5 }}>
+                      Por defecto es hoy. Podés poner una fecha anterior si el pago entró otro día.
                     </div>
                   </div>
                 )}
