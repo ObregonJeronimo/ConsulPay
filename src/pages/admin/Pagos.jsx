@@ -8,6 +8,8 @@ import Spinner from '../../components/ui/Spinner.jsx';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useConsultorio } from '../../hooks/useConsultorio.js';
 import { ESTADOS_PAGO_SESION, formatoARS } from '../../lib/constants.js';
+import { suscribirPacientesConsultorio } from '../../lib/pacientes.js';
+import IngresosPorMes from './IngresosPorMes.jsx';
 import {
   labelEstadoPago,
   montoNetoEfectivo,
@@ -64,6 +66,7 @@ export default function PagosAdmin() {
   const [pagos, setPagos] = useState([]);
   const [sesiones, setSesiones] = useState([]);
   const [profesionales, setProfesionales] = useState([]);
+  const [pacientes, setPacientes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [filtroCanal, setFiltroCanal] = useState('manual'); // 'mp' | 'manual' | 'ambos'
@@ -93,11 +96,22 @@ export default function PagosAdmin() {
     return suscribirProfesionales(consultorioId, setProfesionales);
   }, [consultorioId]);
 
+  useEffect(() => {
+    if (!consultorioId) return;
+    return suscribirPacientesConsultorio(consultorioId, setPacientes);
+  }, [consultorioId]);
+
   const mapaProfesionales = useMemo(() => {
     const m = {};
     for (const p of profesionales) m[p.uid] = p;
     return m;
   }, [profesionales]);
+
+  const mapaPacientes = useMemo(() => {
+    const m = {};
+    for (const p of pacientes) m[p.id] = p;
+    return m;
+  }, [pacientes]);
 
   /* ---- Calculos derivados ---- */
 
@@ -210,9 +224,17 @@ export default function PagosAdmin() {
           >
             Ambos
           </button>
+          <button
+            type="button"
+            className={`cp-pagos-canal-btn ${filtroCanal === 'ingresos' ? 'cp-pagos-canal-btn--active' : ''}`}
+            onClick={() => setFiltroCanal('ingresos')}
+          >
+            Ingresos por mes
+          </button>
         </div>
 
         {/* Stats según canal seleccionado */}
+        {filtroCanal !== 'ingresos' && (<>
         <div className="cp-pagos-resumen-mes">
           {(filtroCanal === 'ambos') && (
             <div className="cp-pagos-resumen-mes__card cp-pagos-resumen-mes__card--total">
@@ -282,8 +304,19 @@ export default function PagosAdmin() {
             completo de cargos de Mercado Pago. El total es aproximado.
           </p>
         )}
+        </>
+        )}
       </div>
 
+      {filtroCanal === 'ingresos' ? (
+        <IngresosPorMes
+          consultorioId={consultorioId}
+          uid={user?.uid}
+          mapaProfesionales={mapaProfesionales}
+          mapaPacientes={mapaPacientes}
+        />
+      ) : (
+      <>
       {stats.pagosSinFeeDetails > 0 && (
         <p className="cp-pagos-nota-asterisco">
           * Hay {stats.pagosSinFeeDetails} pago{stats.pagosSinFeeDetails === 1 ? '' : 's'} sin desglose
@@ -401,6 +434,8 @@ export default function PagosAdmin() {
             </tbody>
           </table>
         </DualScrollTable>
+      )}
+      </>
       )}
 
       {pagoSeleccionado && (
