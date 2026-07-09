@@ -451,6 +451,12 @@ function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, mapaMetodos
     return adminUid;
   });
 
+  const [fechaPagoInput, setFechaPagoInput] = useState(() => {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  });
+
   useEffect(() => {
     if (admins && admins.length > 0 && !admins.find((a) => a.uid === receptorUid)) {
       setReceptorUid(admins[0].uid);
@@ -484,6 +490,9 @@ function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, mapaMetodos
           uid: receptorUid,
           nombre: adminElegido?.displayName || adminElegido?.email || receptorUid,
         };
+        payload.fechaPagoOverride = fechaPagoInput
+          ? new Date(fechaPagoInput + 'T12:00:00')
+          : new Date();
       }
       await aprobarSolicitud(payload);
       onClose();
@@ -591,6 +600,32 @@ function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, mapaMetodos
                 No hay administradores cargados. El pago se asignará a vos.
               </div>
             )}
+          </div>
+        )}
+
+        {esMarcarPagada && esPendiente && (
+          <div className="cp-receptor-selector" style={{ marginTop: 12 }}>
+            <label className="cp-receptor-selector__label">
+              ¿Cuándo se pagó?
+            </label>
+            <p className="cp-receptor-selector__hint">
+              Por defecto es hoy. Podés poner una fecha anterior si el pago entró otro día.
+            </p>
+            <input
+              type="date"
+              value={fechaPagoInput}
+              max={(() => { const d = new Date(); const p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`; })()}
+              onChange={(e) => setFechaPagoInput(e.target.value)}
+              style={{
+                padding: '9px 12px',
+                border: '1px solid var(--cp-border-strong)',
+                borderRadius: 'var(--cp-radius-md, 10px)',
+                fontSize: 14,
+                fontFamily: 'inherit',
+                color: 'var(--cp-text)',
+                background: 'var(--cp-surface)',
+              }}
+            />
           </div>
         )}
 
