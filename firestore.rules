@@ -351,6 +351,7 @@ service cloud.firestore {
             && request.resource.data.consultorioId == resource.data.consultorioId
             && campoNoCambia('receptorUid')
             && campoNoCambia('receptorNombre')
+            && campoNoCambia('fechaPago')
             && (request.resource.data.estadoPago == resource.data.estadoPago
                 || (resource.data.estadoPago == 'pendiente_monto'
                     && request.resource.data.estadoPago == 'debido'))))
