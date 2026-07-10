@@ -264,9 +264,9 @@ export default function Solicitudes() {
         <div style={{ padding: 60, display: 'flex', justifyContent: 'center' }}>
           <Spinner size={24} label="Cargando solicitudes…" />
         </div>
-      ) : lista.length === 0 ? (
+      ) : lista.length === 0 && tab === 'pendientes' ? (
         <EmptyState tab={tab} />
-      ) : (
+      ) : tab === 'pendientes' ? (
         <TablaSolicitudes
           solicitudes={lista}
           mapaPacientes={mapaPacientes}
@@ -275,6 +275,14 @@ export default function Solicitudes() {
           admins={admins}
           adminUid={user.uid}
           adminNombre={user.displayName || user.email}
+        />
+      ) : (
+        <ResueltasPorProfesional
+          solicitudes={resueltas}
+          profesionales={profesionales}
+          mapaPacientes={mapaPacientes}
+          mapaProfesionales={mapaProfesionales}
+          onSeleccionar={setSeleccionada}
         />
       )}
 
@@ -366,7 +374,7 @@ const ChevronSol = ({ abierto }) => (
 function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSeleccionar, admins, adminUid, adminNombre }) {
   // Separar solicitudes agrupables (marcar_pagada / liquidar_os, que tienen
   // fecha de sesión) de las sueltas (crear, modificar, eliminar, etc.).
-  const { grupos, sueltas } = useMemo(() => {
+  const { porProfesional, sueltas } = useMemo(() => {
     const agrupables = [];
     const otras = [];
     for (const s of solicitudes) {
@@ -376,48 +384,68 @@ function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSel
       if (esAgrupable) agrupables.push(s);
       else otras.push(s);
     }
-    // Agrupar por profesional + mes de la sesión + tipo
-    // (separar marcar_pagada de liquidar_os para poder aprobar en lote por tipo)
+    // 1er nivel: profesional. 2do nivel: grupos por mes + tipo.
     const map = {};
     for (const s of agrupables) {
       const d = fechaSesionDeSolicitud(s);
       const km = claveMesSol(d);
-      const key = `${s.profesionalUid}__${km}__${s.tipo}`;
-      if (!map[key]) {
-        map[key] = {
-          key,
+      const gkey = `${km}__${s.tipo}`;
+      const puid = s.profesionalUid;
+      if (!map[puid]) {
+        map[puid] = {
+          profesionalUid: puid,
+          profesionalNombre: s.profesionalNombre || nombreProfesional(mapaProfesionales[puid]),
+          grupos: {},
+        };
+      }
+      if (!map[puid].grupos[gkey]) {
+        map[puid].grupos[gkey] = {
+          key: `${puid}__${gkey}`,
           tipo: s.tipo,
-          profesionalUid: s.profesionalUid,
-          profesionalNombre: s.profesionalNombre || nombreProfesional(mapaProfesionales[s.profesionalUid]),
+          profesionalUid: puid,
+          profesionalNombre: map[puid].profesionalNombre,
           mesClave: km,
           solicitudes: [],
           total: 0,
         };
       }
-      map[key].solicitudes.push(s);
-      map[key].total += montoConsultorioDeSolicitud(s);
+      map[puid].grupos[gkey].solicitudes.push(s);
+      map[puid].grupos[gkey].total += montoConsultorioDeSolicitud(s);
     }
-    const gruposArr = Object.values(map).sort((a, b) => {
-      if (a.mesClave !== b.mesClave) return b.mesClave.localeCompare(a.mesClave);
-      if (a.profesionalNombre !== b.profesionalNombre) return a.profesionalNombre.localeCompare(b.profesionalNombre);
-      return a.tipo.localeCompare(b.tipo);
-    });
-    return { grupos: gruposArr, sueltas: otras };
+    // Ordenar: profesionales alfabéticamente; dentro, grupos por mes desc y tipo
+    const profesionalesArr = Object.values(map)
+      .map((p) => ({
+        ...p,
+        gruposArr: Object.values(p.grupos).sort((a, b) => {
+          if (a.mesClave !== b.mesClave) return b.mesClave.localeCompare(a.mesClave);
+          return a.tipo.localeCompare(b.tipo);
+        }),
+      }))
+      .sort((a, b) => a.profesionalNombre.localeCompare(b.profesionalNombre));
+    return { porProfesional: profesionalesArr, sueltas: otras };
   }, [solicitudes, mapaProfesionales]);
 
   return (
     <div className="cp-solicitudes-agrupadas">
-      {grupos.map((g) => (
-        <GrupoSolicitudes
-          key={g.key}
-          grupo={g}
-          mapaPacientes={mapaPacientes}
-          mapaProfesionales={mapaProfesionales}
-          onSeleccionar={onSeleccionar}
-          admins={admins}
-          adminUid={adminUid}
-          adminNombre={adminNombre}
-        />
+      {porProfesional.map((prof) => (
+        <div key={prof.profesionalUid} className="cp-sol-prof-bloque">
+          <div className="cp-sol-prof-bloque__head">
+            <Avatar initials={(prof.profesionalNombre?.[0] || '?').toUpperCase()} size={26} />
+            <span className="cp-sol-prof-bloque__nombre">{prof.profesionalNombre}</span>
+          </div>
+          {prof.gruposArr.map((g) => (
+            <GrupoSolicitudes
+              key={g.key}
+              grupo={g}
+              mapaPacientes={mapaPacientes}
+              mapaProfesionales={mapaProfesionales}
+              onSeleccionar={onSeleccionar}
+              admins={admins}
+              adminUid={adminUid}
+              adminNombre={adminNombre}
+            />
+          ))}
+        </div>
       ))}
 
       {sueltas.length > 0 && (
@@ -456,6 +484,214 @@ function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSel
   );
 }
 
+/* ============================================================
+   RESUELTAS: Profesional → Mes → Solicitudes (dos niveles desplegables)
+   Lista TODOS los profesionales del consultorio; los que no tienen
+   resueltas muestran un estado vacío.
+   ============================================================ */
+function ResueltasPorProfesional({ solicitudes, profesionales, mapaPacientes, mapaProfesionales, onSeleccionar }) {
+  const bloques = useMemo(() => {
+    // Agrupar resueltas por profesional
+    const porProf = {};
+    for (const s of solicitudes) {
+      const puid = s.profesionalUid || '__sin__';
+      if (!porProf[puid]) porProf[puid] = [];
+      porProf[puid].push(s);
+    }
+    // Construir bloque por cada profesional del consultorio
+    const arr = profesionales.map((p) => {
+      const sols = porProf[p.uid] || [];
+      // Agrupar por mes de la sesión (o de resolución si no hay fecha de sesión)
+      const meses = {};
+      for (const s of sols) {
+        const d = fechaSesionDeSolicitud(s) || (s.resolvedAt?.toDate ? s.resolvedAt.toDate() : null);
+        const km = d ? claveMesSol(d) : 'sin-fecha';
+        if (!meses[km]) meses[km] = [];
+        meses[km].push(s);
+      }
+      const mesesArr = Object.entries(meses)
+        .map(([clave, lista]) => ({
+          clave,
+          lista: lista.sort((a, b) => (tsMs(b.resolvedAt) - tsMs(a.resolvedAt))),
+        }))
+        .sort((a, b) => b.clave.localeCompare(a.clave));
+      return {
+        uid: p.uid,
+        nombre: nombreProfesional(p) || p.displayName || p.email || 'Profesional',
+        cant: sols.length,
+        meses: mesesArr,
+      };
+    });
+    // Ordenar: primero los que tienen resueltas, luego alfabético
+    return arr.sort((a, b) => {
+      if ((a.cant > 0) !== (b.cant > 0)) return b.cant - a.cant > 0 ? 1 : -1;
+      return a.nombre.localeCompare(b.nombre);
+    });
+  }, [solicitudes, profesionales, mapaProfesionales]);
+
+  if (bloques.length === 0) {
+    return <EmptyState tab="resueltas" />;
+  }
+
+  return (
+    <div className="cp-resueltas">
+      {bloques.map((b) => (
+        <ProfesionalResueltas
+          key={b.uid}
+          bloque={b}
+          mapaPacientes={mapaPacientes}
+          onSeleccionar={onSeleccionar}
+        />
+      ))}
+    </div>
+  );
+}
+
+function tsMs(ts) {
+  if (!ts) return 0;
+  if (ts.toDate) return ts.toDate().getTime();
+  if (ts.seconds) return ts.seconds * 1000;
+  return 0;
+}
+
+/* Nivel 1: profesional (desplegable) */
+function ProfesionalResueltas({ bloque, mapaPacientes, onSeleccionar }) {
+  const [abierto, setAbierto] = useState(false);
+  const vacio = bloque.cant === 0;
+
+  return (
+    <div className={`cp-res-prof ${abierto ? 'cp-res-prof--abierto' : ''} ${vacio ? 'cp-res-prof--vacio' : ''}`}>
+      <button
+        className="cp-res-prof__head"
+        onClick={() => !vacio && setAbierto((v) => !v)}
+        disabled={vacio}
+      >
+        <span className="cp-res-prof__chevron">
+          {!vacio && <ChevronSol abierto={abierto} />}
+        </span>
+        <Avatar initials={(bloque.nombre?.[0] || '?').toUpperCase()} size={28} />
+        <span className="cp-res-prof__nombre">{bloque.nombre}</span>
+        {vacio ? (
+          <span className="cp-res-prof__vacio-txt">Sin solicitudes resueltas</span>
+        ) : (
+          <span className="cp-res-prof__cant">{bloque.cant} resuelta{bloque.cant === 1 ? '' : 's'}</span>
+        )}
+      </button>
+
+      {abierto && !vacio && (
+        <div className="cp-res-prof__meses">
+          {bloque.meses.map((m) => (
+            <MesResueltas
+              key={m.clave}
+              mes={m}
+              mapaPacientes={mapaPacientes}
+              onSeleccionar={onSeleccionar}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* Nivel 2: mes (desplegable) */
+function MesResueltas({ mes, mapaPacientes, onSeleccionar }) {
+  const [abierto, setAbierto] = useState(false);
+  const nombreMes = mes.clave === 'sin-fecha' ? 'Sin fecha' : nombreMesSol(mes.clave);
+
+  return (
+    <div className={`cp-res-mes ${abierto ? 'cp-res-mes--abierto' : ''}`}>
+      <button className="cp-res-mes__head" onClick={() => setAbierto((v) => !v)}>
+        <span className="cp-res-mes__chevron"><ChevronSol abierto={abierto} /></span>
+        <span className="cp-res-mes__nombre">{nombreMes}</span>
+        <span className="cp-res-mes__cant">{mes.lista.length}</span>
+      </button>
+      {abierto && (
+        <DualScrollTable className="cp-compact-list">
+          <table className="cp-table cp-solicitudes-tabla">
+            <thead>
+              <tr>
+                <th>Tipo</th>
+                <th>Paciente</th>
+                <th>Resuelta</th>
+                <th>Estado</th>
+                <th aria-label="Acciones" />
+              </tr>
+            </thead>
+            <tbody>
+              {mes.lista.map((s) => (
+                <FilaResuelta
+                  key={s.id}
+                  s={s}
+                  mapaPacientes={mapaPacientes}
+                  onSeleccionar={onSeleccionar}
+                />
+              ))}
+            </tbody>
+          </table>
+        </DualScrollTable>
+      )}
+    </div>
+  );
+}
+
+/* Fila de una solicitud resuelta */
+function FilaResuelta({ s, mapaPacientes, onSeleccionar }) {
+  const snap = s.payloadPropuesto?.sesionSnapshot || {};
+  const nombrePac = snap.pacienteNombre
+    || (s.payloadPropuesto?.datosPaciente
+      ? `${s.payloadPropuesto.datosPaciente.apellido || ''} ${s.payloadPropuesto.datosPaciente.nombre || ''}`.trim()
+      : '—');
+
+  return (
+    <tr className="cp-solicitudes-tabla__row cp-solicitudes-tabla__row--resuelta" onClick={() => onSeleccionar(s)}>
+      <td data-label="Tipo">
+        <span className={`cp-solicitud-tipo cp-solicitud-tipo--${s.tipo}`}>
+          {iconoTipo(s.tipo)}
+          {LABELS_TIPO_SOLICITUD[s.tipo]}
+        </span>
+      </td>
+      <td data-label="Paciente">
+        <span style={{ fontSize: 13.5, fontWeight: 500 }}>{nombrePac}</span>
+      </td>
+      <td data-label="Resuelta" style={{ fontSize: 13, color: 'var(--cp-text-muted)' }}>
+        {formatoRelativo(s.resolvedAt)}
+      </td>
+      <td data-label="Estado">{badgeEstado(s.estado)}</td>
+      <td className="cp-solicitudes-tabla__action-cell" style={{ textAlign: 'right' }}>
+        <button
+          type="button"
+          className="cp-prof-action"
+          onClick={(e) => { e.stopPropagation(); onSeleccionar(s); }}
+        >
+          Ver detalle
+        </button>
+      </td>
+
+      {/* Mobile */}
+      <td className="cp-td-mobile-main" onClick={() => onSeleccionar(s)}>
+        <div className="cp-row-mobile__top">
+          <span style={{ fontSize: 13.5, fontWeight: 500 }}>{nombrePac}</span>
+        </div>
+        <div className="cp-row-mobile__mid">{LABELS_TIPO_SOLICITUD[s.tipo]}</div>
+        <div className="cp-row-mobile__bot">{formatoRelativo(s.resolvedAt)}</div>
+      </td>
+      <td className="cp-td-mobile-badge">{badgeEstado(s.estado)}</td>
+      <td className="cp-td-mobile-actions" onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          className="cp-action-menu__trigger"
+          onClick={() => onSeleccionar(s)}
+          aria-label="Ver detalle"
+          style={{ fontSize: 12, width: 'auto', padding: '4px 8px' }}
+        >
+          →
+        </button>
+      </td>
+    </tr>
+  );
+}
+
 /* Grupo colapsable: profesional + mes + tipo, con total y aprobar en lote */
 function GrupoSolicitudes({ grupo, mapaPacientes, mapaProfesionales, onSeleccionar, admins, adminUid, adminNombre }) {
   const [abierto, setAbierto] = useState(false);
@@ -469,32 +705,35 @@ function GrupoSolicitudes({ grupo, mapaPacientes, mapaProfesionales, onSeleccion
   );
   const puedeAprobarLote = pendientesDelGrupo.length > 0;
 
-  const labelBoton = esMarcarPagada ? 'Marcar mes como pagado' : 'Aprobar liquidaciones';
+  const labelBoton = esMarcarPagada ? 'Marcar pagado' : 'Aprobar';
 
   return (
     <div className={`cp-sol-grupo ${abierto ? 'cp-sol-grupo--abierto' : ''}`}>
       <div className="cp-sol-grupo__head-wrap">
         <button className="cp-sol-grupo__head" onClick={() => setAbierto((v) => !v)}>
           <span className="cp-sol-grupo__chevron"><ChevronSol abierto={abierto} /></span>
-          <Avatar initials={(grupo.profesionalNombre?.[0] || '?').toUpperCase()} size={30} />
+          <span className={`cp-sol-grupo__tipo-icon cp-sol-grupo__tipo-icon--${esMarcarPagada ? 'pago' : 'liq'}`}>
+            {iconoTipo(grupo.tipo)}
+          </span>
           <div className="cp-sol-grupo__info">
-            <span className="cp-sol-grupo__prof">{grupo.profesionalNombre}</span>
-            <span className="cp-sol-grupo__mes">
+            <span className="cp-sol-grupo__prof">
               {nombreMesSol(grupo.mesClave)}
-              {' · '}
-              {esMarcarPagada ? 'Pagos' : 'Liquidaciones OS'}
+            </span>
+            <span className="cp-sol-grupo__mes">
+              {esMarcarPagada ? 'Marcar como pagado' : 'Liquidar sesiones'}
             </span>
           </div>
-          <span className="cp-sol-grupo__cant">{cant} solicitud{cant === 1 ? '' : 'es'}</span>
+          <span className="cp-sol-grupo__cant">{cant}</span>
           <span className="cp-sol-grupo__total">{formatoARS.format(grupo.total)}</span>
         </button>
         {puedeAprobarLote && (
           <button
             className="cp-sol-grupo__aprobar-btn"
             onClick={() => setModalLote(true)}
+            title={esMarcarPagada ? 'Marcar el mes como pagado' : 'Aprobar todas las liquidaciones'}
           >
             {iconoTipo(grupo.tipo)}
-            {labelBoton}
+            <span className="cp-sol-grupo__aprobar-btn-txt">{labelBoton}</span>
           </button>
         )}
       </div>
