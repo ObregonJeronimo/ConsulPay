@@ -309,6 +309,33 @@ export async function solicitarLiquidarMonto({
  * que vino en la solicitud (que es el profesional que solicitó, lo cual
  * normalmente no es el correcto — por eso siempre conviene pasar override).
  */
+/* ============================================================
+   Aprobar varias solicitudes en lote (un grupo profesional+mes+tipo)
+   ----------------------------------------------------------------
+   Procesa cada solicitud de forma independiente: si una falla (p.ej.
+   la sesión ya estaba pagada), no corta el resto. Devuelve un resumen
+   con cuántas se aprobaron y cuántas fallaron (con el motivo).
+   receptorOverride y fechaPagoOverride se aplican solo a MARCAR_PAGADA.
+   ============================================================ */
+export async function aprobarSolicitudesEnLote({
+  solicitudIds,
+  adminUid,
+  adminNombre,
+  receptorOverride,
+  fechaPagoOverride,
+}) {
+  const resultado = { ok: 0, fallidas: [] };
+  for (const solicitudId of solicitudIds) {
+    try {
+      await aprobarSolicitud({ solicitudId, adminUid, adminNombre, receptorOverride, fechaPagoOverride });
+      resultado.ok += 1;
+    } catch (err) {
+      resultado.fallidas.push({ solicitudId, motivo: err.message || 'Error desconocido' });
+    }
+  }
+  return resultado;
+}
+
 export async function aprobarSolicitud({
   solicitudId,
   adminUid,
