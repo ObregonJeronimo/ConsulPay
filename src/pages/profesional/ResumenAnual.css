@@ -1,0 +1,207 @@
+/* ============================================================
+   Resumen anual del profesional — 12 cards
+   ============================================================ */
+.cp-resumen-anual {
+  margin-top: 8px;
+}
+
+.cp-resumen-anual__head {
+  margin-bottom: 16px;
+}
+.cp-resumen-anual__title {
+  font-family: var(--cp-font-serif, Georgia, serif);
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--cp-text);
+  margin: 0 0 4px;
+}
+.cp-resumen-anual__sub {
+  font-size: 13px;
+  color: var(--cp-text-muted);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.cp-resumen-anual__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.cp-mes-card {
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md, 10px);
+  background: var(--cp-surface);
+  padding: 14px;
+  min-height: 92px;
+  display: flex;
+  flex-direction: column;
+  transition: box-shadow 140ms var(--cp-ease), border-color 140ms var(--cp-ease);
+}
+.cp-mes-card--pend {
+  cursor: pointer;
+}
+.cp-mes-card--pend:hover {
+  border-color: var(--cp-accent);
+  box-shadow: 0 4px 16px -6px rgba(28, 27, 23, 0.12);
+}
+.cp-mes-card--ok {
+  background: var(--cp-success-bg, #E8EDDE);
+  border-color: transparent;
+}
+.cp-mes-card--actual {
+  border-color: var(--cp-accent);
+}
+
+.cp-mes-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.cp-mes-card__nombre {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cp-text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cp-mes-card__actual-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--cp-accent);
+  display: inline-block;
+}
+
+.cp-mes-card__ok {
+  color: var(--cp-success, #4F6F3A);
+  display: flex;
+}
+.cp-mes-card__ok-text {
+  font-size: 12.5px;
+  color: var(--cp-success, #4F6F3A);
+  font-weight: 500;
+  margin-top: 8px;
+}
+
+.cp-mes-card__badge {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 20px;
+  background: var(--cp-accent-bg);
+  color: var(--cp-accent-dark, #8F4528);
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cp-mes-card__body {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cp-mes-card__seccion-label {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--cp-text-muted);
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.cp-mes-card__lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cp-mes-card__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12.5px;
+}
+.cp-mes-card__pac {
+  color: var(--cp-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.cp-mes-card__monto {
+  font-family: var(--cp-font-mono, monospace);
+  color: var(--cp-accent);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  font-size: 12px;
+}
+.cp-mes-card__monto--q {
+  color: var(--cp-warning, #B07D1F);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.cp-mes-card__subtotal {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--cp-border);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--cp-text);
+}
+.cp-mes-card__subtotal span:last-child {
+  font-family: var(--cp-font-mono, monospace);
+  color: var(--cp-accent);
+}
+
+/* Tablet */
+@media (max-width: 900px) {
+  .cp-resumen-anual__grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Móvil: 2 columnas, y las cards con pendientes se expanden al tocar */
+@media (max-width: 620px) {
+  .cp-resumen-anual__grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .cp-mes-card {
+    padding: 12px;
+    min-height: 76px;
+  }
+  /* En móvil, las cards con pendientes muestran solo el resumen (badge)
+     y expanden el detalle al tocar */
+  .cp-mes-card--pend .cp-mes-card__body {
+    display: none;
+  }
+  .cp-mes-card--pend.cp-mes-card--abierto {
+    grid-column: 1 / -1;  /* ocupa todo el ancho al expandirse */
+  }
+  .cp-mes-card--pend.cp-mes-card--abierto .cp-mes-card__body {
+    display: flex;
+  }
+  .cp-mes-card__nombre { font-size: 13.5px; }
+}
+
+/* Muy chico: 1 columna */
+@media (max-width: 380px) {
+  .cp-resumen-anual__grid {
+    grid-template-columns: 1fr;
+  }
+}
