@@ -21,6 +21,7 @@ import { suscribirPacientesConsultorio } from '../../lib/pacientes.js';
 import { suscribirMiembrosConsultorio, suscribirProfesionales } from '../../lib/profesionales.js';
 import {
   aprobarSolicitud,
+  aprobarSolicitudesEnLote,
   rechazarSolicitud,
   suscribirTodasSolicitudes,
 } from '../../lib/solicitudes.js';
@@ -271,6 +272,9 @@ export default function Solicitudes() {
           mapaPacientes={mapaPacientes}
           mapaProfesionales={mapaProfesionales}
           onSeleccionar={setSeleccionada}
+          admins={admins}
+          adminUid={user.uid}
+          adminNombre={user.displayName || user.email}
         />
       )}
 
@@ -359,7 +363,7 @@ const ChevronSol = ({ abierto }) => (
   </svg>
 );
 
-function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSeleccionar }) {
+function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSeleccionar, admins, adminUid, adminNombre }) {
   // Separar solicitudes agrupables (marcar_pagada / liquidar_os, que tienen
   // fecha de sesión) de las sueltas (crear, modificar, eliminar, etc.).
   const { grupos, sueltas } = useMemo(() => {
@@ -372,15 +376,17 @@ function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSel
       if (esAgrupable) agrupables.push(s);
       else otras.push(s);
     }
-    // Agrupar por profesional + mes de la sesión
+    // Agrupar por profesional + mes de la sesión + tipo
+    // (separar marcar_pagada de liquidar_os para poder aprobar en lote por tipo)
     const map = {};
     for (const s of agrupables) {
       const d = fechaSesionDeSolicitud(s);
       const km = claveMesSol(d);
-      const key = `${s.profesionalUid}__${km}`;
+      const key = `${s.profesionalUid}__${km}__${s.tipo}`;
       if (!map[key]) {
         map[key] = {
           key,
+          tipo: s.tipo,
           profesionalUid: s.profesionalUid,
           profesionalNombre: s.profesionalNombre || nombreProfesional(mapaProfesionales[s.profesionalUid]),
           mesClave: km,
@@ -393,7 +399,8 @@ function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSel
     }
     const gruposArr = Object.values(map).sort((a, b) => {
       if (a.mesClave !== b.mesClave) return b.mesClave.localeCompare(a.mesClave);
-      return a.profesionalNombre.localeCompare(b.profesionalNombre);
+      if (a.profesionalNombre !== b.profesionalNombre) return a.profesionalNombre.localeCompare(b.profesionalNombre);
+      return a.tipo.localeCompare(b.tipo);
     });
     return { grupos: gruposArr, sueltas: otras };
   }, [solicitudes, mapaProfesionales]);
@@ -407,6 +414,9 @@ function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSel
           mapaPacientes={mapaPacientes}
           mapaProfesionales={mapaProfesionales}
           onSeleccionar={onSeleccionar}
+          admins={admins}
+          adminUid={adminUid}
+          adminNombre={adminNombre}
         />
       ))}
 
@@ -446,24 +456,48 @@ function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSel
   );
 }
 
-/* Grupo colapsable: profesional + mes, con total */
-function GrupoSolicitudes({ grupo, mapaPacientes, mapaProfesionales, onSeleccionar }) {
-  const [abierto, setAbierto] = useState(true);
+/* Grupo colapsable: profesional + mes + tipo, con total y aprobar en lote */
+function GrupoSolicitudes({ grupo, mapaPacientes, mapaProfesionales, onSeleccionar, admins, adminUid, adminNombre }) {
+  const [abierto, setAbierto] = useState(false);
+  const [modalLote, setModalLote] = useState(false);
   const cant = grupo.solicitudes.length;
-  const prof = mapaProfesionales[grupo.profesionalUid];
+  const esMarcarPagada = grupo.tipo === TIPOS_SOLICITUD_SESION.MARCAR_PAGADA;
+
+  // Solo se pueden aprobar en lote las que están pendientes
+  const pendientesDelGrupo = grupo.solicitudes.filter(
+    (s) => s.estado === ESTADOS_SOLICITUD_SESION.PENDIENTE,
+  );
+  const puedeAprobarLote = pendientesDelGrupo.length > 0;
+
+  const labelBoton = esMarcarPagada ? 'Marcar mes como pagado' : 'Aprobar liquidaciones';
 
   return (
     <div className={`cp-sol-grupo ${abierto ? 'cp-sol-grupo--abierto' : ''}`}>
-      <button className="cp-sol-grupo__head" onClick={() => setAbierto((v) => !v)}>
-        <span className="cp-sol-grupo__chevron"><ChevronSol abierto={abierto} /></span>
-        <Avatar initials={(grupo.profesionalNombre?.[0] || '?').toUpperCase()} size={30} />
-        <div className="cp-sol-grupo__info">
-          <span className="cp-sol-grupo__prof">{grupo.profesionalNombre}</span>
-          <span className="cp-sol-grupo__mes">{nombreMesSol(grupo.mesClave)}</span>
-        </div>
-        <span className="cp-sol-grupo__cant">{cant} solicitud{cant === 1 ? '' : 'es'}</span>
-        <span className="cp-sol-grupo__total">{formatoARS.format(grupo.total)}</span>
-      </button>
+      <div className="cp-sol-grupo__head-wrap">
+        <button className="cp-sol-grupo__head" onClick={() => setAbierto((v) => !v)}>
+          <span className="cp-sol-grupo__chevron"><ChevronSol abierto={abierto} /></span>
+          <Avatar initials={(grupo.profesionalNombre?.[0] || '?').toUpperCase()} size={30} />
+          <div className="cp-sol-grupo__info">
+            <span className="cp-sol-grupo__prof">{grupo.profesionalNombre}</span>
+            <span className="cp-sol-grupo__mes">
+              {nombreMesSol(grupo.mesClave)}
+              {' · '}
+              {esMarcarPagada ? 'Pagos' : 'Liquidaciones OS'}
+            </span>
+          </div>
+          <span className="cp-sol-grupo__cant">{cant} solicitud{cant === 1 ? '' : 'es'}</span>
+          <span className="cp-sol-grupo__total">{formatoARS.format(grupo.total)}</span>
+        </button>
+        {puedeAprobarLote && (
+          <button
+            className="cp-sol-grupo__aprobar-btn"
+            onClick={() => setModalLote(true)}
+          >
+            {iconoTipo(grupo.tipo)}
+            {labelBoton}
+          </button>
+        )}
+      </div>
 
       {abierto && (
         <DualScrollTable className="cp-compact-list">
@@ -490,6 +524,186 @@ function GrupoSolicitudes({ grupo, mapaPacientes, mapaProfesionales, onSeleccion
           </table>
         </DualScrollTable>
       )}
+
+      {modalLote && (
+        <AprobarGrupoModal
+          grupo={grupo}
+          pendientes={pendientesDelGrupo}
+          esMarcarPagada={esMarcarPagada}
+          admins={admins}
+          adminUid={adminUid}
+          adminNombre={adminNombre}
+          onClose={() => setModalLote(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   Modal: aprobar un grupo de solicitudes en lote
+   ----------------------------------------------------------------
+   - MARCAR_PAGADA: muestra resumen (mes, total, cantidad) + selector
+     de quién recibió y cuándo se pagó, y aprueba todas.
+   - LIQUIDAR_OS: muestra resumen de los montos que el profesional
+     cargó, sin receptor ni fecha, y aprueba todas.
+   Procesa cada una por separado; al final informa cuántas se
+   aprobaron y cuántas fallaron (p.ej. ya estaban pagadas).
+   ============================================================ */
+function AprobarGrupoModal({ grupo, pendientes, esMarcarPagada, admins, adminUid, adminNombre, onClose }) {
+  const overlayProps = useOverlayClose(onClose);
+  const [receptorUid, setReceptorUid] = useState(admins?.[0]?.uid ?? adminUid);
+  const [fechaPagoInput, setFechaPagoInput] = useState(() => {
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [resultado, setResultado] = useState(null);
+
+  const total = pendientes.reduce((acc, s) => acc + montoConsultorioDeSolicitud(s), 0);
+  const maxHoy = (() => {
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  })();
+
+  async function handleAprobar() {
+    setSubmitting(true);
+    try {
+      const payload = {
+        solicitudIds: pendientes.map((s) => s.id),
+        adminUid,
+        adminNombre,
+      };
+      if (esMarcarPagada) {
+        const adminElegido = admins.find((a) => a.uid === receptorUid);
+        payload.receptorOverride = {
+          uid: receptorUid,
+          nombre: adminElegido?.displayName || adminElegido?.email || receptorUid,
+        };
+        payload.fechaPagoOverride = fechaPagoInput ? new Date(fechaPagoInput + 'T12:00:00') : new Date();
+      }
+      const res = await aprobarSolicitudesEnLote(payload);
+      setResultado(res);
+      // Si se aprobaron todas sin fallos, cerramos solo
+      if (res.fallidas.length === 0) {
+        setTimeout(onClose, 900);
+      }
+    } catch (err) {
+      setResultado({ ok: 0, fallidas: [{ motivo: err.message || 'Error inesperado' }] });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="cp-modal-overlay" {...overlayProps}>
+      <div className="cp-modal cp-modal--detalle" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 460 }}>
+        <button className="cp-modal__close" onClick={onClose} aria-label="Cerrar">×</button>
+        <h2 className="cp-modal__title">
+          {esMarcarPagada ? 'Marcar mes como pagado' : 'Aprobar liquidaciones'}
+        </h2>
+        <p className="cp-modal__sub">
+          {grupo.profesionalNombre} · {nombreMesSol(grupo.mesClave)}
+        </p>
+
+        {/* Resumen */}
+        <div className="cp-lote-resumen">
+          <div className="cp-lote-resumen__fila">
+            <span>Solicitudes</span>
+            <strong>{pendientes.length}</strong>
+          </div>
+          <div className="cp-lote-resumen__fila">
+            <span>{esMarcarPagada ? 'Total al consultorio' : 'Total a liquidar'}</span>
+            <strong className="cp-lote-resumen__total">{formatoARS.format(total)}</strong>
+          </div>
+        </div>
+
+        {/* Lista de pacientes */}
+        <div className="cp-lote-lista">
+          {pendientes.map((s) => {
+            const snap = s.payloadPropuesto?.sesionSnapshot || {};
+            return (
+              <div key={s.id} className="cp-lote-item">
+                <span className="cp-lote-item__pac">{snap.pacienteNombre || 'Paciente'}</span>
+                <span className="cp-lote-item__monto">{formatoARS.format(montoConsultorioDeSolicitud(s))}</span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Solo para marcar pagada: receptor + fecha */}
+        {esMarcarPagada && !resultado && (
+          <>
+            <div className="cp-receptor-selector">
+              <label className="cp-receptor-selector__label">¿Quién recibió el dinero?</label>
+              <p className="cp-receptor-selector__hint">
+                Se asigna a esta persona en todas las sesiones del grupo.
+              </p>
+              <div className="cp-receptor-selector__opciones">
+                {admins.map((a) => (
+                  <button
+                    key={a.uid}
+                    className={`cp-receptor-opcion ${receptorUid === a.uid ? 'cp-receptor-opcion--sel' : ''}`}
+                    onClick={() => setReceptorUid(a.uid)}
+                    type="button"
+                  >
+                    <Avatar initials={(a.displayName || a.email || '?')[0].toUpperCase()} size={30} />
+                    <span className="cp-receptor-opcion__nombre">{a.displayName || a.email}</span>
+                    {receptorUid === a.uid && <span className="cp-receptor-opcion__check">✓</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="cp-receptor-selector" style={{ marginTop: 12 }}>
+              <label className="cp-receptor-selector__label">¿Cuándo se pagó?</label>
+              <p className="cp-receptor-selector__hint">
+                Por defecto es hoy. Podés poner una fecha anterior si el pago entró otro día.
+              </p>
+              <input
+                type="date"
+                value={fechaPagoInput}
+                max={maxHoy}
+                onChange={(e) => setFechaPagoInput(e.target.value)}
+                style={{
+                  padding: '9px 12px', border: '1px solid var(--cp-border-strong)',
+                  borderRadius: 'var(--cp-radius-md, 10px)', fontSize: 14,
+                  fontFamily: 'inherit', color: 'var(--cp-text)', background: 'var(--cp-surface)',
+                }}
+              />
+            </div>
+          </>
+        )}
+
+        {/* Resultado */}
+        {resultado && (
+          <div className={`cp-lote-resultado ${resultado.fallidas.length === 0 ? 'cp-lote-resultado--ok' : 'cp-lote-resultado--parcial'}`}>
+            <strong>
+              {resultado.ok > 0 && `Se aprobaron ${resultado.ok} solicitud${resultado.ok === 1 ? '' : 'es'}.`}
+            </strong>
+            {resultado.fallidas.length > 0 && (
+              <div style={{ marginTop: 4 }}>
+                {resultado.fallidas.length} no se pudo{resultado.fallidas.length === 1 ? '' : 'ieron'} aprobar
+                {' '}(probablemente ya estaban pagadas o cambiaron). Quedaron marcadas como obsoletas.
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="cp-modal__actions">
+          <Button type="button" variant="ghost" onClick={onClose} disabled={submitting}>
+            {resultado ? 'Cerrar' : 'Cancelar'}
+          </Button>
+          {!resultado && (
+            <Button type="button" variant="primary" onClick={handleAprobar} disabled={submitting || (esMarcarPagada && !receptorUid)}>
+              {submitting
+                ? <><Spinner size={14} /> Aprobando…</>
+                : `Aprobar ${pendientes.length}`}
+            </Button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
