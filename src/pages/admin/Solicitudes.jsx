@@ -76,6 +76,12 @@ const CheckIcon = () => (
   </svg>
 );
 
+const CheckIconSmall = () => (
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="20 6 9 17 4 12" />
+  </svg>
+);
+
 /* ============================================================
    Helpers
    ============================================================ */
@@ -122,10 +128,10 @@ function iconoTipo(tipo) {
     case TIPOS_SOLICITUD_SESION.CREAR: return <PlusIcon />;
     case TIPOS_SOLICITUD_SESION.MODIFICAR: return <EditIcon />;
     case TIPOS_SOLICITUD_SESION.ELIMINAR: return <TrashIcon />;
-    case TIPOS_SOLICITUD_SESION.LIQUIDAR_MONTO: return <CheckIcon />;
+    case TIPOS_SOLICITUD_SESION.LIQUIDAR_MONTO: return <CheckIconSmall />;
     case TIPOS_SOLICITUD_SESION.CARGA_RAPIDA: return <span style={{ fontSize: 13 }}>⚡</span>;
     case TIPOS_SOLICITUD_SESION.CREAR_PACIENTE: return <UserIcon />;
-    case TIPOS_SOLICITUD_SESION.MARCAR_PAGADA: return <CheckIcon />;
+    case TIPOS_SOLICITUD_SESION.MARCAR_PAGADA: return <CheckIconSmall />;
     case TIPOS_SOLICITUD_SESION.LIQUIDAR_OS: return <EditIcon />;
     default: return null;
   }
