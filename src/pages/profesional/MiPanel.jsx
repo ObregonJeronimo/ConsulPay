@@ -7,6 +7,7 @@ import { useAuth } from '../../hooks/useAuth.js';
 import { useConsultorio } from '../../hooks/useConsultorio.js';
 import { ESTADOS_PAGO_SESION, formatoARS } from '../../lib/constants.js';
 import { suscribirPacientesProfesional } from '../../lib/pacientes.js';
+import ResumenAnual from './ResumenAnual.jsx';
 import {
   aceptarInstancia,
   suscribirInstanciasProfesional,
@@ -165,6 +166,12 @@ export default function MiPanel() {
 
   const cantidadPacientesActivos = pacientes.length;
 
+  const mapaPacientes = useMemo(() => {
+    const m = {};
+    for (const p of pacientes) m[p.id] = p;
+    return m;
+  }, [pacientes]);
+
   const cargando = loadingConsultorio || loadingSesiones || loadingPacientes;
 
   /* ---- Render ---- */
@@ -278,6 +285,9 @@ export default function MiPanel() {
           mono
         />
       </section>
+
+      {/* ---- Resumen anual: 12 cards ---- */}
+      <ResumenAnual sesiones={sesiones} mapaPacientes={mapaPacientes} />
 
       {/* ---- Atajos ---- */}
       <section className="cp-panel__shortcuts" aria-label="Accesos rápidos">
