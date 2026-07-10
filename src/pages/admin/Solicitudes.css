@@ -873,6 +873,10 @@
   box-shadow: 0 2px 12px -4px rgba(28, 27, 23, 0.08);
 }
 
+.cp-sol-grupo__head-wrap {
+  display: flex;
+  align-items: stretch;
+}
 .cp-sol-grupo__head {
   width: 100%;
   display: flex;
@@ -887,6 +891,73 @@
   transition: background 120ms var(--cp-ease);
 }
 .cp-sol-grupo__head:hover { background: var(--cp-surface-hover); }
+
+.cp-sol-grupo__aprobar-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 12px 8px 0;
+  padding: 0 14px;
+  background: var(--cp-accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--cp-radius-md);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 120ms var(--cp-ease);
+}
+.cp-sol-grupo__aprobar-btn:hover { background: var(--cp-accent-hover); }
+.cp-sol-grupo__aprobar-btn svg { width: 14px; height: 14px; }
+
+/* Modal aprobar en lote */
+.cp-lote-resumen {
+  margin: 0 var(--cp-space-5) 14px;
+  background: var(--cp-surface-sunken);
+  border-radius: var(--cp-radius-md);
+  padding: 12px 16px;
+}
+.cp-lote-resumen__fila {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13.5px;
+  color: var(--cp-text-muted);
+  padding: 3px 0;
+}
+.cp-lote-resumen__fila strong { color: var(--cp-text); font-size: 14px; }
+.cp-lote-resumen__total { color: var(--cp-accent) !important; font-size: 17px !important; font-family: var(--cp-font-mono); }
+
+.cp-lote-lista {
+  margin: 0 var(--cp-space-5) 16px;
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+}
+.cp-lote-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 14px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--cp-border);
+}
+.cp-lote-item:last-child { border-bottom: none; }
+.cp-lote-item__pac { color: var(--cp-text); font-weight: 500; }
+.cp-lote-item__monto { font-family: var(--cp-font-mono); color: var(--cp-text-muted); }
+
+.cp-lote-resultado {
+  margin: 0 var(--cp-space-5) 4px;
+  padding: 12px 16px;
+  border-radius: var(--cp-radius-md);
+  font-size: 13.5px;
+}
+.cp-lote-resultado--ok { background: var(--cp-success-bg); color: var(--cp-success); }
+.cp-lote-resultado--parcial { background: var(--cp-warning-bg); color: var(--cp-warning); }
 
 .cp-sol-grupo__chevron { color: var(--cp-accent); display: flex; flex-shrink: 0; }
 
