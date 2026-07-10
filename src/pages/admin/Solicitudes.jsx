@@ -322,121 +322,344 @@ function EmptyState({ tab }) {
   );
 }
 
+/* Extrae la fecha de la sesión (para agrupar por mes) desde el snapshot */
+function fechaSesionDeSolicitud(s) {
+  const f = s.payloadPropuesto?.sesionSnapshot?.fecha
+    || s.payloadPropuesto?.fecha
+    || s.payloadAnterior?.fecha;
+  if (!f) return null;
+  if (f.toDate) return f.toDate();
+  if (f.seconds !== undefined) return new Date(f.seconds * 1000);
+  const d = new Date(f);
+  return isNaN(d.getTime()) ? null : d;
+}
+function montoConsultorioDeSolicitud(s) {
+  const snap = s.payloadPropuesto?.sesionSnapshot;
+  if (!snap) return 0;
+  if (snap.montoConsultorio != null) return snap.montoConsultorio;
+  if (snap.valorTotal != null && snap.porcentajeConsultorio != null) {
+    return Math.round(snap.valorTotal * snap.porcentajeConsultorio / 100);
+  }
+  return 0;
+}
+const MESES_LARGO = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+function claveMesSol(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+function nombreMesSol(clave) {
+  const [y, m] = clave.split('-').map(Number);
+  return `${MESES_LARGO[m - 1]} ${y}`;
+}
+
+const ChevronSol = ({ abierto }) => (
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
+    style={{ transform: abierto ? 'rotate(90deg)' : 'none', transition: 'transform 160ms' }}>
+    <polyline points="9 18 15 12 9 6" />
+  </svg>
+);
+
 function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSeleccionar }) {
+  // Separar solicitudes agrupables (marcar_pagada / liquidar_os, que tienen
+  // fecha de sesión) de las sueltas (crear, modificar, eliminar, etc.).
+  const { grupos, sueltas } = useMemo(() => {
+    const agrupables = [];
+    const otras = [];
+    for (const s of solicitudes) {
+      const esAgrupable = (s.tipo === TIPOS_SOLICITUD_SESION.MARCAR_PAGADA
+        || s.tipo === TIPOS_SOLICITUD_SESION.LIQUIDAR_OS)
+        && fechaSesionDeSolicitud(s);
+      if (esAgrupable) agrupables.push(s);
+      else otras.push(s);
+    }
+    // Agrupar por profesional + mes de la sesión
+    const map = {};
+    for (const s of agrupables) {
+      const d = fechaSesionDeSolicitud(s);
+      const km = claveMesSol(d);
+      const key = `${s.profesionalUid}__${km}`;
+      if (!map[key]) {
+        map[key] = {
+          key,
+          profesionalUid: s.profesionalUid,
+          profesionalNombre: s.profesionalNombre || nombreProfesional(mapaProfesionales[s.profesionalUid]),
+          mesClave: km,
+          solicitudes: [],
+          total: 0,
+        };
+      }
+      map[key].solicitudes.push(s);
+      map[key].total += montoConsultorioDeSolicitud(s);
+    }
+    const gruposArr = Object.values(map).sort((a, b) => {
+      if (a.mesClave !== b.mesClave) return b.mesClave.localeCompare(a.mesClave);
+      return a.profesionalNombre.localeCompare(b.profesionalNombre);
+    });
+    return { grupos: gruposArr, sueltas: otras };
+  }, [solicitudes, mapaProfesionales]);
+
   return (
-    <DualScrollTable className="cp-compact-list">
-      <table className="cp-table cp-solicitudes-tabla">
-        <thead>
-          <tr>
-            <th>Tipo</th>
-            <th>Profesional</th>
-            <th>Paciente</th>
-            <th>Solicitada</th>
-            <th>Estado</th>
-            <th aria-label="Acciones" />
-          </tr>
-        </thead>
-        <tbody>
-          {solicitudes.map((s) => {
-            const prof = mapaProfesionales[s.profesionalUid];
-            const pacienteId = s.payloadPropuesto?.pacienteId || s.payloadAnterior?.pacienteId;
-            const pac = pacienteId ? mapaPacientes[pacienteId] : null;
-            const nombrePacDesdePayload = s.tipo === TIPOS_SOLICITUD_SESION.CREAR_PACIENTE
-              ? `${s.payloadPropuesto?.datosPaciente?.apellido || ''} ${s.payloadPropuesto?.datosPaciente?.nombre || ''}`.trim()
-              : s.tipo === TIPOS_SOLICITUD_SESION.MARCAR_PAGADA || s.tipo === TIPOS_SOLICITUD_SESION.LIQUIDAR_OS
-                ? s.payloadPropuesto?.sesionSnapshot?.pacienteNombre || ''
-                : null;
-            const resuelta = s.estado !== ESTADOS_SOLICITUD_SESION.PENDIENTE;
-            const cantidad = cantidadDePayload(s.payloadPropuesto || s.payloadAnterior);
+    <div className="cp-solicitudes-agrupadas">
+      {grupos.map((g) => (
+        <GrupoSolicitudes
+          key={g.key}
+          grupo={g}
+          mapaPacientes={mapaPacientes}
+          mapaProfesionales={mapaProfesionales}
+          onSeleccionar={onSeleccionar}
+        />
+      ))}
 
-            return (
-              <tr
-                key={s.id}
-                className={`cp-solicitudes-tabla__row ${resuelta ? 'cp-solicitudes-tabla__row--resuelta' : ''}`}
-                onClick={() => onSeleccionar(s)}
-              >
-                <td data-label="Tipo">
-                  <span className={`cp-solicitud-tipo cp-solicitud-tipo--${s.tipo}`}>
-                    {iconoTipo(s.tipo)}
-                    {LABELS_TIPO_SOLICITUD[s.tipo]}
-                  </span>
-                </td>
-                <td data-label="Profesional" style={{ fontSize: 13.5 }}>
-                  {s.profesionalNombre || nombreProfesional(prof)}
-                </td>
-                <td data-label="Paciente">
-                  {nombrePacDesdePayload ? (
-                    <span style={{ fontSize: 13.5, fontWeight: 500 }}>{nombrePacDesdePayload}</span>
-                  ) : pac ? (
-                    <div className="cp-prof-cell">
-                      <Avatar initials={inicialesPaciente(pac)} size={28} />
-                      <div className="cp-prof-name" style={{ fontSize: 13.5 }}>
-                        {nombrePaciente(pac)}
-                        <GroupBadge cantidad={cantidad} />
-                      </div>
-                    </div>
-                  ) : (
-                    <span style={{ color: 'var(--cp-text-faint)', fontSize: 13.5 }}>—</span>
-                  )}
-                </td>
-                <td data-label="Solicitada" style={{ fontSize: 13, color: 'var(--cp-text-muted)' }}>
-                  {formatoRelativo(s.createdAt)}
-                </td>
-                <td data-label="Estado">{badgeEstado(s.estado)}</td>
-                <td className="cp-solicitudes-tabla__action-cell" style={{ textAlign: 'right' }}>
-                  <button
-                    type="button"
-                    className="cp-prof-action"
-                    onClick={(e) => { e.stopPropagation(); onSeleccionar(s); }}
-                  >
-                    Ver detalle
-                  </button>
-                </td>
+      {sueltas.length > 0 && (
+        <>
+          {grupos.length > 0 && (
+            <div className="cp-solicitudes-sueltas-titulo">Otras solicitudes</div>
+          )}
+          <DualScrollTable className="cp-compact-list">
+            <table className="cp-table cp-solicitudes-tabla">
+              <thead>
+                <tr>
+                  <th>Tipo</th>
+                  <th>Profesional</th>
+                  <th>Paciente</th>
+                  <th>Solicitada</th>
+                  <th>Estado</th>
+                  <th aria-label="Acciones" />
+                </tr>
+              </thead>
+              <tbody>
+                {sueltas.map((s) => (
+                  <FilaSolicitud
+                    key={s.id}
+                    s={s}
+                    mapaPacientes={mapaPacientes}
+                    mapaProfesionales={mapaProfesionales}
+                    onSeleccionar={onSeleccionar}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </DualScrollTable>
+        </>
+      )}
+    </div>
+  );
+}
 
-                <td className="cp-td-mobile-main" onClick={() => onSeleccionar(s)}>
-                  <div className="cp-row-mobile__top">
-                    {pac ? (
-                      <div className="cp-prof-cell">
-                        <Avatar initials={inicialesPaciente(pac)} size={26} />
-                        <div className="cp-prof-name">
-                          {nombrePaciente(pac)}
-                          <GroupBadge cantidad={cantidad} />
-                        </div>
-                      </div>
-                    ) : (
-                      <span className={`cp-solicitud-tipo cp-solicitud-tipo--${s.tipo}`}>
-                        {iconoTipo(s.tipo)} {LABELS_TIPO_SOLICITUD[s.tipo]}
-                      </span>
-                    )}
-                  </div>
-                  <div className="cp-row-mobile__mid">
-                    {LABELS_TIPO_SOLICITUD[s.tipo]}
-                    {pac ? ` · ${s.profesionalNombre || nombreProfesional(prof)}` : ''}
-                  </div>
-                  <div className="cp-row-mobile__bot">
-                    {formatoRelativo(s.createdAt)}
-                  </div>
-                </td>
-                <td className="cp-td-mobile-badge">
-                  {badgeEstado(s.estado)}
-                </td>
-                <td className="cp-td-mobile-actions" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    type="button"
-                    className="cp-action-menu__trigger"
-                    onClick={() => onSeleccionar(s)}
-                    aria-label="Ver detalle"
-                    style={{ fontSize: 12, width: 'auto', padding: '4px 8px' }}
-                  >
-                    →
-                  </button>
-                </td>
+/* Grupo colapsable: profesional + mes, con total */
+function GrupoSolicitudes({ grupo, mapaPacientes, mapaProfesionales, onSeleccionar }) {
+  const [abierto, setAbierto] = useState(true);
+  const cant = grupo.solicitudes.length;
+  const prof = mapaProfesionales[grupo.profesionalUid];
+
+  return (
+    <div className={`cp-sol-grupo ${abierto ? 'cp-sol-grupo--abierto' : ''}`}>
+      <button className="cp-sol-grupo__head" onClick={() => setAbierto((v) => !v)}>
+        <span className="cp-sol-grupo__chevron"><ChevronSol abierto={abierto} /></span>
+        <Avatar initials={(grupo.profesionalNombre?.[0] || '?').toUpperCase()} size={30} />
+        <div className="cp-sol-grupo__info">
+          <span className="cp-sol-grupo__prof">{grupo.profesionalNombre}</span>
+          <span className="cp-sol-grupo__mes">{nombreMesSol(grupo.mesClave)}</span>
+        </div>
+        <span className="cp-sol-grupo__cant">{cant} solicitud{cant === 1 ? '' : 'es'}</span>
+        <span className="cp-sol-grupo__total">{formatoARS.format(grupo.total)}</span>
+      </button>
+
+      {abierto && (
+        <DualScrollTable className="cp-compact-list">
+          <table className="cp-table cp-solicitudes-tabla">
+            <thead>
+              <tr>
+                <th>Tipo</th>
+                <th>Paciente</th>
+                <th className="cp-num-col">Al consultorio</th>
+                <th>Solicitada</th>
+                <th>Estado</th>
+                <th aria-label="Acciones" />
               </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </DualScrollTable>
+            </thead>
+            <tbody>
+              {grupo.solicitudes.map((s) => (
+                <FilaSolicitudGrupo
+                  key={s.id}
+                  s={s}
+                  onSeleccionar={onSeleccionar}
+                />
+              ))}
+            </tbody>
+          </table>
+        </DualScrollTable>
+      )}
+    </div>
+  );
+}
+
+/* Fila dentro de un grupo (sin columna profesional, con monto) */
+function FilaSolicitudGrupo({ s, onSeleccionar }) {
+  const snap = s.payloadPropuesto?.sesionSnapshot || {};
+  const nombrePac = snap.pacienteNombre || '—';
+  const resuelta = s.estado !== ESTADOS_SOLICITUD_SESION.PENDIENTE;
+  const monto = montoConsultorioDeSolicitud(s);
+  const d = fechaSesionDeSolicitud(s);
+
+  return (
+    <tr
+      className={`cp-solicitudes-tabla__row ${resuelta ? 'cp-solicitudes-tabla__row--resuelta' : ''}`}
+      onClick={() => onSeleccionar(s)}
+    >
+      <td data-label="Tipo">
+        <span className={`cp-solicitud-tipo cp-solicitud-tipo--${s.tipo}`}>
+          {iconoTipo(s.tipo)}
+          {LABELS_TIPO_SOLICITUD[s.tipo]}
+        </span>
+      </td>
+      <td data-label="Paciente">
+        <span style={{ fontSize: 13.5, fontWeight: 500 }}>{nombrePac}</span>
+        {d && (
+          <span style={{ display: 'block', fontSize: 11.5, color: 'var(--cp-text-muted)' }}>
+            {d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })}
+          </span>
+        )}
+      </td>
+      <td data-label="Al consultorio" className="cp-num" style={{ color: 'var(--cp-accent)' }}>
+        {formatoARS.format(monto)}
+      </td>
+      <td data-label="Solicitada" style={{ fontSize: 13, color: 'var(--cp-text-muted)' }}>
+        {formatoRelativo(s.createdAt)}
+      </td>
+      <td data-label="Estado">{badgeEstado(s.estado)}</td>
+      <td className="cp-solicitudes-tabla__action-cell" style={{ textAlign: 'right' }}>
+        <button
+          type="button"
+          className="cp-prof-action"
+          onClick={(e) => { e.stopPropagation(); onSeleccionar(s); }}
+        >
+          Ver detalle
+        </button>
+      </td>
+
+      {/* Mobile */}
+      <td className="cp-td-mobile-main" onClick={() => onSeleccionar(s)}>
+        <div className="cp-row-mobile__top">
+          <span style={{ fontSize: 13.5, fontWeight: 500 }}>{nombrePac}</span>
+        </div>
+        <div className="cp-row-mobile__mid">
+          {LABELS_TIPO_SOLICITUD[s.tipo]} · {formatoARS.format(monto)}
+        </div>
+        <div className="cp-row-mobile__bot">
+          {formatoRelativo(s.createdAt)}
+        </div>
+      </td>
+      <td className="cp-td-mobile-badge">{badgeEstado(s.estado)}</td>
+      <td className="cp-td-mobile-actions" onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          className="cp-action-menu__trigger"
+          onClick={() => onSeleccionar(s)}
+          aria-label="Ver detalle"
+          style={{ fontSize: 12, width: 'auto', padding: '4px 8px' }}
+        >
+          →
+        </button>
+      </td>
+    </tr>
+  );
+}
+
+/* Fila normal (solicitudes sueltas: crear, modificar, etc.) */
+function FilaSolicitud({ s, mapaPacientes, mapaProfesionales, onSeleccionar }) {
+  const prof = mapaProfesionales[s.profesionalUid];
+  const pacienteId = s.payloadPropuesto?.pacienteId || s.payloadAnterior?.pacienteId;
+  const pac = pacienteId ? mapaPacientes[pacienteId] : null;
+  const nombrePacDesdePayload = s.tipo === TIPOS_SOLICITUD_SESION.CREAR_PACIENTE
+    ? `${s.payloadPropuesto?.datosPaciente?.apellido || ''} ${s.payloadPropuesto?.datosPaciente?.nombre || ''}`.trim()
+    : s.tipo === TIPOS_SOLICITUD_SESION.MARCAR_PAGADA || s.tipo === TIPOS_SOLICITUD_SESION.LIQUIDAR_OS
+      ? s.payloadPropuesto?.sesionSnapshot?.pacienteNombre || ''
+      : null;
+  const resuelta = s.estado !== ESTADOS_SOLICITUD_SESION.PENDIENTE;
+  const cantidad = cantidadDePayload(s.payloadPropuesto || s.payloadAnterior);
+
+  return (
+    <tr
+      className={`cp-solicitudes-tabla__row ${resuelta ? 'cp-solicitudes-tabla__row--resuelta' : ''}`}
+      onClick={() => onSeleccionar(s)}
+    >
+      <td data-label="Tipo">
+        <span className={`cp-solicitud-tipo cp-solicitud-tipo--${s.tipo}`}>
+          {iconoTipo(s.tipo)}
+          {LABELS_TIPO_SOLICITUD[s.tipo]}
+        </span>
+      </td>
+      <td data-label="Profesional" style={{ fontSize: 13.5 }}>
+        {s.profesionalNombre || nombreProfesional(prof)}
+      </td>
+      <td data-label="Paciente">
+        {nombrePacDesdePayload ? (
+          <span style={{ fontSize: 13.5, fontWeight: 500 }}>{nombrePacDesdePayload}</span>
+        ) : pac ? (
+          <div className="cp-prof-cell">
+            <Avatar initials={inicialesPaciente(pac)} size={28} />
+            <div className="cp-prof-name" style={{ fontSize: 13.5 }}>
+              {nombrePaciente(pac)}
+              <GroupBadge cantidad={cantidad} />
+            </div>
+          </div>
+        ) : (
+          <span style={{ color: 'var(--cp-text-faint)', fontSize: 13.5 }}>—</span>
+        )}
+      </td>
+      <td data-label="Solicitada" style={{ fontSize: 13, color: 'var(--cp-text-muted)' }}>
+        {formatoRelativo(s.createdAt)}
+      </td>
+      <td data-label="Estado">{badgeEstado(s.estado)}</td>
+      <td className="cp-solicitudes-tabla__action-cell" style={{ textAlign: 'right' }}>
+        <button
+          type="button"
+          className="cp-prof-action"
+          onClick={(e) => { e.stopPropagation(); onSeleccionar(s); }}
+        >
+          Ver detalle
+        </button>
+      </td>
+
+      <td className="cp-td-mobile-main" onClick={() => onSeleccionar(s)}>
+        <div className="cp-row-mobile__top">
+          {pac ? (
+            <div className="cp-prof-cell">
+              <Avatar initials={inicialesPaciente(pac)} size={26} />
+              <div className="cp-prof-name">
+                {nombrePaciente(pac)}
+                <GroupBadge cantidad={cantidad} />
+              </div>
+            </div>
+          ) : (
+            <span className={`cp-solicitud-tipo cp-solicitud-tipo--${s.tipo}`}>
+              {iconoTipo(s.tipo)} {LABELS_TIPO_SOLICITUD[s.tipo]}
+            </span>
+          )}
+        </div>
+        <div className="cp-row-mobile__mid">
+          {LABELS_TIPO_SOLICITUD[s.tipo]}
+          {pac ? ` · ${s.profesionalNombre || nombreProfesional(prof)}` : ''}
+        </div>
+        <div className="cp-row-mobile__bot">
+          {formatoRelativo(s.createdAt)}
+        </div>
+      </td>
+      <td className="cp-td-mobile-badge">
+        {badgeEstado(s.estado)}
+      </td>
+      <td className="cp-td-mobile-actions" onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          className="cp-action-menu__trigger"
+          onClick={() => onSeleccionar(s)}
+          aria-label="Ver detalle"
+          style={{ fontSize: 12, width: 'auto', padding: '4px 8px' }}
+        >
+          →
+        </button>
+      </td>
+    </tr>
   );
 }
 
