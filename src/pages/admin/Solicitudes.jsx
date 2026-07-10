@@ -4,6 +4,7 @@ import Avatar from '../../components/ui/Avatar.jsx';
 import DualScrollTable from '../../components/ui/DualScrollTable.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
+import ErrorBoundary from '../../components/ErrorBoundary.jsx';
 
 import { useAuth } from '../../hooks/useAuth.js';
 import { useConsultorio } from '../../hooks/useConsultorio.js';
@@ -156,6 +157,14 @@ function badgeEstado(estado) {
    Pagina principal
    ============================================================ */
 export default function Solicitudes() {
+  return (
+    <ErrorBoundary title="No se pudieron mostrar las solicitudes">
+      <SolicitudesInner />
+    </ErrorBoundary>
+  );
+}
+
+function SolicitudesInner() {
   const { user } = useAuth();
   const { consultorio } = useConsultorio();
   const mapaMetodos = useMemo(() => {
@@ -367,7 +376,9 @@ function claveMesSol(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 function nombreMesSol(clave) {
+  if (!clave || clave === 'sin-fecha') return 'Sin fecha';
   const [y, m] = clave.split('-').map(Number);
+  if (!m || m < 1 || m > 12 || !y) return 'Sin fecha';
   return `${MESES_LARGO[m - 1]} ${y}`;
 }
 
@@ -459,7 +470,7 @@ function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSel
 
       {sueltas.length > 0 && (
         <>
-          {grupos.length > 0 && (
+          {porProfesional.length > 0 && (
             <div className="cp-solicitudes-sueltas-titulo">Otras solicitudes</div>
           )}
           <DualScrollTable className="cp-compact-list">
