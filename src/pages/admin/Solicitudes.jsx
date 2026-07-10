@@ -363,6 +363,7 @@ function montoConsultorioDeSolicitud(s) {
 const MESES_LARGO = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 const MESES_TITULO = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
 function claveMesSol(d) {
+  if (!d || typeof d.getFullYear !== 'function') return 'sin-fecha';
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 function nombreMesSol(clave) {
@@ -423,11 +424,13 @@ function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSel
       .map((p) => ({
         ...p,
         gruposArr: Object.values(p.grupos).sort((a, b) => {
-          if (a.mesClave !== b.mesClave) return b.mesClave.localeCompare(a.mesClave);
-          return a.tipo.localeCompare(b.tipo);
+          const ma = a.mesClave || '';
+          const mb = b.mesClave || '';
+          if (ma !== mb) return mb.localeCompare(ma);
+          return (a.tipo || '').localeCompare(b.tipo || '');
         }),
       }))
-      .sort((a, b) => a.profesionalNombre.localeCompare(b.profesionalNombre));
+      .sort((a, b) => (a.profesionalNombre || '').localeCompare(b.profesionalNombre || ''));
     return { porProfesional: profesionalesArr, sueltas: otras };
   }, [solicitudes, mapaProfesionales]);
 
@@ -499,13 +502,13 @@ function ResueltasPorProfesional({ solicitudes, profesionales, mapaPacientes, ma
   const bloques = useMemo(() => {
     // Agrupar resueltas por profesional
     const porProf = {};
-    for (const s of solicitudes) {
+    for (const s of (solicitudes || [])) {
       const puid = s.profesionalUid || '__sin__';
       if (!porProf[puid]) porProf[puid] = [];
       porProf[puid].push(s);
     }
     // Construir bloque por cada profesional del consultorio
-    const arr = profesionales.map((p) => {
+    const arr = (profesionales || []).map((p) => {
       const sols = porProf[p.uid] || [];
       // Agrupar por mes de la sesión (o de resolución si no hay fecha de sesión)
       const meses = {};
@@ -520,7 +523,7 @@ function ResueltasPorProfesional({ solicitudes, profesionales, mapaPacientes, ma
           clave,
           lista: lista.sort((a, b) => (tsMs(b.resolvedAt) - tsMs(a.resolvedAt))),
         }))
-        .sort((a, b) => b.clave.localeCompare(a.clave));
+        .sort((a, b) => (b.clave || '').localeCompare(a.clave || ''));
       return {
         uid: p.uid,
         nombre: nombreProfesional(p) || p.displayName || p.email || 'Profesional',
@@ -531,7 +534,7 @@ function ResueltasPorProfesional({ solicitudes, profesionales, mapaPacientes, ma
     // Ordenar: primero los que tienen resueltas, luego alfabético
     return arr.sort((a, b) => {
       if ((a.cant > 0) !== (b.cant > 0)) return b.cant - a.cant > 0 ? 1 : -1;
-      return a.nombre.localeCompare(b.nombre);
+      return (a.nombre || '').localeCompare(b.nombre || '');
     });
   }, [solicitudes, profesionales, mapaProfesionales]);
 
