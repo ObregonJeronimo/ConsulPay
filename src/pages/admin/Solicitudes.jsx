@@ -343,6 +343,7 @@ function montoConsultorioDeSolicitud(s) {
   return 0;
 }
 const MESES_LARGO = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+const MESES_TITULO = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
 function claveMesSol(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
@@ -698,6 +699,14 @@ function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, mapaMetodos
 
   const cantidad = cantidadDePayload(solicitud.payloadPropuesto || solicitud.payloadAnterior);
 
+  // Mes de la sesión (para el título), solo en solicitudes agrupables con fecha.
+  const esAgrupable = solicitud.tipo === TIPOS_SOLICITUD_SESION.MARCAR_PAGADA
+    || solicitud.tipo === TIPOS_SOLICITUD_SESION.LIQUIDAR_OS;
+  const fechaSesionTitulo = esAgrupable ? fechaSesionDeSolicitud(solicitud) : null;
+  const mesTitulo = fechaSesionTitulo
+    ? MESES_TITULO[fechaSesionTitulo.getMonth()]
+    : null;
+
   async function handleAprobar() {
     setError('');
     setSubmitting(true);
@@ -760,7 +769,7 @@ function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, mapaMetodos
           {' '}
           {solicitud.tipo === TIPOS_SOLICITUD_SESION.CARGA_RAPIDA
             ? `Carga rápida — ${solicitud.payloadPropuesto?.sesiones?.length ?? 0} sesiones`
-            : <>{LABELS_TIPO_SOLICITUD[solicitud.tipo]} · {nombrePac}<GroupBadge cantidad={cantidad} /></>}
+            : <>{LABELS_TIPO_SOLICITUD[solicitud.tipo]}{mesTitulo ? ` · ${mesTitulo}` : ''} · {nombrePac}<GroupBadge cantidad={cantidad} /></>}
         </h2>
 
         {cantidad > 1 && esPendiente && (
