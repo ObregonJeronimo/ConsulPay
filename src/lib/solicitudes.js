@@ -419,6 +419,19 @@ export async function aprobarSolicitud({
 
   if (sol.tipo === TIPOS_SOLICITUD_SESION.MARCAR_PAGADA) {
     const { marcarSesionPagada } = await import('./sesiones.js');
+    // Si la sesión ya está pagada (p. ej. por una solicitud duplicada ya
+    // aprobada), esta queda obsoleta en vez de re-procesarse.
+    const sesSnap = await getDoc(doc(db, 'sesiones', sol.sesionId));
+    if (sesSnap.exists() && sesSnap.data().estadoPago === ESTADOS_PAGO_SESION.PAGADO) {
+      await updateDoc(doc(db, 'solicitudes_sesion', solicitudId), {
+        estado: ESTADOS_SOLICITUD_SESION.OBSOLETA,
+        resolvedAt: serverTimestamp(),
+        resolvedByUid: adminUid,
+        resolvedByNombre: adminNombre,
+        updatedAt: serverTimestamp(),
+      });
+      throw new Error('Esta sesión ya fue marcada como pagada (probablemente por otra solicitud). Quedó marcada como obsoleta.');
+    }
     // Prioridad del receptor: override del admin > snapshot en la solicitud > admin actual
     const receptor = receptorOverride
       || sol.payloadPropuesto?.receptor
@@ -631,6 +644,9 @@ export async function solicitarMarcarPagada({
   sesionSnapshot,
   receptor,
 }) {
+  // Evitar duplicados: si ya hay una solicitud pendiente para esta sesión,
+  // no se crea otra (previene doble click y reintentos).
+  await validarNoHayPendienteParaSesion(consultorioId, sesionId);
   const ref = await addDoc(collection(db, 'solicitudes_sesion'), {
     consultorioId,
     tipo: TIPOS_SOLICITUD_SESION.MARCAR_PAGADA,
