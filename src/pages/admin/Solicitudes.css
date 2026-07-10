@@ -896,22 +896,171 @@
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  margin: 8px 12px 8px 0;
-  padding: 0 14px;
+  gap: 5px;
+  margin: 7px 10px 7px 0;
+  padding: 0 11px;
+  height: 30px;
   background: var(--cp-accent);
   color: #fff;
   border: none;
-  border-radius: var(--cp-radius-md);
+  border-radius: var(--cp-radius-sm);
   font-family: inherit;
-  font-size: 12.5px;
+  font-size: 11.5px;
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
   transition: background 120ms var(--cp-ease);
 }
 .cp-sol-grupo__aprobar-btn:hover { background: var(--cp-accent-hover); }
-.cp-sol-grupo__aprobar-btn svg { width: 14px; height: 14px; }
+.cp-sol-grupo__aprobar-btn svg { width: 12px; height: 12px; }
+
+/* Bloque de profesional en PENDIENTES (1er nivel de agrupación) */
+.cp-sol-prof-bloque {
+  margin-bottom: 16px;
+}
+.cp-sol-prof-bloque__head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 2px 4px 8px;
+}
+.cp-sol-prof-bloque__nombre {
+  font-family: var(--cp-font-serif);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--cp-text);
+}
+.cp-sol-prof-bloque .cp-sol-grupo {
+  margin-bottom: 8px;
+}
+
+/* Ícono de tipo en el header del grupo */
+.cp-sol-grupo__tipo-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--cp-radius-sm);
+  flex-shrink: 0;
+}
+.cp-sol-grupo__tipo-icon svg { width: 15px; height: 15px; }
+.cp-sol-grupo__tipo-icon--pago { background: var(--cp-success-bg); color: var(--cp-success); }
+.cp-sol-grupo__tipo-icon--liq { background: var(--cp-accent-bg); color: var(--cp-accent-dark); }
+
+.cp-sol-grupo__aprobar-btn-txt { display: inline; }
+
+/* ============================================================
+   RESUELTAS: profesional → mes → solicitudes
+   ============================================================ */
+.cp-resueltas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cp-res-prof {
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  background: var(--cp-surface);
+  overflow: hidden;
+}
+.cp-res-prof--vacio { opacity: 0.72; }
+
+.cp-res-prof__head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 16px;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms var(--cp-ease);
+}
+.cp-res-prof__head:not(:disabled):hover { background: var(--cp-surface-hover); }
+.cp-res-prof__head:disabled { cursor: default; }
+
+.cp-res-prof__chevron {
+  color: var(--cp-accent);
+  display: flex;
+  width: 16px;
+  flex-shrink: 0;
+}
+.cp-res-prof__nombre {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--cp-text);
+  flex: 1;
+}
+.cp-res-prof__cant {
+  font-size: 12.5px;
+  color: var(--cp-text-muted);
+  background: var(--cp-surface-sunken);
+  padding: 2px 10px;
+  border-radius: var(--cp-radius-pill);
+}
+.cp-res-prof__vacio-txt {
+  font-size: 12.5px;
+  color: var(--cp-text-faint);
+  font-style: italic;
+}
+
+.cp-res-prof__meses {
+  padding: 4px 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Nivel 2: mes */
+.cp-res-mes {
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-sm);
+  background: var(--cp-bg);
+  overflow: hidden;
+}
+.cp-res-mes__head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms var(--cp-ease);
+}
+.cp-res-mes__head:hover { background: var(--cp-surface-hover); }
+.cp-res-mes__chevron { color: var(--cp-accent); display: flex; width: 16px; flex-shrink: 0; }
+.cp-res-mes__nombre {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--cp-text);
+  flex: 1;
+  text-transform: capitalize;
+}
+.cp-res-mes__cant {
+  font-size: 12px;
+  color: var(--cp-text-muted);
+  background: var(--cp-surface);
+  padding: 2px 9px;
+  border-radius: var(--cp-radius-pill);
+  border: 1px solid var(--cp-border);
+}
+.cp-res-mes .cp-compact-list { background: var(--cp-surface); }
+
+/* Móvil: bloques de profesional en pendientes */
+@media (max-width: 640px) {
+  .cp-sol-prof-bloque__nombre { font-size: 15px; }
+  .cp-sol-grupo__aprobar-btn-txt { display: none; }
+  .cp-sol-grupo__aprobar-btn { padding: 0 9px; }
+  .cp-res-prof__nombre { font-size: 14px; }
+}
 
 /* Modal aprobar en lote */
 .cp-lote-resumen {
