@@ -18,6 +18,7 @@ import {
   totalesGlobales,
 } from '../../lib/sesiones.js';
 
+import ResumenProfesionales from './ResumenProfesionales.jsx';
 import './Dashboard.css';
 
 const PlusIcon = () => (
@@ -253,6 +254,14 @@ export default function Dashboard() {
           </ul>
         )}
       </section>
+
+      {/* Resumen rápido: estado de cada profesional, mes a mes */}
+      {profesionales.length > 0 && (
+        <ResumenProfesionales
+          consultorioId={user?.consultorioId}
+          profesionales={profesionales}
+        />
+      )}
     </div>
   );
 }
