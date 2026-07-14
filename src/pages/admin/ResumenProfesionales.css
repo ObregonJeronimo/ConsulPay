@@ -1,0 +1,279 @@
+/* ============================================================
+   Resumen por profesional (matriz profesional × mes)
+   ============================================================ */
+.cp-rp {
+  margin-top: var(--cp-space-7, 28px);
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-lg);
+  padding: var(--cp-space-5, 20px);
+}
+
+.cp-rp__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.cp-rp__title {
+  font-family: var(--cp-font-serif);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--cp-text);
+  margin: 0 0 2px;
+}
+
+.cp-rp__sub {
+  font-size: 12.5px;
+  color: var(--cp-text-muted);
+  margin: 0;
+}
+
+/* Selector de año */
+.cp-rp__anio {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--cp-surface-sunken);
+  border-radius: var(--cp-radius-md);
+  padding: 3px;
+  flex-shrink: 0;
+}
+.cp-rp__anio-btn {
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  color: var(--cp-text-muted);
+  font-size: 16px;
+  line-height: 1;
+  border-radius: var(--cp-radius-sm);
+  cursor: pointer;
+  transition: background 120ms var(--cp-ease);
+}
+.cp-rp__anio-btn:hover:not(:disabled) { background: var(--cp-surface); color: var(--cp-text); }
+.cp-rp__anio-btn:disabled { opacity: 0.3; cursor: default; }
+.cp-rp__anio-val {
+  font-family: var(--cp-font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cp-text);
+  padding: 0 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cp-rp__loading { padding: 32px; display: flex; justify-content: center; }
+.cp-rp__empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--cp-text-muted);
+  font-size: 13.5px;
+}
+
+/* Contenedor con scroll horizontal (clave en móvil) */
+.cp-rp__scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 calc(var(--cp-space-5, 20px) * -1);
+  padding: 0 var(--cp-space-5, 20px);
+}
+
+.cp-rp__tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.cp-rp__tabla th,
+.cp-rp__tabla td {
+  padding: 0;
+  text-align: center;
+}
+
+/* Encabezado */
+.cp-rp__th-prof {
+  text-align: left !important;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--cp-text-faint);
+  font-weight: 600;
+  padding: 0 10px 8px 0 !important;
+  position: sticky;
+  left: 0;
+  background: var(--cp-surface);
+  z-index: 2;
+  min-width: 132px;
+}
+
+.cp-rp__th-mes {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--cp-text-faint);
+  font-weight: 600;
+  padding-bottom: 8px !important;
+  min-width: 44px;
+}
+.cp-rp__th-mes--actual {
+  color: var(--cp-accent);
+}
+
+.cp-rp__th-total {
+  text-align: right !important;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--cp-text-faint);
+  font-weight: 600;
+  padding: 0 0 8px 12px !important;
+  min-width: 92px;
+}
+
+/* Filas */
+.cp-rp__tabla tbody tr {
+  border-top: 1px solid var(--cp-border);
+}
+
+.cp-rp__td-prof {
+  text-align: left !important;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px 7px 0 !important;
+  position: sticky;
+  left: 0;
+  background: var(--cp-surface);
+  z-index: 1;
+  min-width: 132px;
+}
+
+.cp-rp__prof-nombre {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--cp-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100px;
+}
+
+/* Celdas del mes */
+.cp-rp__celda {
+  padding: 7px 3px !important;
+  vertical-align: middle;
+}
+.cp-rp__celda--actual {
+  background: var(--cp-accent-bg);
+}
+
+.cp-rp__celda-in {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+
+.cp-rp__vacio { color: var(--cp-text-faint); opacity: 0.5; }
+
+.cp-rp__debe {
+  font-family: var(--cp-font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--cp-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.cp-rp__ok {
+  display: inline-flex;
+  color: var(--cp-success);
+  opacity: 0.75;
+}
+
+.cp-rp__liq {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--cp-warning-bg);
+  color: var(--cp-warning);
+  font-size: 10px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* Total por fila */
+.cp-rp__td-total {
+  text-align: right !important;
+  padding: 7px 0 7px 12px !important;
+  white-space: nowrap;
+}
+.cp-rp__total-val {
+  font-family: var(--cp-font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--cp-accent);
+  font-variant-numeric: tabular-nums;
+}
+.cp-rp__total-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  color: var(--cp-success);
+}
+
+/* Pie */
+.cp-rp__tabla tfoot tr { border-top: 2px solid var(--cp-border-strong); }
+.cp-rp__foot-label {
+  font-size: 11.5px !important;
+  font-weight: 600;
+  color: var(--cp-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding-top: 9px !important;
+}
+.cp-rp__foot-total {
+  font-family: var(--cp-font-mono);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--cp-accent);
+  padding-top: 9px !important;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Leyenda */
+.cp-rp__leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--cp-border);
+}
+.cp-rp__leyenda-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--cp-text-muted);
+}
+
+/* Móvil */
+@media (max-width: 720px) {
+  .cp-rp { padding: var(--cp-space-4, 16px); }
+  .cp-rp__head { flex-direction: column; gap: 10px; }
+  .cp-rp__anio { align-self: flex-start; }
+  .cp-rp__scroll {
+    margin: 0 calc(var(--cp-space-4, 16px) * -1);
+    padding: 0 var(--cp-space-4, 16px);
+  }
+  .cp-rp__th-prof, .cp-rp__td-prof { min-width: 112px; }
+  .cp-rp__prof-nombre { max-width: 78px; font-size: 12px; }
+  .cp-rp__th-total, .cp-rp__td-total { min-width: 80px; }
+  .cp-rp__leyenda { gap: 10px; }
+}
