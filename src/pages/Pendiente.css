@@ -65,6 +65,46 @@
   color: var(--cp-text);
 }
 
+/* CTA para el caso "sin consultorio": ofrecer crear el propio */
+.cp-pendiente__cta {
+  width: 100%;
+  margin-top: var(--cp-space-5, 20px);
+  padding: var(--cp-space-5, 20px);
+  background: var(--cp-accent-bg);
+  border-radius: var(--cp-radius-md);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.cp-pendiente__cta-texto {
+  font-size: 13.5px;
+  color: var(--cp-accent-dark);
+  line-height: 1.5;
+  margin: 0;
+  text-align: center;
+}
+
+.cp-pendiente__cta-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: var(--cp-accent);
+  color: var(--cp-text-on-accent, #fff);
+  border-radius: var(--cp-radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 120ms var(--cp-ease);
+  min-height: 42px;
+}
+
+.cp-pendiente__cta-btn:hover {
+  background: var(--cp-accent-hover);
+}
+
 .cp-pendiente__actions {
   display: flex;
   gap: var(--cp-space-2);
@@ -102,5 +142,15 @@
     width: 100%;
     min-height: 44px;
     justify-content: center;
+  }
+
+  .cp-pendiente__cta {
+    padding: var(--cp-space-4, 16px);
+  }
+
+  .cp-pendiente__cta-btn {
+    width: 100%;
+    justify-content: center;
+    min-height: 46px;
   }
 }
