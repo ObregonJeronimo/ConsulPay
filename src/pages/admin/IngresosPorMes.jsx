@@ -19,7 +19,20 @@ function fechaDePago(sesion) {
   if (!f) return null;
   return f.toDate ? f.toDate() : new Date(f);
 }
+/* Fecha en que ocurrió la sesión (el encuentro con el paciente).
+   Distinta de fechaDePago: un pago de julio puede corresponder a
+   sesiones de marzo. Se usa para desglosar a qué mes pertenece
+   el dinero que entró. */
+function fechaDeSesion(sesion) {
+  const f = sesion.fecha;
+  if (!f) return null;
+  if (f.toDate) return f.toDate();
+  if (f.seconds !== undefined) return new Date(f.seconds * 1000);
+  const d = new Date(f);
+  return isNaN(d.getTime()) ? null : d;
+}
 function claveMes(d) {
+  if (!d || typeof d.getFullYear !== 'function') return 'sin-fecha';
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 function claveDia(d) {
@@ -27,7 +40,9 @@ function claveDia(d) {
 }
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 function nombreMesLargo(clave) {
+  if (!clave || clave === 'sin-fecha') return 'Sin fecha';
   const [y, m] = clave.split('-').map(Number);
+  if (!m || m < 1 || m > 12 || !y) return 'Sin fecha';
   return `${MESES[m - 1]} ${y}`;
 }
 function formatoDiaLargo(d) {
@@ -159,7 +174,7 @@ export default function IngresosPorMes({ consultorioId, uid, mapaProfesionales, 
                 </div>
 
                 {vista === 'profesional' && (
-                  <VistaProfesional mes={mes} mapaProfesionales={mapaProfesionales} />
+                  <VistaProfesional mes={mes} mapaProfesionales={mapaProfesionales} mapaPacientes={mapaPacientes} />
                 )}
                 {vista === 'dia' && (
                   <VistaDia mes={mes} mapaProfesionales={mapaProfesionales} />
@@ -192,31 +207,107 @@ export default function IngresosPorMes({ consultorioId, uid, mapaProfesionales, 
 
 /* ============================================================
    Vista: resumen por profesional
+   ----------------------------------------------------------------
+   Cada profesional es desplegable. Al abrirlo se ve DE QUÉ MESES
+   viene ese dinero: un pago que entró en julio puede corresponder a
+   sesiones de marzo, abril y mayo. Sin esto el admin ve el total
+   pero no sabe cómo se compone.
    ============================================================ */
-function VistaProfesional({ mes, mapaProfesionales }) {
+function VistaProfesional({ mes, mapaProfesionales, mapaPacientes }) {
   const filas = useMemo(() => {
     const map = {};
     for (const s of mes.sesiones) {
       const uid = s.profesionalUid;
-      if (!map[uid]) map[uid] = { uid, nombre: nombreProf(s, mapaProfesionales), total: 0, cant: 0 };
+      if (!map[uid]) {
+        map[uid] = {
+          uid,
+          nombre: nombreProf(s, mapaProfesionales),
+          total: 0,
+          pacientes: new Set(),
+          sesiones: [],
+        };
+      }
       map[uid].total += s.montoConsultorio || 0;
-      map[uid].cant += 1;
+      if (s.pacienteId) map[uid].pacientes.add(s.pacienteId);
+      map[uid].sesiones.push(s);
     }
-    return Object.values(map).sort((a, b) => b.total - a.total);
+    return Object.values(map)
+      .map((f) => ({ ...f, cantPacientes: f.pacientes.size }))
+      .sort((a, b) => b.total - a.total);
   }, [mes, mapaProfesionales]);
 
   return (
     <div className="cp-ingreso-lista">
       {filas.map((f) => (
-        <div key={f.uid} className="cp-ingreso-fila">
-          <Avatar initials={(f.nombre[0] || '?').toUpperCase()} size={30} />
-          <div className="cp-ingreso-fila__main">
-            <span className="cp-ingreso-fila__nombre">{f.nombre}</span>
-            <span className="cp-ingreso-fila__sub">{f.cant} sesión{f.cant === 1 ? '' : 'es'}</span>
-          </div>
-          <span className="cp-ingreso-fila__monto">{formatoARS.format(f.total)}</span>
-        </div>
+        <FilaProfesional
+          key={f.uid}
+          fila={f}
+          mapaPacientes={mapaPacientes}
+        />
       ))}
+    </div>
+  );
+}
+
+function FilaProfesional({ fila, mapaPacientes }) {
+  const [abierto, setAbierto] = useState(false);
+
+  // Desglose: a qué mes corresponde cada sesión que se cobró
+  const desglose = useMemo(() => {
+    const map = {};
+    for (const s of fila.sesiones) {
+      const d = fechaDeSesion(s);
+      const km = claveMes(d);
+      if (!map[km]) map[km] = { clave: km, total: 0, pacientes: new Set() };
+      map[km].total += s.montoConsultorio || 0;
+      if (s.pacienteId) map[km].pacientes.add(s.pacienteId);
+    }
+    return Object.values(map)
+      .map((m) => ({ ...m, cantPacientes: m.pacientes.size }))
+      .sort((a, b) => b.clave.localeCompare(a.clave));
+  }, [fila]);
+
+  const variosMeses = desglose.length > 1;
+
+  return (
+    <div className={`cp-ingreso-prof ${abierto ? 'cp-ingreso-prof--abierto' : ''}`}>
+      <button className="cp-ingreso-fila cp-ingreso-fila--btn" onClick={() => setAbierto((v) => !v)}>
+        <span className="cp-ingreso-fila__chev">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+            strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"
+            style={{ transform: abierto ? 'rotate(90deg)' : 'none', transition: 'transform 160ms' }}>
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </span>
+        <Avatar initials={(fila.nombre[0] || '?').toUpperCase()} size={30} />
+        <div className="cp-ingreso-fila__main">
+          <span className="cp-ingreso-fila__nombre">{fila.nombre}</span>
+          <span className="cp-ingreso-fila__sub">
+            {fila.cantPacientes} paciente{fila.cantPacientes === 1 ? '' : 's'}
+            {variosMeses && (
+              <span className="cp-ingreso-fila__badge">{desglose.length} meses</span>
+            )}
+          </span>
+        </div>
+        <span className="cp-ingreso-fila__monto">{formatoARS.format(fila.total)}</span>
+      </button>
+
+      {abierto && (
+        <div className="cp-ingreso-prof__desglose">
+          <div className="cp-ingreso-prof__desglose-titulo">
+            De qué meses viene este dinero
+          </div>
+          {desglose.map((m) => (
+            <div key={m.clave} className="cp-ingreso-desg">
+              <span className="cp-ingreso-desg__mes">{nombreMesLargo(m.clave)}</span>
+              <span className="cp-ingreso-desg__pac">
+                {m.cantPacientes} paciente{m.cantPacientes === 1 ? '' : 's'}
+              </span>
+              <span className="cp-ingreso-desg__monto">{formatoARS.format(m.total)}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
