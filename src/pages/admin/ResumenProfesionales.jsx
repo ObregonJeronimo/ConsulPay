@@ -32,10 +32,10 @@ function fechaDeSesion(s) {
   return isNaN(d.getTime()) ? null : d;
 }
 
-/* Monto compacto: 45.200 → 45,2k (para que entren 12 columnas) */
+/* Monto compacto legible: 45.200 → "45 mil" (para que entren 12 columnas) */
 function montoCompacto(n) {
-  if (n >= 1000000) return `${(n / 1000000).toFixed(1).replace('.', ',')}M`;
-  if (n >= 1000) return `${Math.round(n / 1000)}k`;
+  if (n >= 1000000) return `${(n / 1000000).toFixed(1).replace('.', ',')} M`;
+  if (n >= 1000) return `${Math.round(n / 1000)} mil`;
   return String(n);
 }
 
@@ -206,7 +206,7 @@ export default function ResumenProfesionales({ consultorioId, profesionales }) {
 
           <div className="cp-rp__leyenda">
             <span className="cp-rp__leyenda-item">
-              <span className="cp-rp__debe">45k</span> debe al consultorio
+              <span className="cp-rp__debe">45 mil</span> debe al consultorio
             </span>
             <span className="cp-rp__leyenda-item">
               <span className="cp-rp__ok"><CheckMini /></span> al día
