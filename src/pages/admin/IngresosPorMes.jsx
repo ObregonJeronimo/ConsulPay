@@ -5,7 +5,7 @@ import Button from '../../components/ui/Button.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
 
 import { formatoARS } from '../../lib/constants.js';
-import { editarFechaPago, suscribirSesionesPagadas } from '../../lib/sesiones.js';
+import { editarFechaPago, getCantidadSesiones, suscribirSesionesPagadas } from '../../lib/sesiones.js';
 
 import './IngresosPorMes.css';
 
@@ -104,9 +104,13 @@ export default function IngresosPorMes({ consultorioId, uid, mapaProfesionales, 
       const d = fechaDePago(s);
       if (!d) continue;
       const km = claveMes(d);
-      if (!map[km]) map[km] = { clave: km, sesiones: [], total: 0 };
+      if (!map[km]) map[km] = { clave: km, sesiones: [], total: 0, pacientes: new Set(), encuentros: 0 };
       map[km].sesiones.push(s);
       map[km].total += s.montoConsultorio || 0;
+      // Cada registro es un paciente con N sesiones adentro: la unidad de
+      // cobro es el paciente, los encuentros son contexto del trabajo.
+      if (s.pacienteId) map[km].pacientes.add(s.pacienteId);
+      map[km].encuentros += getCantidadSesiones(s);
     }
     return Object.values(map).sort((a, b) => b.clave.localeCompare(a.clave));
   }, [sesiones]);
@@ -150,7 +154,12 @@ export default function IngresosPorMes({ consultorioId, uid, mapaProfesionales, 
               <span className="cp-ingreso-mes__chevron"><Chevron abierto={abierto} /></span>
               <span className="cp-ingreso-mes__nombre">{nombreMesLargo(mes.clave)}</span>
               <span className="cp-ingreso-mes__meta">
-                {mes.sesiones.length} sesión{mes.sesiones.length === 1 ? '' : 'es'}
+                {mes.pacientes.size} paciente{mes.pacientes.size === 1 ? '' : 's'}
+                {mes.encuentros !== mes.pacientes.size && (
+                  <span className="cp-ingreso-mes__meta-sec">
+                    {' · '}{mes.encuentros} sesion{mes.encuentros === 1 ? '' : 'es'}
+                  </span>
+                )}
               </span>
               <span className="cp-ingreso-mes__total">{formatoARS.format(mes.total)}</span>
             </button>
