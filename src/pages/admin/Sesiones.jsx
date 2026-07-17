@@ -41,6 +41,7 @@ import {
   totalesGlobales,
   validarFechaContraConsultorio,
 } from '../../lib/sesiones.js';
+import { marcarPendientesComoObsoletas } from '../../lib/solicitudes.js';
 
 import './Sesiones.css';
 
@@ -1651,7 +1652,7 @@ export function PagarMesModal({ consultorioId, profesionales, pacientes, mapaPac
             <div className="cp-pagar-mes__done">
               <div style={{ fontSize: 48 }}>✓</div>
               <div style={{ fontWeight: 500, fontSize: 16 }}>
-                {done.cantidad} sesión{done.cantidad === 1 ? '' : 'es'} marcada{done.cantidad === 1 ? '' : 's'} como pagadas
+                {done.cantidad} paciente{done.cantidad === 1 ? '' : 's'} marcado{done.cantidad === 1 ? '' : 's'} como pagado{done.cantidad === 1 ? '' : 's'}
               </div>
               <div style={{ color: 'var(--cp-text-muted)', fontSize: 13.5 }}>
                 Total: {formatoARS.format(done.total)}
@@ -1760,7 +1761,7 @@ export function PagarMesModal({ consultorioId, profesionales, pacientes, mapaPac
                     <div className="cp-aviso-diferido__icon">⚠</div>
                     <div className="cp-aviso-diferido__body">
                       <div className="cp-aviso-diferido__title">
-                        {totalALiquidar} sesión{totalALiquidar === 1 ? '' : 'es'} de obra social sin liquidar
+                        {totalALiquidar} paciente{totalALiquidar === 1 ? '' : 's'} de obra social sin liquidar
                       </div>
                       <div className="cp-aviso-diferido__text">
                         Estas sesiones no tienen valor aún (probablemente la obra social todavía no informó el monto). No se pueden marcar como pagadas hasta que tengan valor. Quedarán pendientes.
@@ -1827,7 +1828,7 @@ export function PagarMesModal({ consultorioId, profesionales, pacientes, mapaPac
                 >
                   {submitting
                     ? <><Spinner size={14} /> Procesando…</>
-                    : `Marcar ${sesionesPagables.length} sesión${sesionesPagables.length === 1 ? '' : 'es'} como pagadas`}
+                    : `Marcar ${sesionesPagables.length} paciente${sesionesPagables.length === 1 ? '' : 's'} como pagado${sesionesPagables.length === 1 ? '' : 's'}`}
                 </Button>
               )}
             </div>
@@ -1926,7 +1927,7 @@ export function LiquidarMasivoModal({ consultorioId, profesionales, mapaPaciente
           <div className="cp-modal__form" style={{ textAlign: 'center', padding: '24px 0' }}>
             <div style={{ fontSize: 40 }}>{done.errores.length === 0 ? '✓' : '⚠'}</div>
             <div style={{ fontWeight: 500, fontSize: 16, margin: '8px 0' }}>
-              {done.ok} sesión{done.ok === 1 ? '' : 'es'} liquidada{done.ok === 1 ? '' : 's'}
+              {done.ok} paciente{done.ok === 1 ? '' : 's'} liquidado{done.ok === 1 ? '' : 's'}
             </div>
             {done.errores.length > 0 && (
               <div style={{ color: 'var(--cp-danger)', fontSize: 13 }}>
@@ -2009,7 +2010,7 @@ export function LiquidarMasivoModal({ consultorioId, profesionales, mapaPaciente
               <Button type="button" variant="ghost" onClick={onClose} disabled={submitting}>Cancelar</Button>
               {hayMontosCompletos && (
                 <Button type="button" variant="primary" onClick={handleGuardar} disabled={submitting}>
-                  {submitting ? <><Spinner size={14} /> Guardando…</> : `Liquidar ${sesiones.filter((s) => Number(montos[s.id]) > 0).length} sesión${sesiones.filter((s) => Number(montos[s.id]) > 0).length === 1 ? '' : 'es'}`}
+                  {submitting ? <><Spinner size={14} /> Guardando…</> : `Liquidar ${sesiones.filter((s) => Number(montos[s.id]) > 0).length} paciente${sesiones.filter((s) => Number(montos[s.id]) > 0).length === 1 ? '' : 's'}`}
                 </Button>
               )}
             </div>
