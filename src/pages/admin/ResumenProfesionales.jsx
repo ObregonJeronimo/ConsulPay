@@ -17,7 +17,7 @@ import Avatar from '../../components/ui/Avatar.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
 
 import { ESTADOS_PAGO_SESION, formatoARS } from '../../lib/constants.js';
-import { suscribirSesionesConsultorio } from '../../lib/sesiones.js';
+import { getCantidadSesiones, suscribirSesionesConsultorio } from '../../lib/sesiones.js';
 
 import './ResumenProfesionales.css';
 
@@ -72,7 +72,9 @@ export default function ResumenProfesionales({ consultorioId, profesionales }) {
       base[p.uid] = {
         uid: p.uid,
         nombre: p.displayName || p.email || 'Profesional',
-        meses: Array.from({ length: 12 }, () => ({ debe: 0, porLiquidar: 0, sesiones: 0 })),
+        meses: Array.from({ length: 12 }, () => ({
+          debe: 0, porLiquidar: 0, pacientes: new Set(), encuentros: 0,
+        })),
         totalDebe: 0,
       };
     }
@@ -82,7 +84,9 @@ export default function ResumenProfesionales({ consultorioId, profesionales }) {
       const d = fechaDeSesion(s);
       if (!d || d.getFullYear() !== anio) continue;
       const celda = fila.meses[d.getMonth()];
-      celda.sesiones += 1;
+      // Cada registro es un paciente con N sesiones adentro.
+      if (s.pacienteId) celda.pacientes.add(s.pacienteId);
+      celda.encuentros += getCantidadSesiones(s);
       if (s.estadoPago === ESTADOS_PAGO_SESION.PENDIENTE_MONTO) {
         celda.porLiquidar += 1;
       } else if (s.estadoPago === ESTADOS_PAGO_SESION.DEBIDO) {
@@ -160,14 +164,15 @@ export default function ResumenProfesionales({ consultorioId, profesionales }) {
                         key={i}
                         className={`cp-rp__celda ${i === mesActual ? 'cp-rp__celda--actual' : ''}`}
                         title={
-                          c.sesiones === 0
-                            ? 'Sin sesiones'
-                            : `${c.sesiones} sesión${c.sesiones === 1 ? '' : 'es'}`
+                          c.pacientes.size === 0
+                            ? 'Sin pacientes este mes'
+                            : `${c.pacientes.size} paciente${c.pacientes.size === 1 ? '' : 's'}`
+                            + ` · ${c.encuentros} ${c.encuentros === 1 ? 'sesión' : 'sesiones'}`
                             + (c.debe > 0 ? ` · debe ${formatoARS.format(c.debe)}` : '')
                             + (c.porLiquidar > 0 ? ` · ${c.porLiquidar} a liquidar` : '')
                         }
                       >
-                        {c.sesiones === 0 ? (
+                        {c.pacientes.size === 0 ? (
                           <span className="cp-rp__vacio">·</span>
                         ) : (
                           <span className="cp-rp__celda-in">
