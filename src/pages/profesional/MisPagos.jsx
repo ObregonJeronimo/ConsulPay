@@ -311,12 +311,12 @@ export default function MisPagos() {
           </div>
           <div className="cp-deuda-card__hint" style={{ marginBottom: 16 }}>
             {sesionesDebidas.length === 0
-              ? 'No tenés sesiones pendientes en este mes'
+              ? 'No tenés pacientes pendientes en este mes'
               : modoSeleccion
                 ? seleccionadas.size === 0
-                  ? `Elegí cuáles de las ${sesionesDebidas.length} sesiones`
-                  : `${seleccionadas.size} de ${sesionesDebidas.length} seleccionadas`
-                : `${sesionesDebidas.length} sesión${sesionesDebidas.length === 1 ? '' : 'es'} pendiente${sesionesDebidas.length === 1 ? '' : 's'}`}
+                  ? `Elegí cuáles de los ${sesionesDebidas.length} pacientes`
+                  : `${seleccionadas.size} de ${sesionesDebidas.length} pacientes seleccionados`
+                : `${sesionesDebidas.length} paciente${sesionesDebidas.length === 1 ? '' : 's'} pendiente${sesionesDebidas.length === 1 ? '' : 's'}`}
           </div>
           {sesionesDebidas.length > 0 && (
             <div className="cp-pagos-recuadro__actions">
@@ -335,7 +335,7 @@ export default function MisPagos() {
                 <>
                   <Button variant="secondary" onClick={salirModoSeleccion} disabled={iniciando}>Cancelar</Button>
                   <Button variant="primary" onClick={handlePagar} disabled={mpDeshabilitado || iniciando || seleccionadas.size === 0}>
-                    {iniciando ? <><Spinner size={14} /> Redirigiendo…</> : seleccionadas.size === 0 ? 'Elegí sesiones' : `Pagar ${formatoARS.format(subtotalSeleccionado)}`}
+                    {iniciando ? <><Spinner size={14} /> Redirigiendo…</> : seleccionadas.size === 0 ? 'Elegí pacientes' : `Pagar ${formatoARS.format(subtotalSeleccionado)}`}
                   </Button>
                 </>
               )}
@@ -360,8 +360,8 @@ export default function MisPagos() {
                 ? 'Solicitud pendiente de aprobación por el administrador'
                 : modoSeleccionManual
                   ? seleccionadasManual.size === 0
-                    ? `Elegí cuáles de las ${sesionesDebidas.length} sesiones`
-                    : `${seleccionadasManual.size} de ${sesionesDebidas.length} seleccionadas`
+                    ? `Elegí cuáles de los ${sesionesDebidas.length} pacientes`
+                    : `${seleccionadasManual.size} de ${sesionesDebidas.length} pacientes seleccionados`
                   : `Marcar ${sesionesDebidas.length} sesión${sesionesDebidas.length === 1 ? '' : 'es'} como pagadas manualmente`}
           </div>
           {sesionesDebidas.length > 0 && !hayPendienteManual && (
@@ -381,7 +381,7 @@ export default function MisPagos() {
                 <>
                   <Button variant="secondary" onClick={() => { setModoSeleccionManual(false); setSeleccionadasManual(new Set()); }} disabled={enviandoSolicitud}>Cancelar</Button>
                   <Button variant="primary" onClick={() => handlePagarManual([...seleccionadasManual])} disabled={!puedeMarcarPagadas || enviandoSolicitud || seleccionadasManual.size === 0}>
-                    {enviandoSolicitud ? <><Spinner size={14} /> Enviando…</> : seleccionadasManual.size === 0 ? 'Elegí sesiones' : `Solicitar pagar ${seleccionadasManual.size}`}
+                    {enviandoSolicitud ? <><Spinner size={14} /> Enviando…</> : seleccionadasManual.size === 0 ? 'Elegí pacientes' : `Solicitar pagar ${seleccionadasManual.size}`}
                   </Button>
                 </>
               )}
@@ -539,7 +539,7 @@ export default function MisPagos() {
                       <div className="cp-row-mobile__mid">
                         {formatoFechaCorta(p.createdAt)}
                         {' · '}
-                        {p.sesionesIds?.length || 0} sesión{(p.sesionesIds?.length || 0) === 1 ? '' : 'es'}
+                        {p.sesionesIds?.length || 0} paciente{(p.sesionesIds?.length || 0) === 1 ? '' : 's'}
                       </div>
                     </td>
                     <td className="cp-td-mobile-badge">
