@@ -218,3 +218,96 @@
   color: var(--cp-text-faint);
   margin-top: 6px;
 }
+
+/* Fila de profesional desplegable + desglose por mes de la sesión */
+.cp-ingreso-prof {
+  border-radius: var(--cp-radius-sm);
+  overflow: hidden;
+}
+.cp-ingreso-prof--abierto {
+  background: var(--cp-bg);
+  border: 1px solid var(--cp-border);
+}
+
+.cp-ingreso-fila--btn {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cp-ingreso-fila__chev {
+  display: flex;
+  color: var(--cp-accent);
+  flex-shrink: 0;
+  width: 14px;
+}
+
+.cp-ingreso-fila__badge {
+  display: inline-block;
+  margin-left: 7px;
+  padding: 1px 7px;
+  background: var(--cp-accent-bg);
+  color: var(--cp-accent-dark);
+  border-radius: var(--cp-radius-pill);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.cp-ingreso-prof__desglose {
+  padding: 4px 12px 12px 50px;
+}
+
+.cp-ingreso-prof__desglose-titulo {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--cp-text-faint);
+  font-weight: 600;
+  margin-bottom: 7px;
+}
+
+.cp-ingreso-desg {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-sm);
+  margin-bottom: 4px;
+}
+.cp-ingreso-desg:last-child { margin-bottom: 0; }
+
+.cp-ingreso-desg__mes {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--cp-text);
+  text-transform: capitalize;
+  flex: 1;
+  min-width: 0;
+}
+.cp-ingreso-desg__pac {
+  font-size: 11.5px;
+  color: var(--cp-text-muted);
+  white-space: nowrap;
+}
+.cp-ingreso-desg__monto {
+  font-family: var(--cp-font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--cp-accent);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  min-width: 88px;
+  text-align: right;
+}
+
+@media (max-width: 640px) {
+  .cp-ingreso-prof__desglose { padding: 4px 8px 10px 34px; }
+  .cp-ingreso-desg { flex-wrap: wrap; gap: 4px 8px; }
+  .cp-ingreso-desg__mes { flex-basis: 100%; }
+  .cp-ingreso-desg__monto { min-width: 0; margin-left: auto; }
+}
