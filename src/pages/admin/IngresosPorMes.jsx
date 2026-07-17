@@ -267,9 +267,10 @@ function FilaProfesional({ fila, mapaPacientes }) {
     for (const s of fila.sesiones) {
       const d = fechaDeSesion(s);
       const km = claveMes(d);
-      if (!map[km]) map[km] = { clave: km, total: 0, pacientes: new Set() };
+      if (!map[km]) map[km] = { clave: km, total: 0, pacientes: new Set(), sesiones: [] };
       map[km].total += s.montoConsultorio || 0;
       if (s.pacienteId) map[km].pacientes.add(s.pacienteId);
+      map[km].sesiones.push(s);
     }
     return Object.values(map)
       .map((m) => ({ ...m, cantPacientes: m.pacientes.size }))
@@ -307,12 +308,65 @@ function FilaProfesional({ fila, mapaPacientes }) {
             De qué meses viene este dinero
           </div>
           {desglose.map((m) => (
-            <div key={m.clave} className="cp-ingreso-desg">
-              <span className="cp-ingreso-desg__mes">{nombreMesLargo(m.clave)}</span>
-              <span className="cp-ingreso-desg__pac">
-                {m.cantPacientes} paciente{m.cantPacientes === 1 ? '' : 's'}
+            <MesDesglose key={m.clave} mes={m} mapaPacientes={mapaPacientes} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* Nivel 3: al abrir un mes se ven los pacientes con su monto */
+function MesDesglose({ mes, mapaPacientes }) {
+  const [abierto, setAbierto] = useState(false);
+
+  // Agrupar por paciente: cuánto aportó cada uno de ese mes
+  const pacientes = useMemo(() => {
+    const map = {};
+    for (const s of mes.sesiones) {
+      const key = s.pacienteId || s.pacienteNombre || 'sin-paciente';
+      if (!map[key]) {
+        map[key] = {
+          key,
+          nombre: nombrePac(s, mapaPacientes),
+          monto: 0,
+          encuentros: 0,
+          registros: 0,
+        };
+      }
+      map[key].monto += s.montoConsultorio || 0;
+      map[key].encuentros += getCantidadSesiones(s);
+      map[key].registros += 1;
+    }
+    return Object.values(map).sort((a, b) => b.monto - a.monto);
+  }, [mes, mapaPacientes]);
+
+  return (
+    <div className={`cp-ingreso-desg-wrap ${abierto ? 'cp-ingreso-desg-wrap--abierto' : ''}`}>
+      <button className="cp-ingreso-desg cp-ingreso-desg--btn" onClick={() => setAbierto((v) => !v)}>
+        <span className="cp-ingreso-desg__chev">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor"
+            strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"
+            style={{ transform: abierto ? 'rotate(90deg)' : 'none', transition: 'transform 160ms' }}>
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </span>
+        <span className="cp-ingreso-desg__mes">{nombreMesLargo(mes.clave)}</span>
+        <span className="cp-ingreso-desg__pac">
+          {mes.cantPacientes} paciente{mes.cantPacientes === 1 ? '' : 's'}
+        </span>
+        <span className="cp-ingreso-desg__monto">{formatoARS.format(mes.total)}</span>
+      </button>
+
+      {abierto && (
+        <div className="cp-ingreso-pacs">
+          {pacientes.map((p) => (
+            <div key={p.key} className="cp-ingreso-pac">
+              <span className="cp-ingreso-pac__nombre">{p.nombre}</span>
+              <span className="cp-ingreso-pac__ses">
+                {p.encuentros} {p.encuentros === 1 ? 'sesión' : 'sesiones'}
               </span>
-              <span className="cp-ingreso-desg__monto">{formatoARS.format(m.total)}</span>
+              <span className="cp-ingreso-pac__monto">{formatoARS.format(p.monto)}</span>
             </div>
           ))}
         </div>
