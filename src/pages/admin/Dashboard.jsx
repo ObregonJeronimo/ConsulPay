@@ -13,6 +13,7 @@ import { suscribirProfesionales } from '../../lib/profesionales.js';
 import { suscribirInvitaciones } from '../../lib/invitaciones.js';
 import {
   finDeMes,
+  getCantidadSesiones,
   inicioDeMes,
   suscribirSesionesConsultorio,
   totalesGlobales,
@@ -91,9 +92,12 @@ export default function Dashboard() {
       if (s.estadoPago !== ESTADOS_PAGO_SESION.DEBIDO) continue;
       const uid = s.profesionalUid;
       if (!uid) continue;
-      const prev = mapa.get(uid) || { uid, monto: 0, sesiones: 0 };
+      const prev = mapa.get(uid) || { uid, monto: 0, pacientes: new Set(), encuentros: 0 };
       prev.monto += Number(s.montoConsultorio || 0);
-      prev.sesiones += 1;
+      // La unidad de deuda es el paciente (cada registro es un paciente con
+      // sus N sesiones adentro). Los encuentros se muestran como contexto.
+      if (s.pacienteId) prev.pacientes.add(s.pacienteId);
+      prev.encuentros += getCantidadSesiones(s);
       mapa.set(uid, prev);
     }
     const arr = Array.from(mapa.values());
@@ -242,7 +246,8 @@ export default function Dashboard() {
                   <div className="cp-deuda-item__info">
                     <div className="cp-deuda-item__name">{nombre}</div>
                     <div className="cp-deuda-item__sub">
-                      {d.sesiones} {d.sesiones === 1 ? 'sesión impaga' : 'sesiones impagas'}
+                      {d.pacientes.size} {d.pacientes.size === 1 ? 'paciente impago' : 'pacientes impagos'}
+                      {d.encuentros !== d.pacientes.size && ` · ${d.encuentros} ${d.encuentros === 1 ? 'sesión' : 'sesiones'}`}
                     </div>
                   </div>
                   <div className="cp-deuda-item__monto">
