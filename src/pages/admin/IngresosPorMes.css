@@ -273,13 +273,79 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 10px;
+  padding: 7px 10px;
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-sm);
+  width: 100%;
+}
+
+/* El mes ahora es clickeable para ver los pacientes */
+.cp-ingreso-desg--btn {
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms var(--cp-ease);
+}
+.cp-ingreso-desg--btn:hover { background: var(--cp-surface-hover); }
+
+.cp-ingreso-desg-wrap {
   background: var(--cp-surface);
   border: 1px solid var(--cp-border);
   border-radius: var(--cp-radius-sm);
   margin-bottom: 4px;
+  overflow: hidden;
 }
-.cp-ingreso-desg:last-child { margin-bottom: 0; }
+.cp-ingreso-desg-wrap:last-child { margin-bottom: 0; }
+.cp-ingreso-desg-wrap--abierto { background: var(--cp-surface); }
+
+.cp-ingreso-desg__chev {
+  display: flex;
+  color: var(--cp-accent);
+  flex-shrink: 0;
+  width: 12px;
+}
+
+/* Nivel 3: pacientes de ese mes */
+.cp-ingreso-pacs {
+  border-top: 1px solid var(--cp-border);
+  background: var(--cp-bg);
+  padding: 6px 10px 8px 32px;
+}
+.cp-ingreso-pac {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--cp-border);
+}
+.cp-ingreso-pac:last-child { border-bottom: none; }
+.cp-ingreso-pac__nombre {
+  font-size: 12.5px;
+  color: var(--cp-text);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cp-ingreso-pac__ses {
+  font-size: 11px;
+  color: var(--cp-text-faint);
+  white-space: nowrap;
+}
+.cp-ingreso-pac__monto {
+  font-family: var(--cp-font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--cp-text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  min-width: 82px;
+  text-align: right;
+}
 
 .cp-ingreso-desg__mes {
   font-size: 12.5px;
@@ -306,10 +372,14 @@
 }
 
 @media (max-width: 640px) {
-  .cp-ingreso-prof__desglose { padding: 4px 8px 10px 34px; }
-  .cp-ingreso-desg { flex-wrap: wrap; gap: 4px 8px; }
-  .cp-ingreso-desg__mes { flex-basis: 100%; }
-  .cp-ingreso-desg__monto { min-width: 0; margin-left: auto; }
+  .cp-ingreso-prof__desglose { padding: 4px 8px 10px 20px; }
+  .cp-ingreso-desg { gap: 6px; padding: 7px 8px; }
+  .cp-ingreso-desg__mes { font-size: 12px; }
+  .cp-ingreso-desg__pac { font-size: 10.5px; }
+  .cp-ingreso-desg__monto { min-width: 0; font-size: 12px; }
+  .cp-ingreso-pacs { padding: 6px 8px 8px 22px; }
+  .cp-ingreso-pac__monto { min-width: 72px; }
+  .cp-ingreso-pac__ses { font-size: 10px; }
 }
 
 /* Dato secundario en el header del mes (sesiones reales) */
