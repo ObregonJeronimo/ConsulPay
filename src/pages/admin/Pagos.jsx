@@ -7,6 +7,7 @@ import Spinner from '../../components/ui/Spinner.jsx';
 
 import { useAuth } from '../../hooks/useAuth.js';
 import { useConsultorio } from '../../hooks/useConsultorio.js';
+import { useOverlayClose } from '../../hooks/useOverlayClose.js';
 import { ESTADOS_PAGO_SESION, formatoARS } from '../../lib/constants.js';
 import { suscribirPacientesConsultorio } from '../../lib/pacientes.js';
 import IngresosPorMes from './IngresosPorMes.jsx';
