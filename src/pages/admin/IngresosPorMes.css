@@ -311,3 +311,8 @@
   .cp-ingreso-desg__mes { flex-basis: 100%; }
   .cp-ingreso-desg__monto { min-width: 0; margin-left: auto; }
 }
+
+/* Dato secundario en el header del mes (sesiones reales) */
+.cp-ingreso-mes__meta-sec {
+  color: var(--cp-text-faint);
+}
