@@ -14,7 +14,6 @@ export default function Landing() {
       <Nav />
       <Hero />
       <ComoFunciona />
-      <Precios />
       <CTAFinal />
       <Footer />
     </div>
@@ -62,7 +61,6 @@ function Nav() {
 
         <div className="lp-nav__links">
           <a href="#como-funciona" className="lp-nav__link">Cómo funciona</a>
-          <a href="#precios" className="lp-nav__link">Precios</a>
         </div>
 
         <div className="lp-nav__cta">
@@ -356,86 +354,6 @@ function ComoFunciona() {
 }
 
 /* ============================================================
-   Precios — tabla editorial
-   ============================================================ */
-function Precios() {
-  return (
-    <section id="precios" className="lp-section lp-section--alt">
-      <div className="lp-section__inner">
-        <div className="lp-section__head">
-          <div className="lp-section__eyebrow">Precios</div>
-          <h2 className="lp-section__title">
-            Pagás por lo que usás.
-            <br />
-            <em>Sin sorpresas.</em>
-          </h2>
-          <p className="lp-section__lead">
-            Empezás gratis. Cuando tu consultorio crece, pasás al Plan Pago y reducís
-            la comisión por transacción.
-          </p>
-        </div>
-
-        <div className="lp-pricing">
-          {/* Plan Free */}
-          <div className="lp-price-card">
-            <div className="lp-price-card__top">
-              <div className="lp-price-card__name">Free</div>
-              <div className="lp-price-card__tagline">Para empezar sin compromiso</div>
-            </div>
-
-            <div className="lp-price-card__price">
-              <span className="lp-price-card__amount">$0</span>
-              <span className="lp-price-card__period">/ mes</span>
-            </div>
-
-            <ul className="lp-price-card__features">
-              <li><CheckIcon /> Profesionales y pacientes ilimitados</li>
-              <li><CheckIcon /> Cálculo automático de deuda</li>
-              <li><CheckIcon /> Panel de autogestión para profesionales</li>
-              <li><CheckIcon /> Pagos vía transferencia manual</li>
-              <li className="lp-price-card__muted">
-                <CheckIcon /> 1% comisión ConsulPay sobre el valor total de cada sesión
-              </li>
-            </ul>
-
-            <Link to="/crear-consultorio" className="lp-btn lp-btn--secondary lp-btn--full">
-              Empezar gratis
-            </Link>
-          </div>
-
-          {/* Plan Pago */}
-          <div className="lp-price-card lp-price-card--featured">
-            <div className="lp-price-card__badge">Recomendado</div>
-
-            <div className="lp-price-card__top">
-              <div className="lp-price-card__name">Pago</div>
-            </div>
-
-            <div className="lp-price-card__price">
-              <span className="lp-price-card__amount">$100.000</span>
-              <span className="lp-price-card__period">/ 30 días</span>
-            </div>
-
-            <ul className="lp-price-card__features">
-              <li><CheckIcon /> Todo lo del plan Free</li>
-              <li><CheckIcon /> Integración con Mercado Pago y Ualá</li>
-              <li><CheckIcon /> Split automático de pagos</li>
-              <li><CheckIcon /> Soporte prioritario</li>
-            </ul>
-
-            <Link to="/crear-consultorio" className="lp-btn lp-btn--primary lp-btn--full">
-              Empezar con plan Pago
-            </Link>
-          </div>
-        </div>
-
-        {/* Nota de comisión oculta — se comunica directamente al cliente */}
-      </div>
-    </section>
-  );
-}
-
-/* ============================================================
    CTA final
    ============================================================ */
 function CTAFinal() {
@@ -477,7 +395,6 @@ function Footer() {
         </div>
 
         <div className="lp-footer__links">
-          <a href="#precios">Precios</a>
           <a href="#como-funciona">Cómo funciona</a>
           <Link to="/login">Iniciar sesión</Link>
         </div>
