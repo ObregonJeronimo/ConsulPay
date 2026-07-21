@@ -13,6 +13,7 @@ export default function Landing() {
     <div className="lp">
       <Nav />
       <Hero />
+      <Features />
       <ComoFunciona />
       <CTAFinal />
       <Footer />
@@ -294,6 +295,218 @@ function Counter({ label, value, formatter = (n) => String(n) }) {
     <div className="lp-hero-card__metric">
       <div className="lp-hero-card__metric-label">{label}</div>
       <div className="lp-hero-card__metric-value">{formatter(display)}</div>
+    </div>
+  );
+}
+
+/* ============================================================
+   Features — bloques alternados con fragmentos reales de UI
+   ============================================================ */
+function Features() {
+  return (
+    <section className="lp-feat-wrap">
+      <div className="lp-section__inner">
+        <div className="lp-section__head">
+          <div className="lp-section__eyebrow">Lo que resuelve</div>
+          <h2 className="lp-section__title">
+            Cada peso,
+            <br />
+            <em>con nombre y fecha.</em>
+          </h2>
+        </div>
+
+        <FeatureRow
+          eyebrow="Control de deudas"
+          titulo="Sepa exactamente quién debe y de qué mes"
+          desc="Una matriz de cada profesional contra cada mes del año. Verde si está al día, el monto en coral si adeuda, un signo si tiene obra social por liquidar. De un vistazo, el estado completo del consultorio."
+          visual={<VisualMatriz />}
+        />
+
+        <FeatureRow
+          reversed
+          eyebrow="Fecha real de cobro"
+          titulo="El pago ingresó hoy, pero corresponde a marzo"
+          desc="ConsulPay separa la fecha de la sesión de la fecha en que se cobró. Un pago que ingresa en julio por sesiones de marzo queda registrado donde corresponde. El registro de ingresos por mes refleja el dinero real, no una aproximación."
+          visual={<VisualFechaPago />}
+        />
+
+        <FeatureRow
+          eyebrow="Acceso por rol"
+          titulo="Cada profesional ve únicamente lo suyo"
+          desc="El profesional accede a su panel y consulta sus sesiones, su saldo y su historial. No ve la información de los demás. El administrador, en cambio, ve el consultorio completo. Sin planillas compartidas ni permisos manuales."
+          visual={<VisualRoles />}
+        />
+
+        <FeatureRow
+          reversed
+          eyebrow="Aprobación por lote"
+          titulo="Apruebe los pagos del mes en una sola acción"
+          desc="Cuando un profesional marca un pago, ingresa como solicitud. Se agrupan por profesional y mes, y se aprueba todo el bloque con un clic. Sin idas y vueltas para confirmar los pagos uno por uno."
+          visual={<VisualSolicitudes />}
+        />
+      </div>
+    </section>
+  );
+}
+
+function FeatureRow({ eyebrow, titulo, desc, visual, reversed }) {
+  return (
+    <FadeInOnScroll>
+      <div className={`lp-feat ${reversed ? 'lp-feat--rev' : ''}`}>
+        <div className="lp-feat__text">
+          <div className="lp-feat__eyebrow">{eyebrow}</div>
+          <h3 className="lp-feat__title">{titulo}</h3>
+          <p className="lp-feat__desc">{desc}</p>
+        </div>
+        <div className="lp-feat__visual">{visual}</div>
+      </div>
+    </FadeInOnScroll>
+  );
+}
+
+/* ---------- Fragmentos de UI aislados ---------- */
+
+// Matriz profesional × mes — recorte del ResumenProfesionales real
+function VisualMatriz() {
+  const meses = ['E', 'F', 'M', 'A', 'M', 'J'];
+  const filas = [
+    { ini: 'LF', nombre: 'Lucía F.', celdas: ['ok', 'ok', 'ok', 'ok', 'debe', 'ok'] },
+    { ini: 'MG', nombre: 'Martín G.', celdas: ['ok', 'ok', 'os', 'ok', 'ok', 'debe'] },
+    { ini: 'SR', nombre: 'Sofía R.', celdas: ['ok', 'ok', 'ok', 'ok', 'ok', 'ok'] },
+    { ini: 'DS', nombre: 'Diego S.', celdas: ['ok', 'debe', 'ok', 'os', 'ok', 'ok'] },
+  ];
+  return (
+    <div className="lp-frag lp-frag--matriz">
+      <div className="lp-frag__head">Estado por profesional</div>
+      <div className="lp-matriz">
+        <div className="lp-matriz__row lp-matriz__row--head">
+          <span className="lp-matriz__name" />
+          {meses.map((m, i) => (
+            <span key={i} className="lp-matriz__mh">{m}</span>
+          ))}
+        </div>
+        {filas.map((f) => (
+          <div className="lp-matriz__row" key={f.ini}>
+            <span className="lp-matriz__name">
+              <span className="lp-matriz__av">{f.ini}</span>
+              {f.nombre}
+            </span>
+            {f.celdas.map((c, i) => (
+              <span key={i} className={`lp-matriz__cell lp-matriz__cell--${c}`}>
+                {c === 'ok' && '✓'}
+                {c === 'os' && '?'}
+                {c === 'debe' && '•'}
+              </span>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// fechaPago ≠ fecha de sesión
+function VisualFechaPago() {
+  return (
+    <div className="lp-frag lp-frag--fecha">
+      <div className="lp-frag__head">Ingreso registrado</div>
+      <div className="lp-fecha__amount">{formatoARS.format(45000)}</div>
+      <div className="lp-fecha__rows">
+        <div className="lp-fecha__row">
+          <span className="lp-fecha__k">Sesiones de</span>
+          <span className="lp-fecha__v">marzo 2026</span>
+        </div>
+        <div className="lp-fecha__arrow" aria-hidden="true">↓</div>
+        <div className="lp-fecha__row lp-fecha__row--pay">
+          <span className="lp-fecha__k">Cobrado el</span>
+          <span className="lp-fecha__v lp-fecha__v--accent">14 jul 2026</span>
+        </div>
+      </div>
+      <div className="lp-fecha__tag">8 pacientes · 12 sesiones</div>
+    </div>
+  );
+}
+
+// Acceso por rol — dos paneles
+function VisualRoles() {
+  return (
+    <div className="lp-frag lp-frag--roles">
+      <div className="lp-roles__card lp-roles__card--admin">
+        <div className="lp-roles__badge">Administrador</div>
+        <div className="lp-roles__rowset">
+          <span className="lp-roles__row" style={{ width: '92%' }} />
+          <span className="lp-roles__row" style={{ width: '78%' }} />
+          <span className="lp-roles__row" style={{ width: '85%' }} />
+          <span className="lp-roles__row" style={{ width: '64%' }} />
+        </div>
+        <div className="lp-roles__foot">Ve todo el consultorio</div>
+      </div>
+      <div className="lp-roles__card lp-roles__card--prof">
+        <div className="lp-roles__badge lp-roles__badge--prof">Profesional</div>
+        <div className="lp-roles__rowset">
+          <span className="lp-roles__row" style={{ width: '70%' }} />
+          <span className="lp-roles__row" style={{ width: '55%' }} />
+        </div>
+        <div className="lp-roles__foot">Ve solo lo suyo</div>
+      </div>
+    </div>
+  );
+}
+
+// Aprobación por lote
+function VisualSolicitudes() {
+  const items = [
+    { n: 'Abril · Lucía F.', m: 156800 },
+    { n: 'Abril · Martín G.', m: 142500 },
+    { n: 'Abril · Sofía R.', m: 98400 },
+  ];
+  return (
+    <div className="lp-frag lp-frag--sol">
+      <div className="lp-sol__head">
+        <span className="lp-sol__title">Solicitudes de abril</span>
+        <span className="lp-sol__badge">3 pendientes</span>
+      </div>
+      <div className="lp-sol__list">
+        {items.map((it) => (
+          <div className="lp-sol__item" key={it.n}>
+            <span className="lp-sol__check"><CheckIcon /></span>
+            <span className="lp-sol__name">{it.n}</span>
+            <span className="lp-sol__monto">{formatoARS.format(it.m)}</span>
+          </div>
+        ))}
+      </div>
+      <div className="lp-sol__approve">Aprobar las 3 · {formatoARS.format(397700)}</div>
+    </div>
+  );
+}
+
+/* ============================================================
+   FadeInOnScroll — reveal al entrar en viewport (respeta reduced-motion)
+   ============================================================ */
+function FadeInOnScroll({ children }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      el.classList.add('lp-reveal--in');
+      return;
+    }
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          el.classList.add('lp-reveal--in');
+          obs.disconnect();
+        }
+      },
+      { threshold: 0.15 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+  return (
+    <div ref={ref} className="lp-reveal">
+      {children}
     </div>
   );
 }
