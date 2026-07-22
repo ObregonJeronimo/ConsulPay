@@ -9,7 +9,14 @@ import { doc, runTransaction, serverTimestamp } from 'firebase/firestore';
 
 import { db } from './firebase.js';
 import { obtenerConfigGlobal } from './configGlobal.js';
-import { ESTADOS_CONSULTORIO, ESTADOS_USUARIO, PLANES, ROLES } from './constants.js';
+import {
+  ESTADOS_CONSULTORIO,
+  ESTADOS_USUARIO,
+  MODELO_REPARTO_DEFAULT,
+  MODELOS_REPARTO,
+  PLANES,
+  ROLES,
+} from './constants.js';
 
 /**
  * Crea un nuevo consultorio y asigna al usuario actual como owner/admin.
@@ -41,10 +48,17 @@ export async function crearConsultorio(params) {
     metodosPagoPaciente = [],
     cbuTransferencia = '',
     aliasTransferencia = '',
+    modeloReparto = MODELO_REPARTO_DEFAULT,
   } = params;
 
   if (!ownerUid) throw new Error('ownerUid requerido');
   if (!nombreConsultorio?.trim()) throw new Error('El nombre del consultorio es obligatorio');
+
+  // Blindaje: solo aceptamos valores válidos del enum. Cualquier otra cosa
+  // cae al modelo clásico para no dejar el consultorio en un estado inválido.
+  const modeloResuelto = Object.values(MODELOS_REPARTO).includes(modeloReparto)
+    ? modeloReparto
+    : MODELO_REPARTO_DEFAULT;
 
   // Leemos las comisiones globales (free y pro) ANTES de la transaction.
   // Si no existe el doc /config/global, usa los defaults de fabrica (1%/0.5%).
@@ -89,6 +103,11 @@ export async function crearConsultorio(params) {
       cuit: cuit.trim(),
       ownerUid,
       adminUids: [ownerUid],
+      // Modelo de circulación del dinero (ver MODELOS_REPARTO en constants).
+      // Se elige al crear el consultorio y condiciona el comportamiento de
+      // los paneles. Inmutable por ahora desde la UI (se podría permitir
+      // cambiarlo más adelante desde Configuración con las validaciones del caso).
+      modeloReparto: modeloResuelto,
       plan: PLANES.FREE,
       planVenceEn: null,
       // Modelo nuevo: ambos campos por consultorio. El backend resuelve
