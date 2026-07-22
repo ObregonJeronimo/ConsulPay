@@ -13,6 +13,44 @@ export const ROLES = {
 };
 
 /* ============================================================
+   Modelo de reparto del consultorio
+   ----------------------------------------------------------------
+   Define cómo circula el dinero dentro del consultorio. Se elige al
+   crearlo y condiciona el comportamiento de los paneles.
+
+   - PROFESIONAL_PAGA (modelo clásico, default histórico):
+       cliente → profesional → consultorio.
+       El paciente le paga al profesional; el profesional le transfiere
+       al consultorio la parte que corresponde. Tanto admin como
+       profesional pueden registrar sesiones, y el profesional paga sus
+       sesiones desde su panel.
+
+   - RECEPCION_COBRA (modelo nuevo):
+       cliente → recepción → profesionales.
+       El paciente le paga a la recepción (el admin), que guarda el dinero
+       en caja y luego reparte a cada profesional. El profesional NO paga
+       sesiones (no existe ese flujo) y NO registra sesiones: solo el admin
+       las crea. El profesional ve cuánto le corresponde y cuándo lo recibió.
+
+   Los consultorios creados antes de este campo se asumen PROFESIONAL_PAGA.
+   ============================================================ */
+export const MODELOS_REPARTO = {
+  PROFESIONAL_PAGA: 'profesional_paga',
+  RECEPCION_COBRA: 'recepcion_cobra',
+};
+
+/** Valor por defecto para consultorios sin el campo (retrocompatibilidad). */
+export const MODELO_REPARTO_DEFAULT = MODELOS_REPARTO.PROFESIONAL_PAGA;
+
+/**
+ * Helper: devuelve el modelo de reparto de un consultorio, con fallback
+ * al modelo clásico si el campo no existe (consultorios previos).
+ */
+export function getModeloReparto(consultorio) {
+  return consultorio?.modeloReparto || MODELO_REPARTO_DEFAULT;
+}
+
+/* ============================================================
    Estados de usuario
    ============================================================ */
 export const ESTADOS_USUARIO = {
