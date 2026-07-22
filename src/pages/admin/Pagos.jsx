@@ -6,7 +6,6 @@ import Badge from '../../components/ui/Badge.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
 
 import { useAuth } from '../../hooks/useAuth.js';
-import { useConsultorio } from '../../hooks/useConsultorio.js';
 import { useOverlayClose } from '../../hooks/useOverlayClose.js';
 import { ESTADOS_PAGO_SESION, formatoARS } from '../../lib/constants.js';
 import { suscribirPacientesConsultorio } from '../../lib/pacientes.js';
@@ -62,7 +61,6 @@ function formatoFechaHora(date) {
 export default function PagosAdmin() {
   const { user } = useAuth();
   const consultorioId = user?.consultorioId;
-  const { consultorio } = useConsultorio();
 
   const [pagos, setPagos] = useState([]);
   const [sesiones, setSesiones] = useState([]);
@@ -259,13 +257,6 @@ export default function PagosAdmin() {
                 </div>
               </div>
               <div className="cp-pagos-resumen-mes__card">
-                <div className="cp-pagos-resumen-mes__label">Comisión ConsulPay</div>
-                <div className="cp-pagos-resumen-mes__value">
-                  {formatoARS.format(stats.totalComision)}
-                </div>
-                <div className="cp-pagos-resumen-mes__hint">descontada antes de acreditar</div>
-              </div>
-              <div className="cp-pagos-resumen-mes__card">
                 <div className="cp-pagos-resumen-mes__label">Cargo Mercado Pago</div>
                 <div className="cp-pagos-resumen-mes__value">
                   {formatoARS.format(stats.totalFeeMP)}
@@ -353,7 +344,6 @@ export default function PagosAdmin() {
                 <th>Fecha</th>
                 <th>Profesional</th>
                 <th className="cp-num-col">Bruto</th>
-                <th className="cp-num-col">Comisión</th>
                 <th className="cp-num-col">Cargo MP</th>
                 <th className="cp-num-col">Recibido</th>
                 <th className="cp-num-col" title="Cantidad de registros de sesiones incluidos. Cada registro puede representar 1 o varias sesiones agrupadas.">
@@ -388,9 +378,6 @@ export default function PagosAdmin() {
                       </div>
                     </td>
                     <td data-label="Bruto" className="cp-num">{formatoARS.format(p.montoTotal || 0)}</td>
-                    <td data-label="Comisión" className="cp-num" style={{ color: 'var(--cp-text-muted)' }}>
-                      −{formatoARS.format(p.montoConsulpay || 0)}
-                    </td>
                     <td data-label="Cargo MP" className="cp-num" style={{ color: 'var(--cp-text-muted)' }}>
                       {tieneFee
                         ? `−${formatoARS.format(p.feeMercadoPago || 0)}`
@@ -532,12 +519,6 @@ function DetallePagoModal({ pago, profesional, onClose }) {
           <div>
             <dt>Monto bruto</dt>
             <dd>{formatoARS.format(pago.montoTotal || 0)}</dd>
-          </div>
-          <div>
-            <dt>Comisión ConsulPay ({pago.comisionPctAplicada ?? '—'}%)</dt>
-            <dd style={{ color: 'var(--cp-text-muted)' }}>
-              −{formatoARS.format(pago.montoConsulpay || 0)}
-            </dd>
           </div>
           {tieneFee ? (
             <div>
