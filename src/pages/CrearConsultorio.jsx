@@ -12,7 +12,7 @@ import {
 } from '../lib/auth.js';
 import { crearConsultorio } from '../lib/consultorios.js';
 import { useAuth } from '../hooks/useAuth.js';
-import { ROLES } from '../lib/constants.js';
+import { MODELO_REPARTO_DEFAULT, MODELOS_REPARTO, ROLES } from '../lib/constants.js';
 import './CrearConsultorio.css';
 
 /* ============================================================
@@ -54,6 +54,7 @@ export default function CrearConsultorio() {
   const [cuit, setCuit] = useState('');
   const [cbu, setCbu] = useState('');
   const [alias, setAlias] = useState('');
+  const [modeloReparto, setModeloReparto] = useState(MODELO_REPARTO_DEFAULT);
   const [metodos, setMetodos] = useState(METODOS_DEFAULT);
 
   // Estados globales
@@ -80,7 +81,9 @@ export default function CrearConsultorio() {
     return null;
   }
 
-  const totalSteps = user ? 2 : 3;
+  // Pasos: [Auth (solo sin sesión)] → Datos → Modelo de reparto → Métodos.
+  // Con sesión son 3 pasos visibles; sin sesión, 4 (el Auth es el primero).
+  const totalSteps = user ? 3 : 4;
   const stepDisplay = user ? step - 1 : step;
 
   async function onFinalizar() {
@@ -104,6 +107,7 @@ export default function CrearConsultorio() {
         cbuTransferencia: cbu,
         aliasTransferencia: alias,
         metodosPagoPaciente: metodosActivos,
+        modeloReparto,
       });
 
       // Refresco el doc del user para que AuthContext tenga rol=admin y el nuevo consultorioId.
@@ -171,7 +175,7 @@ export default function CrearConsultorio() {
           )}
 
           {/* Paso 2: Datos del consultorio */}
-          {user && step < 3 && (
+          {user && step === 2 && (
             <DatosStep
               nombreConsultorio={nombreConsultorio}
               setNombreConsultorio={setNombreConsultorio}
@@ -197,12 +201,22 @@ export default function CrearConsultorio() {
             />
           )}
 
-          {/* Paso 3: Métodos de pago iniciales */}
+          {/* Paso 3: Modelo de reparto del dinero */}
           {user && step === 3 && (
+            <ModeloStep
+              modeloReparto={modeloReparto}
+              setModeloReparto={setModeloReparto}
+              onBack={() => { setError(''); setStep(2); }}
+              onNext={() => { setError(''); setStep(4); }}
+            />
+          )}
+
+          {/* Paso 4: Métodos de pago iniciales */}
+          {user && step === 4 && (
             <MetodosStep
               metodos={metodos}
               setMetodos={setMetodos}
-              onBack={() => setStep(2)}
+              onBack={() => setStep(3)}
               onFinalizar={onFinalizar}
               submitting={submitting}
               error={error}
@@ -452,7 +466,196 @@ function DatosStep({
 }
 
 /* ============================================================
-   Paso 3 — Métodos de pago iniciales
+   Paso — Modelo de reparto del dinero
+   ----------------------------------------------------------------
+   Dos tarjetas seleccionables. Cada una muestra, además del texto,
+   un pequeño diagrama del recorrido del dinero (cliente → X → Y),
+   que es lo que de verdad distingue un modelo del otro.
+   ============================================================ */
+
+const MODELOS_INFO = [
+  {
+    id: MODELOS_REPARTO.RECEPCION_COBRA,
+    nombre: 'Recepción / caja central',
+    resumen: 'El paciente le paga a recepción, que junta todo en caja y después reparte a cada profesional.',
+    flujo: ['paciente', 'recepcion', 'profesionales'],
+    ideal: 'Consultorios con recepcionista o secretaria que cobra en el mostrador. Es el modelo más común.',
+    caracteristicas: [
+      'La recepción (vos como admin) registra las sesiones y cobra al paciente.',
+      'El dinero queda en caja y lo repartís vos a cada profesional cuando corresponde.',
+      'Marcás con un tilde cada reparto que ya entregaste. Por ahora es manual, sin Mercado Pago.',
+      'El profesional no registra sesiones ni carga pagos: solo consulta cuánto le corresponde y cuándo lo recibió.',
+    ],
+  },
+  {
+    id: MODELOS_REPARTO.PROFESIONAL_PAGA,
+    nombre: 'Cada profesional cobra lo suyo',
+    resumen: 'El paciente le paga directo al profesional, y el profesional le transfiere al consultorio la parte que corresponde.',
+    flujo: ['paciente', 'profesional', 'consultorio'],
+    ideal: 'Consultorios donde cada profesional maneja su propia caja y le rinde al consultorio su porcentaje.',
+    caracteristicas: [
+      'Tanto vos como cada profesional pueden registrar sesiones.',
+      'Cada profesional ve cuánto le debe al consultorio y salda sus sesiones desde su panel.',
+      'Vos confirmás los pagos que te van entrando y llevás el control de lo pendiente.',
+      'Cada profesional gestiona sus propios pacientes y su propia agenda.',
+    ],
+  },
+];
+
+/* Cada nodo del flujo tiene su ícono y su etiqueta visible. */
+const NODOS_FLUJO = {
+  paciente: {
+    label: 'Paciente',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="8" r="4" />
+        <path d="M4 21v-1a6 6 0 016-6h4a6 6 0 016 6v1" />
+      </svg>
+    ),
+  },
+  recepcion: {
+    label: 'Recepción',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 21h18" />
+        <path d="M5 21V10l7-4 7 4v11" />
+        <path d="M9 21v-5a3 3 0 016 0v5" />
+      </svg>
+    ),
+  },
+  profesional: {
+    label: 'Profesional',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M8 4h8l-1 4H9L8 4z" />
+        <path d="M12 8v3" />
+        <path d="M6 21v-3a6 6 0 0112 0v3" />
+        <circle cx="12" cy="14" r="0.5" fill="currentColor" />
+      </svg>
+    ),
+  },
+  profesionales: {
+    label: 'Profesionales',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="9" cy="8" r="3.2" />
+        <path d="M3 20v-1a5 5 0 015-5h2a5 5 0 015 5v1" />
+        <path d="M16 5.5a3 3 0 010 5.8" />
+        <path d="M18 14a5 5 0 013 4.6V20" />
+      </svg>
+    ),
+  },
+  consultorio: {
+    label: 'Consultorio',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 21V7l8-4 8 4v14" />
+        <path d="M4 21h16" />
+        <path d="M12 8v6M9 11h6" />
+      </svg>
+    ),
+  },
+};
+
+function FlujoDinero({ pasos, activo }) {
+  return (
+    <div className={`cc-flujo ${activo ? 'cc-flujo--activo' : ''}`} aria-hidden="true">
+      {pasos.map((key, i) => {
+        const nodo = NODOS_FLUJO[key];
+        return (
+          <span key={key} className="cc-flujo__item">
+            <span className="cc-flujo__nodo">
+              <span className="cc-flujo__nodo-icon">{nodo.icon}</span>
+              <span className="cc-flujo__nodo-label">{nodo.label}</span>
+            </span>
+            {i < pasos.length - 1 && (
+              <svg className="cc-flujo__arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 12h14M13 5l7 7-7 7" />
+              </svg>
+            )}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function ModeloStep({ modeloReparto, setModeloReparto, onBack, onNext }) {
+  return (
+    <div className="cc-step">
+      <div className="cc-step__eyebrow">¿Cómo se maneja el dinero?</div>
+      <h1 className="cc-step__title">Elegí el modelo de tu consultorio</h1>
+      <p className="cc-step__sub">
+        Definí quién cobra al paciente y cómo circula la plata hasta cada profesional.
+        Elegí el que se parezca a cómo trabajan hoy. Vas a poder ajustar el resto de la
+        configuración más adelante.
+      </p>
+
+      <div className="cc-step__body">
+        <div className="cc-modelos">
+          {MODELOS_INFO.map((m) => {
+            const seleccionado = modeloReparto === m.id;
+            return (
+              <button
+                type="button"
+                key={m.id}
+                className={`cc-modelo ${seleccionado ? 'cc-modelo--sel' : ''}`}
+                onClick={() => setModeloReparto(m.id)}
+                aria-pressed={seleccionado}
+              >
+                <div className="cc-modelo__head">
+                  <span className="cc-modelo__radio" aria-hidden="true">
+                    {seleccionado && (
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </span>
+                  <span className="cc-modelo__nombre">{m.nombre}</span>
+                </div>
+
+                <p className="cc-modelo__resumen">{m.resumen}</p>
+
+                <FlujoDinero pasos={m.flujo} activo={seleccionado} />
+
+                <div className="cc-modelo__ideal">
+                  <span className="cc-modelo__ideal-label">Ideal para</span>
+                  {m.ideal}
+                </div>
+
+                <ul className="cc-modelo__lista">
+                  {m.caracteristicas.map((c, i) => (
+                    <li key={i} className="cc-modelo__li">
+                      <svg className="cc-modelo__li-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                      <span>{c}</span>
+                    </li>
+                  ))}
+                </ul>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="cc-actions cc-actions--between">
+          <Button variant="secondary" onClick={onBack}>
+            Volver
+          </Button>
+          <Button variant="primary" onClick={onNext}>
+            Continuar
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12h14M13 5l7 7-7 7" />
+            </svg>
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   Paso — Métodos de pago iniciales
    ============================================================ */
 function MetodosStep({ metodos, setMetodos, onBack, onFinalizar, submitting, error }) {
 
