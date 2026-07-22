@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import Button from '../components/ui/Button.jsx';
@@ -24,6 +24,72 @@ const METODOS_DEFAULT = [
   { id: 'obra_social_apross', nombre: 'APROSS', tipo: 'diferido', porcentajeConsultorio: 22, valorSesionDefault: 9500, activo: true },
   { id: 'prepaga', nombre: 'Prepaga', tipo: 'diferido', porcentajeConsultorio: 33, valorSesionDefault: 12000, activo: true },
 ];
+
+/* ============================================================
+   Definición de los pasos del wizard (para el stepper lateral)
+   ----------------------------------------------------------------
+   El primer paso (Cuenta) solo aplica cuando no hay sesión abierta.
+   Cuando el usuario ya está logueado, el stepper muestra los otros 3.
+   ============================================================ */
+const PASOS_INFO = [
+  {
+    key: 'cuenta',
+    label: 'Cuenta',
+    desc: 'Registrate o iniciá sesión para administrar tu consultorio.',
+  },
+  {
+    key: 'datos',
+    label: 'Datos',
+    desc: 'El nombre, la ubicación y los datos de contacto del consultorio.',
+  },
+  {
+    key: 'modelo',
+    label: 'Modelo',
+    desc: 'Elegí cómo circula el dinero entre pacientes, recepción y profesionales.',
+  },
+  {
+    key: 'metodos',
+    label: 'Métodos',
+    desc: 'Definí los métodos de pago que aceptás y el valor de cada sesión.',
+  },
+];
+
+/* ============================================================
+   Stepper lateral — progreso del wizard
+   ----------------------------------------------------------------
+   Cards verticales. La del paso actual queda expandida con su
+   descripción; las demás se comprimen. Los pasos ya completados
+   muestran un tilde; los pendientes, su número.
+   ============================================================ */
+function Stepper({ pasos, activeIndex }) {
+  return (
+    <aside className="cc-stepper" aria-label="Progreso">
+      {pasos.map((p, i) => {
+        const estado = i < activeIndex ? 'done' : i === activeIndex ? 'active' : 'todo';
+        return (
+          <div key={p.key} className={`cc-stepcard cc-stepcard--${estado}`}>
+            <span className="cc-stepcard__bar" aria-hidden="true" />
+            <div className="cc-stepcard__content">
+              <div className="cc-stepcard__num">
+                {estado === 'done' ? (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                ) : (
+                  String(i + 1).padStart(2, '0')
+                )}
+              </div>
+              <div className="cc-stepcard__label">{p.label}</div>
+              <div className="cc-stepcard__desc-wrap">
+                <div className="cc-stepcard__desc">{p.desc}</div>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </aside>
+  );
+}
 
 /* ============================================================
    Ícono de Google
@@ -60,6 +126,14 @@ export default function CrearConsultorio() {
   // Estados globales
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  // Si el usuario ya está logueado (llega con sesión o vuelve al wizard),
+  // saltamos el paso 1 (Cuenta) y arrancamos en Datos. Sin esto, un usuario
+  // logueado veria el wizard vacío en step 1 (Auth requiere !user y Datos
+  // requiere step===2).
+  useEffect(() => {
+    if (user && step === 1) setStep(2);
+  }, [user, step]);
 
   if (loading) {
     return (
@@ -167,7 +241,13 @@ export default function CrearConsultorio() {
       </header>
 
       <main className="cc-main">
-        <div className="cc-shell">
+        <div className="cc-layout">
+          <Stepper
+            pasos={user ? PASOS_INFO.slice(1) : PASOS_INFO}
+            activeIndex={step - (user ? 2 : 1)}
+          />
+
+          <div className="cc-shell">
 
           {/* Paso 1: Autenticación (solo si no hay sesión) */}
           {!user && step === 1 && (
@@ -223,6 +303,7 @@ export default function CrearConsultorio() {
             />
           )}
 
+          </div>
         </div>
       </main>
     </div>
