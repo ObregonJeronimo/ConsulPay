@@ -608,10 +608,10 @@ const NODOS_FLUJO = {
     label: 'Profesional',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M8 4h8l-1 4H9L8 4z" />
-        <path d="M12 8v3" />
-        <path d="M6 21v-3a6 6 0 0112 0v3" />
-        <circle cx="12" cy="14" r="0.5" fill="currentColor" />
+        <rect x="3" y="7.5" width="18" height="12.5" rx="2" />
+        <path d="M8 7.5V6a2 2 0 012-2h4a2 2 0 012 2v1.5" />
+        <path d="M3 12.5h18" />
+        <path d="M11 12.5h2" />
       </svg>
     ),
   },
