@@ -115,10 +115,28 @@
   padding: 60px 32px 80px;
 }
 
+/* Layout de dos columnas: stepper lateral + contenido del paso */
+.cc-layout {
+  width: 100%;
+  max-width: 940px;
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 56px;
+  align-items: start;
+}
+
 .cc-shell {
   width: 100%;
   max-width: 620px;
   animation: cc-fade-up 500ms var(--cp-ease) both;
+}
+
+@media (max-width: 900px) {
+  .cc-layout {
+    grid-template-columns: 1fr;
+    gap: 32px;
+    max-width: 620px;
+  }
 }
 
 @media (max-width: 640px) {
@@ -746,4 +764,146 @@
   .cc-flujo__nodo-icon svg { width: 22px; height: 22px; }
   .cc-flujo__nodo-label { font-size: 10.5px; }
   .cc-flujo__arrow { width: 16px; height: 16px; }
+}
+
+/* ============================================================
+   Stepper lateral — progreso del wizard
+   ============================================================ */
+.cc-stepper {
+  position: sticky;
+  top: 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cc-stepcard {
+  position: relative;
+  display: flex;
+  gap: 0;
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-lg);
+  overflow: hidden;
+  transition: border-color var(--cp-dur) var(--cp-ease),
+              box-shadow var(--cp-dur) var(--cp-ease);
+}
+
+/* Barra lateral de color — la firma visual de cada card */
+.cc-stepcard__bar {
+  flex-shrink: 0;
+  width: 6px;
+  align-self: stretch;
+  background: var(--cp-border-strong);
+  transition: background var(--cp-dur) var(--cp-ease);
+}
+
+.cc-stepcard__content {
+  padding: 16px 18px;
+  min-width: 0;
+}
+
+.cc-stepcard__num {
+  font-family: var(--cp-font-mono);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--cp-text-faint);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 20px;
+  transition: color var(--cp-dur) var(--cp-ease);
+}
+
+.cc-stepcard__label {
+  font-family: var(--cp-font-serif);
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--cp-text-muted);
+  margin-top: 8px;
+  transition: color var(--cp-dur) var(--cp-ease);
+}
+
+/* Descripción: animada con grid-template-rows (0fr → 1fr).
+   Solo se despliega en la card activa. */
+.cc-stepcard__desc-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--cp-dur) var(--cp-ease),
+              opacity var(--cp-dur) var(--cp-ease),
+              margin-top var(--cp-dur) var(--cp-ease);
+  opacity: 0;
+  margin-top: 0;
+}
+
+.cc-stepcard__desc {
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--cp-text-muted);
+}
+
+/* ---- Estado: activo (expandido) ---- */
+.cc-stepcard--active {
+  border-color: var(--cp-accent);
+  box-shadow: 0 12px 30px -20px rgba(193, 95, 60, 0.35);
+}
+.cc-stepcard--active .cc-stepcard__bar { background: var(--cp-accent); }
+.cc-stepcard--active .cc-stepcard__num { color: var(--cp-accent); }
+.cc-stepcard--active .cc-stepcard__label { color: var(--cp-text); }
+.cc-stepcard--active .cc-stepcard__desc-wrap {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  margin-top: 8px;
+}
+
+/* ---- Estado: completado ---- */
+.cc-stepcard--done .cc-stepcard__bar { background: var(--cp-accent); opacity: 0.45; }
+.cc-stepcard--done .cc-stepcard__num { color: var(--cp-accent); }
+.cc-stepcard--done .cc-stepcard__label { color: var(--cp-text-muted); }
+
+/* ---- Estado: pendiente (todo) queda con los valores base ---- */
+
+/* ============================================================
+   Stepper en mobile — barra horizontal compacta arriba
+   ============================================================ */
+@media (max-width: 900px) {
+  .cc-stepper {
+    position: static;
+    flex-direction: row;
+    gap: 8px;
+  }
+
+  .cc-stepcard {
+    flex: 1;
+    flex-direction: column;
+    border-radius: var(--cp-radius-md);
+  }
+
+  /* La barra pasa a ser una franja superior */
+  .cc-stepcard__bar {
+    width: 100%;
+    height: 4px;
+    align-self: auto;
+  }
+
+  .cc-stepcard__content {
+    padding: 10px 12px;
+  }
+
+  .cc-stepcard__num { font-size: 15px; }
+  .cc-stepcard__label { font-size: 12.5px; margin-top: 4px; }
+
+  /* En mobile no expandimos la descripción: el espacio no da.
+     El paso activo se distingue por el color de la barra y el número. */
+  .cc-stepcard__desc-wrap { display: none; }
+}
+
+@media (max-width: 560px) {
+  .cc-stepcard__label { display: none; }
+  .cc-stepcard__content { padding: 8px 10px; text-align: center; }
+  .cc-stepcard__num { width: 100%; }
 }
