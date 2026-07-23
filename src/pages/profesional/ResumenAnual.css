@@ -80,6 +80,25 @@
   color: var(--cp-success, #4F6F3A);
   display: flex;
 }
+/* Mes sin sesiones: neutro, ni verde ni de alerta. No compite por la
+   atencion y deja claro que no hay nada registrado. */
+.cp-mes-card--vacio {
+  background: var(--cp-surface-sunken);
+  border-color: var(--cp-border);
+  cursor: default;
+}
+
+.cp-mes-card__vacio-dash {
+  color: var(--cp-text-faint);
+  font-size: 15px;
+  line-height: 1;
+}
+
+.cp-mes-card__vacio-text {
+  font-size: 12.5px;
+  color: var(--cp-text-faint);
+}
+
 .cp-mes-card__ok-text {
   font-size: 12.5px;
   color: var(--cp-success, #4F6F3A);

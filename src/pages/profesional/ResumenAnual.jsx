@@ -9,6 +9,10 @@ import './ResumenAnual.css';
    ----------------------------------------------------------------
    Por cada mes del año muestra el estado de las sesiones del
    profesional según la FECHA DE LA SESIÓN:
+     - Sin sesiones registradas → estado neutro. NO se muestra como
+       "todo al día": afirmar que un mes está saldado cuando en
+       realidad nunca se cargó nada hace creer que el registro está
+       completo.
      - Todo pagado y nada por liquidar → estado OK (ícono check)
      - Sesiones debidas (con valor, sin pagar) → lista de pacientes
        con el monto que se debe al consultorio
@@ -51,12 +55,14 @@ export default function ResumenAnual({ sesiones, mapaPacientes, anio }) {
       debidas: [],       // { nombre, monto }
       porLiquidar: [],   // { nombre }
       totalDebido: 0,
+      total: 0,          // sesiones del mes, en cualquier estado
     }));
 
     for (const s of sesiones) {
       const d = fechaDeSesion(s);
       if (!d || d.getFullYear() !== year) continue;
       const m = d.getMonth();
+      arr[m].total += 1;
       if (s.estadoPago === ESTADOS_PAGO_SESION.DEBIDO) {
         arr[m].debidas.push({ nombre: nombrePac(s, mapaPacientes), monto: s.montoConsultorio || 0 });
         arr[m].totalDebido += s.montoConsultorio || 0;
@@ -82,14 +88,18 @@ export default function ResumenAnual({ sesiones, mapaPacientes, anio }) {
       <div className="cp-resumen-anual__grid">
         {meses.map((m) => {
           const tienePendientes = m.debidas.length > 0 || m.porLiquidar.length > 0;
-          const estaOk = !tienePendientes;
+          // Un mes sin sesiones NO esta "al dia": simplemente no tiene
+          // actividad. Mezclarlos hacia parecer que el mes estaba
+          // registrado y saldado cuando en realidad estaba vacio.
+          const sinActividad = m.total === 0;
+          const estaOk = !tienePendientes && !sinActividad;
           const esActual = m.mes === mesActual;
           const abierto = expandido === m.mes;
 
           return (
             <div
               key={m.mes}
-              className={`cp-mes-card ${estaOk ? 'cp-mes-card--ok' : 'cp-mes-card--pend'} ${esActual ? 'cp-mes-card--actual' : ''} ${abierto ? 'cp-mes-card--abierto' : ''}`}
+              className={`cp-mes-card ${sinActividad ? 'cp-mes-card--vacio' : estaOk ? 'cp-mes-card--ok' : 'cp-mes-card--pend'} ${esActual ? 'cp-mes-card--actual' : ''} ${abierto ? 'cp-mes-card--abierto' : ''}`}
               onClick={() => tienePendientes && setExpandido(abierto ? null : m.mes)}
             >
               <div className="cp-mes-card__head">
@@ -97,7 +107,9 @@ export default function ResumenAnual({ sesiones, mapaPacientes, anio }) {
                   {MESES[m.mes]}
                   {esActual && <span className="cp-mes-card__actual-dot" title="Mes actual" />}
                 </span>
-                {estaOk ? (
+                {sinActividad ? (
+                  <span className="cp-mes-card__vacio-dash" aria-hidden="true">—</span>
+                ) : estaOk ? (
                   <span className="cp-mes-card__ok"><IconOk /></span>
                 ) : (
                   <span className="cp-mes-card__badge">
@@ -106,7 +118,9 @@ export default function ResumenAnual({ sesiones, mapaPacientes, anio }) {
                 )}
               </div>
 
-              {estaOk ? (
+              {sinActividad ? (
+                <div className="cp-mes-card__vacio-text">Sin sesiones</div>
+              ) : estaOk ? (
                 <div className="cp-mes-card__ok-text">Todo al día</div>
               ) : (
                 <div className="cp-mes-card__body">
