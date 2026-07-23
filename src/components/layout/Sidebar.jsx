@@ -3,10 +3,9 @@ import { NavLink } from 'react-router-dom';
 
 import { useAuth } from '../../hooks/useAuth.js';
 import { useConsultorio } from '../../hooks/useConsultorio.js';
-import { PLANES, ROLES } from '../../lib/constants.js';
+import { ROLES } from '../../lib/constants.js';
 import { suscribirSolicitudesPendientes } from '../../lib/solicitudes.js';
 import Avatar from '../ui/Avatar.jsx';
-import PlanPill from '../ui/PlanPill.jsx';
 import './Sidebar.css';
 
 /* Íconos inline para tener control total del stroke-width */
@@ -138,15 +137,6 @@ export default function Sidebar() {
 
   return (
     <aside className="cp-sidebar">
-      {/* Badge Plan Ultra: arriba de todo, como un "sello" del workspace.
-          Pro tambien se muestra aca arriba con su propio estilo. Free no
-          muestra nada. */}
-      {consultorio && (consultorio.plan === PLANES.ULTRA || consultorio.plan === PLANES.PRO) && (
-        <div className="cp-sidebar__plan-header">
-          <PlanPill plan={consultorio.plan} size="lg" />
-        </div>
-      )}
-
       <div className="cp-sidebar__brand">
         <div className="cp-sidebar__brand-mark">C</div>
         <div className="cp-sidebar__brand-name">ConsulPay</div>
