@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 
 import Metric from '../../components/ui/Metric.jsx';
 import Button from '../../components/ui/Button.jsx';
-import PlanPill from '../../components/ui/PlanPill.jsx';
 import { SkeletonBox } from '../../components/ui/Skeleton.jsx';
 
 import { useAuth } from '../../hooks/useAuth.js';
@@ -172,14 +171,6 @@ export default function Dashboard() {
           <h1 className="cp-page-title">Resumen de {mesActual}</h1>
           <p className="cp-page-sub">
             {consultorio?.nombre}
-            {' · '}
-            {consultorio?.plan === 'ultra' ? (
-              // Ultra ya se muestra como badge llamativo en el sidebar.
-              // Aca solo dejamos texto sutil para evitar duplicacion visual.
-              <span className="cp-page-sub__ultra-text">Plan Ultra</span>
-            ) : (
-              <PlanPill plan={consultorio?.plan} />
-            )}
           </p>
         </div>
         <Link to="/admin/sesiones" state={{ abrirNueva: true }}>
@@ -327,3 +318,5 @@ function OnboardingPasos() {
     </div>
   );
 }
+
+
