@@ -294,3 +294,57 @@
   .cp-desglose__monto { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
   .cp-desglose__cant { grid-column: 1; }
 }
+
+/* ---- Acciones del header ---- */
+.cp-sesiones-header__acciones {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+}
+
+/* ============================================================
+   Economia vertical en pantallas bajas
+   ----------------------------------------------------------------
+   Medido en netbook 1024x600: entre titulo, subtitulo, selector de mes,
+   cuatro botones y el banner de aprobacion, el encabezado se comia casi
+   la mitad del alto util y habia que scrollear para ver la primera
+   sesion. En pantallas asi lo que importa es llegar al listado.
+   ============================================================ */
+@media (max-height: 720px) and (min-width: 641px) {
+  .cp-sesiones-header { margin-bottom: 12px; }
+
+  .cp-sesiones-header__acciones { gap: 6px; }
+
+  .cp-sesiones-header__acciones button {
+    min-height: 34px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+    font-size: 13px;
+  }
+
+  /* El banner explica el modo con aprobacion: en pantallas bajas alcanza
+     con el titulo y una linea, el detalle largo estorba. */
+  .cp-aprobacion-banner { padding: 10px 14px; }
+  .cp-aprobacion-banner p { margin: 2px 0 0; font-size: 12.5px; line-height: 1.4; }
+}
+
+/* ============================================================
+   Prioridad de columnas entre 1025 y 1365
+   ----------------------------------------------------------------
+   Medido con navegador real: la tabla necesita ~1050px y, descontando
+   los 240px del sidebar, recien entra completa a los 1366px de viewport.
+   En 1280x720 (notebook muy comun) se recortaban 56px, o sea media
+   columna cortada por el borde.
+
+   En vez de degradar toda la tabla a tarjetas en esos anchos, se oculta
+   la columna "Método": es texto largo ("OBRA SOCIAL 24%") y el dato ya
+   aparece en el detalle de cada sesion. Las columnas de plata, la fecha
+   y el estado se conservan, que es lo que se viene a mirar.
+   ============================================================ */
+@media (min-width: 1025px) and (max-width: 1365px) {
+  .cp-sesiones .cp-table thead th:nth-child(4),
+  .cp-sesiones .cp-table tbody td:nth-child(4) {
+    display: none;
+  }
+}

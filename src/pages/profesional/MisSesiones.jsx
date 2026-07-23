@@ -430,7 +430,11 @@ export default function MisSesiones() {
           </p>
           <SelectorMes mes={mes} setMes={setMes} />
         </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'stretch' }}>
+        {/* Mismo contenedor en columna que usa el admin: sin esto las filas
+            de botones quedan como hermanas sueltas del header y el flex las
+            acomoda a la par del titulo en vez de apilarlas a la derecha. */}
+        <div className="cp-sesiones-header__acciones">
+          <div style={{ display: 'flex', gap: 10, alignItems: 'stretch' }}>
           <Button variant="secondary" onClick={() => setCargaRapidaOpen(true)} disabled={!hayPrereqs} style={{ flex: 1 }}>
             Carga rápida
           </Button>
@@ -469,6 +473,7 @@ export default function MisSesiones() {
             </Button>
           </div>
         )}
+        </div>
       </header>
 
       {/* Banner de modo "con aprobacion" */}
