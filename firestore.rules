@@ -374,6 +374,65 @@ service cloud.firestore {
     }
 
     // ============================================================
+    //  /citas/{citaId} — agenda del consultorio
+    // ------------------------------------------------------------
+    //  Solo se usa en el modelo de reparto "recepcion_cobra": la
+    //  recepcion (admin o coadmin) maneja la agenda y el profesional
+    //  la consulta en modo lectura.
+    //
+    //  IMPORTANTE sobre el read del profesional: la condicion
+    //  profesionalUid == uid obliga a que el cliente filtre por ese
+    //  campo EN EL QUERY. Firestore evalua las reglas contra la
+    //  consulta y no contra los resultados: pedir todas las citas del
+    //  consultorio para filtrarlas en memoria se rechaza entero.
+    // ============================================================
+    match /citas/{citaId} {
+
+      allow read: if esSuperadmin()
+        || esStaffDe(resource.data.consultorioId)
+        || (esProfesionalDe(resource.data.consultorioId)
+            && resource.data.profesionalUid == request.auth.uid);
+
+      // Solo el staff agenda. El profesional nunca crea ni edita turnos.
+      allow create: if esStaffDe(request.resource.data.consultorioId)
+        && request.resource.data.consultorioId is string
+        && request.resource.data.profesionalUid is string
+        && request.resource.data.pacienteNombre is string
+        && request.resource.data.fecha is string
+        && request.resource.data.hora is string
+        && request.resource.data.duracionMin is number
+        && request.resource.data.estado in ['agendada', 'asistio', 'ausente', 'cancelada'];
+
+      allow update: if esStaffDe(resource.data.consultorioId)
+        && request.resource.data.consultorioId == resource.data.consultorioId
+        && request.resource.data.estado in ['agendada', 'asistio', 'ausente', 'cancelada'];
+
+      allow delete: if esStaffDe(resource.data.consultorioId);
+    }
+
+    // ============================================================
+    //  /series_citas/{serieId} — regla de repeticion de un turno fijo
+    // ------------------------------------------------------------
+    //  Guarda la configuracion de la serie (cada cuanto, hasta cuando).
+    //  Las citas concretas viven en /citas; esto es solo la receta, y
+    //  la maneja unicamente el staff.
+    // ============================================================
+    match /series_citas/{serieId} {
+
+      allow read: if esSuperadmin() || esStaffDe(resource.data.consultorioId);
+
+      allow create: if esStaffDe(request.resource.data.consultorioId)
+        && request.resource.data.consultorioId is string
+        && request.resource.data.profesionalUid is string
+        && request.resource.data.desde is string;
+
+      allow update: if esStaffDe(resource.data.consultorioId)
+        && request.resource.data.consultorioId == resource.data.consultorioId;
+
+      allow delete: if esStaffDe(resource.data.consultorioId);
+    }
+
+    // ============================================================
     //  /solicitudes_sesion/{solicitudId}
     // ============================================================
     match /solicitudes_sesion/{solicitudId} {
