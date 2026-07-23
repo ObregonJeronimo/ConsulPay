@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 
 import { useAuth } from '../../hooks/useAuth.js';
 import { useConsultorio } from '../../hooks/useConsultorio.js';
-import { ROLES } from '../../lib/constants.js';
+import { getModeloReparto, MODELOS_REPARTO, ROLES } from '../../lib/constants.js';
 import { suscribirSolicitudesPendientes } from '../../lib/solicitudes.js';
 import Avatar from '../ui/Avatar.jsx';
 import './Sidebar.css';
@@ -43,6 +43,17 @@ const Icon = {
       <circle cx="8.5" cy="7" r="4" />
       <line x1="20" y1="8" x2="20" y2="14" />
       <line x1="23" y1="11" x2="17" y2="11" />
+    </svg>
+  ),
+  /*
+    Agenda: calendario con un punto marcado. Se diferencia del icono
+    Calendar (que usa Sesiones) para que no se confundan en el menu.
+  */
+  Agenda: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M3 10h18M8 3v4M16 3v4" />
+      <circle cx="12" cy="15" r="1.6" fill="currentColor" stroke="none" />
     </svg>
   ),
   Inbox: () => (
@@ -114,6 +125,11 @@ export default function Sidebar() {
   const esAdmin = user?.rol === ROLES.ADMIN || esCoadmin;
   const mostrarReparto = (user?.rol === ROLES.ADMIN) && (consultorio?.adminUids?.length || 0) >= 2;
 
+  // La agenda compartida existe solo en el modelo donde la recepcion cobra
+  // y reparte. En el otro modelo cada profesional maneja lo suyo y un
+  // calendario central no aplica.
+  const usaAgenda = getModeloReparto(consultorio) === MODELOS_REPARTO.RECEPCION_COBRA;
+
   // Conteo live de solicitudes pendientes (solo para admin).
   // Suscribimos siempre que sea admin con consultorioId; el unsub es seguro
   // si la suscripcion devuelve una funcion vacia (cuando faltan datos).
@@ -156,6 +172,9 @@ export default function Sidebar() {
             <div className="cp-sidebar__label">General</div>
             <NavItem to="/admin" end icon={<Icon.Home />}>Resumen</NavItem>
             <NavItem to="/admin/profesionales" icon={<Icon.Users />}>Profesionales</NavItem>
+            {usaAgenda && (
+              <NavItem to="/admin/calendario" icon={<Icon.Agenda />}>Calendario</NavItem>
+            )}
             <NavItem to="/admin/sesiones" icon={<Icon.Calendar />}>Sesiones</NavItem>
             <NavItem
               to="/admin/solicitudes"
@@ -181,6 +200,9 @@ export default function Sidebar() {
           <div className="cp-sidebar__label">Mi cuenta</div>
           <NavItem to="/mi-panel" end icon={<Icon.Home />}>Resumen</NavItem>
           <NavItem to="/mi-panel/pacientes" icon={<Icon.UserPlus />}>Mis pacientes</NavItem>
+          {usaAgenda && (
+            <NavItem to="/mi-panel/agenda" icon={<Icon.Agenda />}>Mi agenda</NavItem>
+          )}
           <NavItem to="/mi-panel/sesiones" icon={<Icon.Calendar />}>Mis sesiones</NavItem>
           <NavItem to="/mi-panel/pagos" icon={<Icon.Wallet />}>Mis pagos</NavItem>
         </nav>
