@@ -40,7 +40,6 @@ import {
   suscribirRecordatoriosConsultorio,
   TIPOS_CICLO,
 } from '../../lib/recordatorios.js';
-import { comisionDeConsultorio } from '../../lib/superadmin.js';
 import {
   formatearCUIT,
   soloDigitosCBU,
@@ -181,7 +180,6 @@ export default function Configuracion() {
       {tab === 'metodos' && (
         <TabMetodos
           metodos={consultorio.metodosPagoPaciente ?? []}
-          consultorio={consultorio}
           consultorioId={user.consultorioId}
           onDirtyChange={setDirtyMetodos}
         />
@@ -390,23 +388,13 @@ function TabDatos({ consultorio, consultorioId, onDirtyChange }) {
 /* ============================================================
    Tab: Métodos de pago
    ============================================================ */
-function TabMetodos({ metodos: metodosOriginales, consultorio, consultorioId, onDirtyChange }) {
+function TabMetodos({ metodos: metodosOriginales, consultorioId, onDirtyChange }) {
   const [metodos, setMetodos] = useState(metodosOriginales);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
   const [openNuevo, setOpenNuevo] = useState(false);
-
-  // Comision Consulpay segun plan actual del consultorio. Se muestra junto
-  // al % del metodo para que el admin entienda cuanto se queda Consulpay
-  // sobre el valor total de la sesion.
-  const consulpay = useMemo(() => comisionDeConsultorio(consultorio), [consultorio]);
-  const consulpayPct = Number.isFinite(consulpay.pct) ? consulpay.pct : 0;
-  // comisionDeConsultorio ya devuelve la etiqueta correcta para el plan
-  // activo: 'Ultra' / 'Pro' / 'Free' / 'Legacy'. Usar eso aca evita
-  // re-calcular y soporta automaticamente nuevos planes.
-  const planLabel = consulpay.etiqueta || 'Free';
 
   useEffect(() => {
     onDirtyChange(dirty);
@@ -506,21 +494,12 @@ function TabMetodos({ metodos: metodosOriginales, consultorio, consultorioId, on
         </div>
       )}
 
-      {metodos.length > 0 && consulpayPct > 0 && (
-        <BannerComisionConsulpay
-          consulpayPct={consulpayPct}
-          planLabel={planLabel}
-        />
-      )}
-
       {inmediatos.length > 0 && (
         <MetodosGrupo
           tipo="inmediato"
           titulo="Pago inmediato"
           hint="El paciente paga al profesional en el momento."
           metodos={inmediatos}
-          consulpayPct={consulpayPct}
-          planLabel={planLabel}
           onUpdate={updateMetodo}
           onDelete={eliminarMetodo}
         />
@@ -532,8 +511,6 @@ function TabMetodos({ metodos: metodosOriginales, consultorio, consultorioId, on
           titulo="Pago diferido (obra social)"
           hint="El dinero llega meses después. La deuda se activa cuando el profesional liquide el monto en cada sesión."
           metodos={diferidos}
-          consulpayPct={consulpayPct}
-          planLabel={planLabel}
           onUpdate={updateMetodo}
           onDelete={eliminarMetodo}
         />
@@ -568,8 +545,6 @@ function TabMetodos({ metodos: metodosOriginales, consultorio, consultorioId, on
 
       {openNuevo && (
         <ModalNuevoMetodo
-          consulpayPct={consulpayPct}
-          planLabel={planLabel}
           onClose={() => setOpenNuevo(false)}
           onAgregar={agregarMetodo}
         />
@@ -586,7 +561,7 @@ function TabMetodos({ metodos: metodosOriginales, consultorio, consultorioId, on
    social informa el monto meses después de la sesión). El header y las
    rows se renderizan con menos columnas en ese caso.
    ============================================================ */
-function MetodosGrupo({ tipo, titulo, hint, metodos, consulpayPct, planLabel, onUpdate, onDelete }) {
+function MetodosGrupo({ tipo, titulo, hint, metodos, onUpdate, onDelete }) {
   const esDiferido = tipo === 'diferido';
 
   return (
@@ -633,10 +608,8 @@ function MetodosGrupo({ tipo, titulo, hint, metodos, consulpayPct, planLabel, on
             )}
 
             <div className="cp-metodo-row__cell cp-metodo-row__cell--pct">
-              <PorcentajeConConsulpay
+              <PorcentajeInput
                 value={m.porcentajeConsultorio}
-                consulpayPct={consulpayPct}
-                planLabel={planLabel}
                 onChange={(v) => onUpdate(m.id, 'porcentajeConsultorio', v)}
               />
             </div>
@@ -671,23 +644,9 @@ function MetodosGrupo({ tipo, titulo, hint, metodos, consulpayPct, planLabel, on
 }
 
 /* ============================================================
-   Componente: input de porcentaje con badge de comision Consulpay
-   ----------------------------------------------------------------
-   El admin escribe el % que le cobra al profesional (ej: 22). Adentro
-   del mismo "textbox visual", al lado del numero, mostramos un badge
-   naranja con "+ 0.5%" (o "+ 1%") indicando la comision Consulpay
-   segun el plan del consultorio. Esto le permite al admin ver de un
-   vistazo cuanto suma realmente entre lo que se queda el y lo que se
-   queda Consulpay. La decision de absorber esa comision o trasladarla
-   al profesional la toma el dueno del consultorio.
+   Componente: input del porcentaje que se queda el consultorio
    ============================================================ */
-function PorcentajeConConsulpay({ value, consulpayPct, planLabel, onChange }) {
-  const num = Number(value);
-  const tieneValor = Number.isFinite(num) && num >= 0;
-  const total = tieneValor && consulpayPct > 0
-    ? Math.round((num + consulpayPct) * 100) / 100
-    : null;
-
+function PorcentajeInput({ value, onChange }) {
   return (
     <div className="cp-pct-wrapper">
       <div className="cp-pct-input-box">
@@ -704,49 +663,6 @@ function PorcentajeConConsulpay({ value, consulpayPct, planLabel, onChange }) {
           }}
         />
         <span className="cp-pct-input__suffix">%</span>
-        {consulpayPct > 0 && (
-          <span
-            className="cp-pct-input__consulpay"
-            title={`Comisión ConsulPay (plan ${planLabel}): ${consulpayPct}% sobre el valor total de la sesión`}
-          >
-            + {consulpayPct}%
-          </span>
-        )}
-      </div>
-      {consulpayPct > 0 && tieneValor && (
-        <div className="cp-pct-breakdown">
-          {num}% (consultorio) + {consulpayPct}% (ConsulPay) ={' '}
-          <strong>{total}% total</strong>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ============================================================
-   Banner explicativo arriba de los métodos de pago
-   ============================================================ */
-function BannerComisionConsulpay({ consulpayPct, planLabel }) {
-  return (
-    <div className="cp-comision-banner" role="note">
-      <div className="cp-comision-banner__icon" aria-hidden>i</div>
-      <div className="cp-comision-banner__body">
-        <div className="cp-comision-banner__title">
-          Sobre la comisión ConsulPay (plan {planLabel}: {consulpayPct}%)
-        </div>
-        <p className="cp-comision-banner__text">
-          Tu plan {planLabel} paga <strong>{consulpayPct}%</strong> sobre el{' '}
-          <strong>valor total inicial</strong> de cada sesión (lo que pagó el paciente).
-          Esto se suma al porcentaje que cobrás al profesional. Por ejemplo, si en{' '}
-          <em>APROSS</em> ponés <strong>22%</strong>, el total que se descuenta del valor
-          total es <strong>{(22 + consulpayPct).toFixed(consulpayPct % 1 === 0 ? 0 : 1)}%</strong>:{' '}
-          22% queda para el consultorio y {consulpayPct}% para ConsulPay.
-        </p>
-        <p className="cp-comision-banner__text" style={{ marginTop: 8 }}>
-          Vos decidís: dejás el % del método como está y absorbés el {consulpayPct}% del
-          valor total, o lo subís {consulpayPct}% para que lo pague el profesional. Eso es
-          parte de la negociación con tus profesionales.
-        </p>
       </div>
     </div>
   );
@@ -755,17 +671,12 @@ function BannerComisionConsulpay({ consulpayPct, planLabel }) {
 /* ============================================================
    Modal: Nuevo método
    ============================================================ */
-function ModalNuevoMetodo({ onClose, onAgregar, consulpayPct, planLabel }) {
+function ModalNuevoMetodo({ onClose, onAgregar }) {
   const [nombre, setNombre] = useState('');
   const [tipo, setTipo] = useState(TIPOS_METODO_PAGO.INMEDIATO);
   const [porcentaje, setPorcentaje] = useState('25');
   const [valorSesion, setValorSesion] = useState('10000');
   const [error, setError] = useState('');
-
-  const porcentajeNum = Number(porcentaje);
-  const totalConConsulpay = Number.isFinite(porcentajeNum) && porcentajeNum >= 0 && consulpayPct > 0
-    ? Math.round((porcentajeNum + consulpayPct) * 100) / 100
-    : null;
 
   function onSubmit(e) {
     e.preventDefault();
@@ -851,11 +762,6 @@ function ModalNuevoMetodo({ onClose, onAgregar, consulpayPct, planLabel }) {
               min="0"
               max="100"
               step="any"
-              hint={
-                consulpayPct > 0 && totalConConsulpay !== null
-                  ? `+ ${consulpayPct}% ConsulPay (plan ${planLabel}) = ${totalConConsulpay}% total sobre el valor de la sesión`
-                  : undefined
-              }
             />
             {tipo === TIPOS_METODO_PAGO.DIFERIDO ? (
               // Obras sociales no tienen valor default: cada liquidacion
@@ -1322,12 +1228,6 @@ function TabPagos({ consultorio, searchParams, onLimpiarParams }) {
   const cantidadAdmins = (consultorio.adminUids || []).length;
   const esMultiAdmin = cantidadAdmins >= 2;
 
-  // Comision Consulpay segun plan actual del consultorio.
-  const comisionInfo = comisionDeConsultorio(consultorio);
-  const comisionPctTxt = Number.isFinite(comisionInfo.pct)
-    ? `${comisionInfo.pct}%`
-    : '—';
-
   // Aviso post-conexion del primer slot cuando hay 2 admins:
   // mostrar mensaje invitando al segundo a conectar
   const necesitaSegundaCuenta = esMultiAdmin && primaryConfig && !secondaryConfig;
@@ -1344,10 +1244,10 @@ function TabPagos({ consultorio, searchParams, onLimpiarParams }) {
           {esMultiAdmin
             ? <>Cada administrador puede vincular su cuenta de Mercado Pago. Cuando ambos
               tengan su cuenta conectada, ConsulPay alterna los cobros mes a mes (del 15 al 14)
-              entre las dos cuentas. Comisión ConsulPay: {comisionPctTxt} sobre el valor total de cada sesión.</>
+              entre las dos cuentas.</>
             : <>Vinculá tu cuenta de Mercado Pago para que los profesionales puedan pagarte
-              su parte de las sesiones automáticamente. ConsulPay procesa el pago y se
-              queda con su comisión ({comisionPctTxt} sobre el valor total de cada sesión).</>
+              su parte de las sesiones automáticamente. Los pagos caen directamente en tu
+              cuenta de Mercado Pago.</>
           }
         </p>
       </header>
@@ -1483,10 +1383,10 @@ function TabPagos({ consultorio, searchParams, onLimpiarParams }) {
  * Panel informativo sobre la comisión que cobra Mercado Pago.
  *
  * MP cobra su propia comisión (~6% si es al instante, baja con plazos
- * más largos) que es independiente y se suma a la comisión de
- * ConsulPay. Como esto es una fuente común de confusión ("¿por qué
- * recibí menos plata de la que esperaba?"), explicamos el modelo
- * y cómo el admin puede bajarla configurando un plazo más largo.
+ * más largos) por procesar el cobro. Como esto es una fuente común de
+ * confusión ("¿por qué recibí menos plata de la que esperaba?"),
+ * explicamos el modelo y cómo el admin puede bajarla configurando un
+ * plazo más largo.
  *
  * Es un <details> para arrancar colapsado: el admin que ya sabe
  * esto no se distrae; el que no, lo encuentra cuando pregunta.
@@ -1505,10 +1405,9 @@ function SobreComisionMP() {
       </summary>
       <div className="cp-mp-info__body">
         <p>
-          Además de la comisión de ConsulPay, <strong>Mercado Pago cobra su
-          propia comisión</strong> por procesar el cobro. Se descuenta
-          automáticamente del monto que recibís en tu cuenta MP — es independiente
-          de lo que cobra ConsulPay.
+          <strong>Mercado Pago cobra una comisión</strong> por procesar cada
+          cobro. Se descuenta automáticamente del monto que recibís en tu
+          cuenta de MP: no la cobra ConsulPay.
         </p>
 
         <p>
@@ -1581,7 +1480,7 @@ function MPSlotEmptyCard({ slot, mostrarOwner, onConectar }) {
         <p className="cp-mp-card__hint">
           {mostrarOwner
             ? 'El administrador que use esta cuenta puede vincularla acá. Una vez conectada, los cobros que le toquen le caen directo a su MP.'
-            : 'Al conectar Mercado Pago, los pagos de tus profesionales caen directamente en tu cuenta de MP. ConsulPay solo procesa la transacción y se queda con su comisión.'
+            : 'Al conectar Mercado Pago, los pagos de tus profesionales caen directamente en tu cuenta de MP. ConsulPay solo procesa la transacción.'
           }
         </p>
 
