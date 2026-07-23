@@ -1015,3 +1015,35 @@
     text-overflow: ellipsis;
   }
 }
+
+/* ============================================================
+   Prioridad de columnas en las tablas de 9 columnas
+   ----------------------------------------------------------------
+   Aplica a /admin/sesiones y /mi-panel/sesiones, que comparten la clase
+   .cp-sesiones y son las dos tablas mas anchas de la app.
+
+   Medido con navegador real, con contenido de peor caso (nombres largos,
+   "OBRA SOCIAL 24%", importes de 6 cifras) y descontando sidebar y padding:
+     completa            -> necesita 1470px de viewport
+     sin "Método"        -> necesita 1309px
+     sin "Método" + celdas compactas -> entra en 1149px
+
+   Por eso, entre el corte del modo tarjeta (1024) y 1469 se oculta la
+   columna "Método" y se achica el padding de las celdas. Es la columna de
+   texto mas largo y el dato ya aparece en el detalle de cada sesion; se
+   conservan fecha, paciente, los importes y el estado, que es lo que se
+   viene a mirar. Degradar un notebook de 1280 a lista de tarjetas
+   desperdiciaria el espacio que si tiene.
+   ============================================================ */
+@media (min-width: 1025px) and (max-width: 1469px) {
+  .cp-sesiones .cp-table thead th:nth-child(4),
+  .cp-sesiones .cp-table tbody td:nth-child(4) {
+    display: none;
+  }
+
+  .cp-sesiones .cp-table th,
+  .cp-sesiones .cp-table td {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+}

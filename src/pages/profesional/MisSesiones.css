@@ -328,23 +328,3 @@
   .cp-aprobacion-banner { padding: 10px 14px; }
   .cp-aprobacion-banner p { margin: 2px 0 0; font-size: 12.5px; line-height: 1.4; }
 }
-
-/* ============================================================
-   Prioridad de columnas entre 1025 y 1365
-   ----------------------------------------------------------------
-   Medido con navegador real: la tabla necesita ~1050px y, descontando
-   los 240px del sidebar, recien entra completa a los 1366px de viewport.
-   En 1280x720 (notebook muy comun) se recortaban 56px, o sea media
-   columna cortada por el borde.
-
-   En vez de degradar toda la tabla a tarjetas en esos anchos, se oculta
-   la columna "Método": es texto largo ("OBRA SOCIAL 24%") y el dato ya
-   aparece en el detalle de cada sesion. Las columnas de plata, la fecha
-   y el estado se conservan, que es lo que se viene a mirar.
-   ============================================================ */
-@media (min-width: 1025px) and (max-width: 1365px) {
-  .cp-sesiones .cp-table thead th:nth-child(4),
-  .cp-sesiones .cp-table tbody td:nth-child(4) {
-    display: none;
-  }
-}
