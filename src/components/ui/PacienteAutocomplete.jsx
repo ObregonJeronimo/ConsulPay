@@ -238,7 +238,6 @@ export default function PacienteAutocomplete({
   // Resultados filtrados en vivo segun query
   const resultados = useMemo(() => {
     return buscarPacientes(query, pacientes, profesionalUid, 5);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, pacientes, profesionalUid]);
 
   // Mantener el highlight dentro del rango cuando cambian los resultados

@@ -549,7 +549,7 @@ function ToggleCargaPacientes({ profesional }) {
     setUpdating(true);
     try {
       await setPermitirCargaPacientes(profesional.uid, !activo);
-    } catch (err) {
+    } catch {
       alert('No se pudo cambiar la configuración. Intentá de nuevo.');
     } finally {
       setUpdating(false);

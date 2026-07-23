@@ -240,7 +240,7 @@ function RepartoNoDisponible({ consultorio }) {
   );
 }
 
-function RepartoEsperandoSegundaCuenta({ consultorio }) {
+function RepartoEsperandoSegundaCuenta() {
   return (
     <div className="cp-reparto__aviso cp-reparto__aviso--info">
       <strong>Esperando que el segundo administrador conecte su Mercado Pago.</strong>
@@ -604,7 +604,7 @@ function Linea({ label, value, subtle }) {
    Muestra cuánto cobró cada admin en el mes seleccionado,
    desglosado por profesional, con filtro de mes.
    ============================================================ */
-function RepartoPagosManuales({ sesiones, profesionales, miembros, mes, setMes, consultorioId }) {
+function RepartoPagosManuales({ sesiones, profesionales, miembros, mes, setMes }) {
   const admins = useMemo(
     () => miembros.filter((m) => m.rol === 'admin' || m.esAdminDelConsultorio),
     [miembros],

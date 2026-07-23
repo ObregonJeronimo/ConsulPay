@@ -50,7 +50,6 @@ export default function ConsultoriosSuper() {
 
   useEffect(() => {
     cargarTodo();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function cargarTodo() {

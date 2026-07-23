@@ -360,17 +360,13 @@ export default function Sesiones() {
 
   async function handleConfirmarLiquidar(valor) {
     if (!liquidando) return;
-    try {
-      if (liquidando.estadoPago === ESTADOS_PAGO_SESION.PENDIENTE_MONTO) {
-        await liquidarMontoSesion(liquidando.id, valor, user.uid);
-      } else {
-        // Ya estaba liquidada (debido) — corregimos el monto
-        await editarMontoLiquidado(liquidando.id, valor, user.uid);
-      }
-      setLiquidando(null);
-    } catch (err) {
-      throw err;
+    if (liquidando.estadoPago === ESTADOS_PAGO_SESION.PENDIENTE_MONTO) {
+      await liquidarMontoSesion(liquidando.id, valor, user.uid);
+    } else {
+      // Ya estaba liquidada (debido) — corregimos el monto
+      await editarMontoLiquidado(liquidando.id, valor, user.uid);
     }
+    setLiquidando(null);
   }
 
   if (loadingConsultorio) {
@@ -1064,11 +1060,9 @@ export function SesionModal({
   // Solo permitimos editar valor en una sesion existente que no sea diferida
   // pendiente_monto. Si la sesion ya tiene monto liquidado (estadoPago=debido)
   // se puede editar normalmente como antes.
-  const esLiquidacionPendiente = !esNueva && sesion?.estadoPago === ESTADOS_PAGO_SESION.PENDIENTE_MONTO;
 
   // El profesional NO puede editar el método de pago. Lo configura el
   // admin en la ficha del paciente. Lo mostramos como solo lectura.
-  const metodoBloqueado = !esAdmin;
 
   /* ---- Copy dinamico segun modo ---- */
   const titulo = esNueva
@@ -1556,7 +1550,7 @@ export function QuienRecibioModal({ admins, sesion, paciente, onClose, onConfirm
    resumen de sesiones por paciente y marcar todas como pagadas
    de una vez (excepto las de obra social sin valor).
    ============================================================ */
-export function PagarMesModal({ consultorioId, profesionales, pacientes, mapaPacientes, admins, uid, onClose }) {
+export function PagarMesModal({ consultorioId, profesionales, mapaPacientes, admins, uid, onClose }) {
   const overlayProps = useOverlayClose(onClose);
   const [profUid, setProfUid] = useState('');
   const [mes, setMes] = useState(() => inicioDeMes(new Date()));

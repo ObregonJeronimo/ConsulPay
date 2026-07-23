@@ -386,7 +386,7 @@ function BellIcon() {
 /* ============================================================
    Panel desplegable de recordatorios
    ============================================================ */
-function PanelRecordatorios({ instancias, uid, onClose }) {
+function PanelRecordatorios({ instancias, onClose }) {
   const ref = useRef(null);
 
   // Cerrar al click afuera

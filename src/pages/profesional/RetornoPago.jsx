@@ -36,7 +36,7 @@ export default function RetornoPago() {
 
   const [estado, setEstado] = useState(null); // pendiente | aprobado | rechazado | cancelado
   const [pagoData, setPagoData] = useState(null);
-  const [intentos, setIntentos] = useState(0);
+  const [, setIntentos] = useState(0); // solo se usa para forzar re-render del polling
   const [error, setError] = useState('');
   const [polling, setPolling] = useState(true);
 
@@ -89,7 +89,6 @@ export default function RetornoPago() {
       cancelado = true;
       if (timeoutId) clearTimeout(timeoutId);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pagoId]);
 
   /* ---- Renders ---- */

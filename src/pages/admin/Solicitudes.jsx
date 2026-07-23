@@ -656,7 +656,7 @@ function MesResueltas({ mes, mapaPacientes, onSeleccionar }) {
 }
 
 /* Fila de una solicitud resuelta */
-function FilaResuelta({ s, mapaPacientes, onSeleccionar }) {
+function FilaResuelta({ s, onSeleccionar }) {
   const snap = s.payloadPropuesto?.sesionSnapshot || {};
   const nombrePac = snap.pacienteNombre
     || (s.payloadPropuesto?.datosPaciente
@@ -713,7 +713,7 @@ function FilaResuelta({ s, mapaPacientes, onSeleccionar }) {
 }
 
 /* Grupo colapsable: profesional + mes + tipo, con total y aprobar en lote */
-function GrupoSolicitudes({ grupo, mapaPacientes, mapaProfesionales, onSeleccionar, admins, adminUid, adminNombre }) {
+function GrupoSolicitudes({ grupo, onSeleccionar, admins, adminUid, adminNombre }) {
   const [abierto, setAbierto] = useState(false);
   const [modalLote, setModalLote] = useState(false);
   const cant = grupo.solicitudes.length;

@@ -18,7 +18,7 @@ import {
   TIPOS_METODO_PAGO,
   TIPOS_SOLICITUD_SESION,
 } from '../../lib/constants.js';
-import { getMetodosPaciente, suscribirPacientesProfesional } from '../../lib/pacientes.js';
+import { suscribirPacientesProfesional } from '../../lib/pacientes.js';
 import {
   actualizarSesion,
   crearSesion,
@@ -332,44 +332,40 @@ export default function MisSesiones() {
 
   async function handleConfirmarLiquidar(valor) {
     if (!liquidando) return;
-    try {
-      const esPrimeraLiquidacion = liquidando.estadoPago === ESTADOS_PAGO_SESION.PENDIENTE_MONTO;
-      if (esPrimeraLiquidacion) {
-        if (tieneConfianza) {
-          await liquidarMontoSesion(liquidando.id, valor, user.uid);
-        } else if (puedeMarcarPagadas) {
-          // Tiene permiso de marcar pagadas → solicita liquidación OS
-          const pac = mapaPacientes[liquidando.pacienteId];
-          await solicitarLiquidarOSSesion({
-            consultorioId: user.consultorioId,
-            sesionId: liquidando.id,
-            monto: valor,
-            profesionalUid: user.uid,
-            profesionalNombre: user.displayName || user.email || '',
-            sesionSnapshot: {
-              pacienteNombre: pac ? nombrePaciente(pac) : (liquidando.pacienteNombre || ''),
-              fecha: liquidando.fecha,
-              metodoPagoNombre: liquidando.metodoPagoNombre || '',
-            },
-          });
-        } else {
-          const pac = mapaPacientes[liquidando.pacienteId];
-          await solicitarLiquidarMonto({
-            consultorioId: user.consultorioId,
-            sesionId: liquidando.id,
-            valorLiquidado: valor,
-            profesionalUid: user.uid,
-            profesionalNombre: user.displayName || user.email,
-            pacienteNombre: pac ? nombrePaciente(pac) : 'Paciente',
-          });
-        }
+    const esPrimeraLiquidacion = liquidando.estadoPago === ESTADOS_PAGO_SESION.PENDIENTE_MONTO;
+    if (esPrimeraLiquidacion) {
+      if (tieneConfianza) {
+        await liquidarMontoSesion(liquidando.id, valor, user.uid);
+      } else if (puedeMarcarPagadas) {
+        // Tiene permiso de marcar pagadas → solicita liquidación OS
+        const pac = mapaPacientes[liquidando.pacienteId];
+        await solicitarLiquidarOSSesion({
+          consultorioId: user.consultorioId,
+          sesionId: liquidando.id,
+          monto: valor,
+          profesionalUid: user.uid,
+          profesionalNombre: user.displayName || user.email || '',
+          sesionSnapshot: {
+            pacienteNombre: pac ? nombrePaciente(pac) : (liquidando.pacienteNombre || ''),
+            fecha: liquidando.fecha,
+            metodoPagoNombre: liquidando.metodoPagoNombre || '',
+          },
+        });
       } else {
-        await editarMontoLiquidado(liquidando.id, valor, user.uid);
+        const pac = mapaPacientes[liquidando.pacienteId];
+        await solicitarLiquidarMonto({
+          consultorioId: user.consultorioId,
+          sesionId: liquidando.id,
+          valorLiquidado: valor,
+          profesionalUid: user.uid,
+          profesionalNombre: user.displayName || user.email,
+          pacienteNombre: pac ? nombrePaciente(pac) : 'Paciente',
+        });
       }
-      setLiquidando(null);
-    } catch (err) {
-      throw err;
+    } else {
+      await editarMontoLiquidado(liquidando.id, valor, user.uid);
     }
+    setLiquidando(null);
   }
 
   // Marcar sesión como pagada / revertir a debe

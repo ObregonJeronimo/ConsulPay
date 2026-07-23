@@ -23,7 +23,6 @@ import { useOverlayClose } from '../../hooks/useOverlayClose.js';
 import {
   ESTADOS_PACIENTE,
   TIPOS_METODO_PAGO,
-  formatoARS,
 } from '../../lib/constants.js';
 import { getMetodosPaciente } from '../../lib/pacientes.js';
 import { crearSesion } from '../../lib/sesiones.js';
@@ -53,7 +52,7 @@ function nombreProf(p) {
 }
 
 /* ---- Fila inicial para un paciente ---- */
-function filaInicial(paciente, mapaMetodos, esAdmin) {
+function filaInicial(paciente, mapaMetodos) {
   const metodoIds = getMetodosPaciente(paciente);
   const tieneMulti = metodoIds.length > 1;
   // Si tiene 1 solo método → pre-llenamos. Si tiene 2+ → vacío (debe elegir)
@@ -113,7 +112,7 @@ export default function CargaRapidaModal({
 
   // Cuando se arman las filas, inicializarlas
   function armarFilas(pacs) {
-    setFilas(pacs.map((p) => filaInicial(p, mapaMetodos, esAdmin)));
+    setFilas(pacs.map((p) => filaInicial(p, mapaMetodos)));
   }
 
   // ---- Handlers del wizard ----
@@ -256,7 +255,6 @@ export default function CargaRapidaModal({
     setDone({ ok, errores, esSolicitud: false });
   }
 
-  const pasoActual = esAdmin ? paso : paso + 1; // normalizar para render
 
   // ---- Render por paso ----
   return (
