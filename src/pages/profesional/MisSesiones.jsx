@@ -639,6 +639,22 @@ function MarcarMesPagadoModal({ sesiones, mapaPacientes, mes, user, onClose }) {
     [sesiones],
   );
 
+  // Desglose por paciente: es lo que el profesional necesita para revisar
+  // antes de mandar. Una sesion puede agrupar varias (cantidadSesiones),
+  // asi que se suman los encuentros, no los registros.
+  const porPaciente = useMemo(() => {
+    const mapa = new Map();
+    for (const ses of sesiones) {
+      const pac = mapaPacientes[ses.pacienteId];
+      const nombre = pac ? nombrePaciente(pac) : (ses.pacienteNombre || 'Paciente');
+      const prev = mapa.get(nombre) || { nombre, cantidad: 0, monto: 0 };
+      prev.cantidad += getCantidadSesiones(ses);
+      prev.monto += ses.montoConsultorio || 0;
+      mapa.set(nombre, prev);
+    }
+    return [...mapa.values()].sort((x, y) => y.monto - x.monto);
+  }, [sesiones, mapaPacientes]);
+
   async function confirmar() {
     setError('');
     setSubmitting(true);
@@ -685,14 +701,26 @@ function MarcarMesPagadoModal({ sesiones, mapaPacientes, mes, user, onClose }) {
           todavía figuran como debidas este mes.
         </p>
 
-        <div className="cp-solicitud-detalle__grid" style={{ marginBottom: 16 }}>
-          <div className="cp-solicitud-detalle__item">
-            <span className="cp-solicitud-detalle__label">Sesiones</span>
-            <span className="cp-solicitud-detalle__valor">{sesiones.length}</span>
+        <div className="cp-desglose">
+          <div className="cp-desglose__head">
+            <span>Paciente</span>
+            <span>Sesiones</span>
+            <span>Al consultorio</span>
           </div>
-          <div className="cp-solicitud-detalle__item">
-            <span className="cp-solicitud-detalle__label">Total al consultorio</span>
-            <span className="cp-solicitud-detalle__valor">{formatoARS.format(total)}</span>
+          <div className="cp-desglose__body">
+            {porPaciente.map((p) => (
+              <div key={p.nombre} className="cp-desglose__fila">
+                <span className="cp-desglose__pac">{p.nombre}</span>
+                <span className="cp-desglose__cant">
+                  {p.cantidad} {p.cantidad === 1 ? 'sesión' : 'sesiones'}
+                </span>
+                <span className="cp-desglose__monto">{formatoARS.format(p.monto)}</span>
+              </div>
+            ))}
+          </div>
+          <div className="cp-desglose__total">
+            <span>Total a pagar</span>
+            <strong>{formatoARS.format(total)}</strong>
           </div>
         </div>
 
