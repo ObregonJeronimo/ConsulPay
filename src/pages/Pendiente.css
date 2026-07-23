@@ -42,6 +42,21 @@
   height: 28px;
 }
 
+/* Hay una invitación esperando: el icono pasa al acento de marca,
+   que es la señal de "esto es accionable" en el resto del panel. */
+.cp-pendiente__icon--invitacion {
+  background: var(--cp-accent-bg);
+  color: var(--cp-accent);
+}
+
+/* Respuesta del botón "Volver a comprobar" cuando no hubo cambios. */
+.cp-pendiente__nota {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--cp-text-muted);
+}
+
 .cp-pendiente__title {
   font-family: var(--cp-font-serif);
   font-size: 26px;
