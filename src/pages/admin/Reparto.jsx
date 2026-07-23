@@ -576,11 +576,6 @@ function SlotColumna({ nombre, totales, esPagante }) {
           value={`-${formatoARS.format(totales.comisionMP || 0)}`}
           subtle
         />
-        <Linea
-          label="Comisión ConsulPay"
-          value={`-${formatoARS.format(totales.comisionConsulpay || 0)}`}
-          subtle
-        />
       </div>
 
       <div className="cp-slot-col__divider" />
