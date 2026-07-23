@@ -151,10 +151,6 @@ export default function RetornoPago() {
               <strong>{pagoData?.mpPaymentId || '—'}</strong>
             </div>
             <div>
-              <span>Comisión ConsulPay</span>
-              <strong>{formatoARS.format(pagoData?.marketplaceFee || 0)}</strong>
-            </div>
-            <div>
               <span>Recibe el consultorio</span>
               <strong>{formatoARS.format(pagoData?.montoConsultorio || 0)}</strong>
             </div>
