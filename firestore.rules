@@ -253,10 +253,29 @@ service cloud.firestore {
 
     // ============================================================
     //  /invitaciones_profesional/{invitacionId}
+    // ------------------------------------------------------------
+    //  'get' queda abierto a proposito: el link que llega por mail se
+    //  abre SIN sesion iniciada, y /aceptar-invitacion necesita leer la
+    //  invitacion por ID antes de que la persona se registre o entre.
+    //
+    //  'list' va cerrado. Con un 'read' unico (get + list) cualquiera,
+    //  incluso sin autenticarse, podia enumerar la coleccion entera y
+    //  llevarse los mails, los nombres, los consultorios y el
+    //  porcentaje negociado de cada profesional invitado.
+    //
+    //  Los tres casos legitimos de listado:
+    //    - el superadmin,
+    //    - el staff, que lista las invitaciones de su consultorio,
+    //    - el propio invitado, que busca la suya por email desde
+    //      /pendiente cuando ya inicio sesion.
     // ============================================================
     match /invitaciones_profesional/{invitacionId} {
 
-      allow read: if true;
+      allow get: if true;
+
+      allow list: if esSuperadmin()
+        || esStaffDe(resource.data.consultorioId)
+        || (estaAutenticado() && request.auth.token.email == resource.data.email);
 
       allow create: if false;
 
