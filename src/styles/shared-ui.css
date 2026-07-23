@@ -882,7 +882,11 @@
   display: none !important;
 }
 
-@media (max-width: 640px) {
+/* Modo tarjeta en pantallas donde la tabla completa no entra.
+   Medido con navegador real: la tabla de sesiones necesita ~1050px. Con el
+   corte anterior en 640px, entre 641 y 1024 se recortaban de 444 a 61px de
+   columnas — o sea tablets y notebooks chicas veian la tabla mochada. */
+@media (max-width: 1024px) {
 
   /* Contenedor de la tabla: sin borde, fondo transparente */
   .cp-compact-list .cp-table-wrap {
