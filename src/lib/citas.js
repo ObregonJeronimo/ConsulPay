@@ -273,10 +273,33 @@ export function suscribirCitas(consultorioId, { desde, hasta }, callback) {
   });
 }
 
-/** Igual que suscribirCitas pero solo las de un profesional. */
-export function suscribirCitasProfesional(consultorioId, profesionalUid, rango, callback) {
-  return suscribirCitas(consultorioId, rango, (citas) => {
-    callback(citas.filter((c) => c.profesionalUid === profesionalUid));
+/**
+ * Citas de un profesional puntual.
+ *
+ * IMPORTANTE: el filtro por profesionalUid va en el query y no en memoria.
+ * Las reglas de seguridad solo dejan al profesional leer sus propias citas,
+ * y Firestore evalua eso contra el query, no contra los resultados: si
+ * pidieramos todas las del consultorio para filtrarlas despues, rechazaria
+ * la consulta entera con permission-denied.
+ */
+export function suscribirCitasProfesional(consultorioId, profesionalUid, { desde, hasta }, callback) {
+  if (!consultorioId || !profesionalUid) return () => {};
+
+  const q = query(
+    collection(db, 'citas'),
+    where('consultorioId', '==', consultorioId),
+    where('profesionalUid', '==', profesionalUid),
+  );
+
+  return onSnapshot(q, (snap) => {
+    const citas = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .filter((c) => (!desde || c.fecha >= desde) && (!hasta || c.fecha <= hasta))
+      .sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora));
+    callback(citas);
+  }, (err) => {
+    console.error('Error en suscripción de citas del profesional:', err);
+    callback([]);
   });
 }
 
