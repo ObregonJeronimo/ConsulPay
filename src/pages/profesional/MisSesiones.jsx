@@ -46,6 +46,7 @@ import {
 
 import { GroupBadge, LiquidarMontoModal, SesionModal } from '../admin/Sesiones.jsx';
 import '../admin/Sesiones.css';
+import './MisSesiones.css';
 
 /* ============================================================
    Iconos
@@ -225,6 +226,24 @@ export default function MisSesiones() {
       return t >= desde && t <= hasta;
     }).slice(0, 10);
   }, [solicitudes, mes]);
+
+  const [marcarMesOpen, setMarcarMesOpen] = useState(false);
+  const [liquidarOSOpen, setLiquidarOSOpen] = useState(false);
+
+  // Sesiones del mes elegibles para cada accion masiva. Se excluyen las que
+  // ya tienen una solicitud pendiente: pedir dos veces lo mismo le duplica
+  // el trabajo al admin y el helper del backend lo rechaza igual.
+  const sesionesDebidasDelMes = useMemo(
+    () => sesiones.filter((x) => x.estadoPago === ESTADOS_PAGO_SESION.DEBIDO
+      && !sesionesConPendiente.has(x.id)),
+    [sesiones, sesionesConPendiente],
+  );
+
+  const sesionesPorLiquidar = useMemo(
+    () => sesiones.filter((x) => x.estadoPago === ESTADOS_PAGO_SESION.PENDIENTE_MONTO
+      && !sesionesConPendiente.has(x.id)),
+    [sesiones, sesionesConPendiente],
+  );
 
   const solicitudesPendientesCount = useMemo(
     () => solicitudes.filter((s) => s.estado === ESTADOS_SOLICITUD_SESION.PENDIENTE).length,
@@ -429,6 +448,31 @@ export default function MisSesiones() {
             {tieneConfianza ? 'Registrar sesión' : 'Solicitar nueva sesión'}
           </Button>
         </div>
+        {/* Acciones masivas del mes. Solo aparecen si el admin le habilito
+            "marcar pagadas": sin ese permiso el profesional no puede tocar
+            el estado de pago ni siquiera pidiendolo. */}
+        {puedeMarcarPagadas && (
+          <div style={{ display: 'flex', gap: 10, alignItems: 'stretch' }}>
+            <Button
+              variant="secondary"
+              type="button"
+              onClick={() => setMarcarMesOpen(true)}
+              disabled={!hayPrereqs || sesionesDebidasDelMes.length === 0}
+              style={{ flex: 1 }}
+            >
+              Marcar mes como pagado
+            </Button>
+            <Button
+              variant="secondary"
+              type="button"
+              onClick={() => setLiquidarOSOpen(true)}
+              disabled={!hayPrereqs || sesionesPorLiquidar.length === 0}
+              style={{ flex: 1 }}
+            >
+              Liquidar sesiones OS
+            </Button>
+          </div>
+        )}
       </header>
 
       {/* Banner de modo "con aprobacion" */}
@@ -546,6 +590,26 @@ export default function MisSesiones() {
         />
       )}
 
+      {marcarMesOpen && (
+        <MarcarMesPagadoModal
+          sesiones={sesionesDebidasDelMes}
+          mapaPacientes={mapaPacientes}
+          mes={mes}
+          user={user}
+          onClose={() => setMarcarMesOpen(false)}
+        />
+      )}
+
+      {liquidarOSOpen && (
+        <LiquidarOSMasivoModal
+          sesiones={sesionesPorLiquidar}
+          mapaPacientes={mapaPacientes}
+          mes={mes}
+          user={user}
+          onClose={() => setLiquidarOSOpen(false)}
+        />
+      )}
+
       {liquidando && (
         <LiquidarMontoModal
           sesion={liquidando}
@@ -561,18 +625,251 @@ export default function MisSesiones() {
 }
 
 /* ============================================================
+   Modal: marcar el mes como pagado (genera solicitudes)
+   ----------------------------------------------------------------
+   El profesional NO puede cambiar el estado de pago por su cuenta:
+   estaria saldando su propia deuda con el consultorio sin que nadie
+   lo confirme. Las reglas de Firestore lo bloquean. Asi que esto
+   genera una solicitud por sesion, que el admin ve agrupada por mes
+   y aprueba en lote.
+   ============================================================ */
+function MarcarMesPagadoModal({ sesiones, mapaPacientes, mes, user, onClose }) {
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [progreso, setProgreso] = useState(0);
+
+  const total = useMemo(
+    () => sesiones.reduce((acc, x) => acc + (x.montoConsultorio || 0), 0),
+    [sesiones],
+  );
+
+  async function confirmar() {
+    setError('');
+    setSubmitting(true);
+    let hechas = 0;
+    try {
+      for (const ses of sesiones) {
+        const pac = mapaPacientes[ses.pacienteId];
+        await solicitarMarcarPagada({
+          consultorioId: user.consultorioId,
+          profesionalUid: user.uid,
+          profesionalNombre: user.displayName || user.email || '',
+          sesionId: ses.id,
+          sesionSnapshot: {
+            pacienteNombre: pac ? nombrePaciente(pac) : (ses.pacienteNombre || ''),
+            fecha: ses.fecha,
+            metodoPagoNombre: ses.metodoPagoNombre || '',
+            valorTotal: ses.valorTotal || 0,
+          },
+          receptor: { uid: user.uid, nombre: user.displayName || user.email || user.uid },
+        });
+        hechas += 1;
+        setProgreso(hechas);
+      }
+      onClose();
+    } catch (err) {
+      // Si fallo a mitad, las ya creadas quedan validas: se informa cuantas
+      // salieron para que el profesional no reintente todo y duplique.
+      setError(
+        `${err.message || 'No se pudieron enviar todas las solicitudes.'}`
+        + (hechas > 0 ? ` Se enviaron ${hechas} de ${sesiones.length}.` : ''),
+      );
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="cp-modal-overlay" onClick={onClose}>
+      <div className="cp-modal" onClick={(e) => e.stopPropagation()}>
+        <button className="cp-modal__close" onClick={onClose} aria-label="Cerrar">×</button>
+        <h2 className="cp-modal__title">Marcar {nombreDelMes(mes)} como pagado</h2>
+        <p className="cp-modal__sub">
+          Se va a pedir al administrador que dé por pagadas las{' '}
+          <strong>{sesiones.length}</strong> sesion{sesiones.length === 1 ? '' : 'es'} que
+          todavía figuran como debidas este mes.
+        </p>
+
+        <div className="cp-solicitud-detalle__grid" style={{ marginBottom: 16 }}>
+          <div className="cp-solicitud-detalle__item">
+            <span className="cp-solicitud-detalle__label">Sesiones</span>
+            <span className="cp-solicitud-detalle__valor">{sesiones.length}</span>
+          </div>
+          <div className="cp-solicitud-detalle__item">
+            <span className="cp-solicitud-detalle__label">Total al consultorio</span>
+            <span className="cp-solicitud-detalle__valor">{formatoARS.format(total)}</span>
+          </div>
+        </div>
+
+        <div className="cp-aprobacion-nota">
+          Queda pendiente hasta que el administrador la apruebe. Él las ve
+          agrupadas por mes, así que las aprueba todas juntas.
+        </div>
+
+        {error && <div className="cp-modal__error">{error}</div>}
+
+        <div className="cp-modal__actions">
+          <Button variant="ghost" type="button" onClick={onClose} disabled={submitting}>
+            Cancelar
+          </Button>
+          <Button variant="primary" type="button" onClick={confirmar} disabled={submitting}>
+            {submitting
+              ? <><Spinner size={14} /> Enviando {progreso}/{sesiones.length}…</>
+              : `Enviar ${sesiones.length} solicitud${sesiones.length === 1 ? '' : 'es'}`}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   Modal: liquidar sesiones de obra social (genera solicitudes)
+   ----------------------------------------------------------------
+   Cada sesion de obra social se liquida con SU propio monto (la obra
+   social informa un importe distinto por prestacion), asi que no
+   alcanza con un boton: hay que cargar el valor de cada una.
+   ============================================================ */
+function LiquidarOSMasivoModal({ sesiones, mapaPacientes, mes, user, onClose }) {
+  const [montos, setMontos] = useState({});
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [progreso, setProgreso] = useState(0);
+
+  const conMonto = useMemo(
+    () => sesiones.filter((x) => Number(montos[x.id]) > 0),
+    [sesiones, montos],
+  );
+  const totalCargado = useMemo(
+    () => conMonto.reduce((acc, x) => acc + Number(montos[x.id] || 0), 0),
+    [conMonto, montos],
+  );
+
+  async function confirmar() {
+    if (conMonto.length === 0) {
+      setError('Cargá el monto de al menos una sesión.');
+      return;
+    }
+    setError('');
+    setSubmitting(true);
+    let hechas = 0;
+    try {
+      for (const ses of conMonto) {
+        const pac = mapaPacientes[ses.pacienteId];
+        await solicitarLiquidarOSSesion({
+          consultorioId: user.consultorioId,
+          profesionalUid: user.uid,
+          profesionalNombre: user.displayName || user.email || '',
+          sesionId: ses.id,
+          monto: Number(montos[ses.id]),
+          sesionSnapshot: {
+            pacienteNombre: pac ? nombrePaciente(pac) : (ses.pacienteNombre || ''),
+            fecha: ses.fecha,
+            metodoPagoNombre: ses.metodoPagoNombre || '',
+          },
+        });
+        hechas += 1;
+        setProgreso(hechas);
+      }
+      onClose();
+    } catch (err) {
+      setError(
+        `${err.message || 'No se pudieron enviar todas las solicitudes.'}`
+        + (hechas > 0 ? ` Se enviaron ${hechas} de ${conMonto.length}.` : ''),
+      );
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="cp-modal-overlay" onClick={onClose}>
+      <div className="cp-modal cp-modal--wide" onClick={(e) => e.stopPropagation()}>
+        <button className="cp-modal__close" onClick={onClose} aria-label="Cerrar">×</button>
+        <h2 className="cp-modal__title">Liquidar sesiones de obra social</h2>
+        <p className="cp-modal__sub">
+          Cargá lo que liquidó la obra social por cada sesión de {nombreDelMes(mes)}.
+          Las que dejes en blanco no se envían.
+        </p>
+
+        <div className="cp-liquidar-lista">
+          {sesiones.map((ses) => {
+            const pac = mapaPacientes[ses.pacienteId];
+            const fechaRaw = ses.fecha?.toDate ? ses.fecha.toDate() : null;
+            return (
+              <div key={ses.id} className="cp-liquidar-fila">
+                <div className="cp-liquidar-fila__info">
+                  <span className="cp-liquidar-fila__pac">
+                    {pac ? nombrePaciente(pac) : (ses.pacienteNombre || 'Paciente')}
+                  </span>
+                  <span className="cp-liquidar-fila__meta">
+                    {fechaRaw ? fechaRaw.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' }) : '—'}
+                    {ses.metodoPagoNombre ? ` · ${ses.metodoPagoNombre}` : ''}
+                  </span>
+                </div>
+                <div className="cp-liquidar-fila__input">
+                  <span>$</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    placeholder="0"
+                    value={montos[ses.id] ?? ''}
+                    onChange={(e) => setMontos((m) => ({ ...m, [ses.id]: e.target.value }))}
+                    disabled={submitting}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="cp-liquidar-total">
+          <span>{conMonto.length} de {sesiones.length} con monto cargado</span>
+          <strong>{formatoARS.format(totalCargado)}</strong>
+        </div>
+
+        <div className="cp-aprobacion-nota">
+          Cada monto se envía como solicitud al administrador. Recién cuando
+          las apruebe se genera la deuda con el consultorio.
+        </div>
+
+        {error && <div className="cp-modal__error">{error}</div>}
+
+        <div className="cp-modal__actions">
+          <Button variant="ghost" type="button" onClick={onClose} disabled={submitting}>
+            Cancelar
+          </Button>
+          <Button
+            variant="primary"
+            type="button"
+            onClick={confirmar}
+            disabled={submitting || conMonto.length === 0}
+          >
+            {submitting
+              ? <><Spinner size={14} /> Enviando {progreso}/{conMonto.length}…</>
+              : `Enviar ${conMonto.length} solicitud${conMonto.length === 1 ? '' : 'es'}`}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
    Banner + panel de solicitudes
    ============================================================ */
 function SolicitudesPanel({ solicitudes, mapaPacientes, totalPendientes }) {
+  const [abierta, setAbierta] = useState(null);
+
   return (
     <div className="cp-solicitudes-panel">
       <div className="cp-solicitudes-panel__head">
         <h3 className="cp-solicitudes-panel__title">
-          Mis solicitudes recientes
+          Mis solicitudes
           {totalPendientes > 0 && (
             <span className="cp-solicitudes-panel__count">{totalPendientes} pendiente{totalPendientes === 1 ? '' : 's'}</span>
           )}
         </h3>
+        <span className="cp-solicitudes-panel__hint">Tocá una para ver el detalle</span>
       </div>
       <div className="cp-solicitudes-panel__list">
         {solicitudes.map((s) => {
@@ -582,74 +879,189 @@ function SolicitudesPanel({ solicitudes, mapaPacientes, totalPendientes }) {
             : (s.payloadAnterior?.pacienteId ? mapaPacientes[s.payloadAnterior.pacienteId] : null));
           const nombrePac = esCargaRapida
             ? `${s.payloadPropuesto?.sesiones?.length ?? 0} sesiones`
-            : (pac ? nombrePaciente(pac) : '—');
+            : (pac
+              ? nombrePaciente(pac)
+              : (s.payloadPropuesto?.sesionSnapshot?.pacienteNombre
+                || s.payloadPropuesto?.pacienteNombre
+                || '—'));
 
           const cantidad = !esCargaRapida
             ? (s.payloadPropuesto?.cantidadSesiones ?? s.payloadAnterior?.cantidadSesiones ?? 1)
             : 1;
 
-          // Fecha compacta
-          const fechaRaw = s.createdAt?.toDate ? s.createdAt.toDate()
-            : s.createdAt?.seconds ? new Date(s.createdAt.seconds * 1000) : null;
+          const fechaRaw = fechaDeTimestamp(s.createdAt);
           const fechaStr = fechaRaw
             ? fechaRaw.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })
             : '';
 
-          let icon, badgeClass, badgeText;
-          switch (s.estado) {
-            case ESTADOS_SOLICITUD_SESION.PENDIENTE:
-              icon = <ClockIcon />;
-              badgeClass = 'cp-badge--debido';
-              badgeText = 'Pendiente';
-              break;
-            case ESTADOS_SOLICITUD_SESION.APROBADA:
-              badgeClass = 'cp-badge--pagada';
-              badgeText = 'Aprobada';
-              break;
-            case ESTADOS_SOLICITUD_SESION.RECHAZADA:
-              badgeClass = 'cp-badge--rechazada';
-              badgeText = 'Rechazada';
-              break;
-            case ESTADOS_SOLICITUD_SESION.OBSOLETA:
-              badgeClass = 'cp-badge--obsoleta';
-              badgeText = 'Obsoleta';
-              break;
-            default:
-              badgeClass = '';
-              badgeText = s.estado;
-          }
+          const { badgeClass, badgeText } = estiloEstadoSolicitud(s.estado);
+          const abiertaEsta = abierta === s.id;
 
           return (
-            <div key={s.id} className="cp-solicitud-row">
-              <div className="cp-solicitud-row__main">
-                <div className="cp-solicitud-row__title">
-                  {LABELS_TIPO_SOLICITUD[s.tipo]} — {nombrePac}
-                  {!esCargaRapida && <GroupBadge cantidad={cantidad} />}
-                  {fechaStr && (
-                    <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--cp-text-faint)', fontWeight: 400 }}>
-                      {fechaStr}
-                    </span>
+            <div key={s.id} className={`cp-solicitud-item ${abiertaEsta ? 'cp-solicitud-item--abierta' : ''}`}>
+              <button
+                type="button"
+                className="cp-solicitud-row cp-solicitud-row--btn"
+                onClick={() => setAbierta(abiertaEsta ? null : s.id)}
+                aria-expanded={abiertaEsta}
+              >
+                <div className="cp-solicitud-row__main">
+                  <div className="cp-solicitud-row__title">
+                    {LABELS_TIPO_SOLICITUD[s.tipo] ?? s.tipo} — {nombrePac}
+                    {!esCargaRapida && <GroupBadge cantidad={cantidad} />}
+                    {fechaStr && (
+                      <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--cp-text-faint)', fontWeight: 400 }}>
+                        {fechaStr}
+                      </span>
+                    )}
+                  </div>
+                  {s.estado === ESTADOS_SOLICITUD_SESION.RECHAZADA && s.motivoRechazo && (
+                    <div className="cp-solicitud-row__motivo">Motivo: {s.motivoRechazo}</div>
+                  )}
+                  {s.estado === ESTADOS_SOLICITUD_SESION.OBSOLETA && (
+                    <div className="cp-solicitud-row__motivo">
+                      La sesión fue modificada por otro camino. Si querés, podés volver a solicitar.
+                    </div>
                   )}
                 </div>
-                {s.estado === ESTADOS_SOLICITUD_SESION.RECHAZADA && s.motivoRechazo && (
-                  <div className="cp-solicitud-row__motivo">
-                    Motivo: {s.motivoRechazo}
-                  </div>
-                )}
-                {s.estado === ESTADOS_SOLICITUD_SESION.OBSOLETA && (
-                  <div className="cp-solicitud-row__motivo">
-                    La sesión fue modificada por otro camino. Si querés, podés volver a solicitar.
-                  </div>
-                )}
-              </div>
-              <span className={`cp-badge ${badgeClass}`}>
-                {icon}
-                {badgeText}
-              </span>
+                <span className={`cp-badge ${badgeClass}`}>{badgeText}</span>
+                <span className="cp-solicitud-row__chevron" aria-hidden="true">
+                  {abiertaEsta ? '▴' : '▾'}
+                </span>
+              </button>
+
+              {abiertaEsta && <DetalleSolicitud solicitud={s} pacienteNombre={nombrePac} />}
             </div>
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/* ---- Helpers de solicitudes ---- */
+
+function fechaDeTimestamp(ts) {
+  if (!ts) return null;
+  if (ts.toDate) return ts.toDate();
+  if (ts.seconds !== undefined) return new Date(ts.seconds * 1000);
+  const d = new Date(ts);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function estiloEstadoSolicitud(estado) {
+  switch (estado) {
+    case ESTADOS_SOLICITUD_SESION.PENDIENTE:
+      return { badgeClass: 'cp-badge--pendiente-monto', badgeText: 'Pendiente' };
+    case ESTADOS_SOLICITUD_SESION.APROBADA:
+      return { badgeClass: 'cp-badge--pagada', badgeText: 'Aprobada' };
+    case ESTADOS_SOLICITUD_SESION.RECHAZADA:
+      return { badgeClass: 'cp-badge--debido', badgeText: 'Rechazada' };
+    case ESTADOS_SOLICITUD_SESION.OBSOLETA:
+      return { badgeClass: 'cp-badge--obsoleta', badgeText: 'Obsoleta' };
+    default:
+      return { badgeClass: '', badgeText: estado };
+  }
+}
+
+function fmtFechaLarga(ts) {
+  const d = fechaDeTimestamp(ts);
+  if (!d) return '—';
+  return d.toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })
+    + ' · ' + d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+}
+
+/*
+  Detalle de una solicitud.
+
+  Los payloads no tienen una forma unica (cada tipo guarda lo suyo), asi
+  que en vez de asumir una estructura rigida se arma la lista con los
+  campos que efectivamente existan. Si manana se agrega un tipo nuevo,
+  esto no se rompe: muestra lo que haya.
+*/
+function DetalleSolicitud({ solicitud: s, pacienteNombre }) {
+  const prop = s.payloadPropuesto || {};
+  const ant = s.payloadAnterior || null;
+  const snap = prop.sesionSnapshot || {};
+
+  const filas = [];
+  const push = (label, valor) => {
+    if (valor === undefined || valor === null || valor === '') return;
+    filas.push({ label, valor });
+  };
+
+  push('Paciente', pacienteNombre !== '—' ? pacienteNombre : null);
+  push('Fecha de la sesión', prop.fecha || snap.fecha
+    ? fmtFechaLarga(prop.fecha || snap.fecha) : null);
+  push('Método', prop.metodoPagoNombre || snap.metodoPagoNombre);
+  if (Number.isFinite(Number(prop.cantidadSesiones)) && Number(prop.cantidadSesiones) > 1) {
+    push('Sesiones agrupadas', prop.cantidadSesiones);
+  }
+  if (Number.isFinite(Number(prop.valorTotal ?? snap.valorTotal))) {
+    push('Valor total', formatoARS.format(Number(prop.valorTotal ?? snap.valorTotal)));
+  }
+  if (Number.isFinite(Number(prop.montoConsultorio))) {
+    push('Al consultorio', formatoARS.format(Number(prop.montoConsultorio)));
+  }
+  if (Number.isFinite(Number(prop.monto))) {
+    push('Monto liquidado', formatoARS.format(Number(prop.monto)));
+  }
+  if (prop.valorLiquidado !== undefined) {
+    push('Monto liquidado', formatoARS.format(Number(prop.valorLiquidado) || 0));
+  }
+  if (s.tipo === TIPOS_SOLICITUD_SESION.CARGA_RAPIDA) {
+    push('Sesiones en la carga', prop.sesiones?.length);
+  }
+  if (prop.receptor?.nombre) push('Recibe', prop.receptor.nombre);
+
+  return (
+    <div className="cp-solicitud-detalle">
+      <div className="cp-solicitud-detalle__grid">
+        <div className="cp-solicitud-detalle__item">
+          <span className="cp-solicitud-detalle__label">Enviada</span>
+          <span className="cp-solicitud-detalle__valor">{fmtFechaLarga(s.createdAt)}</span>
+        </div>
+        {filas.map((f) => (
+          <div key={f.label} className="cp-solicitud-detalle__item">
+            <span className="cp-solicitud-detalle__label">{f.label}</span>
+            <span className="cp-solicitud-detalle__valor">{f.valor}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Solo en modificaciones tiene sentido el antes/despues */}
+      {ant && s.tipo === TIPOS_SOLICITUD_SESION.MODIFICAR && (
+        <div className="cp-solicitud-detalle__cambio">
+          <span className="cp-solicitud-detalle__label">Valor anterior</span>
+          <span className="cp-solicitud-detalle__valor">
+            {Number.isFinite(Number(ant.valorTotal))
+              ? formatoARS.format(Number(ant.valorTotal))
+              : '—'}
+            {Number.isFinite(Number(prop.valorTotal)) && (
+              <> → <strong>{formatoARS.format(Number(prop.valorTotal))}</strong></>
+            )}
+          </span>
+        </div>
+      )}
+
+      {s.estado !== ESTADOS_SOLICITUD_SESION.PENDIENTE && (
+        <div className="cp-solicitud-detalle__resolucion">
+          <span className="cp-solicitud-detalle__label">
+            {s.estado === ESTADOS_SOLICITUD_SESION.APROBADA ? 'Aprobada' : 'Resuelta'}
+          </span>
+          <span className="cp-solicitud-detalle__valor">
+            {fmtFechaLarga(s.updatedAt || s.resueltaEn)}
+            {s.adminNombre ? ` · por ${s.adminNombre}` : ''}
+          </span>
+        </div>
+      )}
+
+      {s.estado === ESTADOS_SOLICITUD_SESION.PENDIENTE && (
+        <div className="cp-solicitud-detalle__nota">
+          Esperando la aprobación del administrador. Mientras tanto la sesión
+          no cambia de estado.
+        </div>
+      )}
     </div>
   );
 }
@@ -887,6 +1299,12 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, puede
                       label: 'Liquidar monto', icon: <CheckIcon />, onClick: () => onLiquidar(s),
                     }] : s.metodoPagoTipo === TIPOS_METODO_PAGO.DIFERIDO && !pagada && !tienePendiente ? [{
                       label: 'Corregir monto', icon: <EditIcon />, onClick: () => onLiquidar(s),
+                    }] : []),
+                    /* Marcar como pagada: genera una solicitud al admin, no
+                       cambia el estado directo. Solo si el admin le habilito
+                       el permiso y la sesion ya tiene monto definido. */
+                    ...(puedeMarcarPagadas && !pagada && !pendienteMonto && !tienePendiente ? [{
+                      label: 'Marcar como pagada', icon: <CheckIcon />, onClick: () => onTogglePagado(s),
                     }] : []),
                     { label: 'Editar', icon: <EditIcon />, onClick: () => onEditar(s), disabled: accionesDisabled },
                     ...(!pagada ? [{ label: 'Eliminar', icon: <TrashIcon />, onClick: () => onEliminar(s), danger: true, disabled: tienePendiente }] : []),

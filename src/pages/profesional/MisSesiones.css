@@ -1,0 +1,207 @@
+/* ============================================================
+   Mis sesiones — piezas propias de la vista del profesional
+   ----------------------------------------------------------------
+   El grueso de los estilos viene de admin/Sesiones.css (la tabla es
+   la misma). Acá solo vive lo que no existe del lado admin: el
+   detalle expandible de solicitudes y los modales masivos que, en el
+   profesional, generan solicitudes en vez de escribir directo.
+   ============================================================ */
+
+/* ---- Solicitudes: fila expandible ---- */
+.cp-solicitud-item + .cp-solicitud-item {
+  border-top: 1px solid var(--cp-border);
+}
+
+.cp-solicitud-row--btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: none;
+  border: none;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  padding: 11px 14px;
+  transition: background var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-solicitud-row--btn:hover { background: var(--cp-surface-hover); }
+
+.cp-solicitud-item--abierta .cp-solicitud-row--btn { background: var(--cp-surface-hover); }
+
+.cp-solicitud-row__chevron {
+  color: var(--cp-text-faint);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.cp-solicitudes-panel__hint {
+  font-size: 11.5px;
+  color: var(--cp-text-faint);
+}
+
+/* ---- Detalle de la solicitud ---- */
+.cp-solicitud-detalle {
+  padding: 4px 14px 16px;
+  background: var(--cp-surface-hover);
+}
+
+.cp-solicitud-detalle__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px 20px;
+  padding: 14px;
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+}
+
+.cp-solicitud-detalle__item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.cp-solicitud-detalle__label {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--cp-text-faint);
+  font-weight: 500;
+}
+
+.cp-solicitud-detalle__valor {
+  font-size: 13.5px;
+  color: var(--cp-text);
+  overflow-wrap: anywhere;
+}
+
+.cp-solicitud-detalle__cambio,
+.cp-solicitud-detalle__resolucion {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 10px;
+  padding: 11px 14px;
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+}
+
+.cp-solicitud-detalle__nota {
+  margin-top: 10px;
+  padding: 10px 13px;
+  background: var(--cp-warning-bg);
+  border-radius: var(--cp-radius-sm);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--cp-text);
+}
+
+/* ---- Nota de aprobación dentro de los modales masivos ---- */
+.cp-aprobacion-nota {
+  padding: 11px 14px;
+  background: var(--cp-warning-bg);
+  border-radius: var(--cp-radius-sm);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--cp-text);
+  margin-bottom: 16px;
+}
+
+/* ---- Liquidación masiva de obra social ---- */
+.cp-liquidar-lista {
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  margin-bottom: 14px;
+}
+
+.cp-liquidar-fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 14px;
+}
+
+.cp-liquidar-fila + .cp-liquidar-fila {
+  border-top: 1px solid var(--cp-border);
+}
+
+.cp-liquidar-fila__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cp-liquidar-fila__pac {
+  font-size: 13.5px;
+  color: var(--cp-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cp-liquidar-fila__meta {
+  font-size: 11.5px;
+  color: var(--cp-text-faint);
+}
+
+.cp-liquidar-fila__input {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.cp-liquidar-fila__input span {
+  color: var(--cp-text-faint);
+  font-size: 13px;
+}
+
+.cp-liquidar-fila__input input {
+  width: 116px;
+  padding: 8px 10px;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-sm);
+  font-family: var(--cp-font-mono);
+  font-size: 13px;
+  background: var(--cp-bg);
+  color: var(--cp-text);
+  text-align: right;
+}
+
+.cp-liquidar-fila__input input:focus {
+  outline: none;
+  border-color: var(--cp-accent);
+}
+
+.cp-liquidar-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 14px;
+  background: var(--cp-surface-sunken);
+  border-radius: var(--cp-radius-md);
+  margin-bottom: 14px;
+  font-size: 13px;
+  color: var(--cp-text-muted);
+}
+
+.cp-liquidar-total strong {
+  font-family: var(--cp-font-mono);
+  font-size: 15px;
+  color: var(--cp-text);
+}
+
+@media (max-width: 640px) {
+  .cp-solicitud-detalle__grid { grid-template-columns: 1fr; }
+  .cp-liquidar-fila { flex-direction: column; align-items: stretch; gap: 8px; }
+  .cp-liquidar-fila__input input { width: 100%; }
+}
