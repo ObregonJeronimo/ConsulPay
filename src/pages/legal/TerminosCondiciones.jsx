@@ -16,18 +16,19 @@
  *   - Codigo Civil y Comercial de la Nacion (Argentina)
  *
  * Notas sobre clausulas comerciales:
- *   - Las comisiones (1% Free, 0.5% Pro sobre el valor total inicial de la
- *     sesion) NO se hardcodean acá porque pueden cambiar via /config/global.
- *     Se mencionan como "según el plan vigente al momento de cada operación".
- *   - El precio del Plan Pro tampoco se hardcodea ($50.000/mes)
- *     porque sale de env var CONSULPAY_PRECIO_PRO_ARS.
+ *   - ConsulPay es un servicio pago de contratacion directa: no hay plan
+ *     gratuito ni contratacion self-service dentro de la plataforma.
+ *   - No se retiene comision sobre los pagos entre profesionales y
+ *     consultorios.
+ *   - El precio no se hardcodea acá: se acuerda con cada consultorio y
+ *     puede cambiar, asi que se menciona en terminos generales.
  */
 
 import { Link } from 'react-router-dom';
 
 import './Legal.css';
 
-const FECHA_VIGENCIA = '30 de abril de 2026';
+const FECHA_VIGENCIA = '23 de julio de 2026';
 
 export default function TerminosCondiciones() {
   return (
@@ -131,54 +132,46 @@ export default function TerminosCondiciones() {
           </section>
 
           <section className="cp-legal__section">
-            <h2 className="cp-legal__section-title">4. Planes, comisiones y suscripciones</h2>
+            <h2 className="cp-legal__section-title">4. Acceso al servicio y facturación</h2>
 
-            <h3 className="cp-legal__subsection-title">4.1 Plan gratuito</h3>
+            <h3 className="cp-legal__subsection-title">4.1 Servicio pago</h3>
             <p>
-              ConsulPay ofrece un plan gratuito que permite acceder a las
-              funciones esenciales del servicio. Este plan no requiere pago
-              mensual alguno. Cada operación de pago entre profesionales y
-              consultorios genera una comisión a favor de ConsulPay,
-              calculada como un porcentaje del monto operado, según el plan
-              vigente al momento de cada operación.
+              ConsulPay es un servicio pago. El acceso se habilita luego de
+              contratar el servicio directamente con nosotros: no existe un
+              plan gratuito ni una contratación automática dentro de la
+              plataforma.
             </p>
 
-            <h3 className="cp-legal__subsection-title">4.2 Plan Pro</h3>
+            <h3 className="cp-legal__subsection-title">4.2 Precio y facturación</h3>
             <p>
-              ConsulPay ofrece un Plan Pro mediante suscripción mensual,
-              cuyo precio actual se informa al momento de la contratación
-              dentro de la plataforma. Este plan incluye una comisión
-              reducida sobre las operaciones de pago.
-            </p>
-            <p>
-              La suscripción se renueva automáticamente cada 30 días desde
-              la fecha del último cobro exitoso. Podés cancelar la
-              suscripción en cualquier momento desde tu panel: al cancelar,
-              mantenés los beneficios del Plan Pro hasta el fin del período
-              ya pagado, y luego volvés automáticamente al plan gratuito.
+              El precio y la periodicidad de la facturación se acuerdan con
+              cada consultorio antes de habilitar el acceso, y se informan
+              por escrito. La facturación y el cobro se gestionan de forma
+              directa entre ConsulPay y el consultorio.
             </p>
 
-            <h3 className="cp-legal__subsection-title">4.3 Cobro y fallos</h3>
+            <h3 className="cp-legal__subsection-title">4.3 Sin comisiones por operación</h3>
             <p>
-              Si por algún motivo no podemos cobrar la renovación mensual
-              (tarjeta vencida, sin saldo, rechazo del banco u otro), el
-              sistema realiza hasta 3 reintentos en un plazo de 3 días.
-              Si todos los reintentos fallan, la suscripción se cancela
-              automáticamente y el consultorio vuelve al plan gratuito.
+              ConsulPay no retiene comisión alguna sobre los pagos que los
+              profesionales realizan al consultorio ni sobre el valor de las
+              sesiones registradas. Los importes que se operan a través de la
+              plataforma se acreditan íntegros en la cuenta del consultorio,
+              descontados únicamente los cargos del procesador de pagos
+              descriptos en la sección 5.
             </p>
 
-            <h3 className="cp-legal__subsection-title">4.4 Cambios en planes y comisiones</h3>
+            <h3 className="cp-legal__subsection-title">4.4 Cambios en el precio</h3>
             <p>
-              ConsulPay se reserva el derecho de modificar los planes y los
-              porcentajes de comisión. Cualquier cambio se comunicará con al
-              menos 30 días de anticipación a través del email registrado o
-              de un aviso destacado en la plataforma. Los cambios en
-              comisiones se aplican únicamente a operaciones futuras.
+              ConsulPay se reserva el derecho de modificar el precio del
+              servicio. Cualquier cambio se comunicará con al menos 30 días
+              de anticipación a través del email registrado o de un aviso
+              destacado en la plataforma, y se aplicará únicamente a
+              períodos futuros.
             </p>
 
             <h3 className="cp-legal__subsection-title">4.5 Reembolsos</h3>
             <p>
-              Las suscripciones mensuales no generan derecho a reembolso
+              Los períodos ya facturados no generan derecho a reembolso
               salvo que un error técnico atribuible exclusivamente a
               ConsulPay haya impedido el uso del servicio durante el período
               pagado. En esos casos, podés reclamar el reembolso escribiendo
@@ -202,7 +195,7 @@ export default function TerminosCondiciones() {
             <ul className="cp-legal__list">
               <li>
                 Cargos, comisiones o cobros del procesador de pagos, que
-                son ajenos a las comisiones de ConsulPay.
+                son ajenos a ConsulPay.
               </li>
               <li>
                 Demoras en la acreditación de fondos atribuibles al
@@ -303,9 +296,9 @@ export default function TerminosCondiciones() {
               <li>El servicio sea discontinuado total o parcialmente.</li>
             </ul>
             <p>
-              Vos podés cancelar tu cuenta en cualquier momento. Si tenés
-              una suscripción Pro activa, mantenés los beneficios hasta el
-              fin del período pagado.
+              Vos podés cancelar tu cuenta en cualquier momento. Si ya
+              facturamos un período en curso, mantenés el acceso hasta que
+              ese período termine.
             </p>
           </section>
 
