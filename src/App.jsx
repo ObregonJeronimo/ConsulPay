@@ -31,11 +31,13 @@ const Sesiones = lazyWithRetry(() => import('./pages/admin/Sesiones.jsx'));
 const Solicitudes = lazyWithRetry(() => import('./pages/admin/Solicitudes.jsx'));
 const PagosAdmin = lazyWithRetry(() => import('./pages/admin/Pagos.jsx'));
 const Reparto = lazyWithRetry(() => import('./pages/admin/Reparto.jsx'));
+const Calendario = lazyWithRetry(() => import('./pages/admin/Calendario.jsx'));
 const MiPanel = lazyWithRetry(() => import('./pages/profesional/MiPanel.jsx'));
 const MisPacientes = lazyWithRetry(() => import('./pages/profesional/MisPacientes.jsx'));
 const MisSesiones = lazyWithRetry(() => import('./pages/profesional/MisSesiones.jsx'));
 const MisPagos = lazyWithRetry(() => import('./pages/profesional/MisPagos.jsx'));
 const RetornoPago = lazyWithRetry(() => import('./pages/profesional/RetornoPago.jsx'));
+const MiAgenda = lazyWithRetry(() => import('./pages/profesional/MiAgenda.jsx'));
 
 // Paginas legales publicas (sin auth) — se incluyen como lazy igual
 // que el resto, asi no engordan el bundle inicial. Quien viene a leer
@@ -108,6 +110,7 @@ export default function App() {
                 <Route path="/admin" element={<DashboardAdmin />} />
                 <Route path="/admin/profesionales" element={<Profesionales />} />
                 <Route path="/admin/pacientes" element={<Pacientes />} />
+                <Route path="/admin/calendario" element={<Calendario />} />
                 <Route path="/admin/sesiones" element={<Sesiones />} />
                 <Route path="/admin/solicitudes" element={<Solicitudes />} />
                 <Route path="/admin/pagos" element={<PagosAdmin />} />
@@ -121,6 +124,7 @@ export default function App() {
               <Route element={<AppShell />}>
                 <Route path="/mi-panel" element={<MiPanel />} />
                 <Route path="/mi-panel/pacientes" element={<MisPacientes />} />
+                <Route path="/mi-panel/agenda" element={<MiAgenda />} />
                 <Route path="/mi-panel/sesiones" element={<MisSesiones />} />
                 <Route path="/mi-panel/pagos" element={<MisPagos />} />
                 <Route path="/mi-panel/pagos/retorno" element={<RetornoPago />} />
