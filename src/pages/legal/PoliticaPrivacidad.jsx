@@ -145,7 +145,7 @@ export default function PoliticaPrivacidad() {
             <ul className="cp-legal__list">
               <li>Prestar el servicio de gestión administrativa de consultorios.</li>
               <li>Procesar pagos entre profesionales y consultorios.</li>
-              <li>Gestionar suscripciones al Plan Pro.</li>
+              <li>Gestionar la facturación del servicio.</li>
               <li>Notificarte sobre cambios importantes en tu cuenta o el servicio.</li>
               <li>Cumplir con obligaciones legales y fiscales aplicables.</li>
               <li>Mejorar la plataforma y prevenir usos indebidos.</li>
