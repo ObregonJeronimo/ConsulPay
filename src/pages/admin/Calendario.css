@@ -1,0 +1,602 @@
+/* ============================================================
+   Calendario / Agenda del consultorio
+   ----------------------------------------------------------------
+   Solo se usa en el modelo de reparto "recepcion cobra".
+   ============================================================ */
+
+/* Color por profesional. Son los unicos valores crudos del archivo:
+   actuan como tokens de la paleta de agenda (no habia equivalente en
+   tokens.css). Todo lo demas usa --cp-*. */
+.cp-cal {
+  --cp-prof-1: #C15F3C;
+  --cp-prof-1-bg: #F6E7E0;
+  --cp-prof-2: #3F6B63;
+  --cp-prof-2-bg: #E1ECE9;
+  --cp-prof-3: #8A6D2F;
+  --cp-prof-3-bg: #F1E9D8;
+  --cp-prof-4: #5B5A78;
+  --cp-prof-4-bg: #E7E6EF;
+  --cp-prof-5: #7A4A55;
+  --cp-prof-5-bg: #F0E3E6;
+}
+
+.cp-cal__c1 { --pf: var(--cp-prof-1); --pfbg: var(--cp-prof-1-bg); }
+.cp-cal__c2 { --pf: var(--cp-prof-2); --pfbg: var(--cp-prof-2-bg); }
+.cp-cal__c3 { --pf: var(--cp-prof-3); --pfbg: var(--cp-prof-3-bg); }
+.cp-cal__c4 { --pf: var(--cp-prof-4); --pfbg: var(--cp-prof-4-bg); }
+.cp-cal__c5 { --pf: var(--cp-prof-5); --pfbg: var(--cp-prof-5-bg); }
+
+/* ---- Barra superior ---- */
+.cp-cal__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.cp-cal__nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cp-cal__navbtn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--cp-border);
+  background: var(--cp-surface);
+  border-radius: var(--cp-radius-sm);
+  cursor: pointer;
+  color: var(--cp-text-muted);
+  font-size: 15px;
+  line-height: 1;
+  transition: border-color var(--cp-dur-fast) var(--cp-ease),
+              color var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-cal__navbtn:hover {
+  border-color: var(--cp-border-strong);
+  color: var(--cp-text);
+}
+
+.cp-cal__mes {
+  font-family: var(--cp-font-serif);
+  font-size: 19px;
+  font-weight: 500;
+  min-width: 168px;
+  text-align: center;
+  text-transform: capitalize;
+}
+
+.cp-cal__hoy {
+  font-size: 12.5px;
+  color: var(--cp-text-muted);
+  background: none;
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 6px 4px;
+}
+
+.cp-cal__hoy:hover { color: var(--cp-accent); }
+
+/* ---- Filtros por profesional ---- */
+.cp-cal__filtros {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.cp-cal__filtros-lbl {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--cp-text-faint);
+}
+
+.cp-cal__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: var(--cp-radius-pill);
+  border: 1px solid var(--cp-border);
+  background: var(--cp-surface);
+  font-family: inherit;
+  font-size: 12.5px;
+  color: var(--cp-text-muted);
+  cursor: pointer;
+  transition: border-color var(--cp-dur-fast) var(--cp-ease),
+              background var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-cal__chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--pf, var(--cp-border-strong));
+}
+
+.cp-cal__chip--on {
+  border-color: var(--pf);
+  background: var(--pfbg);
+  color: var(--cp-text);
+}
+
+/* ---- Grilla del mes ---- */
+.cp-cal__grid {
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-lg);
+  overflow: hidden;
+}
+
+.cp-cal__dow {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  background: var(--cp-bg);
+  border-bottom: 1px solid var(--cp-border);
+}
+
+.cp-cal__dow div {
+  padding: 9px 10px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--cp-text-muted);
+  font-weight: 500;
+}
+
+.cp-cal__days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.cp-cal__cell {
+  min-height: 118px;
+  border-right: 1px solid var(--cp-border);
+  border-bottom: 1px solid var(--cp-border);
+  padding: 7px 8px;
+  position: relative;
+  text-align: left;
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-cal__cell:nth-child(7n) { border-right: none; }
+.cp-cal__cell:hover { background: var(--cp-surface-hover); }
+
+.cp-cal__cell--out {
+  background: var(--cp-surface-sunken);
+  cursor: default;
+}
+
+.cp-cal__cell--out:hover { background: var(--cp-surface-sunken); }
+.cp-cal__cell--out .cp-cal__num { color: var(--cp-text-faint); }
+
+.cp-cal__num {
+  font-family: var(--cp-font-mono);
+  font-size: 12.5px;
+  color: var(--cp-text-muted);
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  margin-bottom: 4px;
+}
+
+.cp-cal__cell--hoy .cp-cal__num {
+  background: var(--cp-accent);
+  color: var(--cp-text-on-accent, #fff);
+}
+
+.cp-cal__add {
+  position: absolute;
+  right: 7px;
+  top: 6px;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--cp-accent);
+  opacity: 0;
+  transition: opacity var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-cal__cell:not(.cp-cal__cell--out):hover .cp-cal__add { opacity: 1; }
+
+/* ---- Chip de cita dentro de la celda ---- */
+.cp-cal__cita {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 3px 6px;
+  border: none;
+  border-left: 2.5px solid var(--pf);
+  border-radius: 5px;
+  background: var(--pfbg);
+  margin-bottom: 3px;
+  font-family: inherit;
+  font-size: 11.5px;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.cp-cal__cita:hover { filter: brightness(0.97); }
+
+.cp-cal__cita--cancelada {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+.cp-cal__cita-h {
+  font-family: var(--cp-font-mono);
+  font-size: 10.5px;
+  color: var(--pf);
+  flex-shrink: 0;
+}
+
+.cp-cal__cita-n {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--cp-text);
+}
+
+.cp-cal__cita-rep {
+  flex-shrink: 0;
+  opacity: 0.6;
+  font-size: 9.5px;
+  margin-left: auto;
+}
+
+.cp-cal__mas {
+  font-size: 10.5px;
+  color: var(--cp-text-faint);
+  padding-left: 3px;
+}
+
+/* ---- Modal ---- */
+.cp-cal__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.cp-cal__field { margin-bottom: 15px; }
+
+.cp-cal__field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--cp-text-muted);
+  margin-bottom: 6px;
+}
+
+.cp-cal__field input,
+.cp-cal__field select,
+.cp-cal__field textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-sm);
+  font-family: inherit;
+  font-size: 14px;
+  background: var(--cp-bg);
+  color: var(--cp-text);
+}
+
+.cp-cal__field input:focus,
+.cp-cal__field select:focus {
+  outline: none;
+  border-color: var(--cp-accent);
+}
+
+.cp-cal__hint {
+  font-size: 11.5px;
+  color: var(--cp-text-faint);
+  margin-top: 5px;
+}
+
+/* Autocomplete de paciente */
+.cp-cal__ac { position: relative; }
+
+.cp-cal__aclist {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 3px);
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-sm);
+  box-shadow: 0 10px 26px -14px rgba(0, 0, 0, 0.3);
+  max-height: 172px;
+  overflow: auto;
+  z-index: 5;
+}
+
+.cp-cal__acit {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 13.5px;
+  text-align: left;
+  cursor: pointer;
+  color: var(--cp-text);
+}
+
+.cp-cal__acit:hover { background: var(--cp-accent-bg); }
+
+.cp-cal__acit small {
+  color: var(--cp-text-faint);
+  font-size: 11.5px;
+}
+
+.cp-cal__acit--nuevo {
+  border-top: 1px solid var(--cp-border);
+  color: var(--cp-accent);
+  font-weight: 500;
+}
+
+/* Panel de repeticion */
+.cp-cal__reptg {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 14px;
+  border: 1px dashed var(--cp-border-strong);
+  border-radius: var(--cp-radius-md);
+  background: none;
+  font-family: inherit;
+  font-size: 13.5px;
+  color: var(--cp-text);
+  cursor: pointer;
+  margin-bottom: 15px;
+  transition: border-color var(--cp-dur-fast) var(--cp-ease),
+              color var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-cal__reptg:hover {
+  border-color: var(--cp-accent);
+  color: var(--cp-accent-dark);
+}
+
+.cp-cal__reptg--on {
+  border-style: solid;
+  border-color: var(--cp-accent);
+  background: var(--cp-accent-bg);
+  color: var(--cp-accent-dark);
+}
+
+.cp-cal__reppanel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--cp-dur) var(--cp-ease);
+  margin-bottom: 15px;
+}
+
+.cp-cal__reppanel--on { grid-template-rows: 1fr; }
+
+.cp-cal__repinner { overflow: hidden; }
+
+.cp-cal__repbox {
+  background: var(--cp-surface-sunken);
+  border-radius: var(--cp-radius-md);
+  padding: 16px;
+}
+
+.cp-cal__replbl {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--cp-text-muted);
+  margin-bottom: 8px;
+}
+
+.cp-cal__opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 14px;
+}
+
+.cp-cal__opt {
+  padding: 7px 13px;
+  border: 1.5px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  background: var(--cp-bg);
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--cp-text);
+  cursor: pointer;
+}
+
+.cp-cal__opt--on {
+  border-color: var(--cp-accent);
+  background: var(--cp-accent-bg);
+  color: var(--cp-accent-dark);
+  font-weight: 500;
+}
+
+.cp-cal__dows {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 14px;
+}
+
+.cp-cal__dw {
+  width: 33px;
+  height: 33px;
+  border: 1.5px solid var(--cp-border);
+  border-radius: 50%;
+  background: var(--cp-bg);
+  font-family: var(--cp-font-mono);
+  font-size: 12px;
+  color: var(--cp-text);
+  cursor: pointer;
+}
+
+.cp-cal__dw--on {
+  border-color: var(--cp-accent);
+  background: var(--cp-accent);
+  color: var(--cp-text-on-accent, #fff);
+}
+
+.cp-cal__resumen {
+  background: var(--cp-accent-bg);
+  border-radius: var(--cp-radius-sm);
+  padding: 10px 13px;
+  font-size: 12.5px;
+  color: var(--cp-accent-dark);
+  line-height: 1.5;
+}
+
+/* Alcance al editar/eliminar una serie */
+.cp-cal__scope {
+  background: var(--cp-warning-bg);
+  border-radius: var(--cp-radius-sm);
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+
+.cp-cal__scope p {
+  margin: 0 0 9px;
+  font-size: 12.5px;
+  color: var(--cp-text);
+}
+
+.cp-cal__scope label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  margin-bottom: 6px;
+  cursor: pointer;
+}
+
+.cp-cal__scope label:last-child { margin-bottom: 0; }
+
+/* Estado del turno */
+.cp-cal__estado {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.cp-cal__acts {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--cp-border);
+}
+
+.cp-cal__acts-right {
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
+}
+
+/* ---- Agenda del profesional (solo lectura) ---- */
+.cp-agenda {
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-lg);
+  overflow: hidden;
+}
+
+.cp-agenda__day {
+  border-bottom: 1px solid var(--cp-border);
+  padding: 14px 18px;
+  display: grid;
+  grid-template-columns: 78px 1fr;
+  gap: 16px;
+}
+
+.cp-agenda__day:last-child { border-bottom: none; }
+
+.cp-agenda__fecha {
+  font-family: var(--cp-font-mono);
+  font-size: 12px;
+  color: var(--cp-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.5;
+}
+
+.cp-agenda__fecha strong {
+  display: block;
+  font-family: var(--cp-font-serif);
+  font-size: 22px;
+  color: var(--cp-text);
+  letter-spacing: -0.01em;
+  font-weight: 500;
+}
+
+.cp-agenda__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 12px;
+  border-radius: var(--cp-radius-md);
+  background: var(--cp-accent-bg);
+  border-left: 3px solid var(--cp-accent);
+  margin-bottom: 7px;
+}
+
+.cp-agenda__item:last-child { margin-bottom: 0; }
+
+.cp-agenda__item--cancelada {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+.cp-agenda__hora {
+  font-family: var(--cp-font-mono);
+  font-size: 13px;
+  color: var(--cp-accent-dark);
+  font-weight: 500;
+}
+
+.cp-agenda__nom { font-size: 14px; }
+
+.cp-agenda__meta {
+  font-size: 12px;
+  color: var(--cp-text-muted);
+  margin-left: auto;
+}
+
+.cp-agenda__vacio {
+  padding: 40px 24px;
+  text-align: center;
+  color: var(--cp-text-muted);
+  font-size: 13.5px;
+}
+
+/* ---- Mobile ---- */
+@media (max-width: 760px) {
+  .cp-cal__cell { min-height: 84px; padding: 5px; }
+  .cp-cal__cita-n { display: none; }
+  .cp-cal__num { font-size: 11px; }
+  .cp-cal__row { grid-template-columns: 1fr; }
+  .cp-cal__mes { font-size: 17px; min-width: 140px; }
+  .cp-agenda__day { grid-template-columns: 62px 1fr; padding: 12px 14px; }
+}
