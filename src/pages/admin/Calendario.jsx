@@ -33,6 +33,21 @@ const MESES = [
   'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
 ];
 const DURACIONES = [15, 30, 45, 60, 90];
+
+const LABEL_ESTADO = {
+  [ESTADOS_CITA.AGENDADA]: 'Sin marcar',
+  [ESTADOS_CITA.ASISTIO]: 'Asistió',
+  [ESTADOS_CITA.AUSENTE]: 'No asistió',
+  [ESTADOS_CITA.CANCELADA]: 'Cancelado',
+};
+
+/** Clase del chip segun el estado, para que se distinga de un vistazo. */
+function claseEstado(estado) {
+  if (estado === ESTADOS_CITA.ASISTIO) return 'cp-cal__cita--asistio';
+  if (estado === ESTADOS_CITA.AUSENTE) return 'cp-cal__cita--ausente';
+  if (estado === ESTADOS_CITA.CANCELADA) return 'cp-cal__cita--cancelada';
+  return '';
+}
 const MAX_VISIBLES = 3;
 
 /** Color estable por profesional segun su posicion en la lista. */
@@ -240,13 +255,13 @@ export default function Calendario() {
 
                 {delDia.slice(0, MAX_VISIBLES).map((c) => {
                   const info = mapaProf[c.profesionalUid];
-                  const cancelada = c.estado === ESTADOS_CITA.CANCELADA;
                   return (
                     <span
                       key={c.id}
                       role="button"
                       tabIndex={0}
-                      className={`cp-cal__cita ${info?.clase ?? ''} ${cancelada ? 'cp-cal__cita--cancelada' : ''}`}
+                      title={`${c.hora} · ${c.pacienteNombre} · ${LABEL_ESTADO[c.estado] ?? ''}`}
+                      className={`cp-cal__cita ${info?.clase ?? ''} ${claseEstado(c.estado)}`}
                       onClick={(e) => { e.stopPropagation(); setModal({ cita: c }); }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
@@ -258,6 +273,12 @@ export default function Calendario() {
                     >
                       <span className="cp-cal__cita-h">{c.hora}</span>
                       <span className="cp-cal__cita-n">{c.pacienteNombre}</span>
+                      {c.estado === ESTADOS_CITA.ASISTIO && (
+                        <span className="cp-cal__cita-marca" aria-label="Asistió">✓</span>
+                      )}
+                      {c.estado === ESTADOS_CITA.AUSENTE && (
+                        <span className="cp-cal__cita-marca" aria-label="No asistió">✕</span>
+                      )}
                       {c.serieId && <span className="cp-cal__cita-rep" title="Turno fijo">↻</span>}
                     </span>
                   );
@@ -311,6 +332,7 @@ function CitaModal({
   const [duracionMin, setDuracionMin] = useState(cita?.duracionMin ?? 45);
   const [notas, setNotas] = useState(cita?.notas ?? '');
 
+  const [estadoActual, setEstadoActual] = useState(cita?.estado ?? ESTADOS_CITA.AGENDADA);
   const [buscando, setBuscando] = useState(false);
   const [repOn, setRepOn] = useState(false);
   const [rep, setRep] = useState(REPETICION_INICIAL);
@@ -382,13 +404,20 @@ function CitaModal({
     }
   }
 
+  /*
+    Marcar la asistencia NO cierra el modal: actualiza el estado a la
+    vista. Antes cerraba y, como el chip del calendario no mostraba el
+    estado, parecia que el boton no hacia nada.
+  */
   async function cambiarEstado(estado) {
+    setError('');
     setSubmitting(true);
     try {
       await marcarEstadoCita(cita.id, estado);
-      onClose();
+      setEstadoActual(estado);
     } catch (err) {
       setError(err.message || 'No se pudo actualizar el estado.');
+    } finally {
       setSubmitting(false);
     }
   }
@@ -438,12 +467,38 @@ function CitaModal({
 
         {editando && (
           <div className="cp-cal__estado">
-            <Button variant="secondary" onClick={() => cambiarEstado(ESTADOS_CITA.ASISTIO)} disabled={submitting}>
-              Marcar asistió
-            </Button>
-            <Button variant="secondary" onClick={() => cambiarEstado(ESTADOS_CITA.AUSENTE)} disabled={submitting}>
-              No asistió
-            </Button>
+            <div className="cp-cal__estado-head">
+              <span className="cp-cal__estado-lbl">Asistencia</span>
+              <span className={`cp-cal__estado-badge cp-cal__estado-badge--${estadoActual}`}>
+                {LABEL_ESTADO[estadoActual] ?? estadoActual}
+              </span>
+            </div>
+            <div className="cp-cal__estado-btns">
+              <Button
+                variant={estadoActual === ESTADOS_CITA.ASISTIO ? 'primary' : 'secondary'}
+                onClick={() => cambiarEstado(ESTADOS_CITA.ASISTIO)}
+                disabled={submitting}
+              >
+                Asistió
+              </Button>
+              <Button
+                variant={estadoActual === ESTADOS_CITA.AUSENTE ? 'primary' : 'secondary'}
+                onClick={() => cambiarEstado(ESTADOS_CITA.AUSENTE)}
+                disabled={submitting}
+              >
+                No asistió
+              </Button>
+              {estadoActual !== ESTADOS_CITA.AGENDADA && (
+                <button
+                  type="button"
+                  className="cp-cal__estado-reset"
+                  onClick={() => cambiarEstado(ESTADOS_CITA.AGENDADA)}
+                  disabled={submitting}
+                >
+                  Desmarcar
+                </button>
+              )}
+            </div>
           </div>
         )}
 
