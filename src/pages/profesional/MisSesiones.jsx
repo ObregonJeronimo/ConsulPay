@@ -386,7 +386,12 @@ export default function MisSesiones() {
     // Marcar como pagada — genera solicitud si tiene permiso
     if (!puedeMarcarPagadas) return;
     const pac = mapaPacientes[sesion.pacienteId];
-    const receptor = { uid: user.uid, nombre: user.displayName || user.email || user.uid };
+    /* Sin receptor a proposito. El profesional le PAGA al consultorio: el
+       receptor es quien cobro del otro lado, no el. Poniendose a si mismo
+       ensuciaba /admin/reparto, que agrupa por receptorUid para mostrar
+       cuanto cobro cada administrador. Al omitirlo, aprobarSolicitud lo
+       resuelve con el admin que aprueba, que es justamente quien confirma
+       haber recibido la plata. */
     try {
       await solicitarMarcarPagada({
         consultorioId: user.consultorioId,
@@ -399,7 +404,6 @@ export default function MisSesiones() {
           metodoPagoNombre: sesion.metodoPagoNombre || '',
           valorTotal: sesion.valorTotal || 0,
         },
-        receptor,
       });
     } catch (err) {
       alert(err.message || 'No se pudo enviar la solicitud.');
@@ -678,7 +682,7 @@ function MarcarMesPagadoModal({ sesiones, mapaPacientes, mes, user, onClose }) {
             metodoPagoNombre: ses.metodoPagoNombre || '',
             valorTotal: ses.valorTotal || 0,
           },
-          receptor: { uid: user.uid, nombre: user.displayName || user.email || user.uid },
+          // Sin receptor: lo define el admin al aprobar (ver handleTogglePagado).
         });
         hechas += 1;
         setProgreso(hechas);

@@ -806,7 +806,7 @@ function PacienteModal({ paciente, profesionales, metodos, onClose, onGuardar })
     }
     // Nuevo paciente: sin profesional preseleccionado. El admin elige.
     return [];
-  }, [paciente, profesionales]);
+  }, [paciente]);
 
   const [form, setForm] = useState(() => {
     const metodosIniciales = paciente

@@ -648,6 +648,9 @@ function CantidadPicker({ value, onChange }) {
     const idx = Number(value) - 1;
     const item = listRef.current.children[idx];
     if (item) item.scrollIntoView({ block: 'center' });
+    // Solo al montar: posiciona la rueda en el valor inicial. Reaccionar a
+    // cada cambio de value la haria saltar mientras el usuario la arrastra.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Touch scroll para el picker

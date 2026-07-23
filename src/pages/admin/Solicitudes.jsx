@@ -509,7 +509,7 @@ function TablaSolicitudes({ solicitudes, mapaPacientes, mapaProfesionales, onSel
    Lista TODOS los profesionales del consultorio; los que no tienen
    resueltas muestran un estado vacío.
    ============================================================ */
-function ResueltasPorProfesional({ solicitudes, profesionales, mapaPacientes, mapaProfesionales, onSeleccionar }) {
+function ResueltasPorProfesional({ solicitudes, profesionales, mapaPacientes, onSeleccionar }) {
   const bloques = useMemo(() => {
     // Agrupar resueltas por profesional
     const porProf = {};
@@ -547,7 +547,7 @@ function ResueltasPorProfesional({ solicitudes, profesionales, mapaPacientes, ma
       if ((a.cant > 0) !== (b.cant > 0)) return b.cant - a.cant > 0 ? 1 : -1;
       return (a.nombre || '').localeCompare(b.nombre || '');
     });
-  }, [solicitudes, profesionales, mapaProfesionales]);
+  }, [solicitudes, profesionales]);
 
   if (bloques.length === 0) {
     return <EmptyState tab="resueltas" />;

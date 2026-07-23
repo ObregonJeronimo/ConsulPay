@@ -68,3 +68,6 @@ vite.config.*.timestamp-*
 
 # Local-only
 *.local
+
+# Artefactos temporales de scripts/audit-responsive.mjs
+.audit/

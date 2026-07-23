@@ -17,7 +17,7 @@
  *     { label: 'Eliminar', icon: <TrashIcon />, onClick: () => handleEliminar(s), danger: true },
  *   ]} />
  */
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import './ActionMenu.css';
 
 export default function ActionMenu({ items = [], align = 'right' }) {
@@ -28,7 +28,10 @@ export default function ActionMenu({ items = [], align = 'right' }) {
 
   // Calcular posicion del dropdown al abrir — usa fixed para salir
   // de cualquier stacking context (tr, tbody, etc.) que pudiera cortar el dropdown.
-  function calcularPosicion() {
+  /* Memoizada: la usan dos efectos como dependencia. Sin useCallback se
+     recrea en cada render y esos efectos se re-suscribirian de mas. Solo
+     depende de la prop align; lo demas son refs y setState. */
+  const calcularPosicion = useCallback(() => {
     if (!triggerRef.current) return;
     const r = triggerRef.current.getBoundingClientRect();
     const spaceRight = window.innerWidth - r.right;
@@ -48,7 +51,7 @@ export default function ActionMenu({ items = [], align = 'right' }) {
         right: 'auto',
       });
     }
-  }
+  }, [align]);
 
   // Cerrar al clickear afuera
   useEffect(() => {
@@ -86,7 +89,7 @@ export default function ActionMenu({ items = [], align = 'right' }) {
       window.removeEventListener('scroll', handler, true);
       window.removeEventListener('resize', handler);
     };
-  }, [open]);
+  }, [open, calcularPosicion]);
 
   return (
     <div className="cp-action-menu" ref={ref}>

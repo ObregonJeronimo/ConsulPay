@@ -178,7 +178,11 @@ export default function Sesiones() {
       setEditando('nueva');
       navigate(location.pathname, { replace: true, state: {} });
     }
-  }, [location.state?.abrirNueva]);  // sesion a la que vamos a cargarle el monto
+    // navigate es estable en react-router v6 y pathname no cambia mientras
+    // se esta en esta pagina, asi que declararlas no altera cuando corre.
+  }, [location.state?.abrirNueva, location.pathname, navigate]);
+
+  // sesion a la que vamos a cargarle el monto
 
   useEffect(() => {
     if (!user?.consultorioId) return;
