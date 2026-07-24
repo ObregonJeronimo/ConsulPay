@@ -349,6 +349,7 @@ export default function MisSesiones() {
             pacienteNombre: pac ? nombrePaciente(pac) : (liquidando.pacienteNombre || ''),
             fecha: liquidando.fecha,
             metodoPagoNombre: liquidando.metodoPagoNombre || '',
+            porcentajeConsultorio: Number(liquidando.porcentajeConsultorio) || 0,
           },
         });
       } else {
@@ -799,6 +800,7 @@ function LiquidarOSMasivoModal({ sesiones, mapaPacientes, mes, user, onClose }) 
             pacienteNombre: pac ? nombrePaciente(pac) : (ses.pacienteNombre || ''),
             fecha: ses.fecha,
             metodoPagoNombre: ses.metodoPagoNombre || '',
+            porcentajeConsultorio: Number(ses.porcentajeConsultorio) || 0,
           },
         });
         hechas += 1;

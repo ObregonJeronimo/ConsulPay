@@ -367,6 +367,16 @@ function montoConsultorioDeSolicitud(s) {
   if (snap.valorTotal != null && snap.porcentajeConsultorio != null) {
     return Math.round(snap.valorTotal * snap.porcentajeConsultorio / 100);
   }
+  // LIQUIDAR_OS: la sesion todavia esta en pendiente_monto, asi que el
+  // snapshot no puede traer montoConsultorio (no existe hasta aprobar).
+  // El total propuesto vive en el payload y el % viaja en el snapshot.
+  if (s.tipo === TIPOS_SOLICITUD_SESION.LIQUIDAR_OS) {
+    const monto = Number(s.payloadPropuesto?.monto);
+    const pct = Number(snap.porcentajeConsultorio);
+    if (Number.isFinite(monto) && Number.isFinite(pct)) {
+      return Math.round(monto * pct / 100);
+    }
+  }
   return 0;
 }
 const MESES_LARGO = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
