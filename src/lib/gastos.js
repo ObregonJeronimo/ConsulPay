@@ -91,9 +91,16 @@ export function armarLibro({ sesionesPagadas = [], pagosMP = [], gastos = [], cu
     // está, o sesión vieja sin receptor), va a "sin asignar" en vez de
     // desaparecer: la plata entró igual y tiene que verse.
     const cuenta = idsValidos.has(s.receptorUid) ? s.receptorUid : 'sin_asignar';
+    /* detalle NO cae a receptorNombre: ese es el admin que cobro, que ya se
+       muestra en la columna de la caja. Cuando la sesion no tiene el nombre
+       del paciente desnormalizado, el consumidor lo resuelve contra el mapa
+       de pacientes usando pacienteId; antes se colaba el nombre del admin
+       como si fuera un paciente. */
     movimientos.push({
       id: `s_${s.id}`, tipo: 'ingreso', cuenta, monto,
-      fecha: aFecha(s.fechaPago), detalle: s.pacienteNombre || s.receptorNombre || 'Sesión cobrada',
+      fecha: aFecha(s.fechaPago), detalle: s.pacienteNombre || '',
+      pacienteId: s.pacienteId || null,
+      cantidad: Number(s.cantidadSesiones) > 0 ? Math.floor(Number(s.cantidadSesiones)) : 1,
       origen: 'sesion',
     });
   }

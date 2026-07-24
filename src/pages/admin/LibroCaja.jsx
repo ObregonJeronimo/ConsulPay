@@ -7,6 +7,7 @@ import { formatoARS } from '../../lib/constants.js';
 import {
   armarLibro, crearGasto, CUENTA_MP, eliminarGasto, suscribirGastos,
 } from '../../lib/gastos.js';
+import { suscribirPacientesConsultorio } from '../../lib/pacientes.js';
 import { suscribirMiembrosConsultorio } from '../../lib/profesionales.js';
 import { montoNetoEfectivo, suscribirPagosDelConsultorio } from '../../lib/pagos.js';
 import { mpHabilitado } from '../../lib/mpIntegracion.js';
@@ -26,6 +27,10 @@ function diaCorto(iso) {
   if (!iso) return '—';
   const [, m, d] = iso.split('-');
   return `${d}/${m}`;
+}
+
+function nombrePaciente(p) {
+  return `${p.apellido ?? ''}${p.apellido && p.nombre ? ', ' : ''}${p.nombre ?? ''}`.trim();
 }
 
 function nombreCorto(u) {
@@ -49,6 +54,9 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
   const [sesiones, setSesiones] = useState([]);
   const [miembros, setMiembros] = useState([]);
   const [pagosMP, setPagosMP] = useState([]);
+  const [pacientes, setPacientes] = useState([]);
+  const [filtroCaja, setFiltroCaja] = useState('todas');
+  const [abiertos, setAbiertos] = useState(() => new Set());
   const [cargando, setCargando] = useState(true);
   const [nuevoAbierto, setNuevoAbierto] = useState(false);
 
@@ -66,6 +74,13 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
   useEffect(() => {
     if (!consultorioId) return undefined;
     return suscribirMiembrosConsultorio(consultorioId, setMiembros);
+  }, [consultorioId]);
+
+  // Los movimientos de sesion guardan pacienteId, no el nombre. Sin esto el
+  // detalle quedaba vacio o, peor, mostraba el nombre del admin receptor.
+  useEffect(() => {
+    if (!consultorioId) return undefined;
+    return suscribirPacientesConsultorio(consultorioId, setPacientes);
   }, [consultorioId]);
 
   // Cobros por Mercado Pago: son la otra fuente de ingresos y van a su
@@ -128,6 +143,67 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
     return { movimientos: delMes, totales: tot, columnas: cols };
   }, [sesiones, pagosMP, gastos, cuentas, rangoMes]);
 
+  const mapaPacientes = useMemo(() => {
+    const m = {};
+    for (const p of pacientes) m[p.id] = p;
+    return m;
+  }, [pacientes]);
+
+  /* Los movimientos ya resueltos para mostrar: el nombre del paciente sale
+     del mapa; si el paciente fue borrado o la sesion no lo tiene, se dice
+     "Sesión cobrada" y no el nombre de un administrador. */
+  const conNombre = useMemo(() => movimientos.map((mv) => {
+    if (mv.origen !== 'sesion') return mv;
+    const pac = mapaPacientes[mv.pacienteId];
+    const nombre = pac ? nombrePaciente(pac) : (mv.detalle || 'Sesión cobrada');
+    return { ...mv, detalle: nombre };
+  }), [movimientos, mapaPacientes]);
+
+  const visibles = useMemo(
+    () => (filtroCaja === 'todas' ? conNombre : conNombre.filter((mv) => mv.cuenta === filtroCaja)),
+    [conNombre, filtroCaja],
+  );
+
+  /* Agrupacion: los cobros de sesiones del mismo dia y la misma caja se
+     juntan en una linea sola. Un dia de cobranza son 14 sesiones sueltas y
+     leerlas de a una no aporta nada; el desglose queda a un click. Los
+     gastos y los cobros por MP NO se agrupan: cada uno tiene su motivo. */
+  const filas = useMemo(() => {
+    const out = [];
+    const grupos = new Map();
+    for (const mv of visibles) {
+      if (mv.origen !== 'sesion') { out.push({ tipo: 'simple', mv }); continue; }
+      const clave = `${mv.fecha}|${mv.cuenta}`;
+      if (!grupos.has(clave)) {
+        const g = { tipo: 'grupo', clave, fecha: mv.fecha, cuenta: mv.cuenta, monto: 0, sesiones: 0, items: [] };
+        grupos.set(clave, g);
+        out.push(g);
+      }
+      const g = grupos.get(clave);
+      g.monto += mv.monto;
+      g.sesiones += mv.cantidad || 1;
+      g.items.push(mv);
+    }
+    // Un solo cobro en el dia no necesita fila de grupo.
+    return out.map((f) => (f.tipo === 'grupo' && f.items.length === 1 ? { tipo: 'simple', mv: f.items[0] } : f));
+  }, [visibles]);
+
+  const totalesVisibles = useMemo(() => {
+    let ingresos = 0; let egresos = 0;
+    for (const mv of visibles) {
+      if (mv.tipo === 'ingreso') ingresos += mv.monto; else egresos += mv.monto;
+    }
+    return { ingresos, egresos, saldo: ingresos - egresos };
+  }, [visibles]);
+
+  function alternar(clave) {
+    setAbiertos((prev) => {
+      const n = new Set(prev);
+      if (n.has(clave)) n.delete(clave); else n.add(clave);
+      return n;
+    });
+  }
+
   async function borrar(mv) {
     if (!confirm(`¿Eliminar el gasto "${mv.detalle}"?`)) return;
     try { await eliminarGasto(mv.gastoId); } catch (e) { alert(e.message); }
@@ -140,9 +216,6 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
       </div>
     );
   }
-
-  const totalIngresos = Object.values(totales).reduce((a, t) => a + t.ingresos, 0);
-  const totalEgresos = Object.values(totales).reduce((a, t) => a + t.egresos, 0);
 
   return (
     <div className="cp-libro">
@@ -171,80 +244,183 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
         })}
       </div>
 
-      {movimientos.length === 0 ? (
+      {/* Filtro por caja: reemplaza a la vieja matriz de una columna por
+          caja. Aquella dejaba 2 de cada 3 celdas vacias y obligaba a barrer
+          la fila para encontrar el numero. Ahora hay una sola columna de
+          monto y, si queres leer una caja sola, la filtras. */}
+      {columnas.length > 1 && (
+        <div className="cp-libro__filtros" role="group" aria-label="Filtrar por caja">
+          <button
+            type="button"
+            className={`cp-libro__chip ${filtroCaja === 'todas' ? 'cp-libro__chip--on' : ''}`}
+            onClick={() => setFiltroCaja('todas')}
+            aria-pressed={filtroCaja === 'todas'}
+          >
+            Todas
+          </button>
+          {columnas.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              className={`cp-libro__chip ${filtroCaja === c.id ? 'cp-libro__chip--on' : ''}`}
+              onClick={() => setFiltroCaja(c.id)}
+              aria-pressed={filtroCaja === c.id}
+              title={c.completo}
+            >
+              {c.nombre}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {visibles.length === 0 ? (
         <div className="cp-libro__vacio">
-          No hay movimientos en {MESES[mes.getMonth()]}. Los ingresos aparecen solos
-          cuando marcás sesiones como pagadas; los gastos se cargan con el botón de arriba.
+          {filtroCaja === 'todas'
+            ? `No hay movimientos en ${MESES[mes.getMonth()]}. Los ingresos aparecen solos
+               cuando marcás sesiones como pagadas; los gastos se cargan con el botón de arriba.`
+            : 'Esa caja no tuvo movimientos este mes.'}
         </div>
       ) : (
-        <div className="cp-table-wrap">
-          <table className="cp-table cp-libro__tabla">
-            <thead>
-              <tr>
-                <th className="cp-libro__th-fecha">Fecha</th>
-                {columnas.map((c) => (
-                  <th key={c.id} className="cp-num-col" title={c.completo}>{c.nombre}</th>
-                ))}
-                <th>Detalle</th>
-                <th aria-label="Acciones" />
-              </tr>
-            </thead>
-            <tbody>
-              {movimientos.map((mv) => (
-                <tr key={mv.id} className={mv.tipo === 'ingreso' ? 'cp-libro__row--in' : 'cp-libro__row--out'}>
-                  <td data-label="Fecha" className="cp-libro__td-fecha">{diaCorto(mv.fecha)}</td>
-                  {columnas.map((c) => (
-                    <td key={c.id} data-label={c.nombre} className="cp-num">
-                      {mv.cuenta === c.id
-                        ? (mv.tipo === 'ingreso'
-                          ? formatoARS.format(mv.monto)
-                          : `−${formatoARS.format(mv.monto)}`)
-                        : ''}
-                    </td>
-                  ))}
-                  <td data-label="Detalle" className="cp-libro__td-detalle">{mv.detalle}</td>
-                  <td>
-                    {mv.origen === 'gasto' && (
-                      <button type="button" className="cp-libro__del" onClick={() => borrar(mv)}
-                        title="Eliminar gasto" aria-label="Eliminar gasto">×</button>
-                    )}
-                  </td>
-
-                  <td className="cp-td-mobile-main">
-                    <div className="cp-libro__m-top">
-                      <span className="cp-libro__m-fecha">{diaCorto(mv.fecha)}</span>
-                      <span className="cp-libro__m-detalle">{mv.detalle}</span>
-                    </div>
-                    <div className="cp-libro__m-bot">
-                      {columnas.find((c) => c.id === mv.cuenta)?.nombre ?? 'Sin asignar'}
-                    </div>
-                  </td>
-                  <td className="cp-td-mobile-badge">
-                    <span className={mv.tipo === 'ingreso' ? 'cp-libro__in' : 'cp-libro__out'}>
-                      {mv.tipo === 'ingreso' ? '' : '−'}{formatoARS.format(mv.monto)}
-                    </span>
-                  </td>
-                  <td className="cp-td-mobile-actions" />
+        <>
+          <div className="cp-table-wrap">
+            <table className="cp-table cp-libro__tabla">
+              <thead>
+                <tr>
+                  <th className="cp-libro__th-fecha">Fecha</th>
+                  <th>Concepto</th>
+                  <th>Caja</th>
+                  <th className="cp-num-col">Monto</th>
+                  <th aria-label="Acciones" />
                 </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="cp-libro__totales">
-                <td>Total</td>
-                {columnas.map((c) => (
-                  <td key={c.id} className="cp-num">
-                    {formatoARS.format((totales[c.id] || {}).saldo || 0)}
-                  </td>
-                ))}
-                <td colSpan={2}>
-                  <span className="cp-libro__in">+{formatoARS.format(totalIngresos)}</span>
-                  {' · '}
-                  <span className="cp-libro__out">−{formatoARS.format(totalEgresos)}</span>
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {filas.map((f) => {
+                  if (f.tipo === 'grupo') {
+                    const abierto = abiertos.has(f.clave);
+                    const caja = columnas.find((c) => c.id === f.cuenta)?.nombre ?? 'Sin asignar';
+                    return [
+                      <tr key={f.clave} className="cp-libro__fila cp-libro__fila--grupo">
+                        <td data-label="Fecha" className="cp-libro__td-fecha">{diaCorto(f.fecha)}</td>
+                        <td data-label="Concepto">
+                          <button
+                            type="button"
+                            className="cp-libro__toggle"
+                            onClick={() => alternar(f.clave)}
+                            aria-expanded={abierto}
+                          >
+                            <span className={`cp-libro__chevron ${abierto ? 'cp-libro__chevron--on' : ''}`} aria-hidden="true">›</span>
+                            {f.items.length} cobros · {f.sesiones} {f.sesiones === 1 ? 'sesión' : 'sesiones'}
+                          </button>
+                        </td>
+                        <td data-label="Caja" className="cp-libro__td-caja">{caja}</td>
+                        <td data-label="Monto" className="cp-num cp-libro__in">+{formatoARS.format(f.monto)}</td>
+                        <td />
+                        <td className="cp-td-mobile-main" onClick={() => alternar(f.clave)}>
+                          <div className="cp-libro__m-top">
+                            <span className="cp-libro__m-fecha">{diaCorto(f.fecha)}</span>
+                            <span className="cp-libro__m-detalle">
+                              {f.items.length} cobros · {f.sesiones} {f.sesiones === 1 ? 'sesión' : 'sesiones'}
+                            </span>
+                          </div>
+                          <div className="cp-libro__m-bot">{caja}</div>
+                        </td>
+                        <td className="cp-td-mobile-badge">
+                          <span className="cp-libro__in">+{formatoARS.format(f.monto)}</span>
+                        </td>
+                        <td className="cp-td-mobile-actions" />
+                      </tr>,
+                      ...(abierto ? f.items.map((mv) => (
+                        <tr key={mv.id} className="cp-libro__fila cp-libro__fila--hija">
+                          <td className="cp-libro__td-fecha" />
+                          <td data-label="Concepto" className="cp-libro__td-detalle">
+                            <span className="cp-libro__guion" aria-hidden="true">↳</span>
+                            {mv.detalle}
+                            {mv.cantidad > 1 && (
+                              <span className="cp-libro__cant"> · {mv.cantidad} sesiones</span>
+                            )}
+                          </td>
+                          <td />
+                          <td data-label="Monto" className="cp-num cp-libro__in">+{formatoARS.format(mv.monto)}</td>
+                          <td />
+                          <td className="cp-td-mobile-main">
+                            <div className="cp-libro__m-top">
+                              <span className="cp-libro__m-detalle">↳ {mv.detalle}</span>
+                            </div>
+                          </td>
+                          <td className="cp-td-mobile-badge">
+                            <span className="cp-libro__in">+{formatoARS.format(mv.monto)}</span>
+                          </td>
+                          <td className="cp-td-mobile-actions" />
+                        </tr>
+                      )) : []),
+                    ];
+                  }
+
+                  const mv = f.mv;
+                  const esIngreso = mv.tipo === 'ingreso';
+                  const caja = columnas.find((c) => c.id === mv.cuenta)?.nombre ?? 'Sin asignar';
+                  const signo = esIngreso ? '+' : '−';
+                  return (
+                    <tr key={mv.id} className="cp-libro__fila">
+                      <td data-label="Fecha" className="cp-libro__td-fecha">{diaCorto(mv.fecha)}</td>
+                      <td data-label="Concepto">
+                        {mv.detalle}
+                        {mv.origen === 'sesion' && mv.cantidad > 1 && (
+                          <span className="cp-libro__cant"> · {mv.cantidad} sesiones</span>
+                        )}
+                        {mv.origen === 'gasto' && <span className="cp-libro__tag">gasto</span>}
+                        {mv.origen === 'mp' && <span className="cp-libro__tag">Mercado Pago</span>}
+                      </td>
+                      <td data-label="Caja" className="cp-libro__td-caja">{caja}</td>
+                      <td data-label="Monto" className={`cp-num ${esIngreso ? 'cp-libro__in' : 'cp-libro__out'}`}>
+                        {signo}{formatoARS.format(mv.monto)}
+                      </td>
+                      <td>
+                        {mv.origen === 'gasto' && (
+                          <button type="button" className="cp-libro__del" onClick={() => borrar(mv)}
+                            title="Eliminar gasto" aria-label="Eliminar gasto">×</button>
+                        )}
+                      </td>
+
+                      <td className="cp-td-mobile-main">
+                        <div className="cp-libro__m-top">
+                          <span className="cp-libro__m-fecha">{diaCorto(mv.fecha)}</span>
+                          <span className="cp-libro__m-detalle">{mv.detalle}</span>
+                        </div>
+                        <div className="cp-libro__m-bot">{caja}</div>
+                      </td>
+                      <td className="cp-td-mobile-badge">
+                        <span className={esIngreso ? 'cp-libro__in' : 'cp-libro__out'}>
+                          {signo}{formatoARS.format(mv.monto)}
+                        </span>
+                      </td>
+                      <td className="cp-td-mobile-actions" />
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Cierre del mes. Antes esto vivia en un tfoot con colSpan y los
+              numeros terminaban pegados al ultimo total de columna. */}
+          <div className="cp-libro__cierre">
+            <div className="cp-libro__cierre-item">
+              <span className="cp-libro__cierre-label">Ingresos</span>
+              <span className="cp-libro__cierre-valor cp-libro__in">+{formatoARS.format(totalesVisibles.ingresos)}</span>
+            </div>
+            <div className="cp-libro__cierre-item">
+              <span className="cp-libro__cierre-label">Egresos</span>
+              <span className="cp-libro__cierre-valor cp-libro__out">−{formatoARS.format(totalesVisibles.egresos)}</span>
+            </div>
+            <div className="cp-libro__cierre-item cp-libro__cierre-item--saldo">
+              <span className="cp-libro__cierre-label">Saldo</span>
+              <span className={`cp-libro__cierre-valor ${totalesVisibles.saldo < 0 ? 'cp-libro__out' : ''}`}>
+                {formatoARS.format(totalesVisibles.saldo)}
+              </span>
+            </div>
+          </div>
+        </>
       )}
 
       {nuevoAbierto && (

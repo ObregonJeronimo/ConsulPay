@@ -76,13 +76,149 @@
   font-size: 13px;
 }
 
-/* Fondo tenue por tipo de movimiento: es la lectura de un vistazo que
-   tenia la planilla original — verde entra, rojo sale. Tenue a proposito,
-   el color fuerte queda para el numero. */
-.cp-libro__row--in td { background: var(--cp-success-bg); }
-.cp-libro__row--out td { background: var(--cp-danger-bg); }
-.cp-libro__row--in .cp-num { color: var(--cp-success); }
-.cp-libro__row--out .cp-num { color: var(--cp-danger); }
+/* El fondo verde/rojo por fila se saco a proposito: en un mes normal casi
+   todo es ingreso, la tabla quedaba entera verde y el color dejaba de
+   distinguir nada. El signo y el color del numero alcanzan, y ahora el
+   unico fondo que aparece es el de la fila de gasto, que si es la
+   excepcion que conviene que salte. */
+.cp-libro__fila td { background: var(--cp-surface); }
+.cp-libro__fila:hover td { background: var(--cp-surface-sunken); }
+
+.cp-libro__td-caja {
+  font-size: 12.5px;
+  color: var(--cp-text-muted);
+  white-space: nowrap;
+}
+
+/* ---- Filtro por caja ---- */
+.cp-libro__filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.cp-libro__chip {
+  border: 1px solid var(--cp-border);
+  background: var(--cp-surface);
+  color: var(--cp-text-muted);
+  font-family: inherit;
+  font-size: 12.5px;
+  padding: 6px 13px;
+  border-radius: var(--cp-radius-pill);
+  cursor: pointer;
+  transition: color var(--cp-dur-fast) var(--cp-ease),
+              border-color var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-libro__chip:hover { color: var(--cp-text); }
+
+.cp-libro__chip--on {
+  color: var(--cp-text-on-accent);
+  background: var(--cp-accent);
+  border-color: var(--cp-accent);
+}
+
+.cp-libro__chip:focus-visible {
+  outline: none;
+  box-shadow: var(--cp-shadow-focus);
+}
+
+/* ---- Fila agrupada ---- */
+.cp-libro__toggle {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--cp-text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  text-align: left;
+}
+
+.cp-libro__toggle:focus-visible {
+  outline: none;
+  box-shadow: var(--cp-shadow-focus);
+  border-radius: var(--cp-radius-sm);
+}
+
+.cp-libro__chevron {
+  display: inline-block;
+  color: var(--cp-text-faint);
+  font-size: 15px;
+  line-height: 1;
+  transition: transform var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-libro__chevron--on { transform: rotate(90deg); }
+
+.cp-libro__fila--hija td {
+  background: var(--cp-surface-sunken);
+  font-size: 13px;
+}
+
+.cp-libro__guion {
+  color: var(--cp-text-faint);
+  margin-right: 6px;
+}
+
+.cp-libro__cant,
+.cp-libro__tag {
+  color: var(--cp-text-faint);
+  font-size: 12px;
+}
+
+.cp-libro__tag {
+  margin-left: 8px;
+  padding: 1px 7px;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-pill);
+}
+
+/* ---- Cierre del mes ---- */
+.cp-libro__cierre {
+  display: flex;
+  justify-content: flex-end;
+  gap: 28px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding: 14px 18px;
+  background: var(--cp-surface-sunken);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-lg);
+}
+
+.cp-libro__cierre-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-end;
+}
+
+.cp-libro__cierre-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--cp-text-muted);
+}
+
+.cp-libro__cierre-valor {
+  font-family: var(--cp-font-mono);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cp-libro__cierre-item--saldo .cp-libro__cierre-valor {
+  font-size: 19px;
+  color: var(--cp-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cp-libro__chevron,
+  .cp-libro__chip { transition: none; }
+}
 
 .cp-libro__del {
   border: none;
@@ -96,13 +232,6 @@
 }
 
 .cp-libro__del:hover { color: var(--cp-danger); background: var(--cp-danger-bg); }
-
-.cp-libro__totales td {
-  background: var(--cp-surface-sunken);
-  font-family: var(--cp-font-mono);
-  font-weight: 500;
-  border-top: 2px solid var(--cp-border-strong);
-}
 
 .cp-libro__vacio {
   padding: 40px 24px;
@@ -180,5 +309,6 @@
 
 @media (max-width: 560px) {
   .cp-libro__row { grid-template-columns: 1fr; }
+  .cp-libro__cierre { justify-content: space-between; gap: 14px; }
   .cp-libro__resumen { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
 }
