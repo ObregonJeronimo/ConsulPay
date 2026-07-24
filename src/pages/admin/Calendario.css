@@ -137,7 +137,11 @@
 
 .cp-cal__dow {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  /* minmax(0, 1fr) y no 1fr: 1fr equivale a minmax(auto, 1fr), asi que
+     un turno con nombre largo empuja su columna y aprieta las demas.
+     Con minimo 0 las 7 columnas quedan siempre iguales y el texto se
+     recorta adentro de la celda. */
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   background: var(--cp-bg);
   border-bottom: 1px solid var(--cp-border);
 }
@@ -153,7 +157,11 @@
 
 .cp-cal__days {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  /* minmax(0, 1fr) y no 1fr: 1fr equivale a minmax(auto, 1fr), asi que
+     un turno con nombre largo empuja su columna y aprieta las demas.
+     Con minimo 0 las 7 columnas quedan siempre iguales y el texto se
+     recorta adentro de la celda. */
+  grid-template-columns: repeat(7, minmax(0, 1fr));
 }
 
 .cp-cal__cell {
@@ -217,6 +225,7 @@
   align-items: center;
   gap: 5px;
   width: 100%;
+  min-width: 0;   /* sin esto el contenido flex no se deja achicar */
   padding: 3px 6px;
   border: none;
   border-left: 2.5px solid var(--pf);
@@ -264,6 +273,8 @@
 }
 
 .cp-cal__cita-n {
+  min-width: 0;
+  flex: 1 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -290,6 +301,12 @@
 .cp-cal__modal {
   max-width: 560px;
   padding: 30px 32px 26px;
+
+  /* .cp-modal delega el scroll a .cp-modal__form, y este modal no usa esa
+     clase: al desplegar el panel de turno fijo el contenido se salia y no
+     habia forma de llegar al boton de guardar. Scrollea el modal entero. */
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
 .cp-cal__modal .cp-modal__title { margin-bottom: 6px; }
@@ -697,4 +714,137 @@
   .cp-cal__mes { font-size: 17px; min-width: 140px; }
   .cp-cal__modal { padding: 24px 20px 20px; }
   .cp-agenda__day { grid-template-columns: 62px 1fr; padding: 12px 14px; }
+}
+
+/* ============================================================
+   Turnos de hoy
+   ============================================================ */
+.cp-hoy {
+  margin-top: 26px;
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-lg);
+  overflow: hidden;
+}
+
+.cp-hoy__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--cp-border);
+}
+
+.cp-hoy__title {
+  font-family: var(--cp-font-serif);
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.cp-hoy__sub {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--cp-text-muted);
+  text-transform: capitalize;
+}
+
+.cp-hoy__contador {
+  font-size: 12.5px;
+  color: var(--cp-text-muted);
+  background: var(--cp-surface-sunken);
+  padding: 4px 11px;
+  border-radius: var(--cp-radius-pill);
+}
+
+.cp-hoy__vacio {
+  padding: 30px 18px;
+  text-align: center;
+  color: var(--cp-text-muted);
+  font-size: 13.5px;
+}
+
+.cp-hoy__lista { list-style: none; margin: 0; padding: 0; }
+
+.cp-hoy__item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 12px 18px;
+  border: none;
+  border-left: 3px solid var(--pf, var(--cp-border-strong));
+  background: none;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-hoy__lista li + li .cp-hoy__item { border-top: 1px solid var(--cp-border); }
+.cp-hoy__item:hover { background: var(--cp-surface-hover); }
+
+.cp-hoy__item.cp-cal__cita--cancelada,
+.cp-hoy__item.cp-cal__cita--ausente { opacity: 0.55; }
+
+.cp-hoy__item.cp-cal__cita--cancelada .cp-hoy__pac,
+.cp-hoy__item.cp-cal__cita--ausente .cp-hoy__pac { text-decoration: line-through; }
+
+.cp-hoy__hora {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  flex-shrink: 0;
+  width: 58px;
+  font-family: var(--cp-font-mono);
+}
+
+.cp-hoy__hora strong {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--pf, var(--cp-text));
+}
+
+.cp-hoy__hora-fin { font-size: 11px; color: var(--cp-text-faint); }
+
+.cp-hoy__datos { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+
+.cp-hoy__pac {
+  font-size: 14.5px;
+  color: var(--cp-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cp-hoy__meta {
+  font-size: 12px;
+  color: var(--cp-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cp-hoy__estado {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  padding: 3px 10px;
+  border-radius: var(--cp-radius-pill);
+  background: var(--cp-surface-sunken);
+  color: var(--cp-text-muted);
+}
+
+.cp-hoy__estado--asistio { background: var(--cp-success-bg); color: var(--cp-success); }
+.cp-hoy__estado--ausente { background: var(--cp-warning-bg); color: var(--cp-warning); }
+.cp-hoy__estado--cancelada { background: var(--cp-danger-bg); color: var(--cp-danger); }
+.cp-hoy__estado--agendada { display: none; }
+
+@media (max-width: 560px) {
+  .cp-hoy__item { gap: 10px; padding: 11px 14px; }
+  .cp-hoy__hora { width: 48px; }
+  .cp-hoy__estado { display: none; }
+  .cp-hoy__estado--asistio, .cp-hoy__estado--ausente, .cp-hoy__estado--cancelada { display: inline; }
 }

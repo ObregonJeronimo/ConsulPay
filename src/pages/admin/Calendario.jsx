@@ -297,6 +297,13 @@ export default function Calendario() {
         <p className="cp-cal__hint" style={{ marginTop: 12 }}>Cargando turnos…</p>
       )}
 
+      <TurnosDeHoy
+        citas={citas}
+        hoyKey={hoyKey}
+        mapaProf={mapaProf}
+        onAbrir={(c) => setModal({ cita: c })}
+      />
+
       {modal && (
         <CitaModal
           consultorioId={consultorioId}
@@ -310,6 +317,91 @@ export default function Calendario() {
       )}
     </div>
   );
+}
+
+/* ============================================================
+   Turnos de hoy
+   ----------------------------------------------------------------
+   La grilla del mes sirve para planificar; para trabajar hace falta
+   saber que hay HOY, en orden y con los datos completos. Se muestra
+   siempre, aunque estes mirando otro mes: es la pregunta que la
+   recepcion se hace todo el tiempo.
+   ============================================================ */
+function TurnosDeHoy({ citas, hoyKey, mapaProf, onAbrir }) {
+  const delDia = useMemo(
+    () => citas
+      .filter((c) => c.fecha === hoyKey)
+      .sort((a, b) => a.hora.localeCompare(b.hora)),
+    [citas, hoyKey],
+  );
+
+  const fecha = desdeKey(hoyKey);
+  const activos = delDia.filter((c) => c.estado !== ESTADOS_CITA.CANCELADA);
+  const pendientes = activos.filter((c) => c.estado === ESTADOS_CITA.AGENDADA).length;
+
+  return (
+    <section className="cp-hoy">
+      <header className="cp-hoy__head">
+        <div>
+          <h2 className="cp-hoy__title">Turnos de hoy</h2>
+          <p className="cp-hoy__sub">
+            {DOW[(fecha.getDay() === 0 ? 7 : fecha.getDay()) - 1]}{' '}
+            {fecha.getDate()} de {MESES[fecha.getMonth()]}
+          </p>
+        </div>
+        {delDia.length > 0 && (
+          <span className="cp-hoy__contador">
+            {activos.length} turno{activos.length === 1 ? '' : 's'}
+            {pendientes !== activos.length && ` · ${pendientes} sin marcar`}
+          </span>
+        )}
+      </header>
+
+      {delDia.length === 0 ? (
+        <div className="cp-hoy__vacio">No hay turnos agendados para hoy.</div>
+      ) : (
+        <ul className="cp-hoy__lista">
+          {delDia.map((c) => {
+            const info = mapaProf[c.profesionalUid];
+            const fin = sumarMinutos(c.hora, c.duracionMin);
+            return (
+              <li key={c.id}>
+                <button
+                  type="button"
+                  className={`cp-hoy__item ${info?.clase ?? ''} ${claseEstado(c.estado)}`}
+                  onClick={() => onAbrir(c)}
+                >
+                  <span className="cp-hoy__hora">
+                    <strong>{c.hora}</strong>
+                    <span className="cp-hoy__hora-fin">{fin}</span>
+                  </span>
+                  <span className="cp-hoy__datos">
+                    <span className="cp-hoy__pac">{c.pacienteNombre}</span>
+                    <span className="cp-hoy__meta">
+                      {nombreProfesional(info?.prof)}
+                      {' · '}{c.duracionMin} min
+                      {c.serieId && ' · turno fijo'}
+                      {c.notas && ` · ${c.notas}`}
+                    </span>
+                  </span>
+                  <span className={`cp-hoy__estado cp-hoy__estado--${c.estado}`}>
+                    {LABEL_ESTADO[c.estado] ?? ''}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/** Hora de fin de un turno, para mostrar la franja completa. */
+function sumarMinutos(hora, minutos) {
+  const [h, m] = String(hora || '00:00').split(':').map(Number);
+  const total = (h * 60 + m + (Number(minutos) || 0)) % (24 * 60);
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
 }
 
 /* ============================================================
