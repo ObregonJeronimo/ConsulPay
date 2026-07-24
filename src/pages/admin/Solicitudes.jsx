@@ -360,6 +360,30 @@ function fechaSesionDeSolicitud(s) {
   const d = new Date(f);
   return isNaN(d.getTime()) ? null : d;
 }
+/* Lo que declaro el profesional al pedir el pago. Son sugerencias: el admin
+   las ve precargadas y confirma o corrige. Sin esto el admin arrancaba
+   siempre en admins[0] y la fecha de hoy, o sea que el dato declarado se
+   guardaba pero nunca se usaba. */
+function receptorDeclarado(sol) {
+  const r = sol?.payloadPropuesto?.receptor;
+  return r?.uid ? r : null;
+}
+
+function fechaPagoDeclarada(sol) {
+  const f = sol?.payloadPropuesto?.fechaPago;
+  if (!f) return null;
+  if (f.toDate) return f.toDate();
+  if (f.seconds !== undefined) return new Date(f.seconds * 1000);
+  const d = new Date(f);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function aInputFecha(d) {
+  if (!(d instanceof Date) || isNaN(d.getTime())) return null;
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
 function montoConsultorioDeSolicitud(s) {
   const snap = s.payloadPropuesto?.sesionSnapshot;
   if (!snap) return 0;
@@ -821,8 +845,25 @@ function GrupoSolicitudes({ grupo, onSeleccionar, admins, adminUid, adminNombre 
    ============================================================ */
 function AprobarGrupoModal({ grupo, pendientes, esMarcarPagada, admins, adminUid, adminNombre, onClose }) {
   const overlayProps = useOverlayClose(onClose);
-  const [receptorUid, setReceptorUid] = useState(admins?.[0]?.uid ?? adminUid);
+  // Precarga con lo que declaro el profesional: si varias solicitudes del
+  // grupo lo traen, se usa la primera (vienen del mismo envio).
+  const declarado = useMemo(() => {
+    const conReceptor = pendientes.find((s) => receptorDeclarado(s));
+    const conFecha = pendientes.find((s) => fechaPagoDeclarada(s));
+    return {
+      receptor: conReceptor ? receptorDeclarado(conReceptor) : null,
+      fecha: conFecha ? fechaPagoDeclarada(conFecha) : null,
+    };
+  }, [pendientes]);
+
+  const [receptorUid, setReceptorUid] = useState(
+    () => (declarado.receptor && admins?.some((a) => a.uid === declarado.receptor.uid)
+      ? declarado.receptor.uid
+      : (admins?.[0]?.uid ?? adminUid)),
+  );
   const [fechaPagoInput, setFechaPagoInput] = useState(() => {
+    const dec = aInputFecha(declarado.fecha);
+    if (dec) return dec;
     const d = new Date();
     const p = (n) => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
@@ -908,7 +949,9 @@ function AprobarGrupoModal({ grupo, pendientes, esMarcarPagada, admins, adminUid
             <div className="cp-receptor-selector">
               <label className="cp-receptor-selector__label">¿Quién recibió el dinero?</label>
               <p className="cp-receptor-selector__hint">
-                Se asigna a esta persona en todas las sesiones del grupo.
+                {declarado.receptor
+                  ? `${grupo?.profesionalNombre || 'El profesional'} declaró que le pagó a ${declarado.receptor.nombre}. Confirmalo o corregilo.`
+                  : 'Se asigna a esta persona en todas las sesiones del grupo.'}
               </p>
               <div className="cp-receptor-selector__opciones">
                 {admins.map((a) => (
@@ -1153,12 +1196,21 @@ function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, mapaMetodos
   const [mostrandoMotivo, setMostrandoMotivo] = useState(false);
   const [motivo, setMotivo] = useState('');
 
+  // Precarga con lo declarado por el profesional (ver receptorDeclarado).
+  const declaradoReceptor = receptorDeclarado(solicitud);
+  const declaradaFecha = fechaPagoDeclarada(solicitud);
+
   const [receptorUid, setReceptorUid] = useState(() => {
+    if (declaradoReceptor && admins?.some((a) => a.uid === declaradoReceptor.uid)) {
+      return declaradoReceptor.uid;
+    }
     if (admins && admins.length > 0) return admins[0].uid;
     return adminUid;
   });
 
   const [fechaPagoInput, setFechaPagoInput] = useState(() => {
+    const dec = aInputFecha(declaradaFecha);
+    if (dec) return dec;
     const d = new Date();
     const pad = (n) => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -1166,7 +1218,9 @@ function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, mapaMetodos
 
   useEffect(() => {
     if (admins && admins.length > 0 && !admins.find((a) => a.uid === receptorUid)) {
-      setReceptorUid(admins[0].uid);
+      // Si el declarado sigue siendo admin, se respeta; si no, primero de la lista.
+      const valido = declaradoReceptor && admins.find((a) => a.uid === declaradoReceptor.uid);
+      setReceptorUid(valido ? declaradoReceptor.uid : admins[0].uid);
     }
   }, [admins]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1284,8 +1338,9 @@ function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, mapaMetodos
               ¿Quién recibió el dinero?
             </label>
             <p className="cp-receptor-selector__hint">
-              Elegí cuál de los administradores cobró este pago. Al aprobar la solicitud,
-              el dinero se asigna a esa persona.
+              {declaradoReceptor
+                ? `${solicitud.profesionalNombre || 'El profesional'} declaró que le pagó a ${declaradoReceptor.nombre}. Confirmalo o corregilo antes de aprobar.`
+                : 'Elegí cuál de los administradores cobró este pago. Al aprobar la solicitud, el dinero se asigna a esa persona.'}
             </p>
             {admins && admins.length > 0 ? (
               <div className="cp-receptor-selector__opciones">
