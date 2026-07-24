@@ -154,6 +154,9 @@ export default function MisSesiones() {
   const [editando, setEditando] = useState(null); // null | 'nueva' | sesion
   const [liquidando, setLiquidando] = useState(null);
   const [cargaRapidaOpen, setCargaRapidaOpen] = useState(false);
+  // 'fecha' es el orden natural del registro; 'paciente' sirve para cotejar
+  // contra una lista de nombres, que es como llegan las obras sociales.
+  const [orden, setOrden] = useState('fecha');
 
   // Si no tiene confianza, mostramos un banner aclaratorio y las acciones
   // crean solicitudes en lugar de tocar /sesiones/ directamente.
@@ -206,6 +209,15 @@ export default function MisSesiones() {
 
   // Set de sesionId con solicitudes pendientes (para deshabilitar editar/eliminar
   // en esas filas mientras la solicitud se resuelve)
+  const sesionesOrdenadas = useMemo(() => {
+    if (orden !== 'paciente') return sesiones;
+    return [...sesiones].sort((a, b) => {
+      const na = mapaPacientes[a.pacienteId] ? nombrePaciente(mapaPacientes[a.pacienteId]) : (a.pacienteNombre || '');
+      const nb = mapaPacientes[b.pacienteId] ? nombrePaciente(mapaPacientes[b.pacienteId]) : (b.pacienteNombre || '');
+      return na.localeCompare(nb, 'es', { sensitivity: 'base' });
+    });
+  }, [sesiones, orden, mapaPacientes]);
+
   const sesionesConPendiente = useMemo(() => {
     const set = new Set();
     for (const s of solicitudes) {
@@ -441,6 +453,16 @@ export default function MisSesiones() {
             acomoda a la par del titulo en vez de apilarlas a la derecha. */}
         <div className="cp-sesiones-header__acciones">
           <div style={{ display: 'flex', gap: 10, alignItems: 'stretch' }}>
+          <select
+            className="cp-sesiones-filtros__select"
+            value={orden}
+            onChange={(e) => setOrden(e.target.value)}
+            aria-label="Ordenar sesiones"
+            style={{ flex: 1 }}
+          >
+            <option value="fecha">Por fecha</option>
+            <option value="paciente">Por paciente (A-Z)</option>
+          </select>
           <Button variant="secondary" onClick={() => setCargaRapidaOpen(true)} disabled={!hayPrereqs} style={{ flex: 1 }}>
             Carga rápida
           </Button>
@@ -551,7 +573,7 @@ export default function MisSesiones() {
             </div>
           ) : (
             <TablaMisSesiones
-              sesiones={sesiones}
+              sesiones={sesionesOrdenadas}
               mapaPacientes={mapaPacientes}
               sesionesConPendiente={sesionesConPendiente}
               puedeMarcarPagadas={puedeMarcarPagadas}

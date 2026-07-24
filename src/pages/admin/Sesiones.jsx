@@ -102,6 +102,12 @@ const LockIcon = () => (
 /* ============================================================
    Helpers
    ============================================================ */
+/* Nombre para ordenar alfabeticamente. Si el paciente ya no existe, se usa
+   el id para que el orden siga siendo estable en vez de saltar. */
+function nombreDePaciente(pac, fallback = '') {
+  return pac ? nombrePaciente(pac) : String(fallback);
+}
+
 function nombrePaciente(p) {
   return `${p.apellido ?? ''}${p.apellido && p.nombre ? ', ' : ''}${p.nombre ?? ''}`;
 }
@@ -153,6 +159,9 @@ export default function Sesiones() {
   const [filtroProfesional, setFiltroProfesional] = useState('todos');
   const [filtroMetodo, setFiltroMetodo] = useState('todos');
   const [filtroEstado, setFiltroEstado] = useState('todos');
+  // 'fecha' es el orden natural del registro; 'paciente' sirve para cotejar
+  // contra una lista de nombres, que es como llegan las obras sociales.
+  const [orden, setOrden] = useState('fecha');
 
   const [editando, setEditando] = useState(null);
   const [liquidando, setLiquidando] = useState(null);
@@ -266,8 +275,13 @@ export default function Sesiones() {
       });
     }
 
+    if (orden === 'paciente') {
+      list = [...list].sort((a, b) => nombreDePaciente(mapaPacientes[a.pacienteId], a.pacienteId)
+        .localeCompare(nombreDePaciente(mapaPacientes[b.pacienteId], b.pacienteId), 'es', { sensitivity: 'base' }));
+    }
+
     return list;
-  }, [sesiones, busqueda, filtroProfesional, filtroMetodo, filtroEstado, mapaPacientes, mapaProfesionales]);
+  }, [sesiones, busqueda, filtroProfesional, filtroMetodo, filtroEstado, orden, mapaPacientes, mapaProfesionales]);
 
   const stats = useMemo(() => totalesGlobales(sesionesFiltradas), [sesionesFiltradas]);
   const cobrado = stats.totalConsultorio - stats.debido;
@@ -497,6 +511,15 @@ export default function Sesiones() {
               <option value={ESTADOS_PAGO_SESION.PENDIENTE_MONTO}>A liquidar</option>
               <option value={ESTADOS_PAGO_SESION.DEBIDO}>Deben</option>
               <option value={ESTADOS_PAGO_SESION.PAGADO}>Pagadas</option>
+            </select>
+            <select
+              className="cp-sesiones-filtros__select"
+              value={orden}
+              onChange={(e) => setOrden(e.target.value)}
+              aria-label="Ordenar sesiones"
+            >
+              <option value="fecha">Por fecha</option>
+              <option value="paciente">Por paciente (A-Z)</option>
             </select>
           </div>
 
@@ -1597,7 +1620,11 @@ export function PagarMesModal({ consultorioId, profesionales, mapaPacientes, adm
       const pagadas = ss.filter((s) => s.estadoPago === ESTADOS_PAGO_SESION.PAGADO);
       const totalDebe = debidas.reduce((acc, s) => acc + (s.montoConsultorio || 0), 0);
       return { pacienteId, pac, debidas, aLiquidar, pagadas, totalDebe };
-    }).filter((r) => r.debidas.length > 0 || r.aLiquidar.length > 0);
+    }).filter((r) => r.debidas.length > 0 || r.aLiquidar.length > 0)
+    // Alfabetico: la lista salia en el orden en que Firestore devolvio las
+    // sesiones, o sea sin orden util para buscar un paciente.
+      .sort((a, b) => nombreDePaciente(a.pac, a.pacienteId)
+        .localeCompare(nombreDePaciente(b.pac, b.pacienteId), 'es', { sensitivity: 'base' }));
   }, [sesiones, mapaPacientes]);
 
   const sesionesPagables = useMemo(
@@ -1911,6 +1938,14 @@ export function LiquidarMasivoModal({ consultorioId, profesionales, mapaPaciente
     setDone({ ok, errores });
   }
 
+  /* Alfabetico por paciente: la lista venia en el orden crudo de Firestore y
+     con 16 pacientes no habia forma de encontrar uno. Se ordena en el render
+     y no en el efecto para no atar la suscripcion al mapa de pacientes. */
+  const sesionesOrdenadas = useMemo(() => [...sesiones].sort(
+    (a, b) => nombreDePaciente(mapaPacientes[a.pacienteId], a.pacienteId)
+      .localeCompare(nombreDePaciente(mapaPacientes[b.pacienteId], b.pacienteId), 'es', { sensitivity: 'base' }),
+  ), [sesiones, mapaPacientes]);
+
   const hayMontosCompletos = sesiones.some((s) => Number(montos[s.id]) > 0);
 
   return (
@@ -1970,7 +2005,7 @@ export function LiquidarMasivoModal({ consultorioId, profesionales, mapaPaciente
               </p>
             ) : (
               <div className="cp-liquidar-masivo__lista">
-                {sesiones.map((s) => {
+                {sesionesOrdenadas.map((s) => {
                   const pac = mapaPacientes[s.pacienteId];
                   const nombre = pac ? `${pac.apellido || ''} ${pac.nombre || ''}`.trim() : (s.pacienteNombre || '—');
                   return (
