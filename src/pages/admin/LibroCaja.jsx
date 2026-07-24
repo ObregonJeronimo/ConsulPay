@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import Button from '../../components/ui/Button.jsx';
+import DualScrollTable from '../../components/ui/DualScrollTable.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
 import { useOverlayClose } from '../../hooks/useOverlayClose.js';
 import { formatoARS } from '../../lib/constants.js';
@@ -282,7 +283,7 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
         </div>
       ) : (
         <>
-          <div className="cp-table-wrap">
+          <DualScrollTable className="cp-compact-list">
             <table className="cp-table cp-libro__tabla">
               <thead>
                 <tr>
@@ -400,7 +401,7 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
                 })}
               </tbody>
             </table>
-          </div>
+          </DualScrollTable>
 
           {/* Cierre del mes. Antes esto vivia en un tfoot con colSpan y los
               numeros terminaban pegados al ultimo total de columna. */}

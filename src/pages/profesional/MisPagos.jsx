@@ -9,6 +9,7 @@ import Spinner from '../../components/ui/Spinner.jsx';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useConsultorio } from '../../hooks/useConsultorio.js';
 import { ESTADOS_PAGO_SESION, ESTADOS_SOLICITUD_SESION, TIPOS_SOLICITUD_SESION, formatoARS } from '../../lib/constants.js';
+import { mpHabilitado } from '../../lib/mpIntegracion.js';
 import { suscribirPacientesProfesional } from '../../lib/pacientes.js';
 import {
   iniciarPagoAlConsultorio,
@@ -168,7 +169,11 @@ export default function MisPagos() {
   }, [solicitudes, mes]);
 
   const puedeMarcarPagadas = !!user?.permitirMarcarPagadas;
-  const mpDeshabilitado = !consultorio?.mpIntegrado;
+  /* MP solo existe para el profesional si el consultorio lo tiene operativo,
+     es decir si TODOS los admins vincularon su cuenta (ver mpHabilitado).
+     Antes se mostraba el recuadro grisado con un cartel de "deshabilitado":
+     ofrecia una via de pago que el consultorio no va a usar nunca. */
+  const mpActivo = mpHabilitado(consultorio);
 
   /* ---- Handlers ---- */
 
@@ -207,8 +212,8 @@ export default function MisPagos() {
         : 'No tenés sesiones debidas para pagar.');
       return;
     }
-    if (!consultorio?.mpIntegrado) {
-      setError('El método de pago está deshabilitado. Contactá al dueño del consultorio.');
+    if (!mpActivo) {
+      setError('Los pagos online no están habilitados en este consultorio.');
       return;
     }
     setIniciando(true);
@@ -297,13 +302,12 @@ export default function MisPagos() {
         <button className="cp-mes-selector__btn" onClick={() => setMes((m) => { const d = new Date(m); d.setMonth(d.getMonth() + 1); return inicioDeMes(d); })} disabled={inicioDeMes(new Date()).getTime() === mes.getTime()}>›</button>
       </div>
 
-      {/* Recuadro 1: Mercado Pago */}
-      <section className={`cp-pagos-recuadro ${mpDeshabilitado ? 'cp-pagos-recuadro--disabled' : ''}`}>
+      {/* Recuadro 1: Mercado Pago. Si el consultorio no tiene MP operativo,
+          la seccion no se renderiza: no hay nada que ofrecer. */}
+      {mpActivo && (
+      <section className="cp-pagos-recuadro">
         <div className="cp-pagos-recuadro__header">
           <span className="cp-pagos-recuadro__titulo">Pagos con Mercado Pago</span>
-          {mpDeshabilitado && (
-            <span className="cp-pagos-recuadro__badge-off">Pagos online deshabilitados</span>
-          )}
         </div>
         <div className="cp-pagos-recuadro__body">
           <div className="cp-deuda-card__monto" style={{ marginBottom: 6 }}>
@@ -323,18 +327,18 @@ export default function MisPagos() {
               {!modoSeleccion ? (
                 <>
                   {sesionesDebidas.length > 1 && (
-                    <Button variant="secondary" onClick={entrarModoSeleccion} disabled={mpDeshabilitado || iniciando}>
+                    <Button variant="secondary" onClick={entrarModoSeleccion} disabled={iniciando}>
                       Elegir cuáles pagar
                     </Button>
                   )}
-                  <Button variant="primary" onClick={handlePagar} disabled={mpDeshabilitado || iniciando}>
+                  <Button variant="primary" onClick={handlePagar} disabled={iniciando}>
                     {iniciando ? <><Spinner size={14} /> Redirigiendo…</> : `Pagar ${formatoARS.format(deudaTotal)}`}
                   </Button>
                 </>
               ) : (
                 <>
                   <Button variant="secondary" onClick={salirModoSeleccion} disabled={iniciando}>Cancelar</Button>
-                  <Button variant="primary" onClick={handlePagar} disabled={mpDeshabilitado || iniciando || seleccionadas.size === 0}>
+                  <Button variant="primary" onClick={handlePagar} disabled={iniciando || seleccionadas.size === 0}>
                     {iniciando ? <><Spinner size={14} /> Redirigiendo…</> : seleccionadas.size === 0 ? 'Elegí pacientes' : `Pagar ${formatoARS.format(subtotalSeleccionado)}`}
                   </Button>
                 </>
@@ -343,6 +347,7 @@ export default function MisPagos() {
           )}
         </div>
       </section>
+      )}
 
       {/* Recuadro 2: Pagos manuales */}
       <section className={`cp-pagos-recuadro ${!puedeMarcarPagadas ? 'cp-pagos-recuadro--disabled' : ''}`}>
