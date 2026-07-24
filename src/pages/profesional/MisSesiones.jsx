@@ -404,6 +404,7 @@ export default function MisSesiones() {
           fecha: sesion.fecha,
           metodoPagoNombre: sesion.metodoPagoNombre || '',
           valorTotal: sesion.valorTotal || 0,
+          montoConsultorio: Number(sesion.montoConsultorio) || 0,
         },
       });
     } catch (err) {
@@ -683,6 +684,7 @@ function MarcarMesPagadoModal({ sesiones, mapaPacientes, mes, user, onClose }) {
             fecha: ses.fecha,
             metodoPagoNombre: ses.metodoPagoNombre || '',
             valorTotal: ses.valorTotal || 0,
+            montoConsultorio: Number(ses.montoConsultorio) || 0,
           },
           // Sin receptor: lo define el admin al aprobar (ver handleTogglePagado).
         });
