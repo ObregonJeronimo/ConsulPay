@@ -8,6 +8,7 @@ import {
   armarLibro, crearGasto, CUENTA_MP, eliminarGasto, suscribirGastos,
 } from '../../lib/gastos.js';
 import { suscribirMiembrosConsultorio } from '../../lib/profesionales.js';
+import { montoNetoEfectivo, suscribirPagosDelConsultorio } from '../../lib/pagos.js';
 import { suscribirSesionesPagadas } from '../../lib/sesiones.js';
 
 import './LibroCaja.css';
@@ -46,6 +47,7 @@ export default function LibroCaja({ consultorioId, consultorio, uid }) {
   const [gastos, setGastos] = useState([]);
   const [sesiones, setSesiones] = useState([]);
   const [miembros, setMiembros] = useState([]);
+  const [pagosMP, setPagosMP] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [mes, setMes] = useState(() => new Date());
   const [nuevoAbierto, setNuevoAbierto] = useState(false);
@@ -64,6 +66,15 @@ export default function LibroCaja({ consultorioId, consultorio, uid }) {
   useEffect(() => {
     if (!consultorioId) return undefined;
     return suscribirMiembrosConsultorio(consultorioId, setMiembros);
+  }, [consultorioId]);
+
+  // Cobros por Mercado Pago: son la otra fuente de ingresos y van a su
+  // propia caja. Sin esto la columna existia pero marcaba siempre cero.
+  useEffect(() => {
+    if (!consultorioId) return undefined;
+    return suscribirPagosDelConsultorio(consultorioId, (data) => {
+      setPagosMP(data.filter((p) => p.estado === 'aprobado'));
+    });
   }, [consultorioId]);
 
   // Cuentas: Mercado Pago + un administrador por cada adminUid del
@@ -86,7 +97,13 @@ export default function LibroCaja({ consultorioId, consultorio, uid }) {
   }, [mes]);
 
   const { movimientos, totales, columnas } = useMemo(() => {
-    const libro = armarLibro({ sesionesPagadas: sesiones, gastos, cuentas });
+    const libro = armarLibro({
+      sesionesPagadas: sesiones,
+      // Lo que efectivamente entro a la cuenta, ya descontado el cargo de MP.
+      pagosMP: pagosMP.map((p) => ({ ...p, montoConsultorio: montoNetoEfectivo(p) })),
+      gastos,
+      cuentas,
+    });
     const delMes = libro.movimientos.filter(
       (mv) => mv.fecha >= rangoMes.desde && mv.fecha <= rangoMes.hasta,
     );
@@ -103,14 +120,14 @@ export default function LibroCaja({ consultorioId, consultorio, uid }) {
       else { t.egresos += mv.monto; t.saldo -= mv.monto; }
     }
     return { movimientos: delMes, totales: tot, columnas: cols };
-  }, [sesiones, gastos, cuentas, rangoMes]);
+  }, [sesiones, pagosMP, gastos, cuentas, rangoMes]);
 
   async function borrar(mv) {
     if (!confirm(`¿Eliminar el gasto "${mv.detalle}"?`)) return;
     try { await eliminarGasto(mv.gastoId); } catch (e) { alert(e.message); }
   }
 
-  if (cargando && sesiones.length === 0 && gastos.length === 0) {
+  if (cargando && sesiones.length === 0 && gastos.length === 0 && pagosMP.length === 0) {
     return (
       <div style={{ padding: 50, display: 'flex', justifyContent: 'center' }}>
         <Spinner size={22} label="Cargando movimientos…" />
