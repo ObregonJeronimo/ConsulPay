@@ -620,3 +620,34 @@ export function finDeMes(fecha = new Date()) {
 export function nombreDelMes(fecha = new Date()) {
   return fecha.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
 }
+
+/* ============================================================
+   Sesiones que el profesional todavia le debe al consultorio
+   ----------------------------------------------------------------
+   Sin filtro de mes: el profesional puede estar saldando abril y mayo
+   en el mismo pago, sobre todo con pacientes particulares, que pagan
+   en efectivo y no dependen de que una obra social liquide.
+
+   Solo igualdades y sin orderBy a proposito: asi Firestore la resuelve
+   con los indices automaticos y no hay que crear uno compuesto. El
+   orden se arma en memoria, que para este volumen no cuesta nada.
+   ============================================================ */
+export function suscribirSesionesDebidasProfesional(profesionalUid, consultorioId, callback) {
+  if (!profesionalUid || !consultorioId) {
+    callback([]);
+    return () => {};
+  }
+
+  const q = query(
+    collection(db, 'sesiones'),
+    where('consultorioId', '==', consultorioId),
+    where('profesionalUid', '==', profesionalUid),
+    where('estadoPago', '==', ESTADOS_PAGO_SESION.DEBIDO),
+  );
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+  }, (err) => {
+    console.error('Error en suscripción de sesiones debidas:', err);
+    callback([]);
+  });
+}

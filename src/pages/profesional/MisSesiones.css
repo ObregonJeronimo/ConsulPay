@@ -405,3 +405,168 @@
 @media (prefers-reduced-motion: reduce) {
   .cp-pago-datos__opcion { transition: none; }
 }
+
+/* ============================================================
+   Seleccion de sesiones a pagar, agrupadas por mes
+   ----------------------------------------------------------------
+   El pago no respeta el calendario: un profesional puede saldar abril
+   y mayo en el mismo momento. Por eso se listan todos los meses con
+   deuda y se tildan enteros o de a una sesion.
+   ============================================================ */
+.cp-seleccion-meses {
+  max-height: 42vh;
+  overflow-y: auto;
+  margin: 4px 0 14px;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-lg);
+  background: var(--cp-surface);
+  -webkit-overflow-scrolling: touch;
+}
+
+.cp-mes-bloque + .cp-mes-bloque { border-top: 1px solid var(--cp-border); }
+
+.cp-mes-bloque__head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: none;
+  background: var(--cp-surface-sunken);
+  font-family: inherit;
+  font-size: 13.5px;
+  color: var(--cp-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.cp-mes-bloque__head:focus-visible { outline: none; box-shadow: var(--cp-shadow-focus); }
+
+.cp-mes-bloque__nombre { font-weight: 500; text-transform: capitalize; }
+
+.cp-mes-bloque__meta {
+  color: var(--cp-text-muted);
+  font-size: 12px;
+  margin-left: auto;
+}
+
+.cp-mes-bloque__total {
+  font-family: var(--cp-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+
+.cp-fila-sel {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px 10px 18px;
+  border: none;
+  border-top: 1px solid var(--cp-border);
+  background: var(--cp-surface);
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--cp-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.cp-fila-sel:hover { background: var(--cp-surface-sunken); }
+.cp-fila-sel--on { background: var(--cp-accent-bg); }
+.cp-fila-sel:focus-visible { outline: none; box-shadow: var(--cp-shadow-focus); }
+
+.cp-fila-sel__pac { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cp-fila-sel__cant { color: var(--cp-text-muted); font-size: 12px; white-space: nowrap; }
+
+.cp-fila-sel__monto {
+  font-family: var(--cp-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+/* Casilla dibujada a mano: el input nativo no se puede alinear igual en
+   iOS y Android sin pelearse con el user-agent stylesheet. */
+.cp-check {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--cp-border-strong);
+  border-radius: var(--cp-radius-xs);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--cp-text-on-accent);
+  background: var(--cp-surface);
+}
+
+.cp-check--on,
+.cp-check--parcial {
+  background: var(--cp-accent);
+  border-color: var(--cp-accent);
+}
+
+/* ---- Resumen de lo elegido ---- */
+.cp-resumen-sel {
+  padding: 12px 14px;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-lg);
+  background: var(--cp-surface-sunken);
+  margin-bottom: 4px;
+}
+
+.cp-resumen-sel__vacio { color: var(--cp-text-muted); font-size: 13px; }
+
+.cp-resumen-sel__detalle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.cp-resumen-sel__chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-pill);
+  background: var(--cp-surface);
+  font-size: 12px;
+  color: var(--cp-text-muted);
+  text-transform: capitalize;
+}
+
+.cp-resumen-sel__chip strong {
+  font-family: var(--cp-font-mono);
+  font-size: 12.5px;
+  color: var(--cp-text);
+}
+
+.cp-resumen-sel__total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-top: 10px;
+  border-top: 1px solid var(--cp-border);
+  font-size: 13px;
+}
+
+.cp-resumen-sel__total strong {
+  font-family: var(--cp-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 17px;
+}
+
+/* En pantallas chicas la cantidad de sesiones se cae: el nombre y el monto
+   son lo que se necesita para decidir, y el detalle queda en el resumen. */
+@media (max-width: 480px) {
+  .cp-seleccion-meses { max-height: 38vh; }
+  .cp-fila-sel__cant { display: none; }
+  .cp-mes-bloque__meta { display: none; }
+  .cp-fila-sel,
+  .cp-mes-bloque__head { padding-left: 12px; padding-right: 12px; }
+}

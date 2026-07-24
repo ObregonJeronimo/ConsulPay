@@ -30,6 +30,7 @@ import {
   nombreDelMes,
   editarMontoLiquidado,
   liquidarMontoSesion,
+  suscribirSesionesDebidasProfesional,
   suscribirSesionesProfesional,
   totalesGlobales,
 } from '../../lib/sesiones.js';
@@ -147,6 +148,9 @@ export default function MisSesiones() {
   const [pacientes, setPacientes] = useState([]);
   const [solicitudes, setSolicitudes] = useState([]);
   const [loadingSesiones, setLoadingSesiones] = useState(true);
+  // Todas las debidas, de cualquier mes: el pago no tiene por que respetar
+  // el mes que se esta mirando (ver el modal de marcar pagadas).
+  const [debidasTodas, setDebidasTodas] = useState([]);
 
   const [editando, setEditando] = useState(null); // null | 'nueva' | sesion
   const [liquidando, setLiquidando] = useState(null);
@@ -161,6 +165,11 @@ export default function MisSesiones() {
   const puedeMarcarPagadas = !!user?.permitirMarcarPagadas;
 
   // Suscripciones
+  useEffect(() => {
+    if (!user?.uid || !user?.consultorioId) return undefined;
+    return suscribirSesionesDebidasProfesional(user.uid, user.consultorioId, setDebidasTodas);
+  }, [user?.uid, user?.consultorioId]);
+
   useEffect(() => {
     if (!user?.uid || !user?.consultorioId) return;
     setLoadingSesiones(true);
@@ -242,10 +251,11 @@ export default function MisSesiones() {
   // Sesiones del mes elegibles para cada accion masiva. Se excluyen las que
   // ya tienen una solicitud pendiente: pedir dos veces lo mismo le duplica
   // el trabajo al admin y el helper del backend lo rechaza igual.
-  const sesionesDebidasDelMes = useMemo(
-    () => sesiones.filter((x) => x.estadoPago === ESTADOS_PAGO_SESION.DEBIDO
-      && !sesionesConPendiente.has(x.id)),
-    [sesiones, sesionesConPendiente],
+  /* Lo que se puede ofrecer para pagar: todas las debidas de cualquier mes,
+     menos las que ya tienen una solicitud pendiente. */
+  const debidasSeleccionables = useMemo(
+    () => debidasTodas.filter((x) => !sesionesConPendiente.has(x.id)),
+    [debidasTodas, sesionesConPendiente],
   );
 
   const sesionesPorLiquidar = useMemo(
@@ -482,10 +492,10 @@ export default function MisSesiones() {
               variant="secondary"
               type="button"
               onClick={() => setMarcarMesOpen(true)}
-              disabled={!hayPrereqs || sesionesDebidasDelMes.length === 0}
+              disabled={!hayPrereqs || debidasSeleccionables.length === 0}
               style={{ flex: 1 }}
             >
-              Marcar mes como pagado
+              Marcar como pagado
             </Button>
             <Button
               variant="secondary"
@@ -619,7 +629,7 @@ export default function MisSesiones() {
 
       {marcarMesOpen && (
         <MarcarMesPagadoModal
-          sesiones={sesionesDebidasDelMes}
+          sesiones={debidasSeleccionables}
           mapaPacientes={mapaPacientes}
           mes={mes}
           user={user}
@@ -682,35 +692,90 @@ function MarcarMesPagadoModal({ sesiones, mapaPacientes, mes, user, consultorio,
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   });
 
-  const total = useMemo(
-    () => sesiones.reduce((acc, x) => acc + (x.montoConsultorio || 0), 0),
-    [sesiones],
-  );
-
   // Desglose registro por registro: es lo que el profesional necesita para
   // revisar antes de mandar. Antes esto se agrupaba por nombre de paciente
   // y sumaba, asi que dos registros distintos del mismo paciente (por
   // ejemplo uno de 1 sesion y otro de 8) aparecian fusionados en una linea
   // sola y no habia forma de cotejarlos contra la tabla. Cada solicitud
   // viaja por separado al admin, asi que la lista tambien va por separado.
-  const filas = useMemo(() => {
-    const items = sesiones.map((ses) => {
+  /* Agrupado por mes. El profesional puede estar saldando abril y mayo en el
+     mismo pago —los particulares pagan en efectivo y no esperan a la obra
+     social—, asi que la lista no se limita al mes que esta mirando. */
+  const meses = useMemo(() => {
+    const grupos = new Map();
+    for (const ses of sesiones) {
+      // fechaDeTimestamp puede devolver un Date invalido (no null) si el dato
+      // guardado esta roto. Sin este chequeo la clave salia 'NaN-NaN' y el
+      // encabezado del grupo mostraba 'Invalid Date' en vez de 'Sin fecha'.
+      const d = fechaValida(fechaDeTimestamp(ses.fecha));
+      const clave = d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` : 'sin-fecha';
+      if (!grupos.has(clave)) grupos.set(clave, { clave, fecha: d, filas: [] });
       const pac = mapaPacientes[ses.pacienteId];
-      return {
+      grupos.get(clave).filas.push({
         id: ses.id,
         nombre: pac ? nombrePaciente(pac) : (ses.pacienteNombre || 'Paciente'),
         fecha: ses.fecha,
         cantidad: getCantidadSesiones(ses),
         monto: ses.montoConsultorio || 0,
-      };
-    });
-    // Alfabetico por paciente; dentro del mismo paciente, por fecha.
-    return items.sort((x, y) => {
-      const porNombre = x.nombre.localeCompare(y.nombre, 'es', { sensitivity: 'base' });
-      if (porNombre !== 0) return porNombre;
-      return (fechaDeTimestamp(x.fecha)?.getTime() ?? 0) - (fechaDeTimestamp(y.fecha)?.getTime() ?? 0);
-    });
+      });
+    }
+    for (const g of grupos.values()) {
+      // Alfabetico por paciente; dentro del mismo paciente, por fecha.
+      g.filas.sort((x, y) => {
+        const porNombre = x.nombre.localeCompare(y.nombre, 'es', { sensitivity: 'base' });
+        if (porNombre !== 0) return porNombre;
+        return (fechaDeTimestamp(x.fecha)?.getTime() ?? 0) - (fechaDeTimestamp(y.fecha)?.getTime() ?? 0);
+      });
+      g.total = g.filas.reduce((acc, f) => acc + f.monto, 0);
+      g.sesiones = g.filas.reduce((acc, f) => acc + f.cantidad, 0);
+    }
+    // Mas reciente primero: es lo que el profesional suele estar saldando.
+    return [...grupos.values()].sort((a, b) => (b.clave === 'sin-fecha' ? -1 : a.clave === 'sin-fecha' ? 1 : b.clave.localeCompare(a.clave)));
   }, [sesiones, mapaPacientes]);
+
+  /* Arranca con el mes que el profesional estaba mirando ya tildado: es lo
+     que venia a hacer. Los otros meses estan a la vista para sumarlos. */
+  const claveMesActual = `${mes.getFullYear()}-${String(mes.getMonth() + 1).padStart(2, '0')}`;
+  const [elegidas, setElegidas] = useState(() => {
+    const ids = new Set();
+    for (const ses of sesiones) {
+      const d = fechaValida(fechaDeTimestamp(ses.fecha));
+      const c = d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` : 'sin-fecha';
+      if (c === claveMesActual) ids.add(ses.id);
+    }
+    return ids;
+  });
+
+  function alternarSesion(id) {
+    setElegidas((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  }
+
+  function alternarMes(g) {
+    const todasPuestas = g.filas.every((f) => elegidas.has(f.id));
+    setElegidas((prev) => {
+      const n = new Set(prev);
+      for (const f of g.filas) { if (todasPuestas) n.delete(f.id); else n.add(f.id); }
+      return n;
+    });
+  }
+
+  const seleccion = useMemo(() => {
+    const porMes = [];
+    let total = 0; let cantidad = 0;
+    for (const g of meses) {
+      const filas = g.filas.filter((f) => elegidas.has(f.id));
+      if (filas.length === 0) continue;
+      const subtotal = filas.reduce((acc, f) => acc + f.monto, 0);
+      porMes.push({ clave: g.clave, fecha: g.fecha, registros: filas.length, subtotal });
+      total += subtotal;
+      cantidad += filas.length;
+    }
+    return { porMes, total, cantidad };
+  }, [meses, elegidas]);
 
   const receptorElegido = useMemo(() => {
     const a = admins.find((x) => x.uid === receptorUid);
@@ -724,6 +789,10 @@ function MarcarMesPagadoModal({ sesiones, mapaPacientes, mes, user, consultorio,
 
   async function confirmar() {
     setError('');
+    if (elegidas.size === 0) {
+      setError('Elegí al menos una sesión para pagar.');
+      return;
+    }
     if (admins.length > 0 && !receptorUid) {
       setError('Elegí a quién le pagaste.');
       return;
@@ -731,7 +800,7 @@ function MarcarMesPagadoModal({ sesiones, mapaPacientes, mes, user, consultorio,
     setSubmitting(true);
     let hechas = 0;
     try {
-      for (const ses of sesiones) {
+      for (const ses of sesiones.filter((x) => elegidas.has(x.id))) {
         const pac = mapaPacientes[ses.pacienteId];
         await solicitarMarcarPagada({
           consultorioId: user.consultorioId,
@@ -761,7 +830,7 @@ function MarcarMesPagadoModal({ sesiones, mapaPacientes, mes, user, consultorio,
       // salieron para que el profesional no reintente todo y duplique.
       setError(
         `${err.message || 'No se pudieron enviar todas las solicitudes.'}`
-        + (hechas > 0 ? ` Se enviaron ${hechas} de ${sesiones.length}.` : ''),
+        + (hechas > 0 ? ` Se enviaron ${hechas} de ${elegidas.size}.` : ''),
       );
       setSubmitting(false);
     }
@@ -771,34 +840,83 @@ function MarcarMesPagadoModal({ sesiones, mapaPacientes, mes, user, consultorio,
     <div className="cp-modal-overlay" onClick={onClose}>
       <div className="cp-modal" onClick={(e) => e.stopPropagation()}>
         <button className="cp-modal__close" onClick={onClose} aria-label="Cerrar">×</button>
-        <h2 className="cp-modal__title">Marcar {nombreDelMes(mes)} como pagado</h2>
+        <h2 className="cp-modal__title">Marcar sesiones como pagadas</h2>
         <p className="cp-modal__sub">
-          Se va a pedir al administrador que dé por pagadas las{' '}
-          <strong>{sesiones.length}</strong> sesion{sesiones.length === 1 ? '' : 'es'} que
-          todavía figuran como debidas este mes.
+          Elegí qué le pagaste al consultorio. Podés mezclar meses: si saldaste
+          abril y mayo juntos, tildá los dos.
         </p>
 
-        <div className="cp-desglose">
-          <div className="cp-desglose__head">
-            <span>Paciente</span>
-            <span>Sesiones</span>
-            <span>Al consultorio</span>
-          </div>
-          <div className="cp-desglose__body">
-            {filas.map((p) => (
-              <div key={p.id} className="cp-desglose__fila">
-                <span className="cp-desglose__pac">{p.nombre}</span>
-                <span className="cp-desglose__cant">
-                  {p.cantidad} {p.cantidad === 1 ? 'sesión' : 'sesiones'}
-                </span>
-                <span className="cp-desglose__monto">{formatoARS.format(p.monto)}</span>
+        {/* Un bloque por mes, tildable entero o sesion por sesion. */}
+        <div className="cp-seleccion-meses">
+          {meses.map((g) => {
+            const todas = g.filas.every((f) => elegidas.has(f.id));
+            const algunas = !todas && g.filas.some((f) => elegidas.has(f.id));
+            return (
+              <div key={g.clave} className="cp-mes-bloque">
+                <button
+                  type="button"
+                  className="cp-mes-bloque__head"
+                  onClick={() => alternarMes(g)}
+                  aria-pressed={todas}
+                >
+                  <span className={`cp-check ${todas ? 'cp-check--on' : ''} ${algunas ? 'cp-check--parcial' : ''}`} aria-hidden="true">
+                    {todas ? '✓' : algunas ? '–' : ''}
+                  </span>
+                  <span className="cp-mes-bloque__nombre">
+                    {g.clave === 'sin-fecha' ? 'Sin fecha' : nombreDelMes(g.fecha)}
+                  </span>
+                  <span className="cp-mes-bloque__meta">
+                    {g.filas.length} {g.filas.length === 1 ? 'registro' : 'registros'}
+                  </span>
+                  <span className="cp-mes-bloque__total">{formatoARS.format(g.total)}</span>
+                </button>
+
+                <div className="cp-mes-bloque__filas">
+                  {g.filas.map((f) => {
+                    const on = elegidas.has(f.id);
+                    return (
+                      <button
+                        key={f.id}
+                        type="button"
+                        className={`cp-fila-sel ${on ? 'cp-fila-sel--on' : ''}`}
+                        onClick={() => alternarSesion(f.id)}
+                        aria-pressed={on}
+                      >
+                        <span className={`cp-check ${on ? 'cp-check--on' : ''}`} aria-hidden="true">{on ? '✓' : ''}</span>
+                        <span className="cp-fila-sel__pac">{f.nombre}</span>
+                        <span className="cp-fila-sel__cant">
+                          {f.cantidad} {f.cantidad === 1 ? 'sesión' : 'sesiones'}
+                        </span>
+                        <span className="cp-fila-sel__monto">{formatoARS.format(f.monto)}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            ))}
-          </div>
-          <div className="cp-desglose__total">
-            <span>Total a pagar</span>
-            <strong>{formatoARS.format(total)}</strong>
-          </div>
+            );
+          })}
+        </div>
+
+        {/* Resumen de lo elegido, con el detalle de que mes aporta cuanto. */}
+        <div className="cp-resumen-sel">
+          {seleccion.porMes.length === 0 ? (
+            <span className="cp-resumen-sel__vacio">No elegiste ninguna sesión todavía.</span>
+          ) : (
+            <>
+              <div className="cp-resumen-sel__detalle">
+                {seleccion.porMes.map((m) => (
+                  <span key={m.clave} className="cp-resumen-sel__chip">
+                    {m.clave === 'sin-fecha' ? 'Sin fecha' : nombreDelMes(m.fecha)}
+                    <strong>{formatoARS.format(m.subtotal)}</strong>
+                  </span>
+                ))}
+              </div>
+              <div className="cp-resumen-sel__total">
+                <span>Total a pagar</span>
+                <strong>{formatoARS.format(seleccion.total)}</strong>
+              </div>
+            </>
+          )}
         </div>
 
         {admins.length > 0 && (
@@ -844,10 +962,12 @@ function MarcarMesPagadoModal({ sesiones, mapaPacientes, mes, user, consultorio,
           <Button variant="ghost" type="button" onClick={onClose} disabled={submitting}>
             Cancelar
           </Button>
-          <Button variant="primary" type="button" onClick={confirmar} disabled={submitting}>
+          <Button variant="primary" type="button" onClick={confirmar} disabled={submitting || seleccion.cantidad === 0}>
             {submitting
-              ? <><Spinner size={14} /> Enviando {progreso}/{sesiones.length}…</>
-              : `Enviar ${sesiones.length} solicitud${sesiones.length === 1 ? '' : 'es'}`}
+              ? <><Spinner size={14} /> Enviando {progreso}/{seleccion.cantidad}…</>
+              : seleccion.cantidad === 0
+                ? 'Elegí qué pagar'
+                : `Enviar ${seleccion.cantidad} solicitud${seleccion.cantidad === 1 ? '' : 'es'}`}
           </Button>
         </div>
       </div>
@@ -1074,6 +1194,12 @@ function SolicitudesPanel({ solicitudes, mapaPacientes, totalPendientes }) {
 }
 
 /* ---- Helpers de solicitudes ---- */
+
+/* Descarta los Date invalidos, que son truthy y se cuelan en cualquier
+   comparacion sin avisar. */
+function fechaValida(d) {
+  return d instanceof Date && !isNaN(d.getTime()) ? d : null;
+}
 
 function fechaDeTimestamp(ts) {
   if (!ts) return null;
