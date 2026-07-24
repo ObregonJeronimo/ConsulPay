@@ -1,0 +1,48 @@
+
+/* ---- Cambio masivo de fecha ---- */
+.cp-cr-masivo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  background: var(--cp-surface-sunken);
+  border-radius: var(--cp-radius-md);
+}
+
+.cp-cr-masivo label {
+  font-size: 12.5px;
+  color: var(--cp-text-muted);
+}
+
+.cp-cr-masivo input {
+  padding: 7px 10px;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-sm);
+  font-family: inherit;
+  font-size: 13px;
+  background: var(--cp-bg);
+  color: var(--cp-text);
+}
+
+.cp-cr-masivo input:focus { outline: none; border-color: var(--cp-accent); }
+
+.cp-cr-masivo__btn {
+  padding: 7px 14px;
+  border: 1px solid var(--cp-border-strong);
+  border-radius: var(--cp-radius-sm);
+  background: var(--cp-surface);
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--cp-text);
+  cursor: pointer;
+}
+
+.cp-cr-masivo__btn:hover:not(:disabled) { border-color: var(--cp-accent); color: var(--cp-accent-dark); }
+.cp-cr-masivo__btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+@media (max-width: 560px) {
+  .cp-cr-masivo { flex-direction: column; align-items: stretch; }
+  .cp-cr-masivo input, .cp-cr-masivo__btn { width: 100%; }
+}

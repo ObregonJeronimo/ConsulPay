@@ -52,7 +52,22 @@ function nombreProf(p) {
 }
 
 /* ---- Fila inicial para un paciente ---- */
-function filaInicial(paciente, mapaMetodos) {
+/**
+ * Fecha con la que arranca cada fila.
+ *
+ * Antes era siempre hoy, aunque estuvieras parado en marzo: cargabas 15
+ * pacientes y todos quedaban con la fecha de hoy, y habia que corregirlos
+ * uno por uno. Ahora se respeta el mes que estas mirando. Si es el mes en
+ * curso se usa hoy (lo mas probable); si es otro, el dia 1 de ese mes.
+ */
+function fechaDefaultDelMes(mes) {
+  const hoy = new Date();
+  if (!(mes instanceof Date) || isNaN(mes.getTime())) return hoy;
+  if (mes.getFullYear() === hoy.getFullYear() && mes.getMonth() === hoy.getMonth()) return hoy;
+  return new Date(mes.getFullYear(), mes.getMonth(), 1);
+}
+
+function filaInicial(paciente, mapaMetodos, fechaBase) {
   const metodoIds = getMetodosPaciente(paciente);
   const tieneMulti = metodoIds.length > 1;
   // Si tiene 1 solo método → pre-llenamos. Si tiene 2+ → vacío (debe elegir)
@@ -62,7 +77,7 @@ function filaInicial(paciente, mapaMetodos) {
   return {
     id: paciente.id,
     pacienteId: paciente.id,
-    fechaInput: dateAInputValue(new Date()),
+    fechaInput: dateAInputValue(fechaBase instanceof Date ? fechaBase : new Date()),
     cantidad: '',
     metodoPagoId,
     valorSesion: esDiferido ? '' : (metodo?.valorSesionDefault !== undefined ? String(metodo.valorSesionDefault) : ''),
@@ -85,6 +100,7 @@ export default function CargaRapidaModal({
   consultorioId,
   profesionalUidFijo,
   uid,
+  mesContexto,                  // mes que el usuario esta viendo en Sesiones
   onClose,
 }) {
   const overlayProps = useOverlayClose(onClose);
@@ -99,6 +115,17 @@ export default function CargaRapidaModal({
   const [done, setDone] = useState(null); // { ok, errores }
   const rowRefs = useRef({});
 
+  /*
+    Cambiar la fecha de TODAS las filas de una. Es el caso real de la carga
+    rapida: se cargan las sesiones de un mes entero y casi siempre van todas
+    al mismo dia, o al menos al mismo mes. Corregir 15 filas a mano era el
+    cuello de botella.
+  */
+  function aplicarFechaATodas(valor) {
+    if (!valor) return;
+    setFilas((prev) => prev.map((f) => ({ ...f, fechaInput: valor })));
+  }
+
   // Pacientes del profesional seleccionado
   const pacientesDelProf = useMemo(() => {
     const uid = esAdmin ? profUid : profesionalUidFijo;
@@ -112,7 +139,7 @@ export default function CargaRapidaModal({
 
   // Cuando se arman las filas, inicializarlas
   function armarFilas(pacs) {
-    setFilas(pacs.map((p) => filaInicial(p, mapaMetodos)));
+    setFilas(pacs.map((p) => filaInicial(p, mapaMetodos, fechaDefaultDelMes(mesContexto))));
   }
 
   // ---- Handlers del wizard ----
@@ -290,6 +317,8 @@ export default function CargaRapidaModal({
             {/* Paso 3 (admin) o 4 (admin si algunos) / Paso 2-3 prof — tabla de filas */}
             {filas.length > 0 && ((esAdmin && paso >= 3) || (!esAdmin && paso >= 2)) && (
               <TablaFilas
+                onAplicarFechaATodas={aplicarFechaATodas}
+                fechaSugerida={dateAInputValue(fechaDefaultDelMes(mesContexto))}
                 filas={filas}
                 pacientes={pacientes}
                 metodos={metodos}
@@ -428,11 +457,33 @@ function PasoModoPacientes({
 }
 
 /* ---- Tabla de filas editables ---- */
-function TablaFilas({ filas, pacientes, metodos, mapaMetodos, esAdmin, rowRefs, onUpdate, onEliminar, submitting, onGuardar, onClose }) {
+function TablaFilas({ filas, pacientes, metodos, mapaMetodos, esAdmin, rowRefs, onUpdate, onEliminar, submitting, onGuardar, onClose, onAplicarFechaATodas, fechaSugerida }) {
   const hayErrores = filas.some((f) => f.error);
+  const [fechaMasiva, setFechaMasiva] = useState(fechaSugerida || '');
 
   return (
     <div className="cp-cr-tabla-wrap">
+      {/* Cambio masivo de fecha: se cargan sesiones de un mes entero y casi
+          siempre van todas al mismo dia. */}
+      {filas.length > 1 && (
+        <div className="cp-cr-masivo">
+          <label htmlFor="cr-fecha-todas">Aplicar fecha a las {filas.length} filas</label>
+          <input
+            id="cr-fecha-todas"
+            type="datetime-local"
+            value={fechaMasiva}
+            onChange={(e) => setFechaMasiva(e.target.value)}
+          />
+          <button
+            type="button"
+            className="cp-cr-masivo__btn"
+            onClick={() => onAplicarFechaATodas(fechaMasiva)}
+            disabled={!fechaMasiva}
+          >
+            Aplicar a todas
+          </button>
+        </div>
+      )}
       {/* Header de columnas — solo desktop */}
       <div className="cp-cr-tabla-head">
         <span>Paciente</span>

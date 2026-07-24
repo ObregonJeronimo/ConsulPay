@@ -542,6 +542,7 @@ export default function Sesiones() {
 
       {cargaRapidaOpen && (
         <CargaRapidaModal
+          mesContexto={mes}
           esAdmin
           profesionales={profesionalesActivos}
           pacientes={pacientesActivos}

@@ -564,6 +564,7 @@ export default function MisSesiones() {
 
       {cargaRapidaOpen && (
         <CargaRapidaModal
+          mesContexto={mes}
           esAdmin={false}
           tieneConfianza={tieneConfianza}
           profesionalNombre={user?.displayName || user?.email || ''}
