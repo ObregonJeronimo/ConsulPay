@@ -651,20 +651,29 @@ function MarcarMesPagadoModal({ sesiones, mapaPacientes, mes, user, onClose }) {
     [sesiones],
   );
 
-  // Desglose por paciente: es lo que el profesional necesita para revisar
-  // antes de mandar. Una sesion puede agrupar varias (cantidadSesiones),
-  // asi que se suman los encuentros, no los registros.
-  const porPaciente = useMemo(() => {
-    const mapa = new Map();
-    for (const ses of sesiones) {
+  // Desglose registro por registro: es lo que el profesional necesita para
+  // revisar antes de mandar. Antes esto se agrupaba por nombre de paciente
+  // y sumaba, asi que dos registros distintos del mismo paciente (por
+  // ejemplo uno de 1 sesion y otro de 8) aparecian fusionados en una linea
+  // sola y no habia forma de cotejarlos contra la tabla. Cada solicitud
+  // viaja por separado al admin, asi que la lista tambien va por separado.
+  const filas = useMemo(() => {
+    const items = sesiones.map((ses) => {
       const pac = mapaPacientes[ses.pacienteId];
-      const nombre = pac ? nombrePaciente(pac) : (ses.pacienteNombre || 'Paciente');
-      const prev = mapa.get(nombre) || { nombre, cantidad: 0, monto: 0 };
-      prev.cantidad += getCantidadSesiones(ses);
-      prev.monto += ses.montoConsultorio || 0;
-      mapa.set(nombre, prev);
-    }
-    return [...mapa.values()].sort((x, y) => y.monto - x.monto);
+      return {
+        id: ses.id,
+        nombre: pac ? nombrePaciente(pac) : (ses.pacienteNombre || 'Paciente'),
+        fecha: ses.fecha,
+        cantidad: getCantidadSesiones(ses),
+        monto: ses.montoConsultorio || 0,
+      };
+    });
+    // Alfabetico por paciente; dentro del mismo paciente, por fecha.
+    return items.sort((x, y) => {
+      const porNombre = x.nombre.localeCompare(y.nombre, 'es', { sensitivity: 'base' });
+      if (porNombre !== 0) return porNombre;
+      return (fechaDeTimestamp(x.fecha)?.getTime() ?? 0) - (fechaDeTimestamp(y.fecha)?.getTime() ?? 0);
+    });
   }, [sesiones, mapaPacientes]);
 
   async function confirmar() {
@@ -721,8 +730,8 @@ function MarcarMesPagadoModal({ sesiones, mapaPacientes, mes, user, onClose }) {
             <span>Al consultorio</span>
           </div>
           <div className="cp-desglose__body">
-            {porPaciente.map((p) => (
-              <div key={p.nombre} className="cp-desglose__fila">
+            {filas.map((p) => (
+              <div key={p.id} className="cp-desglose__fila">
                 <span className="cp-desglose__pac">{p.nombre}</span>
                 <span className="cp-desglose__cant">
                   {p.cantidad} {p.cantidad === 1 ? 'sesión' : 'sesiones'}
