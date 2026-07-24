@@ -111,3 +111,34 @@ export function diasHastaVencimiento(expiresAt) {
   if (diff <= 0) return { vencido: true, dias: 0 };
   return { vencido: false, dias: Math.ceil(diff / (1000 * 60 * 60 * 24)) };
 }
+
+/* ============================================================
+   ¿Mercado Pago esta operativo para este consultorio?
+   ----------------------------------------------------------------
+   No alcanza con que UN admin haya vinculado su cuenta. Los cobros
+   se alternan mes a mes entre las cuentas de los administradores
+   (ver Configuracion > Pagos), asi que si falta una, los meses que
+   le tocan a esa cuenta no tienen donde caer. La regla es: MP esta
+   habilitado cuando TODOS los adminUids del consultorio tienen su
+   cuenta conectada. Con un solo admin, alcanza con esa.
+
+   Contempla el formato viejo (mpIntegrado + mpConfig) ademas de
+   los slots primary / secondary.
+   ============================================================ */
+export function mpHabilitado(consultorio) {
+  const adminUids = consultorio?.adminUids || [];
+  if (adminUids.length === 0) return false;
+
+  const conectados = new Set();
+  for (const slot of ['primary', 'secondary']) {
+    const cfg = consultorio?.mpConfigs?.[slot];
+    const owner = cfg?.ownerAdminUid || cfg?.connectedByUid;
+    if (owner) conectados.add(owner);
+  }
+  if (consultorio?.mpIntegrado && consultorio?.mpConfig) {
+    const legacy = consultorio.mpConfig.ownerAdminUid || consultorio.mpConfig.connectedByUid;
+    if (legacy) conectados.add(legacy);
+  }
+
+  return adminUids.every((uid) => conectados.has(uid));
+}

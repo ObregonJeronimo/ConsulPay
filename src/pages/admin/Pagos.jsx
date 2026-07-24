@@ -12,6 +12,7 @@ import { ESTADOS_PAGO_SESION, formatoARS } from '../../lib/constants.js';
 import { suscribirPacientesConsultorio } from '../../lib/pacientes.js';
 import IngresosPorMes from './IngresosPorMes.jsx';
 import LibroCaja from './LibroCaja.jsx';
+import { mpHabilitado } from '../../lib/mpIntegracion.js';
 import {
   labelEstadoPago,
   montoNetoEfectivo,
@@ -72,6 +73,18 @@ export default function PagosAdmin() {
   const [loading, setLoading] = useState(true);
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [filtroCanal, setFiltroCanal] = useState('manual'); // 'mp' | 'manual' | 'ambos'
+  // MP solo se ofrece si TODOS los admins vincularon su cuenta. Ver
+  // mpHabilitado(): con una sola conectada los cobros del mes que le toca
+  // a la otra no tienen destino, asi que la opcion no debe existir.
+  const mpActivo = mpHabilitado(consultorio);
+
+  // Si MP se desvincula estando parado en una pestana de MP, la vista
+  // quedaria mostrando un canal que ya no existe. Se vuelve a manuales.
+  useEffect(() => {
+    if (!mpActivo && (filtroCanal === 'mp' || filtroCanal === 'ambos')) {
+      setFiltroCanal('manual');
+    }
+  }, [mpActivo, filtroCanal]);
   const [mes, setMes] = useState(() => inicioDeMes(new Date()));
   const [pagoSeleccionado, setPagoSeleccionado] = useState(null);
 
@@ -212,20 +225,24 @@ export default function PagosAdmin() {
           >
             Pagos manuales
           </button>
-          <button
-            type="button"
-            className={`cp-pagos-canal-btn ${filtroCanal === 'mp' ? 'cp-pagos-canal-btn--active' : ''}`}
-            onClick={() => setFiltroCanal('mp')}
-          >
-            Mercado Pago
-          </button>
-          <button
-            type="button"
-            className={`cp-pagos-canal-btn ${filtroCanal === 'ambos' ? 'cp-pagos-canal-btn--active' : ''}`}
-            onClick={() => setFiltroCanal('ambos')}
-          >
-            Ambos
-          </button>
+          {mpActivo && (
+            <>
+              <button
+                type="button"
+                className={`cp-pagos-canal-btn ${filtroCanal === 'mp' ? 'cp-pagos-canal-btn--active' : ''}`}
+                onClick={() => setFiltroCanal('mp')}
+              >
+                Mercado Pago
+              </button>
+              <button
+                type="button"
+                className={`cp-pagos-canal-btn ${filtroCanal === 'ambos' ? 'cp-pagos-canal-btn--active' : ''}`}
+                onClick={() => setFiltroCanal('ambos')}
+              >
+                Ambos
+              </button>
+            </>
+          )}
           <button
             type="button"
             className={`cp-pagos-canal-btn ${filtroCanal === 'ingresos' ? 'cp-pagos-canal-btn--active' : ''}`}

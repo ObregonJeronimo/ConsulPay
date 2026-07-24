@@ -9,6 +9,7 @@ import {
 } from '../../lib/gastos.js';
 import { suscribirMiembrosConsultorio } from '../../lib/profesionales.js';
 import { montoNetoEfectivo, suscribirPagosDelConsultorio } from '../../lib/pagos.js';
+import { mpHabilitado } from '../../lib/mpIntegracion.js';
 import { suscribirSesionesPagadas } from '../../lib/sesiones.js';
 
 import './LibroCaja.css';
@@ -86,8 +87,14 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
       nombre: porUid[id] ? nombreCorto(porUid[id]) : `Admin ${id.slice(0, 4)}`,
       completo: porUid[id]?.displayName || porUid[id]?.email || id,
     }));
-    return [{ id: CUENTA_MP, nombre: 'Mercado Pago', completo: 'Cobros por Mercado Pago' }, ...admins];
-  }, [consultorio?.adminUids, miembros]);
+    // La caja de Mercado Pago solo existe si MP esta habilitado (todos los
+    // admins vincularon). Si no, quedaba una card y una columna enteras
+    // clavadas en cero. Se conserva igual si hay cobros MP historicos, para
+    // no esconder plata que ya entro.
+    const mpVisible = mpHabilitado(consultorio) || pagosMP.length > 0;
+    const cajaMP = { id: CUENTA_MP, nombre: 'Mercado Pago', completo: 'Cobros por Mercado Pago' };
+    return mpVisible ? [cajaMP, ...admins] : admins;
+  }, [consultorio, miembros, pagosMP.length]);
 
   const rangoMes = useMemo(() => {
     const y = mes.getFullYear(); const m = String(mes.getMonth() + 1).padStart(2, '0');
