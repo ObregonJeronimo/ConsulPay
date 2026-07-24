@@ -315,6 +315,7 @@ export default function PagosAdmin() {
           consultorioId={consultorioId}
           consultorio={consultorio}
           uid={user?.uid}
+          mes={mes}
         />
       ) : filtroCanal === 'ingresos' ? (
         <IngresosPorMes

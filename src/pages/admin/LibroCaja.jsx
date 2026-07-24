@@ -43,13 +43,12 @@ function nombreCorto(u) {
  * pagadas, que guardan quien recibio la plata. Lo unico que se carga son
  * los gastos, que el sistema no tiene forma de deducir.
  */
-export default function LibroCaja({ consultorioId, consultorio, uid }) {
+export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
   const [gastos, setGastos] = useState([]);
   const [sesiones, setSesiones] = useState([]);
   const [miembros, setMiembros] = useState([]);
   const [pagosMP, setPagosMP] = useState([]);
   const [cargando, setCargando] = useState(true);
-  const [mes, setMes] = useState(() => new Date());
   const [nuevoAbierto, setNuevoAbierto] = useState(false);
 
   useEffect(() => {
@@ -140,16 +139,9 @@ export default function LibroCaja({ consultorioId, consultorio, uid }) {
 
   return (
     <div className="cp-libro">
+      {/* El mes lo manda Pagos.jsx. Antes LibroCaja tenia su propio state y
+          se renderizaba un segundo selector que no hablaba con el de arriba. */}
       <div className="cp-libro__bar">
-        <div className="cp-mes-selector">
-          <button type="button" className="cp-mes-selector__btn" aria-label="Mes anterior"
-            onClick={() => setMes((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))}>‹</button>
-          <span className="cp-mes-selector__label">
-            {MESES[mes.getMonth()]} de {mes.getFullYear()}
-          </span>
-          <button type="button" className="cp-mes-selector__btn" aria-label="Mes siguiente"
-            onClick={() => setMes((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))}>›</button>
-        </div>
         <Button variant="primary" onClick={() => setNuevoAbierto(true)}>+ Registrar gasto</Button>
       </div>
 
