@@ -67,3 +67,49 @@
   font-size: 12.5px;
   color: var(--cp-text-muted);
 }
+
+/* ---- Mostrar / ocultar contraseña ---- */
+
+/* display:block + width:100% no son decorativos: .cp-field es flex-column,
+   asi que el input se estiraba solo. Al envolverlo, el wrapper pasa a ser
+   el hijo flex y el input se encoge a su ancho intrinseco (208px en vez de
+   420px) si no se le devuelve el ancho explicitamente. */
+.cp-field__control {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.cp-field__control .cp-input {
+  width: 100%;
+  box-sizing: border-box;   /* sin esto el padding se suma y desborda */
+}
+
+/* Espacio a la derecha para que el texto no pase por debajo del botón. */
+.cp-field__control--pass .cp-input { padding-right: 44px; }
+
+.cp-field__ojo {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: none;
+  border-radius: var(--cp-radius-sm);
+  color: var(--cp-text-faint);
+  cursor: pointer;
+  transition: color var(--cp-dur-fast) var(--cp-ease),
+              background var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-field__ojo:hover:not(:disabled) {
+  color: var(--cp-text-muted);
+  background: var(--cp-surface-hover);
+}
+
+.cp-field__ojo:disabled { opacity: 0.4; cursor: not-allowed; }
