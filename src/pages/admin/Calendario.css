@@ -848,3 +848,32 @@
   .cp-hoy__estado { display: none; }
   .cp-hoy__estado--asistio, .cp-hoy__estado--ausente, .cp-hoy__estado--cancelada { display: inline; }
 }
+
+/* Acciones del encabezado del calendario */
+.cp-cal__acciones {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Resaltado al llegar desde el botón "Turnos de hoy".
+   Sin esto, si la sección ya estaba a la vista el clic no producía ningún
+   cambio visible y parecía que el botón no hacía nada. */
+.cp-hoy--destacado {
+  animation: cp-hoy-flash 1600ms var(--cp-ease) both;
+}
+
+@keyframes cp-hoy-flash {
+  0%   { border-color: var(--cp-accent); box-shadow: 0 0 0 4px var(--cp-accent-bg); }
+  60%  { border-color: var(--cp-accent); box-shadow: 0 0 0 4px var(--cp-accent-bg); }
+  100% { border-color: var(--cp-border); box-shadow: 0 0 0 0 transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cp-hoy--destacado { animation-duration: 1ms; border-color: var(--cp-accent); }
+}
+
+@media (max-width: 560px) {
+  .cp-cal__acciones { width: 100%; }
+  .cp-cal__acciones button { flex: 1; }
+}

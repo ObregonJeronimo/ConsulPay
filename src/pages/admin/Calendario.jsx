@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import Button from '../../components/ui/Button.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
@@ -85,6 +85,28 @@ export default function Calendario() {
   const [ocultos, setOcultos] = useState(() => new Set());
   const [modal, setModal] = useState(null); // { fecha } | { cita }
   const [cargando, setCargando] = useState(true);
+  const [destacarHoy, setDestacarHoy] = useState(false);
+  const refHoy = useRef(null);
+
+  /*
+    Ir a los turnos de hoy. El scroll suave solo no alcanza: si la seccion
+    ya estaba a la vista, el usuario aprieta y no pasa nada visible. Por eso
+    ademas se resalta un momento, para que quede claro adonde llego.
+  */
+  const irAHoy = useCallback(() => {
+    const nodo = refHoy.current;
+    if (!nodo) return;
+    // Respeta a quien pidio menos animacion en el sistema operativo.
+    const sinMovimiento = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+    nodo.scrollIntoView({ behavior: sinMovimiento ? 'auto' : 'smooth', block: 'start' });
+    setDestacarHoy(true);
+  }, []);
+
+  useEffect(() => {
+    if (!destacarHoy) return undefined;
+    const id = setTimeout(() => setDestacarHoy(false), 1600);
+    return () => clearTimeout(id);
+  }, [destacarHoy]);
 
   const rango = useMemo(() => {
     const dias = grillaDelMes(mes);
@@ -180,9 +202,14 @@ export default function Calendario() {
             Agenda del consultorio. Hacé clic en un día para agendar un turno.
           </p>
         </div>
-        <Button variant="primary" onClick={() => setModal({ fecha: hoyKey })}>
-          Agendar turno
-        </Button>
+        <div className="cp-cal__acciones">
+          <Button variant="secondary" onClick={irAHoy}>
+            Turnos de hoy
+          </Button>
+          <Button variant="primary" onClick={() => setModal({ fecha: hoyKey })}>
+            Agendar turno
+          </Button>
+        </div>
       </header>
 
       <div className="cp-cal__bar">
@@ -298,6 +325,8 @@ export default function Calendario() {
       )}
 
       <TurnosDeHoy
+        ref={refHoy}
+        destacado={destacarHoy}
         citas={citas}
         hoyKey={hoyKey}
         mapaProf={mapaProf}
@@ -327,7 +356,10 @@ export default function Calendario() {
    siempre, aunque estes mirando otro mes: es la pregunta que la
    recepcion se hace todo el tiempo.
    ============================================================ */
-function TurnosDeHoy({ citas, hoyKey, mapaProf, onAbrir }) {
+const TurnosDeHoy = forwardRef(function TurnosDeHoy(
+  { citas, hoyKey, mapaProf, onAbrir, destacado },
+  ref,
+) {
   const delDia = useMemo(
     () => citas
       .filter((c) => c.fecha === hoyKey)
@@ -340,7 +372,7 @@ function TurnosDeHoy({ citas, hoyKey, mapaProf, onAbrir }) {
   const pendientes = activos.filter((c) => c.estado === ESTADOS_CITA.AGENDADA).length;
 
   return (
-    <section className="cp-hoy">
+    <section ref={ref} className={`cp-hoy ${destacado ? 'cp-hoy--destacado' : ''}`}>
       <header className="cp-hoy__head">
         <div>
           <h2 className="cp-hoy__title">Turnos de hoy</h2>
@@ -395,7 +427,7 @@ function TurnosDeHoy({ citas, hoyKey, mapaProf, onAbrir }) {
       )}
     </section>
   );
-}
+});
 
 /** Hora de fin de un turno, para mostrar la franja completa. */
 function sumarMinutos(hora, minutos) {

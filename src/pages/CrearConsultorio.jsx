@@ -395,7 +395,6 @@ function AuthStep({ onAuthenticated }) {
             name="email"
             type="email"
             label="Email"
-            placeholder="tu@email.com"
             autoComplete={isRegister ? 'email' : 'username'}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -406,7 +405,7 @@ function AuthStep({ onAuthenticated }) {
             name="password"
             type="password"
             label="Contraseña"
-            placeholder={isRegister ? 'Mínimo 6 caracteres' : '••••••••'}
+            placeholder={isRegister ? 'Mínimo 6 caracteres' : undefined}
             autoComplete={isRegister ? 'new-password' : 'current-password'}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
