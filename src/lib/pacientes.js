@@ -310,3 +310,15 @@ export function getProfesionalesUids(paciente) {
   }
   return [];
 }
+
+/* ============================================================
+   Nombre visible de un paciente
+   ----------------------------------------------------------------
+   Formato "Apellido, Nombre", que es como se listan en todas las
+   pantallas. Estaba duplicado en MisSesiones, MisPagos, Sesiones y
+   LibroCaja; vive aca para que no se separen entre si.
+   ============================================================ */
+export function nombrePaciente(p) {
+  if (!p) return '';
+  return `${p.apellido ?? ''}${p.apellido && p.nombre ? ', ' : ''}${p.nombre ?? ''}`.trim();
+}

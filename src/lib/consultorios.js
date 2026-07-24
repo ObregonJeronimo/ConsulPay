@@ -151,24 +151,45 @@ export async function crearConsultorio(params) {
    la proxima vez que abre ConsulPay se corrige solo.
    ============================================================ */
 export async function sincronizarDirectorioAdmins(consultorioId, admin) {
-  if (!consultorioId || !admin?.uid || !admin?.nombre) return;
+  if (!consultorioId || !admin?.uid) return;
 
   const ref = doc(db, 'consultorios', consultorioId);
   const snap = await getDoc(ref);
   if (!snap.exists()) return;
 
   const data = snap.data();
-  // Solo los administradores figuran en el directorio.
-  if (!(data.adminUids || []).includes(admin.uid)) return;
+  const adminUids = data.adminUids || [];
+  // Solo un admin puede leer /usuarios de los demas miembros y escribir el
+  // doc del consultorio. Si quien entra no es admin, no hay nada que hacer.
+  if (!adminUids.includes(admin.uid)) return;
 
+  /* Se publica el directorio COMPLETO, no solo la entrada propia: un admin
+     puede leer los /usuarios de todo su consultorio, asi que con que entre
+     uno alcanza para que el profesional vea los dos nombres. Antes cada uno
+     publicaba lo suyo y la lista quedaba a medias hasta que entraran todos. */
+  const entradas = [];
+  for (const uid of adminUids) {
+    if (uid === admin.uid) {
+      const propio = admin.nombre || uid;
+      entradas.push({ uid, nombre: propio });
+      continue;
+    }
+    try {
+      const u = await getDoc(doc(db, 'usuarios', uid));
+      const d = u.exists() ? u.data() : null;
+      const nombre = d?.displayName || d?.email;
+      if (nombre) entradas.push({ uid, nombre });
+    } catch {
+      // Un admin que no se puede leer no rompe el resto del directorio.
+    }
+  }
+  if (entradas.length === 0) return;
+
+  // Solo se escribe si algo cambio, para no pegarle a Firestore en cada carga.
   const actual = Array.isArray(data.adminsDirectorio) ? data.adminsDirectorio : [];
-  const mio = actual.find((a) => a.uid === admin.uid);
-  if (mio && mio.nombre === admin.nombre) return; // ya esta al dia
+  const igual = actual.length === entradas.length
+    && entradas.every((e) => actual.some((a) => a.uid === e.uid && a.nombre === e.nombre));
+  if (igual) return;
 
-  // Se reescribe la entrada propia y se descartan las de quienes ya no
-  // son admins, para que el selector no ofrezca a alguien que se fue.
-  const limpio = actual.filter((a) => a.uid !== admin.uid && (data.adminUids || []).includes(a.uid));
-  await updateDoc(ref, {
-    adminsDirectorio: [...limpio, { uid: admin.uid, nombre: admin.nombre }],
-  });
+  await updateDoc(ref, { adminsDirectorio: entradas });
 }

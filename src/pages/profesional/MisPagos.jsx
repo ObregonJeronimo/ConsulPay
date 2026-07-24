@@ -10,7 +10,7 @@ import { useAuth } from '../../hooks/useAuth.js';
 import { useConsultorio } from '../../hooks/useConsultorio.js';
 import { ESTADOS_PAGO_SESION, ESTADOS_SOLICITUD_SESION, TIPOS_SOLICITUD_SESION, formatoARS } from '../../lib/constants.js';
 import { mpHabilitado } from '../../lib/mpIntegracion.js';
-import { suscribirPacientesProfesional } from '../../lib/pacientes.js';
+import { nombrePaciente, suscribirPacientesProfesional } from '../../lib/pacientes.js';
 import {
   iniciarPagoAlConsultorio,
   labelEstadoPago,
@@ -34,10 +34,12 @@ import './MisPagos.css';
 /* ============================================================
    Helpers
    ============================================================ */
-function nombrePaciente(p) {
-  if (!p) return '—';
-  return `${p.apellido ?? ''}${p.apellido && p.nombre ? ', ' : ''}${p.nombre ?? ''}`;
+/* El formato vive en lib/pacientes; aca solo el fallback propio de la
+   pantalla, que muestra un guion cuando el paciente ya no existe. */
+function nombrePacienteODash(p) {
+  return p ? nombrePaciente(p) : '—';
 }
+
 function inicialesPaciente(p) {
   if (!p) return '·';
   return ((p.apellido?.[0] ?? '') + (p.nombre?.[0] ?? '')).toUpperCase() || '·';
@@ -247,7 +249,7 @@ export default function MisPagos() {
           profesionalNombre: user.displayName || user.email || '',
           sesionId: id,
           sesionSnapshot: {
-            pacienteNombre: pac ? nombrePaciente(pac) : (s.pacienteNombre || ''),
+            pacienteNombre: pac ? nombrePacienteODash(pac) : (s.pacienteNombre || ''),
             fecha: s.fecha,
             metodoPagoNombre: s.metodoPagoNombre || '',
             valorTotal: s.valorTotal || 0,
@@ -468,7 +470,7 @@ export default function MisPagos() {
                         {pac ? (
                           <div className="cp-prof-cell">
                             <Avatar initials={inicialesPaciente(pac)} size={26} />
-                            <span style={{ fontSize: 13.5 }}>{nombrePaciente(pac)}</span>
+                            <span style={{ fontSize: 13.5 }}>{nombrePacienteODash(pac)}</span>
                           </div>
                         ) : <span style={{ color: 'var(--cp-text-muted)', fontSize: 13 }}>{s.pacienteNombre || '—'}</span>}
                       </td>
@@ -486,7 +488,7 @@ export default function MisPagos() {
                           {pac ? (
                             <div className="cp-prof-cell">
                               <Avatar initials={inicialesPaciente(pac)} size={26} />
-                              <div className="cp-prof-name">{nombrePaciente(pac)}</div>
+                              <div className="cp-prof-name">{nombrePacienteODash(pac)}</div>
                             </div>
                           ) : <span style={{ color: 'var(--cp-text-muted)', fontSize: 13 }}>{s.pacienteNombre || '—'}</span>}
                         </div>

@@ -29,11 +29,9 @@ import { crearSesion } from '../../lib/sesiones.js';
 import { solicitarCargaRapida } from '../../lib/solicitudes.js';
 
 import './CargaRapida.css';
+import { nombrePaciente } from '../../lib/pacientes.js';
 
 /* ---- Helpers ---- */
-function nombrePaciente(p) {
-  return `${p.apellido ?? ''}${p.apellido && p.nombre ? ', ' : ''}${p.nombre ?? ''}`;
-}
 function inicialesPaciente(p) {
   return ((p.apellido?.[0] ?? '') + (p.nombre?.[0] ?? '')).toUpperCase() || '·';
 }

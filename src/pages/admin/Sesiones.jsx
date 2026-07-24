@@ -44,6 +44,7 @@ import {
 import { marcarPendientesComoObsoletas } from '../../lib/solicitudes.js';
 
 import './Sesiones.css';
+import { nombrePaciente } from '../../lib/pacientes.js';
 
 /* ============================================================
    Iconos
@@ -108,9 +109,6 @@ function nombreDePaciente(pac, fallback = '') {
   return pac ? nombrePaciente(pac) : String(fallback);
 }
 
-function nombrePaciente(p) {
-  return `${p.apellido ?? ''}${p.apellido && p.nombre ? ', ' : ''}${p.nombre ?? ''}`;
-}
 function nombreProfesional(p) {
   return p?.displayName || p?.email || '—';
 }

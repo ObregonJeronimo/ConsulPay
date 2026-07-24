@@ -8,7 +8,7 @@ import { formatoARS } from '../../lib/constants.js';
 import {
   armarLibro, crearGasto, CUENTA_MP, eliminarGasto, suscribirGastos,
 } from '../../lib/gastos.js';
-import { suscribirPacientesConsultorio } from '../../lib/pacientes.js';
+import { nombrePaciente, suscribirPacientesConsultorio } from '../../lib/pacientes.js';
 import { suscribirMiembrosConsultorio } from '../../lib/profesionales.js';
 import { montoNetoEfectivo, suscribirPagosDelConsultorio } from '../../lib/pagos.js';
 import { mpHabilitado } from '../../lib/mpIntegracion.js';
@@ -30,9 +30,6 @@ function diaCorto(iso) {
   return `${d}/${m}`;
 }
 
-function nombrePaciente(p) {
-  return `${p.apellido ?? ''}${p.apellido && p.nombre ? ', ' : ''}${p.nombre ?? ''}`.trim();
-}
 
 function nombreCorto(u) {
   const n = u?.displayName || u?.email || '';
@@ -93,6 +90,12 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
     });
   }, [consultorioId]);
 
+  const rangoMes = useMemo(() => {
+    const y = mes.getFullYear(); const m = String(mes.getMonth() + 1).padStart(2, '0');
+    const ultimo = new Date(y, mes.getMonth() + 1, 0).getDate();
+    return { desde: `${y}-${m}-01`, hasta: `${y}-${m}-${String(ultimo).padStart(2, '0')}` };
+  }, [mes]);
+
   // Cuentas: Mercado Pago + un administrador por cada adminUid del
   // consultorio. Se resuelve el nombre contra los miembros; si todavia no
   // cargaron, se muestra el uid recortado en vez de dejar la columna muda.
@@ -103,20 +106,24 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
       nombre: porUid[id] ? nombreCorto(porUid[id]) : `Admin ${id.slice(0, 4)}`,
       completo: porUid[id]?.displayName || porUid[id]?.email || id,
     }));
-    // La caja de Mercado Pago solo existe si MP esta habilitado (todos los
-    // admins vincularon). Si no, quedaba una card y una columna enteras
-    // clavadas en cero. Se conserva igual si hay cobros MP historicos, para
-    // no esconder plata que ya entro.
-    const mpVisible = mpHabilitado(consultorio) || pagosMP.length > 0;
+    /* La caja de Mercado Pago solo existe si MP esta habilitado (todos los
+       admins vincularon); si no, quedaba una card y una columna enteras
+       clavadas en cero. Excepcion: si ESTE MES tuvo cobros por MP, la caja
+       aparece igual, porque esconderla seria esconder plata que entro. Se
+       mira el mes en curso y no toda la historia: con MP apagado, un cobro
+       de marzo no tiene por que dejar una columna vacia en julio. */
+    const hayMPEsteMes = pagosMP.some((pago) => {
+      const f = pago.createdAt?.toDate ? pago.createdAt.toDate()
+        : (pago.createdAt?.seconds !== undefined ? new Date(pago.createdAt.seconds * 1000) : null);
+      if (!f) return false;
+      const p2 = (n) => String(n).padStart(2, '0');
+      const iso = `${f.getFullYear()}-${p2(f.getMonth() + 1)}-${p2(f.getDate())}`;
+      return iso >= rangoMes.desde && iso <= rangoMes.hasta;
+    });
+    const mpVisible = mpHabilitado(consultorio) || hayMPEsteMes;
     const cajaMP = { id: CUENTA_MP, nombre: 'Mercado Pago', completo: 'Cobros por Mercado Pago' };
     return mpVisible ? [cajaMP, ...admins] : admins;
-  }, [consultorio, miembros, pagosMP.length]);
-
-  const rangoMes = useMemo(() => {
-    const y = mes.getFullYear(); const m = String(mes.getMonth() + 1).padStart(2, '0');
-    const ultimo = new Date(y, mes.getMonth() + 1, 0).getDate();
-    return { desde: `${y}-${m}-01`, hasta: `${y}-${m}-${String(ultimo).padStart(2, '0')}` };
-  }, [mes]);
+  }, [consultorio, miembros, pagosMP, rangoMes]);
 
   const { movimientos, totales, columnas } = useMemo(() => {
     const libro = armarLibro({

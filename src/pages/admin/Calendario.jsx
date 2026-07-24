@@ -60,7 +60,10 @@ function nombreProfesional(p) {
   return p.displayName || p.email || `Usuario ${p.uid.slice(0, 6)}`;
 }
 
-function nombrePaciente(p) {
+/* OJO: el calendario usa "Nombre Apellido", no "Apellido, Nombre" como el
+   resto. Se lee mejor en un turno. Se renombra para que no parezca la misma
+   funcion que la de lib/pacientes y alguien las unifique sin querer. */
+function nombreDeTurno(p) {
   return `${p.nombre ?? ''} ${p.apellido ?? ''}`.trim();
 }
 
@@ -475,7 +478,7 @@ function CitaModal({
   const sugerencias = useMemo(() => {
     const q = pacienteNombre.trim().toLowerCase();
     if (!q) return pacientes.slice(0, 5);
-    return pacientes.filter((p) => nombrePaciente(p).toLowerCase().includes(q)).slice(0, 5);
+    return pacientes.filter((p) => nombreDeTurno(p).toLowerCase().includes(q)).slice(0, 5);
   }, [pacienteNombre, pacientes]);
 
   const reglaActual = {
@@ -659,12 +662,12 @@ function CitaModal({
                   type="button"
                   className="cp-cal__acit"
                   onMouseDown={() => {
-                    setPacienteNombre(nombrePaciente(p));
+                    setPacienteNombre(nombreDeTurno(p));
                     setPacienteId(p.id);
                     setBuscando(false);
                   }}
                 >
-                  <span>{nombrePaciente(p)}</span>
+                  <span>{nombreDeTurno(p)}</span>
                   {p.obraSocialNumero && <small>{p.obraSocialNumero}</small>}
                 </button>
               ))}

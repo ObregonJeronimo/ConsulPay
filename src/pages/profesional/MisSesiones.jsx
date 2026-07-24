@@ -18,7 +18,7 @@ import {
   TIPOS_METODO_PAGO,
   TIPOS_SOLICITUD_SESION,
 } from '../../lib/constants.js';
-import { suscribirPacientesProfesional } from '../../lib/pacientes.js';
+import { nombrePaciente, suscribirPacientesProfesional } from '../../lib/pacientes.js';
 import {
   actualizarSesion,
   crearSesion,
@@ -93,9 +93,6 @@ const CheckIcon = () => (
 /* ============================================================
    Helpers
    ============================================================ */
-function nombrePaciente(p) {
-  return `${p.apellido ?? ''}${p.apellido && p.nombre ? ', ' : ''}${p.nombre ?? ''}`;
-}
 function inicialesPaciente(p) {
   return ((p.apellido?.[0] ?? '') + (p.nombre?.[0] ?? '')).toUpperCase() || '·';
 }

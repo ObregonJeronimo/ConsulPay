@@ -31,6 +31,7 @@ import { GroupBadge } from './Sesiones.jsx';
 import './Solicitudes.css';
 import './Solicitudes.receptor.css';
 import './Sesiones.css';
+import { nombrePaciente } from '../../lib/pacientes.js';
 
 /* ============================================================
    Iconos
@@ -86,10 +87,12 @@ const CheckIconSmall = () => (
 /* ============================================================
    Helpers
    ============================================================ */
-function nombrePaciente(p) {
-  if (!p) return null;
-  return `${p.apellido ?? ''}${p.apellido && p.nombre ? ', ' : ''}${p.nombre ?? ''}`;
+/* Igual que MisPagos: el formato es el central, el fallback es de esta
+   pantalla (null para poder decidir el texto en cada lugar). */
+function nombrePacienteONull(p) {
+  return p ? nombrePaciente(p) : null;
 }
+
 function inicialesPaciente(p) {
   return ((p.apellido?.[0] ?? '') + (p.nombre?.[0] ?? '')).toUpperCase() || '·';
 }
@@ -1126,7 +1129,7 @@ function FilaSolicitud({ s, mapaPacientes, mapaProfesionales, onSeleccionar }) {
           <div className="cp-prof-cell">
             <Avatar initials={inicialesPaciente(pac)} size={28} />
             <div className="cp-prof-name" style={{ fontSize: 13.5 }}>
-              {nombrePaciente(pac)}
+              {nombrePacienteONull(pac)}
               <GroupBadge cantidad={cantidad} />
             </div>
           </div>
@@ -1154,7 +1157,7 @@ function FilaSolicitud({ s, mapaPacientes, mapaProfesionales, onSeleccionar }) {
             <div className="cp-prof-cell">
               <Avatar initials={inicialesPaciente(pac)} size={26} />
               <div className="cp-prof-name">
-                {nombrePaciente(pac)}
+                {nombrePacienteONull(pac)}
                 <GroupBadge cantidad={cantidad} />
               </div>
             </div>
@@ -1232,7 +1235,7 @@ function DetalleModal({ solicitud, mapaPacientes, mapaProfesionales, mapaMetodos
   const pac = pacienteId ? mapaPacientes[pacienteId] : null;
   const nombrePac = solicitud.tipo === TIPOS_SOLICITUD_SESION.CREAR_PACIENTE
     ? `${solicitud.payloadPropuesto?.datosPaciente?.apellido || ''} ${solicitud.payloadPropuesto?.datosPaciente?.nombre || ''}`.trim() || 'Nuevo paciente'
-    : (nombrePaciente(pac) || solicitud.payloadPropuesto?.sesionSnapshot?.pacienteNombre || 'paciente');
+    : (nombrePacienteONull(pac) || solicitud.payloadPropuesto?.sesionSnapshot?.pacienteNombre || 'paciente');
 
   const cantidad = cantidadDePayload(solicitud.payloadPropuesto || solicitud.payloadAnterior);
 
@@ -1786,7 +1789,7 @@ function DiffSingle({ payload, pac, encabezado, tono }) {
         {pac && (
           <div className={`cp-diff__row cp-diff__row--single ${tono === 'eliminar' ? 'cp-diff__row--eliminar' : ''}`}>
             <div className="cp-diff__campo">Paciente</div>
-            <div className="cp-diff__valor">{nombrePaciente(pac)}</div>
+            <div className="cp-diff__valor">{nombrePacienteONull(pac)}</div>
           </div>
         )}
         {CAMPOS_DIFF.map(({ key, label }) => {
@@ -1820,8 +1823,8 @@ function DiffDoble({ anterior, propuesto, pac }) {
         {pac && (
           <div className="cp-diff__row">
             <div className="cp-diff__campo">Paciente</div>
-            <div className="cp-diff__valor">{nombrePaciente(pac)}</div>
-            <div className="cp-diff__valor">{nombrePaciente(pac)}</div>
+            <div className="cp-diff__valor">{nombrePacienteONull(pac)}</div>
+            <div className="cp-diff__valor">{nombrePacienteONull(pac)}</div>
           </div>
         )}
         {CAMPOS_DIFF.map(({ key, label }) => {
