@@ -3,6 +3,8 @@ import { Outlet, useLocation } from 'react-router-dom';
 
 import Sidebar from './Sidebar.jsx';
 import './AppShell.css';
+import { useAuth } from '../../hooks/useAuth.js';
+import { sincronizarDirectorioAdmins } from '../../lib/consultorios.js';
 
 /**
  * AppShell — wrapper de layout (sidebar + main).
@@ -45,6 +47,20 @@ function CloseIcon() {
 export default function AppShell() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
+  const { user } = useAuth();
+
+  /* El profesional no puede leer /usuarios de otros miembros, asi que los
+     nombres de los administradores viven denormalizados en el doc del
+     consultorio. Cada admin publica el suyo al entrar; si no es admin, la
+     funcion corta sola. Falla en silencio a proposito: es un dato de
+     conveniencia, no puede romperle la sesion a nadie. */
+  useEffect(() => {
+    if (!user?.uid || !user?.consultorioId) return;
+    const nombre = user.displayName || user.email;
+    if (!nombre) return;
+    sincronizarDirectorioAdmins(user.consultorioId, { uid: user.uid, nombre })
+      .catch(() => {});
+  }, [user?.uid, user?.consultorioId, user?.displayName, user?.email]);
 
   // Cerrar drawer al cambiar de ruta (cuando el user toca un NavItem)
   useEffect(() => {

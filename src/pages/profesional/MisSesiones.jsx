@@ -626,6 +626,7 @@ export default function MisSesiones() {
           mapaPacientes={mapaPacientes}
           mes={mes}
           user={user}
+          consultorio={consultorio}
           onClose={() => setMarcarMesOpen(false)}
         />
       )}
@@ -663,10 +664,26 @@ export default function MisSesiones() {
    genera una solicitud por sesion, que el admin ve agrupada por mes
    y aprueba en lote.
    ============================================================ */
-function MarcarMesPagadoModal({ sesiones, mapaPacientes, mes, user, onClose }) {
+function MarcarMesPagadoModal({ sesiones, mapaPacientes, mes, user, consultorio, onClose }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [progreso, setProgreso] = useState(0);
+
+  /* Los nombres de los admins salen del directorio denormalizado en el doc
+     del consultorio: el profesional no puede leer /usuarios de otros. Si
+     todavia no se publico ninguno (ningun admin entro desde que existe la
+     funcion), no se pide receptor y lo resuelve el admin al aprobar. */
+  const admins = useMemo(() => {
+    const dir = Array.isArray(consultorio?.adminsDirectorio) ? consultorio.adminsDirectorio : [];
+    const uids = consultorio?.adminUids || [];
+    return dir.filter((a) => uids.includes(a.uid));
+  }, [consultorio]);
+
+  const [receptorUid, setReceptorUid] = useState('');
+  const [fechaPago, setFechaPago] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
 
   const total = useMemo(
     () => sesiones.reduce((acc, x) => acc + (x.montoConsultorio || 0), 0),
@@ -698,8 +715,22 @@ function MarcarMesPagadoModal({ sesiones, mapaPacientes, mes, user, onClose }) {
     });
   }, [sesiones, mapaPacientes]);
 
+  const receptorElegido = useMemo(() => {
+    const a = admins.find((x) => x.uid === receptorUid);
+    return a ? { uid: a.uid, nombre: a.nombre } : null;
+  }, [admins, receptorUid]);
+
+  const fechaPagoDate = useMemo(
+    () => (fechaPago ? new Date(`${fechaPago}T12:00:00`) : null),
+    [fechaPago],
+  );
+
   async function confirmar() {
     setError('');
+    if (admins.length > 0 && !receptorUid) {
+      setError('Elegí a quién le pagaste.');
+      return;
+    }
     setSubmitting(true);
     let hechas = 0;
     try {
@@ -717,7 +748,12 @@ function MarcarMesPagadoModal({ sesiones, mapaPacientes, mes, user, onClose }) {
             valorTotal: ses.valorTotal || 0,
             montoConsultorio: Number(ses.montoConsultorio) || 0,
           },
-          // Sin receptor: lo define el admin al aprobar (ver handleTogglePagado).
+          /* El receptor y la fecha son lo que DECLARA el profesional, no la
+             verdad final: el admin los ve precargados al aprobar y confirma
+             o corrige. Quien aprueba es el que dice haber recibido la plata,
+             asi que su decision pisa esto (ver aprobarSolicitud). */
+          receptor: receptorElegido,
+          fechaPago: fechaPagoDate,
         });
         hechas += 1;
         setProgreso(hechas);
@@ -767,6 +803,38 @@ function MarcarMesPagadoModal({ sesiones, mapaPacientes, mes, user, onClose }) {
             <strong>{formatoARS.format(total)}</strong>
           </div>
         </div>
+
+        {admins.length > 0 && (
+          <div className="cp-pago-datos">
+            <div className="cp-pago-datos__campo">
+              <span className="cp-pago-datos__label">¿A quién le pagaste?</span>
+              <div className="cp-pago-datos__opciones">
+                {admins.map((a) => (
+                  <button
+                    key={a.uid}
+                    type="button"
+                    className={`cp-pago-datos__opcion ${receptorUid === a.uid ? 'cp-pago-datos__opcion--on' : ''}`}
+                    onClick={() => setReceptorUid(a.uid)}
+                    aria-pressed={receptorUid === a.uid}
+                  >
+                    {a.nombre}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="cp-pago-datos__campo">
+              <label className="cp-pago-datos__label" htmlFor="cp-fecha-pago">¿Qué día le pagaste?</label>
+              <input
+                id="cp-fecha-pago"
+                type="date"
+                className="cp-pago-datos__fecha"
+                value={fechaPago}
+                onChange={(e) => setFechaPago(e.target.value)}
+                max={new Date().toISOString().slice(0, 10)}
+              />
+            </div>
+          </div>
+        )}
 
         <div className="cp-aprobacion-nota">
           Queda pendiente hasta que el administrador la apruebe. Él las ve

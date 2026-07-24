@@ -328,3 +328,80 @@
   .cp-aprobacion-banner { padding: 10px 14px; }
   .cp-aprobacion-banner p { margin: 2px 0 0; font-size: 12.5px; line-height: 1.4; }
 }
+
+/* ============================================================
+   Datos del pago declarados por el profesional
+   ----------------------------------------------------------------
+   Quien recibio la plata y cuando. Son una declaracion, no la verdad
+   final: el admin los confirma o los corrige al aprobar.
+   ============================================================ */
+.cp-pago-datos {
+  display: grid;
+  gap: 14px;
+  margin: 16px 0;
+  padding: 14px 16px;
+  background: var(--cp-surface-sunken);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-lg);
+}
+
+.cp-pago-datos__label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--cp-text-muted);
+  margin-bottom: 8px;
+}
+
+.cp-pago-datos__opciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cp-pago-datos__opcion {
+  flex: 1 1 auto;
+  min-width: 120px;
+  padding: 10px 14px;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  background: var(--cp-surface);
+  color: var(--cp-text);
+  font-family: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: border-color var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-pago-datos__opcion:hover { border-color: var(--cp-border-strong); }
+
+.cp-pago-datos__opcion--on {
+  border-color: var(--cp-accent);
+  background: var(--cp-accent-bg);
+  color: var(--cp-accent-dark);
+}
+
+.cp-pago-datos__opcion:focus-visible {
+  outline: none;
+  box-shadow: var(--cp-shadow-focus);
+}
+
+.cp-pago-datos__fecha {
+  width: 100%;
+  padding: 10px 13px;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  background: var(--cp-surface);
+  color: var(--cp-text);
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.cp-pago-datos__fecha:focus {
+  outline: none;
+  border-color: var(--cp-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cp-pago-datos__opcion { transition: none; }
+}

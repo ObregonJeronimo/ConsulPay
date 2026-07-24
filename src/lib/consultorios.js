@@ -5,7 +5,7 @@
  * actual a admin/owner de ese consultorio.
  */
 
-import { doc, runTransaction, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, runTransaction, serverTimestamp, updateDoc } from 'firebase/firestore';
 
 import { db } from './firebase.js';
 import { obtenerConfigGlobal } from './configGlobal.js';
@@ -135,4 +135,40 @@ export async function crearConsultorio(params) {
   });
 
   return { consultorioId: consultorioRef.id };
+}
+
+/* ============================================================
+   Directorio de administradores
+   ----------------------------------------------------------------
+   Un profesional NO puede leer /usuarios de otros miembros (ver las
+   security rules), asi que no tiene forma de saber como se llaman los
+   administradores. Pero SI puede leer el doc del consultorio. Por eso
+   los nombres se denormalizan aca: es el unico lugar que las dos
+   partes pueden ver sin abrir la lectura de /usuarios.
+
+   Cada admin mantiene su propia entrada al entrar a la app. No hay un
+   proceso que lo sincronice todo junto: si un admin cambia su nombre,
+   la proxima vez que abre ConsulPay se corrige solo.
+   ============================================================ */
+export async function sincronizarDirectorioAdmins(consultorioId, admin) {
+  if (!consultorioId || !admin?.uid || !admin?.nombre) return;
+
+  const ref = doc(db, 'consultorios', consultorioId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return;
+
+  const data = snap.data();
+  // Solo los administradores figuran en el directorio.
+  if (!(data.adminUids || []).includes(admin.uid)) return;
+
+  const actual = Array.isArray(data.adminsDirectorio) ? data.adminsDirectorio : [];
+  const mio = actual.find((a) => a.uid === admin.uid);
+  if (mio && mio.nombre === admin.nombre) return; // ya esta al dia
+
+  // Se reescribe la entrada propia y se descartan las de quienes ya no
+  // son admins, para que el selector no ofrezca a alguien que se fue.
+  const limpio = actual.filter((a) => a.uid !== admin.uid && (data.adminUids || []).includes(a.uid));
+  await updateDoc(ref, {
+    adminsDirectorio: [...limpio, { uid: admin.uid, nombre: admin.nombre }],
+  });
 }

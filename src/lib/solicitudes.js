@@ -463,8 +463,13 @@ export async function aprobarSolicitud({
     const receptor = receptorOverride
       || sol.payloadPropuesto?.receptor
       || { uid: adminUid, nombre: adminNombre };
-    // Fecha de pago: la que eligió el admin al aprobar (override) o ahora
-    const fechaPago = fechaPagoOverride instanceof Date ? fechaPagoOverride : null;
+    /* Fecha de pago. Prioridad: lo que el admin eligio al aprobar, despues
+       lo que declaro el profesional al pedirlo, y si no hay nada, el momento
+       de la aprobacion (lo resuelve marcarSesionPagada). */
+    const declarada = sol.payloadPropuesto?.fechaPago;
+    const fechaDeclarada = declarada?.toDate ? declarada.toDate()
+      : (declarada?.seconds !== undefined ? new Date(declarada.seconds * 1000) : null);
+    const fechaPago = fechaPagoOverride instanceof Date ? fechaPagoOverride : fechaDeclarada;
     await marcarSesionPagada(sol.sesionId, adminUid, receptor, fechaPago);
     await actualizarSolicitudResuelta({ solicitudId, adminUid, adminNombre, estado: ESTADOS_SOLICITUD_SESION.APROBADA });
     return;
@@ -670,6 +675,7 @@ export async function solicitarMarcarPagada({
   sesionId,
   sesionSnapshot,
   receptor,
+  fechaPago,
 }) {
   // Evitar duplicados: si ya hay una solicitud pendiente para esta sesión,
   // no se crea otra (previene doble click y reintentos).
@@ -681,7 +687,12 @@ export async function solicitarMarcarPagada({
     profesionalUid,
     profesionalNombre,
     sesionId,
-    payloadPropuesto: { sesionSnapshot, receptor },
+    payloadPropuesto: {
+      sesionSnapshot,
+      receptor: receptor ?? null,
+      // Lo que declara el profesional. El admin lo puede pisar al aprobar.
+      fechaPago: fechaPago instanceof Date ? Timestamp.fromDate(fechaPago) : null,
+    },
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
