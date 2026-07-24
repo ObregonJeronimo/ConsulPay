@@ -6,10 +6,12 @@ import Badge from '../../components/ui/Badge.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
 
 import { useAuth } from '../../hooks/useAuth.js';
+import { useConsultorio } from '../../hooks/useConsultorio.js';
 import { useOverlayClose } from '../../hooks/useOverlayClose.js';
 import { ESTADOS_PAGO_SESION, formatoARS } from '../../lib/constants.js';
 import { suscribirPacientesConsultorio } from '../../lib/pacientes.js';
 import IngresosPorMes from './IngresosPorMes.jsx';
+import LibroCaja from './LibroCaja.jsx';
 import {
   labelEstadoPago,
   montoNetoEfectivo,
@@ -60,6 +62,7 @@ function formatoFechaHora(date) {
    ============================================================ */
 export default function PagosAdmin() {
   const { user } = useAuth();
+  const { consultorio } = useConsultorio();
   const consultorioId = user?.consultorioId;
 
   const [pagos, setPagos] = useState([]);
@@ -230,10 +233,17 @@ export default function PagosAdmin() {
           >
             Ingresos por mes
           </button>
+          <button
+            type="button"
+            className={`cp-pagos-canal-btn ${filtroCanal === 'libro' ? 'cp-pagos-canal-btn--active' : ''}`}
+            onClick={() => setFiltroCanal('libro')}
+          >
+            Ingresos y egresos
+          </button>
         </div>
 
         {/* Stats según canal seleccionado */}
-        {filtroCanal !== 'ingresos' && (<>
+        {filtroCanal !== 'ingresos' && filtroCanal !== 'libro' && (<>
         <div className="cp-pagos-resumen-mes">
           {(filtroCanal === 'ambos') && (
             <div className="cp-pagos-resumen-mes__card cp-pagos-resumen-mes__card--total">
@@ -300,7 +310,13 @@ export default function PagosAdmin() {
         )}
       </div>
 
-      {filtroCanal === 'ingresos' ? (
+      {filtroCanal === 'libro' ? (
+        <LibroCaja
+          consultorioId={consultorioId}
+          consultorio={consultorio}
+          uid={user?.uid}
+        />
+      ) : filtroCanal === 'ingresos' ? (
         <IngresosPorMes
           consultorioId={consultorioId}
           uid={user?.uid}

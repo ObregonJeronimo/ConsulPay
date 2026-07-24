@@ -386,3 +386,50 @@
 .cp-ingreso-mes__meta-sec {
   color: var(--cp-text-faint);
 }
+
+/* ============================================================
+   Desglose por receptor (quién cobró)
+   ----------------------------------------------------------------
+   Cada sesión pagada guarda quién recibió la plata. El total del mes
+   decía cuánto entró pero no a qué caja, que es justo lo que los
+   dueños necesitan para repartir.
+   ============================================================ */
+.cp-receptores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 16px 12px 16px;
+  margin-top: -4px;
+}
+
+.cp-receptores--compacto {
+  padding: 4px 0 0 0;
+  margin-top: 2px;
+}
+
+.cp-receptor {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--cp-radius-pill);
+  background: var(--cp-surface-sunken);
+  border: 1px solid var(--cp-border);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.cp-receptor__nombre { color: var(--cp-text-muted); }
+
+.cp-receptor__monto {
+  font-family: var(--cp-font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--cp-text);
+}
+
+.cp-receptores--compacto .cp-receptor {
+  padding: 2px 8px;
+  font-size: 11.5px;
+  background: var(--cp-bg);
+}

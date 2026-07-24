@@ -452,6 +452,33 @@ service cloud.firestore {
     }
 
     // ============================================================
+    //  /gastos/{gastoId} — egresos del libro de caja
+    // ------------------------------------------------------------
+    //  Solo el staff del consultorio. Los profesionales no ven ni tocan
+    //  la caja: es informacion de los dueños, no del reparto de sesiones.
+    // ============================================================
+    match /gastos/{gastoId} {
+
+      allow read: if esSuperadmin() || esStaffDe(resource.data.consultorioId);
+
+      allow create: if esStaffDe(request.resource.data.consultorioId)
+        && request.resource.data.consultorioId is string
+        && request.resource.data.fecha is string
+        && request.resource.data.cuenta is string
+        && request.resource.data.motivo is string
+        && request.resource.data.motivo.size() > 0
+        && request.resource.data.monto is number
+        && request.resource.data.monto > 0;
+
+      allow update: if esStaffDe(resource.data.consultorioId)
+        && request.resource.data.consultorioId == resource.data.consultorioId
+        && request.resource.data.monto is number
+        && request.resource.data.monto > 0;
+
+      allow delete: if esStaffDe(resource.data.consultorioId);
+    }
+
+    // ============================================================
     //  /solicitudes_sesion/{solicitudId}
     // ============================================================
     match /solicitudes_sesion/{solicitudId} {

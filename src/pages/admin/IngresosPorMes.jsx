@@ -52,6 +52,41 @@ function inputDeFecha(d) {
   const pad = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
+/*
+  Cuanto entro a la caja de cada administrador.
+
+  Cada sesion pagada guarda receptorUid/receptorNombre, o sea quien cobro.
+  Sin esto el total del mes decia cuanto entro pero no a quien, que es
+  justo lo que necesitan los dueños para repartir.
+*/
+function desglosePorReceptor(sesiones) {
+  const map = {};
+  for (const s of sesiones) {
+    const uid = s.receptorUid || 'sin_asignar';
+    if (!map[uid]) {
+      map[uid] = { uid, nombre: s.receptorNombre || 'Sin asignar', total: 0 };
+    }
+    map[uid].total += s.montoConsultorio || 0;
+  }
+  return Object.values(map).sort((a, b) => b.total - a.total);
+}
+
+function ChipsReceptores({ sesiones, compacto }) {
+  const filas = desglosePorReceptor(sesiones);
+  // Con un solo receptor el desglose no aporta: el total ya lo dice todo.
+  if (filas.length <= 1) return null;
+  return (
+    <div className={`cp-receptores ${compacto ? 'cp-receptores--compacto' : ''}`}>
+      {filas.map((f) => (
+        <span key={f.uid} className="cp-receptor" title={`Cobrado por ${f.nombre}`}>
+          <span className="cp-receptor__nombre">{f.nombre.split(/\s+/)[0]}</span>
+          <span className="cp-receptor__monto">{formatoARS.format(f.total)}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function nombrePac(sesion, mapaPacientes) {
   const pac = mapaPacientes[sesion.pacienteId];
   if (pac) return `${pac.apellido ?? ''}${pac.apellido && pac.nombre ? ', ' : ''}${pac.nombre ?? ''}`;
@@ -163,6 +198,10 @@ export default function IngresosPorMes({ consultorioId, uid, mapaProfesionales, 
               </span>
               <span className="cp-ingreso-mes__total">{formatoARS.format(mes.total)}</span>
             </button>
+
+            {/* Cuanto de ese total entro a la caja de cada administrador.
+                Va fuera del <button> porque el header ya es clickeable. */}
+            <ChipsReceptores sesiones={mes.sesiones} />
 
             {abierto && (
               <div className="cp-ingreso-mes__body">
@@ -298,6 +337,10 @@ function FilaProfesional({ fila, mapaPacientes }) {
               <span className="cp-ingreso-fila__badge">{desglose.length} meses</span>
             )}
           </span>
+          {/* De lo que se cobro de este profesional, cuanto entro a cada
+              caja. Es el dato que faltaba para saber quien tiene que
+              rendirle a quien. */}
+          <ChipsReceptores sesiones={fila.sesiones} compacto />
         </div>
         <span className="cp-ingreso-fila__monto">{formatoARS.format(fila.total)}</span>
       </button>
