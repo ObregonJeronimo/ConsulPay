@@ -1252,7 +1252,11 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, puede
                 </td>
                 <td className="cp-sesiones-tabla__actions-cell" onClick={(e) => e.stopPropagation()}>
                   <div className="cp-sesiones-tabla__actions">
-                    {pendienteMonto && !tienePendiente ? (
+                    {/* Las acciones son ADITIVAS, no excluyentes. Antes esto era
+                        una cadena de ternarios: la rama de obra social devolvia
+                        un solo boton y se comia editar / eliminar / marcar
+                        pagada, que no tienen nada que ver con liquidar. */}
+                    {pendienteMonto && !tienePendiente && (
                       <button
                         className="cp-icon-btn cp-icon-btn--success"
                         onClick={() => onLiquidar(s)}
@@ -1261,7 +1265,8 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, puede
                       >
                         <CheckIcon />
                       </button>
-                    ) : s.metodoPagoTipo === TIPOS_METODO_PAGO.DIFERIDO && !pagada && !tienePendiente ? (
+                    )}
+                    {s.metodoPagoTipo === TIPOS_METODO_PAGO.DIFERIDO && !pendienteMonto && !pagada && !tienePendiente && (
                       <button
                         className="cp-icon-btn"
                         onClick={() => onLiquidar(s)}
@@ -1270,30 +1275,39 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, puede
                       >
                         <EditIcon />
                       </button>
-                    ) : (
-                      <>
-                        <button
-                          className="cp-icon-btn"
-                          onClick={() => onEditar(s)}
-                          title={tienePendiente ? 'Hay una solicitud pendiente para esta sesión' : 'Editar'}
-                          aria-label="Editar"
-                          disabled={accionesDisabled}
-                        >
-                          <EditIcon />
-                        </button>
-                        {/* Sesión pagada: el profesional NO puede eliminarla, solo el admin */}
-                        {!pagada && (
-                          <button
-                            className="cp-icon-btn cp-icon-btn--danger"
-                            onClick={() => onEliminar(s)}
-                            title={tienePendiente ? 'Hay una solicitud pendiente para esta sesión' : 'Eliminar'}
-                            aria-label="Eliminar"
-                            disabled={tienePendiente}
-                          >
-                            <TrashIcon />
-                          </button>
-                        )}
-                      </>
+                    )}
+                    {/* Marcar como pagada: manda solicitud al admin. Ya existia
+                        en el menu mobile, faltaba en desktop. */}
+                    {puedeMarcarPagadas && !pagada && !pendienteMonto && !tienePendiente && (
+                      <button
+                        className="cp-icon-btn cp-icon-btn--success"
+                        onClick={() => onTogglePagado(s)}
+                        title="Marcar como pagada (requiere aprobación del admin)"
+                        aria-label="Marcar como pagada"
+                      >
+                        <CheckIcon />
+                      </button>
+                    )}
+                    <button
+                      className="cp-icon-btn"
+                      onClick={() => onEditar(s)}
+                      title={tienePendiente ? 'Hay una solicitud pendiente para esta sesión' : 'Editar'}
+                      aria-label="Editar"
+                      disabled={accionesDisabled}
+                    >
+                      <EditIcon />
+                    </button>
+                    {/* Sesión pagada: el profesional NO puede eliminarla, solo el admin */}
+                    {!pagada && (
+                      <button
+                        className="cp-icon-btn cp-icon-btn--danger"
+                        onClick={() => onEliminar(s)}
+                        title={tienePendiente ? 'Hay una solicitud pendiente para esta sesión' : 'Eliminar'}
+                        aria-label="Eliminar"
+                        disabled={tienePendiente}
+                      >
+                        <TrashIcon />
+                      </button>
                     )}
                   </div>
                 </td>
