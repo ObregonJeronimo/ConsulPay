@@ -103,6 +103,13 @@ export async function crearConsultorio(params) {
       cuit: cuit.trim(),
       ownerUid,
       adminUids: [ownerUid],
+      /* Directorio de nombres visibles para el profesional, sembrado desde
+         el minuto cero. Se mantiene despues en lib/admins.js al promover o
+         remover administradores. */
+      adminsDirectorio: [{
+        uid: ownerUid,
+        nombre: userData.displayName || userData.email || ownerUid,
+      }],
       // Modelo de circulación del dinero (ver MODELOS_REPARTO en constants).
       // Se elige al crear el consultorio y condiciona el comportamiento de
       // los paneles. Inmutable por ahora desde la UI (se podría permitir
@@ -138,17 +145,16 @@ export async function crearConsultorio(params) {
 }
 
 /* ============================================================
-   Directorio de administradores
+   Directorio de administradores — reparacion para consultorios viejos
    ----------------------------------------------------------------
-   Un profesional NO puede leer /usuarios de otros miembros (ver las
-   security rules), asi que no tiene forma de saber como se llaman los
-   administradores. Pero SI puede leer el doc del consultorio. Por eso
-   los nombres se denormalizan aca: es el unico lugar que las dos
-   partes pueden ver sin abrir la lectura de /usuarios.
+   El directorio se mantiene solo: se siembra al crear el consultorio y
+   se actualiza en lib/admins.js cuando se promueve o remueve un admin.
+   Un consultorio nuevo NO necesita que nadie entre a la app.
 
-   Cada admin mantiene su propia entrada al entrar a la app. No hay un
-   proceso que lo sincronice todo junto: si un admin cambia su nombre,
-   la proxima vez que abre ConsulPay se corrige solo.
+   Esta funcion existe solo para los consultorios que ya existian antes
+   de que el campo se creara, y para reparar el dato si quedo desfasado
+   (por ejemplo, un admin que cambio su displayName). Corre al abrir la
+   app y no escribe nada si ya esta al dia.
    ============================================================ */
 export async function sincronizarDirectorioAdmins(consultorioId, admin) {
   if (!consultorioId || !admin?.uid) return;

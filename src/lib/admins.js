@@ -115,6 +115,29 @@ function validarCallerEsOwner(consData, callerUid) {
  * @throws Error si ya hay 2 admins, si el usuario no pertenece al consultorio,
  *               si no esta activo, o si ya es admin.
  */
+
+/* ============================================================
+   Directorio de admins (nombres visibles para el profesional)
+   ----------------------------------------------------------------
+   Un profesional no puede leer /usuarios de otros miembros, asi que
+   necesita los nombres denormalizados en el doc del consultorio para
+   poder decir a quien le pago.
+
+   Se mantiene ACA, en el momento en que cambia quien es admin, y no
+   dependiendo de que alguien abra la app: en un consultorio recien
+   vendido tiene que funcionar desde el primer dia.
+   ============================================================ */
+function directorioCon(consData, uid, nombre) {
+  const actual = Array.isArray(consData?.adminsDirectorio) ? consData.adminsDirectorio : [];
+  const sinEl = actual.filter((a) => a.uid !== uid);
+  return nombre ? [...sinEl, { uid, nombre }] : sinEl;
+}
+
+function directorioSin(consData, uid) {
+  const actual = Array.isArray(consData?.adminsDirectorio) ? consData.adminsDirectorio : [];
+  return actual.filter((a) => a.uid !== uid);
+}
+
 export async function promoverAAdmin({ consultorioId, callerUid, nuevoUid }) {
   if (!consultorioId) throw new Error('consultorioId requerido');
   if (!callerUid) throw new Error('callerUid requerido');
@@ -168,6 +191,9 @@ export async function promoverAAdmin({ consultorioId, callerUid, nuevoUid }) {
     // 1. Agregar al array de admins del consultorio
     tx.update(consRef, {
       adminUids: arrayUnion(nuevoUid),
+      // El nombre viaja junto con el alta: asi el profesional lo ve sin que
+      // el nuevo admin tenga que entrar a la app siquiera una vez.
+      adminsDirectorio: directorioCon(consData, nuevoUid, userData.displayName || userData.email || null),
       updatedAt: serverTimestamp(),
     });
 
@@ -310,6 +336,7 @@ export async function removerAdmin({ consultorioId, callerUid, uidARemover }) {
     // 1. Sacar del array
     tx.update(consRef, {
       adminUids: arrayRemove(uidARemover),
+      adminsDirectorio: directorioSin(consData, uidARemover),
       updatedAt: serverTimestamp(),
     });
 

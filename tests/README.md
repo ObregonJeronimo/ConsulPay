@@ -1,0 +1,31 @@
+# Suite de verificación
+
+Renderiza los componentes reales contra jsdom, con Firestore stubeado en
+memoria. No toca la base ni necesita credenciales.
+
+## Correr
+
+```bash
+cd tests
+npm install esbuild react react-dom jsdom react-router-dom
+node build.mjs && node suite.bundle.mjs
+```
+
+Sale con código 1 si algo falla, así que sirve para un pre-push hook.
+
+## Qué cubre
+
+1. `mpHabilitado` — la regla de "todos los admins vincularon"
+2. `nombrePaciente` centralizado
+3. Libro de caja — caja MP, selector de mes único, agrupación, cierre, celdas mobile
+4. Mis sesiones — orden alfabético con acentos, acciones por fila
+5. Marcar como pagado — selección multi-mes y desglose
+6. Aprobación del admin — precarga de lo declarado por el profesional
+7. Mis pagos — sección de MP condicionada
+8. Pagos del admin — pestañas MP condicionadas
+9. Directorio de admins — alta, baja y siembra al crear el consultorio
+
+## Límite conocido
+
+jsdom no calcula layout: se verifica la estructura del DOM, no cómo se ve.
+Para lo visual hace falta un navegador.

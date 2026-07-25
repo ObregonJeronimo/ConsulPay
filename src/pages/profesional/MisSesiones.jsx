@@ -671,7 +671,7 @@ export default function MisSesiones() {
    genera una solicitud por sesion, que el admin ve agrupada por mes
    y aprueba en lote.
    ============================================================ */
-function MarcarMesPagadoModal({ sesiones, mapaPacientes, mes, user, consultorio, onClose }) {
+export function MarcarMesPagadoModal({ sesiones, mapaPacientes, mes, user, consultorio, onClose }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [progreso, setProgreso] = useState(0);

@@ -846,7 +846,7 @@ function GrupoSolicitudes({ grupo, onSeleccionar, admins, adminUid, adminNombre 
    Procesa cada una por separado; al final informa cuántas se
    aprobaron y cuántas fallaron (p.ej. ya estaban pagadas).
    ============================================================ */
-function AprobarGrupoModal({ grupo, pendientes, esMarcarPagada, admins, adminUid, adminNombre, onClose }) {
+export function AprobarGrupoModal({ grupo, pendientes, esMarcarPagada, admins, adminUid, adminNombre, onClose }) {
   const overlayProps = useOverlayClose(onClose);
   // Precarga con lo que declaro el profesional: si varias solicitudes del
   // grupo lo traen, se usa la primera (vienen del mismo envio).
