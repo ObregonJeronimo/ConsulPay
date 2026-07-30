@@ -25,6 +25,7 @@ import {
   crearPaciente,
   actualizarPaciente,
   getMetodosPaciente,
+  getMetodosPagoIds,
   getProfesionalesUids,
   reactivarPaciente,
   suscribirPacientesConsultorio,
@@ -153,6 +154,7 @@ export default function Pacientes() {
   const [editandoPaciente, setEditandoPaciente] = useState(null); // null | 'nuevo' | paciente
   const [archivandoPaciente, setArchivandoPaciente] = useState(null); // null | paciente
   const [verArchivados, setVerArchivados] = useState(false);
+  const [planillaAbierta, setPlanillaAbierta] = useState(false); // TEMPORAL
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -217,8 +219,12 @@ export default function Pacientes() {
       list = list.filter((p) => getProfesionalesUids(p).includes(filtroProfesional));
     }
 
+    // Igual que el filtro de profesional: un paciente puede tener varios
+    // metodos. Antes esto comparaba solo contra metodoPagoId (el campo
+    // viejo), asi que filtrar por APROSS escondia a los pacientes que lo
+    // tenian como segundo metodo.
     if (filtroMetodo !== 'todos') {
-      list = list.filter((p) => p.metodoPagoId === filtroMetodo);
+      list = list.filter((p) => getMetodosPagoIds(p).includes(filtroMetodo));
     }
 
     const q = busqueda.trim().toLowerCase();
@@ -235,11 +241,17 @@ export default function Pacientes() {
   }, [pacientesActivos, busqueda, filtroProfesional, filtroMetodo]);
 
   /* TEMPORAL — planilla en blanco para que los profesionales anoten a mano.
-     Exporta TODOS los activos, sin aplicar los filtros de la pantalla: la
-     idea es repartir la lista completa, no la vista que quedo en pantalla.
-     Cuando no haga falta mas, se borra este bloque y el boton de abajo. */
-  function exportarPlanillaPacientes() {
-    const nombres = pacientesActivos
+     No aplica los filtros de la pantalla: el metodo se elige en el modal,
+     asi lo que se descarga no depende de como quedo la vista.
+     Cuando no haga falta mas, se borra este bloque, el modal y el boton. */
+  function exportarPlanillaPacientes(metodoId) {
+    const elegidos = metodoId === 'todos'
+      ? pacientesActivos
+      // Un paciente con APROSS + particular entra en las dos planillas: en
+      // ambos casos el profesional lo atiende y lo tiene que anotar.
+      : pacientesActivos.filter((p) => getMetodosPagoIds(p).includes(metodoId));
+
+    const nombres = elegidos
       .map((p) => nombreCompleto(p).trim())
       .filter(Boolean)
       .sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
@@ -254,10 +266,17 @@ export default function Pacientes() {
     const p2 = (n) => String(n).padStart(2, '0');
     const fecha = `${hoy.getFullYear()}-${p2(hoy.getMonth() + 1)}-${p2(hoy.getDate())}`;
 
+    const metodo = metodos.find((m) => m.id === metodoId);
+    const etiqueta = metodo ? metodo.nombre : 'todos';
+    // El nombre del metodo va al archivo y a la solapa: si se imprimen
+    // varias planillas juntas, hay que poder distinguirlas.
+    const sufijo = etiqueta.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
     descargarBlob(
-      construirXlsx(filas, { hoja: 'Pacientes', anchos: [38, 30] }),
-      `pacientes-${fecha}.xlsx`,
+      construirXlsx(filas, { hoja: metodo ? metodo.nombre : 'Pacientes', anchos: [38, 30] }),
+      `pacientes-${sufijo}-${fecha}.xlsx`,
     );
+    setPlanillaAbierta(false);
   }
 
   const activosTotal = pacientesActivos.length;
@@ -356,7 +375,7 @@ export default function Pacientes() {
             {/* TEMPORAL — ver exportarPlanillaPacientes. Se borra junto con el handler. */}
             <Button
               variant="secondary"
-              onClick={exportarPlanillaPacientes}
+              onClick={() => setPlanillaAbierta(true)}
               disabled={activosTotal === 0}
               title="Descarga la lista de pacientes activos con una columna vacía para anotar"
             >
@@ -450,6 +469,16 @@ export default function Pacientes() {
           metodos={metodos}
           onClose={() => setEditandoPaciente(null)}
           onGuardar={handleGuardar}
+        />
+      )}
+
+      {/* TEMPORAL — ver exportarPlanillaPacientes. */}
+      {planillaAbierta && (
+        <PlanillaModal
+          pacientes={pacientesActivos}
+          metodos={metodos}
+          onDescargar={exportarPlanillaPacientes}
+          onCerrar={() => setPlanillaAbierta(false)}
         />
       )}
 
@@ -760,6 +789,90 @@ function PacientesTabla({
         </tbody>
       </table>
     </DualScrollTable>
+  );
+}
+
+/* ============================================================
+   TEMPORAL — Planilla de pacientes en blanco
+   ----------------------------------------------------------------
+   Se elige el metodo de pago antes de bajar el archivo, para poder
+   repartirle a cada profesional solo la lista que le sirve. Se muestra
+   cuantos pacientes entran en cada opcion: es la unica forma de darse
+   cuenta antes de imprimir que un metodo quedo vacio.
+
+   Se borra junto con exportarPlanillaPacientes y su boton.
+   ============================================================ */
+function PlanillaModal({ pacientes, metodos, onDescargar, onCerrar }) {
+  const [elegido, setElegido] = useState('todos');
+  const overlayProps = useOverlayClose(onCerrar);
+
+  // Un paciente con dos metodos suma en los dos: por eso la suma de los
+  // contadores puede dar mas que el total, y esta bien que asi sea.
+  const conteos = useMemo(() => {
+    const m = { todos: pacientes.length };
+    for (const met of metodos) {
+      m[met.id] = pacientes.filter((p) => getMetodosPagoIds(p).includes(met.id)).length;
+    }
+    return m;
+  }, [pacientes, metodos]);
+
+  const opciones = [
+    { id: 'todos', nombre: 'Todos los pacientes' },
+    ...metodos.map((m) => ({ id: m.id, nombre: m.nombre })),
+  ];
+
+  return (
+    <div className="cp-modal-overlay" {...overlayProps}>
+      <div className="cp-modal" onClick={(e) => e.stopPropagation()}>
+        <button className="cp-modal__close" onClick={onCerrar} aria-label="Cerrar">×</button>
+
+        <h2 className="cp-modal__title">Descargar planilla</h2>
+        <p className="cp-modal__sub">
+          Elegí qué pacientes entran. La columna de profesionales va vacía para
+          que la completen a mano.
+        </p>
+
+        <div className="cp-planilla-opciones" role="radiogroup" aria-label="Método de pago">
+          {opciones.map((o) => {
+            const on = elegido === o.id;
+            const cuantos = conteos[o.id] ?? 0;
+            return (
+              <button
+                key={o.id}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                className={`cp-planilla-opcion ${on ? 'cp-planilla-opcion--on' : ''}`}
+                onClick={() => setElegido(o.id)}
+                disabled={cuantos === 0}
+              >
+                <span className={`cp-check ${on ? 'cp-check--on' : ''}`} aria-hidden="true">{on ? '✓' : ''}</span>
+                <span className="cp-planilla-opcion__nombre">{o.nombre}</span>
+                <span className="cp-planilla-opcion__cant">
+                  {cuantos === 0 ? 'sin pacientes' : `${cuantos} paciente${cuantos === 1 ? '' : 's'}`}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <p className="cp-planilla-nota">
+          Un paciente con más de un método aparece en la planilla de cada uno.
+        </p>
+
+        <div className="cp-modal__actions">
+          <Button variant="secondary" type="button" onClick={onCerrar}>Cancelar</Button>
+          <Button
+            variant="primary"
+            type="button"
+            onClick={() => onDescargar(elegido)}
+            disabled={(conteos[elegido] ?? 0) === 0}
+          >
+            Descargar {conteos[elegido] ?? 0} paciente{(conteos[elegido] ?? 0) === 1 ? '' : 's'}
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 

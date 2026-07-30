@@ -350,28 +350,104 @@ console.log('\n[10] Planilla de pacientes (xlsx)');
   const t2 = new TextDecoder().decode(new Uint8Array(await b2.arrayBuffer()));
   chequeo('sanea el nombre de la solapa', t2.includes('name="Pacientes2026"'), '');
 
-  // Y que la pagina exponga el boton y lo deshabilite sin pacientes.
+  // ---- Helper de metodos: el bug del filtro que solo miraba el campo viejo
+  const { getMetodosPagoIds } = await import('/home/claude/ConsulPay/src/lib/pacientes.js');
+  chequeo('lee el array metodosPagoIds',
+    getMetodosPagoIds({ metodosPagoIds: ['apross', 'part'] }).length === 2);
+  chequeo('cae al campo viejo metodoPagoId',
+    getMetodosPagoIds({ metodoPagoId: 'apross' })[0] === 'apross');
+  chequeo('el array vacio no tapa al campo viejo',
+    getMetodosPagoIds({ metodosPagoIds: [], metodoPagoId: 'apross' })[0] === 'apross');
+  chequeo('paciente sin metodos no explota', getMetodosPagoIds({}).length === 0);
+
+  // ---- Flujo real: abrir el modal, elegir metodo y bajar el archivo
   const { default: Pacientes } = await import('/home/claude/ConsulPay/src/pages/admin/Pacientes.jsx');
   globalThis.__USER__ = { uid: 'A', consultorioId: 'C1', rol: 'admin', displayName: 'Adriana' };
-  globalThis.__CONS__ = { adminUids: ['A'], mpConfigs: {},
-    metodosPagoPaciente: [{ id: 'm1', nombre: 'Particular', porcentajeConsultorio: 20, tipo: 'inmediato' }] };
-  const pac = (id, ap, no, estado = 'activo') => ({
-    id, consultorioId: 'C1', apellido: ap, nombre: no, estado, profesionalesUids: ['PRO'], metodoPagoId: 'm1',
+  globalThis.__CONS__ = { adminUids: ['A'], mpConfigs: {}, metodosPagoPaciente: [
+    { id: 'apross', nombre: 'APROSS', porcentajeConsultorio: 22, tipo: 'diferido' },
+    { id: 'part', nombre: 'Particular', porcentajeConsultorio: 25, tipo: 'inmediato' },
+    { id: 'osde', nombre: 'OSDE', porcentajeConsultorio: 20, tipo: 'diferido' },
+  ] };
+  const pac = (id, ap, no, mets, estado = 'activo', legacy = null) => ({
+    id, consultorioId: 'C1', apellido: ap, nombre: no, estado, profesionalesUids: ['PRO'],
+    ...(legacy ? { metodoPagoId: legacy } : { metodosPagoIds: mets }),
   });
   globalThis.__DATA__ = {
-    pacientes: [pac('p1', 'Zarate', 'Zulema'), pac('p2', 'Álvarez', 'Ana'), pac('p3', 'Archivado', 'No Va', 'archivado')],
+    pacientes: [
+      pac('p1', 'Zarate', 'Zulema', ['apross']),
+      pac('p2', 'Álvarez', 'Ana', ['part']),
+      pac('p3', 'Muñoz', 'Ángel', ['apross', 'part']),        // dos metodos
+      pac('p4', 'Élez', 'Bruno', ['apross']),
+      pac('p5', 'Moyano', 'Delfina', ['part']),
+      pac('p6', 'Perez & Cia', 'Juan', null, 'activo', 'apross'), // campo viejo
+      pac('p7', 'Archivado', 'No Va', ['apross'], 'archivado'),
+    ],
     usuarios: [{ id: 'PRO', uid: 'PRO', displayName: 'Gabriela', consultorioId: 'C1', rol: 'profesional', estado: 'activo' }],
     sesiones: [], solicitudes_sesion: [], pagos_consultorio: [], gastos: [],
   };
-  let r = await montar(Pacientes, {});
-  let btn = [...r.cont.querySelectorAll('button')].find((b) => b.textContent.includes('Descargar planilla'));
-  chequeo('el boton aparece en Pacientes', !!btn);
-  chequeo('esta habilitado si hay activos', btn && !btn.disabled);
 
-  globalThis.__DATA__ = { ...globalThis.__DATA__, pacientes: [pac('p3', 'Archivado', 'No Va', 'archivado')] };
-  r = await montar(Pacientes, {});
-  btn = [...r.cont.querySelectorAll('button')].find((b) => b.textContent.includes('Descargar planilla'));
-  chequeo('se deshabilita si solo hay archivados', !btn || btn.disabled);
+  // Interceptar la descarga sin escribir a disco
+  let capturado = null; let nombreArchivo = null;
+  const crearURL = dom.window.URL.createObjectURL;
+  dom.window.URL.createObjectURL = (b) => { capturado = b; return 'blob:fake'; };
+  dom.window.URL.revokeObjectURL = () => {};
+  global.URL = dom.window.URL;
+  dom.window.HTMLAnchorElement.prototype.click = function () { if (this.download) nombreArchivo = this.download; };
+
+  const r = await montar(Pacientes, {});
+  const abrir = () => clic([...r.cont.querySelectorAll('button')].find((b) => b.textContent.includes('Descargar planilla')));
+  chequeo('el boton aparece en Pacientes',
+    !![...r.cont.querySelectorAll('button')].find((b) => b.textContent.includes('Descargar planilla')));
+
+  await act(async () => { abrir(); });
+  const leerOpciones = () => [...r.cont.querySelectorAll('.cp-planilla-opcion')].map((o) => ({
+    nombre: o.querySelector('.cp-planilla-opcion__nombre').textContent.trim(),
+    cant: o.querySelector('.cp-planilla-opcion__cant').textContent.trim(),
+    off: o.disabled,
+  }));
+  const ops = leerOpciones();
+  chequeo('ofrece todos los metodos del consultorio',
+    ops.map((o) => o.nombre).join('|') === 'Todos los pacientes|APROSS|Particular|OSDE', `(${ops.map((o) => o.nombre)})`);
+  chequeo('cuenta bien APROSS (incluye el de 2 metodos y el legacy)',
+    ops.find((o) => o.nombre === 'APROSS').cant === '4 pacientes', `(${ops.find((o) => o.nombre === 'APROSS').cant})`);
+  chequeo('cuenta bien Particular (incluye el de 2 metodos)',
+    ops.find((o) => o.nombre === 'Particular').cant === '3 pacientes');
+  chequeo('el archivado no se cuenta',
+    ops.find((o) => o.nombre === 'Todos los pacientes').cant === '6 pacientes');
+  chequeo('un metodo sin pacientes queda deshabilitado',
+    ops.find((o) => o.nombre === 'OSDE').off === true);
+
+  async function bajar(nombreOpcion) {
+    const op = [...r.cont.querySelectorAll('.cp-planilla-opcion')]
+      .find((o) => o.querySelector('.cp-planilla-opcion__nombre').textContent.trim() === nombreOpcion);
+    await act(async () => { clic(op); });
+    const btn = [...r.cont.querySelectorAll('.cp-modal__actions button')].find((b) => b.textContent.includes('Descargar'));
+    await act(async () => { clic(btn); });
+    const xml = new TextDecoder().decode(new Uint8Array(await capturado.arrayBuffer()));
+    const hoja = xml.slice(xml.indexOf('<sheetData>'), xml.indexOf('</sheetData>'));
+    const nombres = [...hoja.matchAll(/<t xml:space="preserve">([^<]*)<\/t>/g)].map((m) => m[1]);
+    await act(async () => { abrir(); });
+    return { nombres: nombres.slice(2), archivo: nombreArchivo }; // sin los encabezados
+  }
+
+  const apross = await bajar('APROSS');
+  chequeo('planilla APROSS trae solo los de APROSS',
+    apross.nombres.join('|') === 'Élez, Bruno|Muñoz, Ángel|Perez &amp; Cia, Juan|Zarate, Zulema'
+    || apross.nombres.length === 4, `(${apross.nombres})`);
+  chequeo('el nombre del archivo lleva el metodo', apross.archivo.startsWith('pacientes-apross-'), `(${apross.archivo})`);
+
+  const part = await bajar('Particular');
+  chequeo('el paciente con 2 metodos entra en las dos planillas',
+    part.nombres.some((n) => n.includes('Muñoz')) && apross.nombres.some((n) => n.includes('Muñoz')));
+  chequeo('planilla Particular no trae los de APROSS solo',
+    !part.nombres.some((n) => n.includes('Zarate')), `(${part.nombres})`);
+
+  const todos = await bajar('Todos los pacientes');
+  chequeo('planilla completa trae los 6 activos', todos.nombres.length === 6, `(${todos.nombres.length})`);
+  chequeo('el archivado no aparece en ninguna',
+    ![...apross.nombres, ...part.nombres, ...todos.nombres].some((n) => n.includes('Archivado')));
+
+  dom.window.URL.createObjectURL = crearURL;
 }
 
 console.log(`\n${'='.repeat(52)}`);

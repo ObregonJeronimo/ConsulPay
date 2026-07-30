@@ -301,6 +301,25 @@ export function suscribirPacientesProfesional(profesionalUid, consultorioId, cal
  * con backwards compat para docs viejos que aun tengan profesionalUid
  * singular (no deberia haber ninguno post-migracion, pero por las dudas).
  */
+/* ============================================================
+   Metodos de pago de un paciente
+   ----------------------------------------------------------------
+   Un paciente puede tener VARIOS (por ejemplo APROSS y particular).
+   El modelo actual es el array metodosPagoIds; metodoPagoId (string)
+   es el campo viejo, de cuando era uno solo, y todavia hay documentos
+   guardados asi. Cualquier filtro que mire solo metodoPagoId se pierde
+   a los pacientes que tienen ese metodo en segundo lugar.
+   ============================================================ */
+export function getMetodosPagoIds(paciente) {
+  if (Array.isArray(paciente?.metodosPagoIds) && paciente.metodosPagoIds.length > 0) {
+    return paciente.metodosPagoIds;
+  }
+  if (typeof paciente?.metodoPagoId === 'string' && paciente.metodoPagoId) {
+    return [paciente.metodoPagoId];
+  }
+  return [];
+}
+
 export function getProfesionalesUids(paciente) {
   if (Array.isArray(paciente?.profesionalesUids)) {
     return paciente.profesionalesUids;
