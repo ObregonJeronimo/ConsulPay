@@ -24,6 +24,7 @@ import {
 import { getMetodosPaciente, suscribirPacientesConsultorio } from '../../lib/pacientes.js';
 import { suscribirMiembrosConsultorio, suscribirProfesionales } from '../../lib/profesionales.js';
 import {
+  nombreMetodoDeSesion,
   calcularSplit,
   crearSesion,
   actualizarSesion,
@@ -235,6 +236,13 @@ export default function Sesiones() {
   const metodos = useMemo(
     () => consultorio?.metodosPagoPaciente ?? [],
     [consultorio?.metodosPagoPaciente],
+  );
+
+  // Un solo mapa id -> metodo para toda la pantalla: lo usan la tabla, la
+  // carga rapida y el modal de liquidacion.
+  const mapaMetodos = useMemo(
+    () => Object.fromEntries(metodos.map((m) => [m.id, m])),
+    [metodos],
   );
 
   const mapaProfesionales = useMemo(() => {
@@ -552,6 +560,7 @@ export default function Sesiones() {
               sesiones={sesionesFiltradas}
               mapaPacientes={mapaPacientes}
               mapaProfesionales={mapaProfesionales}
+              mapaMetodos={mapaMetodos}
               onEditar={(s) => setEditando(s)}
               onEliminar={handleEliminar}
               onTogglePagado={handleTogglePagado}
@@ -567,7 +576,7 @@ export default function Sesiones() {
           esAdmin
           profesionales={profesionalesActivos}
           pacientes={pacientesActivos}
-          mapaMetodos={Object.fromEntries(metodos.map((m) => [m.id, m]))}
+          mapaMetodos={mapaMetodos}
           metodos={metodos}
           consultorioId={user.consultorioId}
           uid={user.uid}
@@ -593,6 +602,7 @@ export default function Sesiones() {
         <LiquidarMontoModal
           sesion={liquidando}
           paciente={mapaPacientes[liquidando.pacienteId]}
+          mapaMetodos={mapaMetodos}
           esCorreccion={liquidando.estadoPago === ESTADOS_PAGO_SESION.DEBIDO}
           onClose={() => setLiquidando(null)}
           onConfirmar={handleConfirmarLiquidar}
@@ -614,6 +624,7 @@ export default function Sesiones() {
           consultorioId={user.consultorioId}
           profesionales={profesionalesActivos}
           mapaPacientes={mapaPacientes}
+          mapaMetodos={mapaMetodos}
           uid={user.uid}
           onClose={() => setLiquidarMasivoOpen(false)}
         />
@@ -721,7 +732,7 @@ export function GroupBadge({ cantidad }) {
 /* ============================================================
    Tabla de sesiones (vista admin)
    ============================================================ */
-function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, onEditar, onEliminar, onTogglePagado, onLiquidar }) {
+function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, mapaMetodos, onEditar, onEliminar, onTogglePagado, onLiquidar }) {
   return (
     <DualScrollTable className="cp-compact-list">
       <table className="cp-table cp-sesiones-tabla">
@@ -776,7 +787,7 @@ function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, onEditar, o
                   ) : <span style={{ color: 'var(--cp-text-muted)', fontSize: 13 }}>{s.pacienteNombre || 'Paciente eliminado'}</span>}
                 </td>
                 <td data-label="Método" style={{ fontSize: 13 }}>
-                  {s.metodoPagoNombre}
+                  {nombreMetodoDeSesion(s, mapaMetodos)}
                   {s.metodoPagoTipo === TIPOS_METODO_PAGO.DIFERIDO && (
                     <span className="cp-badge cp-badge--diferido" style={{ marginLeft: 6 }}>diferido</span>
                   )}
@@ -888,7 +899,7 @@ function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, onEditar, o
                     {prof ? nombreProfesional(prof) : (s.profesionalNombre || '—')}
                   </div>
                   <div className="cp-row-mobile__bot">
-                    {s.metodoPagoNombre}
+                    {nombreMetodoDeSesion(s, mapaMetodos)}
                     {!pendienteMonto && ` · ${formatoARS.format(s.valorTotal)}`}
                     {!pendienteMonto && s.montoProfesional !== s.valorTotal && ` (prof: ${formatoARS.format(s.montoProfesional)})`}
                   </div>
@@ -1370,7 +1381,7 @@ export function SesionModal({
    y al confirmar llama al onConfirmar que internamente actualiza la
    sesion via liquidarMontoSesion().
    ============================================================ */
-export function LiquidarMontoModal({ sesion, paciente, modoSolicitud, esCorreccion, onClose, onConfirmar }) {
+export function LiquidarMontoModal({ sesion, paciente, mapaMetodos, modoSolicitud, esCorreccion, onClose, onConfirmar }) {
   // Si es correccion, pre-llenamos con el monto actual
   const [valor, setValor] = useState(esCorreccion && sesion?.valorTotal ? String(sesion.valorTotal) : '');
   const [submitting, setSubmitting] = useState(false);
@@ -1380,6 +1391,7 @@ export function LiquidarMontoModal({ sesion, paciente, modoSolicitud, esCorrecci
   const porcentaje = Number(sesion?.porcentajeConsultorio) || 0;
   const split = calcularSplit(valorNum, porcentaje);
   const cantidad = getCantidadSesiones(sesion);
+  const nombreMetodo = nombreMetodoDeSesion(sesion, mapaMetodos);
 
   async function onSubmit(e) {
     e.preventDefault();
@@ -1419,10 +1431,10 @@ export function LiquidarMontoModal({ sesion, paciente, modoSolicitud, esCorrecci
         <h2 className="cp-modal__title">{titulo}</h2>
         <p className="cp-modal__sub">
           {esCorreccion
-            ? `Corregí el monto liquidado por ${sesion.metodoPagoNombre}. Solo disponible mientras la sesión no esté pagada.`
+            ? `Corregí el monto liquidado por ${nombreMetodo}. Solo disponible mientras la sesión no esté pagada.`
             : modoSolicitud
               ? `Cargá el monto que liquidó la obra social. La solicitud quedará pendiente hasta que el administrador la apruebe.`
-              : `Cargá el monto que liquidó la obra social ${sesion.metodoPagoNombre} por la sesión de ${nombrePac}${cantidad > 1 ? ` (${cantidad} sesiones)` : ''}.`}
+              : `Cargá el monto que liquidó la obra social ${nombreMetodo} por la sesión de ${nombrePac}${cantidad > 1 ? ` (${cantidad} sesiones)` : ''}.`}
         </p>
 
         <form className="cp-modal__form" onSubmit={onSubmit}>
@@ -1885,7 +1897,7 @@ function SelectorMesPagarMes({ mes, setMes }) {
    Seleccioná profesional + mes, aparecen las sesiones
    pendiente_monto para liquidar una por una con su monto.
    ============================================================ */
-export function LiquidarMasivoModal({ consultorioId, profesionales, mapaPacientes, uid, onClose }) {
+export function LiquidarMasivoModal({ consultorioId, profesionales, mapaPacientes, mapaMetodos, uid, onClose }) {
   const overlayProps = useOverlayClose(onClose);
   const [profUid, setProfUid] = useState('');
   const [mes, setMes] = useState(() => inicioDeMes(new Date()));
@@ -2013,7 +2025,7 @@ export function LiquidarMasivoModal({ consultorioId, profesionales, mapaPaciente
                         <div>
                           <div style={{ fontSize: 13.5, fontWeight: 500 }}>{nombre}</div>
                           <div style={{ fontSize: 12, color: 'var(--cp-text-muted)' }}>
-                            {s.metodoPagoNombre}
+                            {nombreMetodoDeSesion(s, mapaMetodos)}
                             {s.cantidadSesiones > 1 && ` · ×${s.cantidadSesiones}`}
                           </div>
                         </div>

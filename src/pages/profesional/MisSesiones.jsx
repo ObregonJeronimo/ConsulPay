@@ -20,6 +20,7 @@ import {
 } from '../../lib/constants.js';
 import { nombrePaciente, suscribirPacientesProfesional } from '../../lib/pacientes.js';
 import {
+  nombreMetodoDeSesion,
   actualizarSesion,
   crearSesion,
   eliminarSesion,
@@ -215,6 +216,12 @@ export default function MisSesiones() {
 
   // Set de sesionId con solicitudes pendientes (para deshabilitar editar/eliminar
   // en esas filas mientras la solicitud se resuelve)
+  // Un solo mapa id -> metodo para toda la pantalla.
+  const mapaMetodos = useMemo(
+    () => Object.fromEntries(metodos.map((m) => [m.id, m])),
+    [metodos],
+  );
+
   const sesionesOrdenadas = useMemo(() => {
     if (orden !== 'paciente') return sesiones;
     return [...sesiones].sort((a, b) => {
@@ -582,6 +589,7 @@ export default function MisSesiones() {
             <TablaMisSesiones
               sesiones={sesionesOrdenadas}
               mapaPacientes={mapaPacientes}
+              mapaMetodos={mapaMetodos}
               sesionesConPendiente={sesionesConPendiente}
               puedeMarcarPagadas={puedeMarcarPagadas}
               onEditar={(s) => setEditando(s)}
@@ -601,7 +609,7 @@ export default function MisSesiones() {
           profesionalNombre={user?.displayName || user?.email || ''}
           profesionales={[]}
           pacientes={pacientesActivos}
-          mapaMetodos={Object.fromEntries(metodos.map((m) => [m.id, m]))}
+          mapaMetodos={mapaMetodos}
           metodos={metodos}
           consultorioId={user.consultorioId}
           profesionalUidFijo={user.uid}
@@ -642,6 +650,7 @@ export default function MisSesiones() {
         <LiquidarOSMasivoModal
           sesiones={sesionesPorLiquidar}
           mapaPacientes={mapaPacientes}
+          mapaMetodos={mapaMetodos}
           mes={mes}
           user={user}
           onClose={() => setLiquidarOSOpen(false)}
@@ -652,6 +661,7 @@ export default function MisSesiones() {
         <LiquidarMontoModal
           sesion={liquidando}
           paciente={mapaPacientes[liquidando.pacienteId]}
+          mapaMetodos={mapaMetodos}
           modoSolicitud={!tieneConfianza && liquidando.estadoPago === ESTADOS_PAGO_SESION.PENDIENTE_MONTO}
           esCorreccion={liquidando.estadoPago === ESTADOS_PAGO_SESION.DEBIDO}
           onClose={() => setLiquidando(null)}
@@ -982,7 +992,7 @@ export function MarcarMesPagadoModal({ sesiones, mapaPacientes, mes, user, consu
    social informa un importe distinto por prestacion), asi que no
    alcanza con un boton: hay que cargar el valor de cada una.
    ============================================================ */
-function LiquidarOSMasivoModal({ sesiones, mapaPacientes, mes, user, onClose }) {
+function LiquidarOSMasivoModal({ sesiones, mapaPacientes, mapaMetodos, mes, user, onClose }) {
   const [montos, setMontos] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -1056,7 +1066,7 @@ function LiquidarOSMasivoModal({ sesiones, mapaPacientes, mes, user, onClose }) 
                   </span>
                   <span className="cp-liquidar-fila__meta">
                     {fechaRaw ? fechaRaw.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' }) : '—'}
-                    {ses.metodoPagoNombre ? ` · ${ses.metodoPagoNombre}` : ''}
+                    {` · ${nombreMetodoDeSesion(ses, mapaMetodos)}`}
                   </span>
                 </div>
                 <div className="cp-liquidar-fila__input">
@@ -1370,7 +1380,7 @@ function StatsProfesional({ stats, yaPagado }) {
    Las acciones quedan deshabilitadas si la sesion ya fue pagada o
    si tiene una solicitud pendiente.
    ============================================================ */
-function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, puedeMarcarPagadas, onEditar, onEliminar, onLiquidar, onTogglePagado }) {
+function TablaMisSesiones({ sesiones, mapaPacientes, mapaMetodos, sesionesConPendiente, puedeMarcarPagadas, onEditar, onEliminar, onLiquidar, onTogglePagado }) {
   return (
     <DualScrollTable className="cp-compact-list">
       <table className="cp-table cp-sesiones-tabla">
@@ -1431,7 +1441,7 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, puede
                   </span>
                 </td>
                 <td data-label="Método" style={{ fontSize: 13 }}>
-                  {s.metodoPagoNombre}
+                  {nombreMetodoDeSesion(s, mapaMetodos)}
                   {s.metodoPagoTipo === TIPOS_METODO_PAGO.DIFERIDO && (
                     <span className="cp-badge cp-badge--diferido" style={{ marginLeft: 6 }}>diferido</span>
                   )}
@@ -1550,7 +1560,7 @@ function TablaMisSesiones({ sesiones, mapaPacientes, sesionesConPendiente, puede
                     ) : <span style={{ color: 'var(--cp-text-muted)', fontSize: 13 }}>{s.pacienteNombre || 'Paciente eliminado'}</span>}
                   </div>
                   <div className="cp-row-mobile__mid">
-                    {f.dia} {f.hora} · {s.metodoPagoNombre}
+                    {f.dia} {f.hora} · {nombreMetodoDeSesion(s, mapaMetodos)}
                   </div>
                   <div className="cp-row-mobile__bot">
                     {pendienteMonto ? 'Pendiente de liquidar' : `Mi parte: ${formatoARS.format(s.montoProfesional)} · Total: ${formatoARS.format(s.valorTotal)}`}

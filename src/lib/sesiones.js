@@ -651,3 +651,31 @@ export function suscribirSesionesDebidasProfesional(profesionalUid, consultorioI
     callback([]);
   });
 }
+
+/* ============================================================
+   Nombre del metodo de pago de una sesion
+   ----------------------------------------------------------------
+   La sesion guarda metodoPagoId Y metodoPagoNombre. El nombre es una
+   copia del momento en que se cargo, asi que si despues se renombra el
+   metodo, las sesiones viejas siguen mostrando el nombre anterior: la
+   misma obra social aparece con dos nombres distintos segun la fecha de
+   carga, y parece que fueran dos metodos.
+
+   Para MOSTRAR conviene el nombre actual, resuelto por id. El nombre
+   guardado queda de respaldo para las sesiones cuyo metodo se elimino
+   del consultorio: ahi el snapshot es lo unico que queda.
+
+   Ojo, esto vale solo para el NOMBRE. El porcentaje NO se resuelve asi:
+   porcentajeConsultorio queda congelado en la sesion a proposito, porque
+   la plata ya se repartio con ese numero y recalcularlo contra el
+   porcentaje de hoy falsearia liquidaciones ya cerradas.
+
+   @param {object} sesion
+   @param {object} mapaMetodos  id -> metodo, de consultorio.metodosPagoPaciente
+   @returns {string}
+   ============================================================ */
+export function nombreMetodoDeSesion(sesion, mapaMetodos) {
+  const actual = mapaMetodos?.[sesion?.metodoPagoId]?.nombre;
+  if (actual) return actual;
+  return sesion?.metodoPagoNombre || '—';
+}

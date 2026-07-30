@@ -19,6 +19,7 @@ import {
 } from '../../lib/pagos.js';
 import { calcularDeudaProfesional, retirarProfesional } from '../../lib/profesionales.js';
 import {
+  nombreMetodoDeSesion,
   finDeMes,
   inicioDeMes,
   nombreDelMes,
@@ -176,6 +177,13 @@ export default function MisPagos() {
      Antes se mostraba el recuadro grisado con un cartel de "deshabilitado":
      ofrecia una via de pago que el consultorio no va a usar nunca. */
   const mpActivo = mpHabilitado(consultorio);
+
+  // Para mostrar el nombre ACTUAL del metodo y no el que se copio en la
+  // sesion cuando se cargo (ver nombreMetodoDeSesion).
+  const mapaMetodos = useMemo(
+    () => Object.fromEntries((consultorio?.metodosPagoPaciente ?? []).map((m) => [m.id, m])),
+    [consultorio?.metodosPagoPaciente],
+  );
 
   /* ---- Handlers ---- */
 
@@ -474,7 +482,7 @@ export default function MisPagos() {
                           </div>
                         ) : <span style={{ color: 'var(--cp-text-muted)', fontSize: 13 }}>{s.pacienteNombre || '—'}</span>}
                       </td>
-                      <td data-label="Método" style={{ fontSize: 13 }}>{s.metodoPagoNombre}</td>
+                      <td data-label="Método" style={{ fontSize: 13 }}>{nombreMetodoDeSesion(s, mapaMetodos)}</td>
                       <td data-label="Mi parte" className="cp-num" style={{ color: 'var(--cp-success)' }}>
                         {formatoARS.format(s.montoProfesional)}
                       </td>
@@ -493,7 +501,7 @@ export default function MisPagos() {
                           ) : <span style={{ color: 'var(--cp-text-muted)', fontSize: 13 }}>{s.pacienteNombre || '—'}</span>}
                         </div>
                         <div className="cp-row-mobile__mid">
-                          {formatoFechaCorta(s.fecha)} · {s.metodoPagoNombre}
+                          {formatoFechaCorta(s.fecha)} · {nombreMetodoDeSesion(s, mapaMetodos)}
                         </div>
                         <div className="cp-row-mobile__bot">
                           Mi parte: {formatoARS.format(s.montoProfesional)}

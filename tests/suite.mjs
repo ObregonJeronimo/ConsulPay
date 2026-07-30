@@ -450,6 +450,31 @@ console.log('\n[10] Planilla de pacientes (xlsx)');
   dom.window.URL.createObjectURL = crearURL;
 }
 
+/* ============ 11. Nombre del metodo renombrado ============ */
+console.log('\n[11] Metodo de pago renombrado');
+{
+  const { nombreMetodoDeSesion } = await import('/home/claude/ConsulPay/src/lib/sesiones.js');
+  const mapa = { apross: { id: 'apross', nombre: 'APROSS 22%', porcentajeConsultorio: 22 } };
+
+  chequeo('sesion vieja muestra el nombre actual',
+    nombreMetodoDeSesion({ metodoPagoId: 'apross', metodoPagoNombre: 'APROSS' }, mapa) === 'APROSS 22%');
+  chequeo('sesion nueva muestra el mismo nombre',
+    nombreMetodoDeSesion({ metodoPagoId: 'apross', metodoPagoNombre: 'APROSS 22%' }, mapa) === 'APROSS 22%');
+  chequeo('metodo borrado cae al nombre guardado',
+    nombreMetodoDeSesion({ metodoPagoId: 'noexiste', metodoPagoNombre: 'OSDE viejo' }, mapa) === 'OSDE viejo');
+  chequeo('sin id ni nombre no rompe',
+    nombreMetodoDeSesion({}, mapa) === '—');
+  chequeo('sin mapa cae al snapshot',
+    nombreMetodoDeSesion({ metodoPagoId: 'apross', metodoPagoNombre: 'APROSS' }, undefined) === 'APROSS');
+  chequeo('sesion legacy sin metodoPagoId usa el nombre guardado',
+    nombreMetodoDeSesion({ metodoPagoNombre: 'APROSS' }, mapa) === 'APROSS');
+
+  // Lo que NO debe pasar: que el porcentaje se recalcule contra el actual.
+  const sesionVieja = { metodoPagoId: 'apross', metodoPagoNombre: 'APROSS', porcentajeConsultorio: 18, montoConsultorio: 18000, valorTotal: 100000 };
+  chequeo('el porcentaje de la sesion NO se toca', sesionVieja.porcentajeConsultorio === 18);
+  chequeo('el monto ya repartido NO se toca', sesionVieja.montoConsultorio === 18000);
+}
+
 console.log(`\n${'='.repeat(52)}`);
 console.log(`${ok} chequeos OK, ${fallos.length} fallas`);
 if (fallos.length) { console.log('FALLAN:'); fallos.forEach((f) => console.log('  - ' + f)); }
