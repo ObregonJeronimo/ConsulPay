@@ -315,6 +315,65 @@ console.log('\n[9] Directorio de admins (nombres para el profesional)');
     src.includes('adminsDirectorio: directorioSin(consData, uidARemover)'));
 }
 
+/* ============ 10. Exportacion de la planilla de pacientes ============ */
+console.log('\n[10] Planilla de pacientes (xlsx)');
+{
+  const { construirXlsx } = await import('/home/claude/ConsulPay/src/lib/xlsx.js');
+
+  // El generador produce un ZIP con la estructura minima que pide Excel.
+  const filas = [['PACIENTES', 'PROFESIONALES'], ['Muñoz, Ángel', ''], ['Perez & Cia, Juan', '']];
+  const blob = construirXlsx(filas, { hoja: 'Pacientes', anchos: [38, 30] });
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+
+  chequeo('el blob tiene el mime de xlsx',
+    blob.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  chequeo('arranca con la firma de un ZIP (PK)',
+    bytes[0] === 0x50 && bytes[1] === 0x4B && bytes[2] === 0x03 && bytes[3] === 0x04);
+  chequeo('cierra con el end-of-central-directory', (() => {
+    for (let i = bytes.length - 22; i >= 0; i -= 1) {
+      if (bytes[i] === 0x50 && bytes[i + 1] === 0x4B && bytes[i + 2] === 0x05 && bytes[i + 3] === 0x06) return true;
+    }
+    return false;
+  })());
+
+  const texto = new TextDecoder().decode(bytes);
+  chequeo('incluye las 5 partes que pide el formato',
+    ['[Content_Types].xml', '_rels/.rels', 'xl/workbook.xml', 'xl/_rels/workbook.xml.rels', 'xl/worksheets/sheet1.xml']
+      .every((n) => texto.includes(n)));
+  chequeo('escapa & y < para no romper el XML',
+    texto.includes('Perez &amp; Cia') && !texto.includes('Perez & Cia'));
+  chequeo('conserva acentos y ñ', texto.includes('Muñoz, Ángel'));
+  chequeo('no escribe celdas vacias', !texto.includes('<is><t xml:space="preserve"></t></is>'));
+
+  // Nombre de solapa invalido: Excel rechaza el archivo si tiene / \ ? * [ ]
+  const b2 = construirXlsx([['a']], { hoja: 'Pa/cien*tes[2026]' });
+  const t2 = new TextDecoder().decode(new Uint8Array(await b2.arrayBuffer()));
+  chequeo('sanea el nombre de la solapa', t2.includes('name="Pacientes2026"'), '');
+
+  // Y que la pagina exponga el boton y lo deshabilite sin pacientes.
+  const { default: Pacientes } = await import('/home/claude/ConsulPay/src/pages/admin/Pacientes.jsx');
+  globalThis.__USER__ = { uid: 'A', consultorioId: 'C1', rol: 'admin', displayName: 'Adriana' };
+  globalThis.__CONS__ = { adminUids: ['A'], mpConfigs: {},
+    metodosPagoPaciente: [{ id: 'm1', nombre: 'Particular', porcentajeConsultorio: 20, tipo: 'inmediato' }] };
+  const pac = (id, ap, no, estado = 'activo') => ({
+    id, consultorioId: 'C1', apellido: ap, nombre: no, estado, profesionalesUids: ['PRO'], metodoPagoId: 'm1',
+  });
+  globalThis.__DATA__ = {
+    pacientes: [pac('p1', 'Zarate', 'Zulema'), pac('p2', 'Álvarez', 'Ana'), pac('p3', 'Archivado', 'No Va', 'archivado')],
+    usuarios: [{ id: 'PRO', uid: 'PRO', displayName: 'Gabriela', consultorioId: 'C1', rol: 'profesional', estado: 'activo' }],
+    sesiones: [], solicitudes_sesion: [], pagos_consultorio: [], gastos: [],
+  };
+  let r = await montar(Pacientes, {});
+  let btn = [...r.cont.querySelectorAll('button')].find((b) => b.textContent.includes('Descargar planilla'));
+  chequeo('el boton aparece en Pacientes', !!btn);
+  chequeo('esta habilitado si hay activos', btn && !btn.disabled);
+
+  globalThis.__DATA__ = { ...globalThis.__DATA__, pacientes: [pac('p3', 'Archivado', 'No Va', 'archivado')] };
+  r = await montar(Pacientes, {});
+  btn = [...r.cont.querySelectorAll('button')].find((b) => b.textContent.includes('Descargar planilla'));
+  chequeo('se deshabilita si solo hay archivados', !btn || btn.disabled);
+}
+
 console.log(`\n${'='.repeat(52)}`);
 console.log(`${ok} chequeos OK, ${fallos.length} fallas`);
 if (fallos.length) { console.log('FALLAN:'); fallos.forEach((f) => console.log('  - ' + f)); }

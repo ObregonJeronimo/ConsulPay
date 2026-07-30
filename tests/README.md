@@ -24,6 +24,7 @@ Sale con código 1 si algo falla, así que sirve para un pre-push hook.
 7. Mis pagos — sección de MP condicionada
 8. Pagos del admin — pestañas MP condicionadas
 9. Directorio de admins — alta, baja y siembra al crear el consultorio
+10. Planilla de pacientes — xlsx válido, escapes XML, botón condicionado
 
 ## Límite conocido
 

@@ -13,6 +13,7 @@ import Spinner from '../../components/ui/Spinner.jsx';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useConsultorio } from '../../hooks/useConsultorio.js';
 import { useOverlayClose } from '../../hooks/useOverlayClose.js';
+import { construirXlsx, descargarBlob } from '../../lib/xlsx.js';
 import {
   ESTADOS_PACIENTE,
   ESTADOS_USUARIO,
@@ -233,6 +234,32 @@ export default function Pacientes() {
     return list;
   }, [pacientesActivos, busqueda, filtroProfesional, filtroMetodo]);
 
+  /* TEMPORAL — planilla en blanco para que los profesionales anoten a mano.
+     Exporta TODOS los activos, sin aplicar los filtros de la pantalla: la
+     idea es repartir la lista completa, no la vista que quedo en pantalla.
+     Cuando no haga falta mas, se borra este bloque y el boton de abajo. */
+  function exportarPlanillaPacientes() {
+    const nombres = pacientesActivos
+      .map((p) => nombreCompleto(p).trim())
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+
+    const filas = [
+      ['PACIENTES', 'PROFESIONALES'],
+      // Segunda columna vacia a proposito: se completa a mano en papel.
+      ...nombres.map((n) => [n, '']),
+    ];
+
+    const hoy = new Date();
+    const p2 = (n) => String(n).padStart(2, '0');
+    const fecha = `${hoy.getFullYear()}-${p2(hoy.getMonth() + 1)}-${p2(hoy.getDate())}`;
+
+    descargarBlob(
+      construirXlsx(filas, { hoja: 'Pacientes', anchos: [38, 30] }),
+      `pacientes-${fecha}.xlsx`,
+    );
+  }
+
   const activosTotal = pacientesActivos.length;
   const archivadosTotal = pacientesArchivados.length;
 
@@ -325,14 +352,25 @@ export default function Pacientes() {
         </div>
 
         {pacientes.length > 0 && (
-          <Button
-            variant="primary"
-            icon={<PlusIcon />}
-            onClick={() => setEditandoPaciente('nuevo')}
-            disabled={!puedeCargar}
-          >
-            Agregar paciente
-          </Button>
+          <div className="cp-page-header__acciones">
+            {/* TEMPORAL — ver exportarPlanillaPacientes. Se borra junto con el handler. */}
+            <Button
+              variant="secondary"
+              onClick={exportarPlanillaPacientes}
+              disabled={activosTotal === 0}
+              title="Descarga la lista de pacientes activos con una columna vacía para anotar"
+            >
+              Descargar planilla
+            </Button>
+            <Button
+              variant="primary"
+              icon={<PlusIcon />}
+              onClick={() => setEditandoPaciente('nuevo')}
+              disabled={!puedeCargar}
+            >
+              Agregar paciente
+            </Button>
+          </div>
         )}
       </header>
 

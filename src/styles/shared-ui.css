@@ -21,6 +21,15 @@
   gap: var(--cp-space-4);
 }
 
+/* Varias acciones al lado del titulo. Sin esto quedan como hermanas
+   sueltas del <div> del titulo y el space-between las separa entre si. */
+.cp-page-header__acciones {
+  display: flex;
+  align-items: center;
+  gap: var(--cp-space-2);
+  flex-wrap: wrap;
+}
+
 .cp-page-title {
   font-family: var(--cp-font-serif);
   font-size: 32px;
@@ -739,6 +748,23 @@
   .cp-page-header > button,
   .cp-page-header > a,
   .cp-page-header > .cp-btn {
+    width: 100%;
+    justify-content: center;
+    min-height: 44px;
+  }
+
+  /* Mismo criterio que un boton suelto: a lo ancho y con altura tactil.
+     Apilados y no lado a lado, porque en 360px dos botones con estas
+     etiquetas quedan estrechos y se corta el texto. */
+  .cp-page-header__acciones {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    gap: var(--cp-space-2);
+  }
+
+  .cp-page-header__acciones > button,
+  .cp-page-header__acciones > .cp-btn {
     width: 100%;
     justify-content: center;
     min-height: 44px;
