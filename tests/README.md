@@ -26,6 +26,7 @@ Sale con código 1 si algo falla, así que sirve para un pre-push hook.
 9. Directorio de admins — alta, baja y siembra al crear el consultorio
 10. Planilla de pacientes — xlsx válido, escapes XML, filtro por método de pago
 11. Método renombrado — nombre vivo por id, porcentaje histórico intacto
+12. Navegación de meses — futuros habilitados en los modales de cobro
 
 ## Límite conocido
 

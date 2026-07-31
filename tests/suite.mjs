@@ -475,6 +475,50 @@ console.log('\n[11] Metodo de pago renombrado');
   chequeo('el monto ya repartido NO se toca', sesionVieja.montoConsultorio === 18000);
 }
 
+/* ============ 12. Navegacion de meses en los modales de cobro ============ */
+console.log('\n[12] Meses futuros en Marcar mes como pagado');
+{
+  const { default: Sesiones } = await import('/home/claude/ConsulPay/src/pages/admin/Sesiones.jsx');
+  const { MemoryRouter } = await import('react-router-dom');
+  globalThis.__USER__ = { uid: 'A', consultorioId: 'C1', rol: 'admin', displayName: 'Adriana' };
+  globalThis.__CONS__ = { adminUids: ['A'], mpConfigs: {}, metodosPagoPaciente: [
+    { id: 'part', nombre: 'Particular 20%', porcentajeConsultorio: 20, tipo: 'inmediato' },
+  ] };
+  globalThis.__DATA__ = {
+    sesiones: [], pacientes: [], solicitudes_sesion: [], pagos_consultorio: [], gastos: [],
+    usuarios: [{ id: 'PRO', uid: 'PRO', displayName: 'Maria Pilar niosi', consultorioId: 'C1', rol: 'profesional', estado: 'activo' }],
+  };
+
+  for (const etiqueta of ['Marcar mes como pagado', 'Liquidar sesiones OS']) {
+    const cont = document.createElement('div');
+    document.body.appendChild(cont);
+    const root = createRoot(cont);
+    await act(async () => { root.render(createElement(MemoryRouter, null, createElement(Sesiones))); });
+
+    await act(async () => {
+      clic([...cont.querySelectorAll('button')].find((b) => b.textContent.trim() === etiqueta));
+    });
+    const sel = [...cont.querySelectorAll('.cp-mes-selector')].pop();
+    const sig = () => sel.querySelector('[aria-label="Mes siguiente"]');
+    const label = () => sel.querySelector('.cp-mes-selector__label').textContent.trim();
+
+    chequeo(`${etiqueta}: avanzar no esta bloqueado en el mes actual`, !sig().disabled);
+    const inicial = label();
+    await act(async () => { clic(sig()); });
+    chequeo(`${etiqueta}: avanza al mes siguiente`, label() !== inicial, `(${inicial} -> ${label()})`);
+    await act(async () => { clic(sig()); });
+    await act(async () => { clic(sig()); });
+    chequeo(`${etiqueta}: avanza varios meses seguidos`, !sig().disabled);
+    chequeo(`${etiqueta}: aparece el atajo Hoy fuera del mes actual`, !!sel.querySelector('.cp-mes-selector__hoy'));
+    await act(async () => { clic(sel.querySelector('.cp-mes-selector__hoy')); });
+    chequeo(`${etiqueta}: el atajo vuelve al mes actual`, label() === inicial, `(${label()})`);
+    chequeo(`${etiqueta}: el atajo desaparece al volver`, !sel.querySelector('.cp-mes-selector__hoy'));
+    await act(async () => { clic(sel.querySelector('[aria-label="Mes anterior"]')); });
+    chequeo(`${etiqueta}: sigue andando hacia atras`, label() !== inicial);
+    await act(async () => { root.unmount(); });
+  }
+}
+
 console.log(`\n${'='.repeat(52)}`);
 console.log(`${ok} chequeos OK, ${fallos.length} fallas`);
 if (fallos.length) { console.log('FALLAN:'); fallos.forEach((f) => console.log('  - ' + f)); }

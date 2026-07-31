@@ -1875,6 +1875,13 @@ export function PagarMesModal({ consultorioId, profesionales, mapaPacientes, adm
   );
 }
 
+/* Selector de mes de los modales de cobro (marcar mes pagado y liquidar OS).
+   Antes la flecha de avanzar se deshabilitaba en el mes en curso. Ese tope
+   estaba mal para estas dos pantallas: las sesiones se pueden registrar con
+   fecha futura (turnos ya agendados, paquetes cargados por adelantado), y si
+   un paciente paga antes no habia forma de marcarlas. Los dos modales avisan
+   solos cuando el mes elegido no tiene nada, asi que abrir el futuro no
+   ensucia nada. */
 function SelectorMesPagarMes({ mes, setMes }) {
   function anterior() {
     setMes((m) => { const d = new Date(m); d.setMonth(d.getMonth() - 1); return inicioDeMes(d); });
@@ -1885,9 +1892,18 @@ function SelectorMesPagarMes({ mes, setMes }) {
   const esEsteMes = inicioDeMes(new Date()).getTime() === mes.getTime();
   return (
     <div className="cp-mes-selector" style={{ marginTop: 0 }}>
-      <button type="button" className="cp-mes-selector__btn" onClick={anterior}>‹</button>
+      <button type="button" className="cp-mes-selector__btn" onClick={anterior} aria-label="Mes anterior">‹</button>
       <span className="cp-mes-selector__label">{nombreDelMes(mes)}</span>
-      <button type="button" className="cp-mes-selector__btn" onClick={siguiente} disabled={esEsteMes}>›</button>
+      <button type="button" className="cp-mes-selector__btn" onClick={siguiente} aria-label="Mes siguiente">›</button>
+      {!esEsteMes && (
+        <button
+          type="button"
+          className="cp-mes-selector__hoy"
+          onClick={() => setMes(inicioDeMes(new Date()))}
+        >
+          Hoy
+        </button>
+      )}
     </div>
   );
 }
