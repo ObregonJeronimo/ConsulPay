@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import Button from '../../components/ui/Button.jsx';
+import Input from '../../components/ui/Input.jsx';
 import DualScrollTable from '../../components/ui/DualScrollTable.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
 import { useOverlayClose } from '../../hooks/useOverlayClose.js';
@@ -476,31 +477,51 @@ function GastoModal({ consultorioId, uid, cuentas, onClose }) {
           Queda anotado en el libro de caja del mes, restando de la cuenta que elijas.
         </p>
 
+        {/* Se usan el componente Input y la clase cp-select del sistema. Antes
+            este modal traia sus propios estilos (cp-libro__field input), con
+            fondo --cp-bg en vez de --cp-surface, borde tenue, sin foco visible
+            y sin estados de hover: los campos se veian hundidos y apagados
+            comparados con los del resto de la app. */}
         <div className="cp-libro__form">
           <div className="cp-libro__row">
-            <div className="cp-libro__field">
-              <label htmlFor="g-fecha">Fecha</label>
-              <input id="g-fecha" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
-            </div>
-            <div className="cp-libro__field">
-              <label htmlFor="g-monto">Monto</label>
-              <input id="g-monto" type="number" min="0" step="any" placeholder="0"
-                value={monto} onChange={(e) => setMonto(e.target.value)} />
-            </div>
+            <Input
+              id="g-fecha"
+              label="Fecha"
+              type="date"
+              value={fecha}
+              onChange={(e) => setFecha(e.target.value)}
+            />
+            <Input
+              id="g-monto"
+              label="Monto"
+              type="number"
+              min="0"
+              step="any"
+              placeholder="0"
+              value={monto}
+              onChange={(e) => setMonto(e.target.value)}
+            />
           </div>
 
-          <div className="cp-libro__field">
-            <label htmlFor="g-cuenta">¿De qué caja salió?</label>
-            <select id="g-cuenta" value={cuenta} onChange={(e) => setCuenta(e.target.value)}>
+          <div className="cp-field">
+            <label className="cp-field__label" htmlFor="g-cuenta">¿De qué caja salió?</label>
+            <select
+              id="g-cuenta"
+              className="cp-select"
+              value={cuenta}
+              onChange={(e) => setCuenta(e.target.value)}
+            >
               {cuentas.map((c) => <option key={c.id} value={c.id}>{c.completo}</option>)}
             </select>
           </div>
 
-          <div className="cp-libro__field">
-            <label htmlFor="g-motivo">Motivo</label>
-            <input id="g-motivo" value={motivo} placeholder="Ej: alquiler, EPEC, insumos"
-              onChange={(e) => setMotivo(e.target.value)} />
-          </div>
+          <Input
+            id="g-motivo"
+            label="Motivo"
+            value={motivo}
+            placeholder="Ej: alquiler, EPEC, insumos"
+            onChange={(e) => setMotivo(e.target.value)}
+          />
         </div>
 
         {error && <div className="cp-modal__error">{error}</div>}

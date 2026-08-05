@@ -567,6 +567,44 @@ console.log('\n[13] Estilos del selector de mes');
   }
 }
 
+/* ============ 14. Modal de registrar gasto ============ */
+console.log('\n[14] Formulario de registrar gasto');
+{
+  const fs = await import('fs');
+  const css = fs.readFileSync('/home/claude/ConsulPay/src/pages/admin/LibroCaja.css', 'utf8');
+  chequeo('el libro ya no define sus propios inputs',
+    !css.includes('.cp-libro__field input'));
+  chequeo('tampoco sus propios labels', !css.includes('.cp-libro__field label'));
+
+  const { default: LibroCaja } = await import('/home/claude/ConsulPay/src/pages/admin/LibroCaja.jsx');
+  globalThis.__DATA__ = { sesiones: [], gastos: [], pagos_consultorio: [], pacientes: [],
+    usuarios: [{ id: 'A', uid: 'A', displayName: 'Adriana Barrozo', consultorioId: 'C1', rol: 'admin' },
+               { id: 'R', uid: 'R', displayName: 'Romina Sulaiman', consultorioId: 'C1', rol: 'admin' }] };
+
+  const { cont } = await montar(LibroCaja, {
+    consultorioId: 'C1', consultorio: { adminUids: ['A', 'R'], mpConfigs: {} },
+    uid: 'A', mes: new Date(2026, 7, 1),
+  });
+  await act(async () => {
+    clic([...cont.querySelectorAll('button')].find((b) => b.textContent.includes('Registrar gasto')));
+  });
+  const modal = cont.querySelector('.cp-modal');
+  chequeo('el modal abre', !!modal);
+  chequeo('los 4 campos usan la estructura del sistema',
+    modal.querySelectorAll('.cp-field').length === 4, `(${modal.querySelectorAll('.cp-field').length})`);
+  chequeo('los 3 inputs usan cp-input', modal.querySelectorAll('.cp-input').length === 3);
+  chequeo('el select usa cp-select', modal.querySelectorAll('.cp-select').length === 1);
+  chequeo('los labels usan cp-field__label', modal.querySelectorAll('.cp-field__label').length === 4);
+  chequeo('no quedo ningun campo con los estilos viejos',
+    modal.querySelectorAll('.cp-libro__field').length === 0);
+  chequeo('la fecha sigue siendo un date picker',
+    modal.querySelector('#g-fecha')?.type === 'date');
+  chequeo('el monto sigue siendo numerico',
+    modal.querySelector('#g-monto')?.type === 'number');
+  chequeo('el select ofrece las cajas del consultorio',
+    modal.querySelectorAll('#g-cuenta option').length === 2);
+}
+
 console.log(`\n${'='.repeat(52)}`);
 console.log(`${ok} chequeos OK, ${fallos.length} fallas`);
 if (fallos.length) { console.log('FALLAN:'); fallos.forEach((f) => console.log('  - ' + f)); }
