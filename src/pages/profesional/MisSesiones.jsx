@@ -111,7 +111,7 @@ function SelectorMes({ mes, setMes }) {
   const esEsteMes = mes.getFullYear() === hoy.getFullYear() && mes.getMonth() === hoy.getMonth();
 
   return (
-    <div className="cp-mes-selector">
+    <div className="cp-mes-selector cp-mes-selector--bajo-titulo">
       <button
         className="cp-mes-selector__btn"
         onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() - 1, 1))}

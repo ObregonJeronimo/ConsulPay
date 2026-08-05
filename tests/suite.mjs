@@ -519,6 +519,54 @@ console.log('\n[12] Meses futuros en Marcar mes como pagado');
   }
 }
 
+/* ============ 13. Selector de mes visible en todas las pantallas ============ */
+console.log('\n[13] Estilos del selector de mes');
+{
+  const fs = await import('fs');
+  const leer = (f) => fs.readFileSync(f, 'utf8');
+  const shared = leer('/home/claude/ConsulPay/src/styles/shared-ui.css');
+  const sesionesCss = leer('/home/claude/ConsulPay/src/pages/admin/Sesiones.css');
+
+  chequeo('la regla base vive en shared-ui', shared.includes('.cp-mes-selector {'));
+  chequeo('los botones tambien', shared.includes('.cp-mes-selector__btn {'));
+  chequeo('el atajo Hoy tambien', shared.includes('.cp-mes-selector__hoy {'));
+  chequeo('no quedo duplicada en Sesiones.css, ni la base ni la mobile',
+    !sesionesCss.includes('.cp-mes-selector'));
+  chequeo('la version mobile tambien esta compartida', (() => {
+    const i = shared.indexOf('@media (max-width: 640px)');
+    return shared.slice(i, i + 600).includes('.cp-mes-selector');
+  })());
+  chequeo('el margen no esta acoplado a la clase base', (() => {
+    const i = shared.indexOf('.cp-mes-selector {');
+    return !shared.slice(i, shared.indexOf('}', i)).includes('margin-top');
+  })());
+  chequeo('existe la variante para colgar del subtitulo',
+    shared.includes('.cp-mes-selector--bajo-titulo'));
+
+  // Estilo computado en jsdom, con los CSS que carga realmente cada pantalla.
+  const tokens = ':root{--cp-surface:#fff;--cp-border:#ddd;--cp-radius-md:8px;--cp-radius-sm:4px;'
+    + '--cp-text-muted:#777;--cp-text:#111;--cp-surface-hover:#eee;--cp-dur-fast:.1s;'
+    + '--cp-ease:linear;--cp-accent:#b45;--cp-accent-dark:#923;}';
+  const { JSDOM: JD } = await import('jsdom');
+  function caja(css) {
+    const d = new JD(`<!doctype html><html><head><style>${tokens}${css}</style></head>`
+      + '<body><div class="cp-mes-selector"><button class="cp-mes-selector__btn">x</button>'
+      + '<span class="cp-mes-selector__label">agosto de 2026</span></div></body></html>');
+    const regla = [...d.window.document.styleSheets[0].cssRules].find((r) => r.selectorText === '.cp-mes-selector');
+    const btn = d.window.getComputedStyle(d.window.document.querySelector('.cp-mes-selector__btn'));
+    return { borde: regla?.style.border ?? '', ancho: btn.width };
+  }
+
+  for (const [pantalla, archivo] of [
+    ['admin/Pagos', '/home/claude/ConsulPay/src/pages/admin/Pagos.css'],
+    ['admin/Reparto', '/home/claude/ConsulPay/src/pages/admin/Reparto.css'],
+    ['profesional/MisPagos', '/home/claude/ConsulPay/src/pages/profesional/MisPagos.css'],
+  ]) {
+    const r = caja(leer(archivo) + shared);
+    chequeo(`${pantalla}: el selector tiene caja`, r.borde.includes('1px solid') && r.ancho === '28px', `(${r.borde}|${r.ancho})`);
+  }
+}
+
 console.log(`\n${'='.repeat(52)}`);
 console.log(`${ok} chequeos OK, ${fallos.length} fallas`);
 if (fallos.length) { console.log('FALLAN:'); fallos.forEach((f) => console.log('  - ' + f)); }

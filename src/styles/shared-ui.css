@@ -21,6 +21,85 @@
   gap: var(--cp-space-4);
 }
 
+/* ============================================================
+   Selector de mes
+   ----------------------------------------------------------------
+   Lo usan admin/Sesiones, admin/Pagos, admin/Reparto,
+   profesional/MisSesiones y profesional/MisPagos. Vivia en
+   Sesiones.css, asi que solo se veia bien en las pantallas que
+   importaban ese archivo; en las otras el markup era el mismo pero
+   salia sin caja, sin botones y con el texto pegado.
+
+   margin-top va en el contenedor de cada pagina, no aca: el valor
+   dependia de donde estaba montado y arrastraba un margen fantasma
+   a los modales.
+   ============================================================ */
+.cp-mes-selector {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  padding: 4px;
+}
+
+/* Cuando cuelga debajo del subtitulo de una pagina necesita aire; dentro
+   de un modal o de una barra de filtros, no. */
+.cp-mes-selector--bajo-titulo {
+  margin-top: 6px;
+}
+
+.cp-mes-selector__btn {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--cp-radius-sm);
+  background: transparent;
+  border: none;
+  color: var(--cp-text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--cp-dur-fast) var(--cp-ease), color var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-mes-selector__btn:hover {
+  background: var(--cp-surface-hover);
+  color: var(--cp-text);
+}
+
+.cp-mes-selector__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.cp-mes-selector__label {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--cp-text);
+  padding: 0 12px;
+  text-transform: capitalize;
+  min-width: 130px;
+  text-align: center;
+}
+
+.cp-mes-selector__hoy {
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--cp-accent);
+  cursor: pointer;
+  padding: 0 8px;
+  border-left: 1px solid var(--cp-border);
+  height: 20px;
+}
+
+.cp-mes-selector__hoy:hover {
+  color: var(--cp-accent-dark);
+}
+
 /* Casilla dibujada a mano: el input nativo no se puede alinear igual en
    iOS y Android sin pelearse con el user-agent stylesheet. */
 .cp-check {
@@ -576,6 +655,19 @@
 /* En pantallas chicas (mobile), el modal toma practicamente toda la
    pantalla y el padding del overlay se reduce. */
 @media (max-width: 640px) {
+  /* El selector a lo ancho y centrado. Estaba solo en Sesiones.css, asi que
+     en Pagos, Reparto y MisPagos quedaba chico y pegado a un costado. */
+  .cp-mes-selector {
+    margin-top: 0;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .cp-mes-selector__label {
+    flex: 1;
+    min-width: 0;
+  }
+
   .cp-modal-overlay {
     /* En mobile el modal ocupa casi toda la pantalla. Padding minimo
        arriba y abajo para que no se vea pegado al borde. */

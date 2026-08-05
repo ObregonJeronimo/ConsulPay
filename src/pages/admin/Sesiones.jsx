@@ -660,7 +660,7 @@ function SelectorMes({ mes, setMes }) {
   }
 
   return (
-    <div className="cp-mes-selector">
+    <div className="cp-mes-selector cp-mes-selector--bajo-titulo">
       <button className="cp-mes-selector__btn" onClick={prev} aria-label="Mes anterior">
         <ChevronLeft />
       </button>
@@ -1891,7 +1891,7 @@ function SelectorMesPagarMes({ mes, setMes }) {
   }
   const esEsteMes = inicioDeMes(new Date()).getTime() === mes.getTime();
   return (
-    <div className="cp-mes-selector" style={{ marginTop: 0 }}>
+    <div className="cp-mes-selector">
       <button type="button" className="cp-mes-selector__btn" onClick={anterior} aria-label="Mes anterior">‹</button>
       <span className="cp-mes-selector__label">{nombreDelMes(mes)}</span>
       <button type="button" className="cp-mes-selector__btn" onClick={siguiente} aria-label="Mes siguiente">›</button>
