@@ -13,6 +13,12 @@ import {
   suscribirInstanciasProfesional,
 } from '../../lib/recordatorios.js';
 import {
+  ESTADOS_PERMISO,
+  activarNotificaciones,
+  desactivarNotificaciones,
+  estadoPermiso,
+} from '../../lib/notificaciones.js';
+import {
   finDeMes,
   getCantidadSesiones,
   inicioDeMes,
@@ -384,9 +390,92 @@ function BellIcon() {
 }
 
 /* ============================================================
+   Activar / desactivar las notificaciones push
+   ----------------------------------------------------------------
+   Vive dentro del panel de recordatorios porque es ahi donde el
+   profesional esta pensando en el tema. Un banner suelto en el panel
+   principal seria una interrupcion mas.
+
+   El permiso se pide SOLO cuando aprieta el boton. Pedirlo al entrar
+   es la forma mas rapida de que el navegador se lo guarde como "no"
+   para siempre.
+   ============================================================ */
+function ControlNotificaciones({ uid }) {
+  const [estado, setEstado] = useState(() => estadoPermiso());
+  const [trabajando, setTrabajando] = useState(false);
+  const [aviso, setAviso] = useState('');
+
+  async function activar() {
+    setTrabajando(true);
+    setAviso('');
+    const r = await activarNotificaciones(uid);
+    setEstado(r.estado);
+    if (!r.ok && r.estado === ESTADOS_PERMISO.BLOQUEADO) {
+      setAviso('Las bloqueaste en este navegador. Se habilitan desde el candado de la barra de direcciones.');
+    } else if (!r.ok && r.error) {
+      setAviso('No se pudieron activar. Probá de nuevo en un rato.');
+    }
+    setTrabajando(false);
+  }
+
+  async function desactivar() {
+    setTrabajando(true);
+    await desactivarNotificaciones(uid);
+    setEstado(estadoPermiso());
+    setAviso('Este dispositivo ya no va a recibir avisos.');
+    setTrabajando(false);
+  }
+
+  if (estado === ESTADOS_PERMISO.NO_SOPORTADO) return null;
+
+  return (
+    <div className="cp-notif-control">
+      {estado === ESTADOS_PERMISO.REQUIERE_INSTALAR ? (
+        <>
+          <span className="cp-notif-control__label">Avisos en este iPhone</span>
+          <p className="cp-notif-control__hint">
+            Para recibirlos, tocá Compartir y después &quot;Agregar a inicio&quot;. Apple
+            solo permite avisos a las apps agregadas a la pantalla de inicio.
+          </p>
+        </>
+      ) : estado === ESTADOS_PERMISO.CONCEDIDO ? (
+        <>
+          <span className="cp-notif-control__label">Avisos activados en este dispositivo</span>
+          <button
+            type="button"
+            className="cp-notif-control__btn"
+            onClick={desactivar}
+            disabled={trabajando}
+          >
+            {trabajando ? 'Desactivando…' : 'Desactivar'}
+          </button>
+        </>
+      ) : (
+        <>
+          <span className="cp-notif-control__label">Avisos en el celular o la compu</span>
+          <p className="cp-notif-control__hint">
+            Te llega una notificación cuando tengas un recordatorio nuevo, sin
+            necesidad de tener ConsulPay abierta.
+          </p>
+          <button
+            type="button"
+            className="cp-notif-control__btn cp-notif-control__btn--primary"
+            onClick={activar}
+            disabled={trabajando || estado === ESTADOS_PERMISO.BLOQUEADO}
+          >
+            {trabajando ? 'Activando…' : 'Activar avisos'}
+          </button>
+        </>
+      )}
+      {aviso && <p className="cp-notif-control__aviso">{aviso}</p>}
+    </div>
+  );
+}
+
+/* ============================================================
    Panel desplegable de recordatorios
    ============================================================ */
-function PanelRecordatorios({ instancias, onClose }) {
+function PanelRecordatorios({ instancias, uid, onClose }) {
   const ref = useRef(null);
 
   // Cerrar al click afuera
@@ -466,6 +555,8 @@ function PanelRecordatorios({ instancias, onClose }) {
           )}
         </div>
       )}
+
+      <ControlNotificaciones uid={uid} />
     </div>
   );
 }

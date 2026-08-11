@@ -605,6 +605,80 @@ console.log('\n[14] Formulario de registrar gasto');
     modal.querySelectorAll('#g-cuenta option').length === 2);
 }
 
+/* ============ 15. Notificaciones push ============ */
+console.log('\n[15] Notificaciones push');
+{
+  const fs = await import('fs');
+
+  // --- Piezas que tienen que existir con nombre exacto
+  chequeo('el service worker esta en la raiz publica',
+    fs.existsSync('/home/claude/ConsulPay/public/firebase-messaging-sw.js'));
+  chequeo('hay manifest para que iOS pueda instalar la app',
+    fs.existsSync('/home/claude/ConsulPay/public/manifest.json'));
+  const html = fs.readFileSync('/home/claude/ConsulPay/index.html', 'utf8');
+  chequeo('el manifest esta enlazado en el html', html.includes('rel="manifest"'));
+
+  const manifest = JSON.parse(fs.readFileSync('/home/claude/ConsulPay/public/manifest.json', 'utf8'));
+  chequeo('el manifest es standalone (requisito de iOS)', manifest.display === 'standalone');
+
+  // --- El SW y el cliente tienen que apuntar al mismo proyecto
+  const sw = fs.readFileSync('/home/claude/ConsulPay/public/firebase-messaging-sw.js', 'utf8');
+  const cliente = fs.readFileSync('/home/claude/ConsulPay/src/lib/firebase.js', 'utf8');
+  const senderCliente = cliente.match(/messagingSenderId: '(\d+)'/)?.[1];
+  chequeo('el sender id del SW coincide con el del cliente',
+    !!senderCliente && sw.includes(senderCliente), `(${senderCliente})`);
+  chequeo('el SW maneja los mensajes en background', sw.includes('onBackgroundMessage'));
+  chequeo('el SW maneja el click en la notificacion', sw.includes('notificationclick'));
+
+  // --- El cron registrado
+  const vercel = JSON.parse(fs.readFileSync('/home/claude/ConsulPay/vercel.json', 'utf8'));
+  const cron = vercel.crons.find((c) => c.path === '/api/cron/recordatorios');
+  chequeo('el cron de recordatorios esta registrado', !!cron);
+  chequeo('corre una vez por dia (limite de Vercel Hobby)',
+    !!cron && /^\d+ \d+ \* \* \*$/.test(cron.schedule), `(${cron?.schedule})`);
+  chequeo('no se pasa de 2 crons, que es el tope de Hobby',
+    vercel.crons.length <= 2, `(${vercel.crons.length})`);
+
+  // --- La logica que evita el spam diario, extraida del cron real
+  const src = fs.readFileSync('/home/claude/ConsulPay/api/cron/recordatorios.js', 'utf8');
+  const desde = src.indexOf('function aFecha(valor) {');
+  const hasta = src.indexOf('export default async function handler');
+  const mod = await import('data:text/javascript,' + encodeURIComponent(
+    src.slice(desde, hasta) + '\nexport { hayQueNotificar, armarMensaje };'));
+
+  const ts = (d) => ({ toDate: () => d });
+  const ahora = new Date('2026-08-10T12:00:00');
+  const ayer = new Date('2026-08-09T12:00:00');
+  const haceUnMes = new Date('2026-07-09T12:00:00');
+  const manana = new Date('2026-08-11T12:00:00');
+
+  chequeo('avisa cuando le toca y nunca se aviso',
+    mod.hayQueNotificar({ estado: 'pendiente', proximaEn: ts(ayer), notificadaEn: null }, ahora) === true);
+  chequeo('NO repite el aviso al dia siguiente',
+    mod.hayQueNotificar({ estado: 'pendiente', proximaEn: ts(ayer), notificadaEn: ts(ahora) }, ahora) === false);
+  chequeo('vuelve a avisar en la siguiente vuelta del ciclo',
+    mod.hayQueNotificar({ estado: 'pendiente', proximaEn: ts(ayer), notificadaEn: ts(haceUnMes) }, ahora) === true);
+  chequeo('no avisa antes de tiempo',
+    mod.hayQueNotificar({ estado: 'pendiente', proximaEn: ts(manana), notificadaEn: null }, ahora) === false);
+  chequeo('no avisa de lo ya aceptado',
+    mod.hayQueNotificar({ estado: 'aceptado', proximaEn: ts(ayer), notificadaEn: null }, ahora) === false);
+  chequeo('varios recordatorios del dia van en un solo aviso',
+    mod.armarMensaje([{ titulo: 'A' }, { titulo: 'B' }]).titulo === 'Tenés 2 recordatorios');
+
+  // --- El cliente no puede pedir permiso solo
+  const notif = fs.readFileSync('/home/claude/ConsulPay/src/lib/notificaciones.js', 'utf8');
+  chequeo('el permiso se pide dentro de activarNotificaciones, no al importar', (() => {
+    const i = notif.indexOf('requestPermission');
+    const j = notif.indexOf('export async function activarNotificaciones');
+    return i > j;
+  })());
+  chequeo('detecta el caso del iPhone sin instalar',
+    notif.includes('REQUIERE_INSTALAR') && notif.includes('esPWAInstalada'));
+  chequeo('limpia el token al desactivar', notif.includes('deleteToken'));
+  chequeo('el cron limpia los tokens muertos',
+    src.includes('registration-token-not-registered'));
+}
+
 console.log(`\n${'='.repeat(52)}`);
 console.log(`${ok} chequeos OK, ${fallos.length} fallas`);
 if (fallos.length) { console.log('FALLAN:'); fallos.forEach((f) => console.log('  - ' + f)); }

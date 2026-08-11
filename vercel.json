@@ -35,6 +35,10 @@
     {
       "path": "/api/cron/suscripciones-expiradas",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/recordatorios",
+      "schedule": "0 12 * * *"
     }
   ]
 }

@@ -5,6 +5,15 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#F5F4EE" />
+
+    <!-- El manifest no es decorativo: en iPhone el push web SOLO funciona si
+         la app se agrego a la pantalla de inicio, y para eso hace falta un
+         manifest con display standalone. En Android y escritorio no es
+         obligatorio, pero mejora como se ve al instalarla. -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="ConsulPay" />
     <meta name="description" content="ConsulPay — Gestión de consultorios y pagos de profesionales" />
     <title>ConsulPay</title>
 
