@@ -49,6 +49,23 @@ function hayQueNotificar(inst, ahora) {
   return notificada < proxima;
 }
 
+/* Texto legible de por que una instancia no entra en el envio de hoy.
+   Solo se usa para el log del cron. */
+function motivoDescarte(inst, ahora) {
+  if (inst.estado !== 'pendiente') return `estado ${inst.estado}`;
+
+  const proxima = aFecha(inst.proximaEn);
+  if (!proxima) return 'sin proximaEn';
+  if (proxima > ahora) {
+    const dias = Math.ceil((proxima - ahora) / 86400000);
+    return `todavia no le toca (en ${dias} dia${dias === 1 ? '' : 's'}, el ${proxima.toISOString().slice(0, 10)})`;
+  }
+
+  const notificada = aFecha(inst.notificadaEn);
+  if (notificada) return `ya se aviso el ${notificada.toISOString().slice(0, 10)}`;
+  return 'motivo desconocido';
+}
+
 function armarMensaje(instancias) {
   if (instancias.length === 1) {
     const i = instancias[0];
@@ -92,14 +109,28 @@ export async function notificarRecordatorios() {
     // Agrupadas por profesional: si le tocan tres recordatorios el mismo
     // dia recibe un aviso, no tres seguidos.
     const porProfesional = new Map();
+    /* Por que se descarto cada una. Sin esto, un cron que devuelve
+       "0 a notificar" no dice si es que todavia no les toca, si ya se
+       aviso o si el dato esta roto, y hay que ir a mirar Firestore a
+       mano para saberlo. */
+    const descartadas = [];
+
     for (const docu of snap.docs) {
       const inst = { id: docu.id, ...docu.data() };
-      if (!hayQueNotificar(inst, ahora)) continue;
-      if (!inst.profesionalUid) continue;
+      if (!inst.profesionalUid) {
+        descartadas.push({ id: docu.id, motivo: 'sin profesional asignado' });
+        continue;
+      }
+      if (!hayQueNotificar(inst, ahora)) {
+        descartadas.push({ id: docu.id, motivo: motivoDescarte(inst, ahora) });
+        continue;
+      }
       stats.instanciasANotificar += 1;
       if (!porProfesional.has(inst.profesionalUid)) porProfesional.set(inst.profesionalUid, []);
       porProfesional.get(inst.profesionalUid).push(inst);
     }
+
+    if (descartadas.length > 0) stats.descartadas = descartadas;
 
     for (const [uid, instancias] of porProfesional) {
       try {

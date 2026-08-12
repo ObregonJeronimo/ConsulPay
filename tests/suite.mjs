@@ -709,6 +709,23 @@ console.log('\n[15] Notificaciones push');
     panel.includes('escucharEnPrimerPlano('));
   chequeo('el cron limpia los tokens muertos',
     src.includes('registration-token-not-registered'));
+
+  /* Un cron que devuelve "0 a notificar" sin decir por que obliga a ir a
+     mirar Firestore a mano para saber si el sistema anda o esta roto. */
+  chequeo('el cron explica por que descarta cada instancia',
+    src.includes('function motivoDescarte') && src.includes('stats.descartadas'));
+  const motivos = await import('data:text/javascript,' + encodeURIComponent(
+    src.slice(src.indexOf('function aFecha(valor) {'), src.indexOf('export async function notificarRecordatorios'))
+    + '\nexport { motivoDescarte };'));
+  const ahoraM = new Date('2026-08-12T10:00:00');
+  chequeo('distingue "todavia no le toca"',
+    motivos.motivoDescarte({ estado: 'pendiente', proximaEn: { toDate: () => new Date('2026-08-19T00:00:00') } }, ahoraM)
+      .startsWith('todavia no le toca'));
+  chequeo('distingue "ya se aviso"',
+    motivos.motivoDescarte({ estado: 'pendiente', proximaEn: { toDate: () => new Date('2026-08-11T00:00:00') }, notificadaEn: { toDate: () => new Date('2026-08-11T12:00:00') } }, ahoraM)
+      .startsWith('ya se aviso'));
+  chequeo('distingue el dato roto',
+    motivos.motivoDescarte({ estado: 'pendiente', proximaEn: null }, ahoraM) === 'sin proximaEn');
 }
 
 /* ============ 16. Ciclos de recordatorios ============ */
