@@ -76,9 +76,13 @@ const MARCA = 'Recordatorio ConsulPay';
 function armarMensaje(instancias) {
   if (instancias.length === 1) {
     const i = instancias[0];
-    const titulo = i.titulo || 'Tenés un recordatorio pendiente';
-    // El guion solo si hay descripcion: sin esto quedaba un " — " colgado.
-    const cuerpo = i.descripcion ? `${titulo} — ${i.descripcion}` : titulo;
+    /* Con descripcion se muestra "titulo — descripcion". Sin descripcion va
+       un texto fijo y no el titulo solo: los nombres de recordatorio suelen
+       ser notas internas del admin ("prueba 6 semanal") y en una
+       notificacion quedan mas confusos que utiles. */
+    const cuerpo = i.descripcion
+      ? `${i.titulo || 'Recordatorio'} — ${i.descripcion}`
+      : 'Recordatorio pendiente';
     return { titulo: MARCA, cuerpo };
   }
 

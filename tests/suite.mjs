@@ -715,10 +715,12 @@ console.log('\n[15] Notificaciones push');
     mod.armarMensaje([{ titulo: 'A', descripcion: 'x' }]).titulo === 'Recordatorio ConsulPay');
   chequeo('el detalle del recordatorio va en el cuerpo',
     mod.armarMensaje([{ titulo: 'prueba 6', descripcion: 'wwww' }]).cuerpo === 'prueba 6 — wwww');
-  chequeo('sin descripcion no queda un guion colgado',
-    mod.armarMensaje([{ titulo: 'Pagar alquiler' }]).cuerpo === 'Pagar alquiler');
-  chequeo('sin titulo ni descripcion igual dice algo util',
-    mod.armarMensaje([{}]).cuerpo === 'Tenés un recordatorio pendiente');
+  chequeo('sin descripcion usa el texto fijo, no el titulo del recordatorio',
+    mod.armarMensaje([{ titulo: 'Pagar alquiler' }]).cuerpo === 'Recordatorio pendiente');
+  chequeo('descripcion vacia cuenta como sin descripcion',
+    mod.armarMensaje([{ titulo: 'Pagar alquiler', descripcion: '' }]).cuerpo === 'Recordatorio pendiente');
+  chequeo('sin titulo ni descripcion igual dice algo',
+    mod.armarMensaje([{}]).cuerpo === 'Recordatorio pendiente');
   chequeo('varios recordatorios van en un solo aviso, con la cuenta',
     mod.armarMensaje([{ titulo: 'A' }, { titulo: 'B' }]).cuerpo === 'Tenés 2 recordatorios: A · B');
   chequeo('con muchos, corta en 3 y dice cuantos faltan',
