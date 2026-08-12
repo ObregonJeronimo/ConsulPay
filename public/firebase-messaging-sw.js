@@ -31,6 +31,15 @@ firebase.initializeApp({
   appId: '1:451327014660:web:936624a5cf8a56527f4251',
 });
 
+/* Sin esto, un service worker nuevo queda "esperando" hasta que se cierren
+   TODAS las pestanas del sitio, y mientras tanto sigue respondiendo el
+   viejo. En la practica significa que cualquier cambio de este archivo
+   puede tardar dias en verse: por eso el badge nuevo seguia saliendo con
+   el icono anterior. skipWaiting lo activa de una y clients.claim le da el
+   control de las pestanas ya abiertas. */
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
+
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {

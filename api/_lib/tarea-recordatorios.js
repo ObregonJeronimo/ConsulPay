@@ -66,17 +66,27 @@ function motivoDescarte(inst, ahora) {
   return 'motivo desconocido';
 }
 
+/* El titulo lleva la marca siempre. Antes decia solo el nombre del
+   recordatorio ("prueba 6 semanal"), y en el celular eso llega sin
+   contexto: la URL del sitio aparece chiquita y en gris arriba, asi que
+   alguien que recibe varias notificaciones al dia no tiene como saber de
+   donde salio. Lo especifico pasa al cuerpo, que es donde hay lugar. */
+const MARCA = 'Recordatorio ConsulPay';
+
 function armarMensaje(instancias) {
   if (instancias.length === 1) {
     const i = instancias[0];
-    return {
-      titulo: i.titulo || 'Recordatorio',
-      cuerpo: i.descripcion || 'Tenés un recordatorio pendiente en ConsulPay.',
-    };
+    const titulo = i.titulo || 'Tenés un recordatorio pendiente';
+    // El guion solo si hay descripcion: sin esto quedaba un " — " colgado.
+    const cuerpo = i.descripcion ? `${titulo} — ${i.descripcion}` : titulo;
+    return { titulo: MARCA, cuerpo };
   }
+
+  const nombres = instancias.map((i) => i.titulo).filter(Boolean).slice(0, 3).join(' · ');
+  const resto = instancias.length > 3 ? ` y ${instancias.length - 3} más` : '';
   return {
-    titulo: `Tenés ${instancias.length} recordatorios`,
-    cuerpo: instancias.map((i) => i.titulo).filter(Boolean).slice(0, 3).join(' · '),
+    titulo: MARCA,
+    cuerpo: `Tenés ${instancias.length} recordatorios: ${nombres}${resto}`,
   };
 }
 

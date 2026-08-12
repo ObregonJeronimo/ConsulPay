@@ -124,6 +124,11 @@ export async function activarNotificaciones(uid) {
        haga solo, en algunos navegadores toma un scope distinto y el
        token queda atado a un registro que despues no recibe nada. */
     const registro = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+    /* register() no vuelve a bajar el archivo si ya hay uno registrado con
+       la misma URL. update() fuerza el chequeo, que junto al skipWaiting
+       del SW hace que un cambio se aplique al toque y no cuando el
+       navegador tenga ganas. */
+    registro.update().catch(() => {});
     const token = await getToken(messaging, {
       vapidKey: VAPID_KEY,
       serviceWorkerRegistration: registro,

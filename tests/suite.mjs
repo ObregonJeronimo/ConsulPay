@@ -643,6 +643,14 @@ console.log('\n[15] Notificaciones push');
   chequeo('el badge es PNG, no SVG (Android no lo soporta bien)',
     !sw.includes("badge: '/favicon.svg'"));
 
+  /* Un SW nuevo queda "esperando" hasta que se cierren todas las pestanas y
+     mientras tanto responde el viejo, asi que un cambio puede tardar dias en
+     verse. Fue justo lo que paso con el badge. */
+  chequeo('el service worker se activa sin esperar al viejo',
+    sw.includes('skipWaiting') && sw.includes('clients.claim'));
+  chequeo('el cliente fuerza el chequeo de actualizacion',
+    notifSrc.includes('registro.update()'));
+
   // --- El cron registrado
   const vercel = JSON.parse(fs.readFileSync('/home/claude/ConsulPay/vercel.json', 'utf8'));
   const cron = vercel.crons.find((c) => c.path === '/api/cron/diario');
@@ -700,8 +708,22 @@ console.log('\n[15] Notificaciones push');
     mod.hayQueNotificar({ estado: 'pendiente', proximaEn: ts(manana), notificadaEn: null }, ahora) === false);
   chequeo('no avisa de lo ya aceptado',
     mod.hayQueNotificar({ estado: 'aceptado', proximaEn: ts(ayer), notificadaEn: null }, ahora) === false);
-  chequeo('varios recordatorios del dia van en un solo aviso',
-    mod.armarMensaje([{ titulo: 'A' }, { titulo: 'B' }]).titulo === 'Tenés 2 recordatorios');
+  /* El titulo lleva la marca: en el celular la URL del sitio sale chiquita
+     y en gris, asi que un titulo que dice solo "prueba 6 semanal" llega sin
+     contexto de donde salio. */
+  chequeo('el titulo siempre identifica a ConsulPay',
+    mod.armarMensaje([{ titulo: 'A', descripcion: 'x' }]).titulo === 'Recordatorio ConsulPay');
+  chequeo('el detalle del recordatorio va en el cuerpo',
+    mod.armarMensaje([{ titulo: 'prueba 6', descripcion: 'wwww' }]).cuerpo === 'prueba 6 — wwww');
+  chequeo('sin descripcion no queda un guion colgado',
+    mod.armarMensaje([{ titulo: 'Pagar alquiler' }]).cuerpo === 'Pagar alquiler');
+  chequeo('sin titulo ni descripcion igual dice algo util',
+    mod.armarMensaje([{}]).cuerpo === 'Tenés un recordatorio pendiente');
+  chequeo('varios recordatorios van en un solo aviso, con la cuenta',
+    mod.armarMensaje([{ titulo: 'A' }, { titulo: 'B' }]).cuerpo === 'Tenés 2 recordatorios: A · B');
+  chequeo('con muchos, corta en 3 y dice cuantos faltan',
+    mod.armarMensaje([{ titulo: 'A' }, { titulo: 'B' }, { titulo: 'C' }, { titulo: 'D' }, { titulo: 'E' }]).cuerpo
+      === 'Tenés 5 recordatorios: A · B · C y 2 más');
 
   // --- El cliente no puede pedir permiso solo
   const notif = fs.readFileSync('/home/claude/ConsulPay/src/lib/notificaciones.js', 'utf8');
