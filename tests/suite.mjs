@@ -711,6 +711,73 @@ console.log('\n[15] Notificaciones push');
     src.includes('registration-token-not-registered'));
 }
 
+/* ============ 16. Ciclos de recordatorios ============ */
+console.log('\n[16] Cuando aparece cada recordatorio');
+{
+  const fs = await import('fs');
+  const src = fs.readFileSync('/home/claude/ConsulPay/src/lib/recordatorios.js', 'utf8');
+  const desde = src.indexOf('export const TIPOS_CICLO');
+  const hasta = src.indexOf('/* ============================================================\n   Texto legible del ciclo');
+  const mod = await import('data:text/javascript,' + encodeURIComponent(src.slice(desde, hasta)));
+
+  const f = (d) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+  const prim = (c, d) => f(mod.calcularPrimeraAparicion(c, d));
+  const prox = (c, d) => f(mod.calcularProximaAparicion(c, d));
+
+  /* "El dia 18 de cada mes" creado el 11 aparecia ese mismo 11: la primera
+     instancia se creaba siempre con proximaEn = ahora, ignorando el ciclo. */
+  chequeo('el dia 18, creado el 11, espera al 18',
+    prim({ tipo: 'dia_del_mes', dia: 18 }, new Date(2026, 7, 11)) === '18/08/2026');
+  chequeo('creado el mismo dia 18, aparece hoy',
+    prim({ tipo: 'dia_del_mes', dia: 18 }, new Date(2026, 7, 18)) === '18/08/2026');
+  chequeo('creado el 25 con el 18 ya pasado, va al mes siguiente',
+    prim({ tipo: 'dia_del_mes', dia: 18 }, new Date(2026, 7, 25)) === '18/09/2026');
+
+  /* calcularProximaAparicion hacia setMonth(+1) fijo para dia_del_mes, o sea
+     que saltaba al mes siguiente aunque el dia no hubiera llegado. */
+  chequeo('aceptado el 31 de enero con ciclo dia 15, va al 15 de febrero',
+    prox({ tipo: 'dia_del_mes', dia: 15 }, new Date(2026, 0, 31)) === '15/02/2026');
+  chequeo('aceptado el 18, la siguiente vuelta es el 18 del mes que viene',
+    prox({ tipo: 'dia_del_mes', dia: 18 }, new Date(2026, 7, 18)) === '18/09/2026');
+  chequeo('dia 31 en un mes de 30 cae en el ultimo dia',
+    prim({ tipo: 'dia_del_mes', dia: 31 }, new Date(2026, 8, 5)) === '30/09/2026');
+  chequeo('dia 31 en febrero cae el 28',
+    prim({ tipo: 'dia_del_mes', dia: 31 }, new Date(2026, 1, 5)) === '28/02/2026');
+  chequeo('dia 30 en febrero bisiesto cae el 29',
+    prim({ tipo: 'dia_del_mes', dia: 30 }, new Date(2028, 1, 5)) === '29/02/2028');
+  chequeo('de diciembre pasa a enero del ano siguiente',
+    prox({ tipo: 'dia_del_mes', dia: 5 }, new Date(2026, 11, 20)) === '05/01/2027');
+
+  /* setMonth() a secas normaliza "31 de febrero" al 3 de marzo y se saltea
+     un mes entero. */
+  chequeo('mensual desde el 31 de enero da 28 de febrero, no marzo',
+    prox({ tipo: 'mensual', cada: 1 }, new Date(2026, 0, 31)) === '28/02/2026');
+  chequeo('mensual desde el 31 de marzo da 30 de abril, no mayo',
+    prox({ tipo: 'mensual', cada: 1 }, new Date(2026, 2, 31)) === '30/04/2026');
+  chequeo('mensual en ano bisiesto da 29 de febrero',
+    prox({ tipo: 'mensual', cada: 1 }, new Date(2028, 0, 31)) === '29/02/2028');
+  chequeo('mensual cada 3 meses',
+    prox({ tipo: 'mensual', cada: 3 }, new Date(2026, 0, 15)) === '15/04/2026');
+
+  // Los ciclos "cada N" arrancan hoy a proposito: se crean para que rijan ya.
+  const hoy = new Date(2026, 7, 11);
+  chequeo('semanal arranca hoy', prim({ tipo: 'semanal', cada: 1 }, hoy) === '11/08/2026');
+  chequeo('semanal cada 1 suma 7 dias', prox({ tipo: 'semanal', cada: 1 }, hoy) === '18/08/2026');
+  chequeo('semanal cada 3 suma 21 dias', prox({ tipo: 'semanal', cada: 3 }, hoy) === '01/09/2026');
+  chequeo('quincenal suma 14 dias', prox({ tipo: 'quincenal' }, hoy) === '25/08/2026');
+
+  /* Si proximaEn conservara la hora de creacion, un recordatorio del dia 18
+     cargado a las 22:45 no se notificaria hasta el 19: el cron corre a la
+     manana y compara contra esa hora. */
+  const nocturno = mod.calcularPrimeraAparicion({ tipo: 'dia_del_mes', dia: 18 }, new Date(2026, 7, 11, 22, 45));
+  chequeo('la fecha calculada queda a las 00:00',
+    nocturno.getHours() === 0 && nocturno.getMinutes() === 0);
+
+  const lib = fs.readFileSync('/home/claude/ConsulPay/src/lib/recordatorios.js', 'utf8');
+  chequeo('la primera instancia usa el ciclo y no la fecha de creacion',
+    lib.includes('proximaEn: Timestamp.fromDate(calcularPrimeraAparicion(ciclo, ahora))'));
+}
+
 console.log(`\n${'='.repeat(52)}`);
 console.log(`${ok} chequeos OK, ${fallos.length} fallas`);
 if (fallos.length) { console.log('FALLAN:'); fallos.forEach((f) => console.log('  - ' + f)); }

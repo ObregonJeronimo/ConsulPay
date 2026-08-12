@@ -68,6 +68,63 @@ const DIAS_EXPIRACION = 15;
 /* ============================================================
    Calcular próxima aparición desde una fecha base
    ============================================================ */
+/* Suma meses sin desbordar. setMonth() a secas es una trampa conocida:
+   el 31 de enero + 1 mes da "31 de febrero", que JavaScript normaliza al
+   3 de marzo y se saltea febrero entero. Cuando el dia no existe en el mes
+   destino, se usa el ultimo dia de ese mes, que es lo que espera cualquiera
+   que configure "cada 1 mes" un dia 31. */
+function sumarMeses(fecha, meses) {
+  const diaOriginal = fecha.getDate();
+  const r = new Date(fecha);
+  r.setDate(1);
+  r.setMonth(r.getMonth() + meses);
+  const ultimoDelMes = new Date(r.getFullYear(), r.getMonth() + 1, 0).getDate();
+  r.setDate(Math.min(diaOriginal, ultimoDelMes));
+  return r;
+}
+
+/* El dia X de un mes concreto, a las 00:00. Si el mes no tiene ese dia
+   (31 en febrero), cae en el ultimo. La hora en cero importa: el cron
+   corre a la manana y compara contra proximaEn, asi que si la fecha
+   quedara con la hora de creacion, un recordatorio del dia 18 creado a
+   las 20:00 no se notificaria hasta el 19. */
+function enDiaDelMes(anio, mes, dia) {
+  const ultimoDelMes = new Date(anio, mes + 1, 0).getDate();
+  return new Date(anio, mes, Math.min(dia, ultimoDelMes), 0, 0, 0, 0);
+}
+
+/**
+ * Proxima vez que cae el dia X del mes.
+ * @param {boolean} incluirHoy  true para la primera aparicion (si hoy es 18
+ *   y el ciclo es "dia 18", tiene que aparecer hoy); false para la siguiente
+ *   vuelta (aceptar el dia 18 no puede devolver ese mismo 18).
+ */
+function proximoDiaDelMes(diaPedido, desde, incluirHoy) {
+  const dia = Math.min(31, Math.max(1, diaPedido ?? 1));
+  const hoy = new Date(desde.getFullYear(), desde.getMonth(), desde.getDate());
+
+  const esteMes = enDiaDelMes(desde.getFullYear(), desde.getMonth(), dia);
+  if (incluirHoy ? esteMes >= hoy : esteMes > hoy) return esteMes;
+  return enDiaDelMes(desde.getFullYear(), desde.getMonth() + 1, dia);
+}
+
+/**
+ * Cuando aparece la PRIMERA instancia de un recordatorio recien creado.
+ *
+ * Para los ciclos "cada N" (semanal, quincenal, mensual) es ahora mismo: el
+ * admin lo crea porque quiere que empiece a regir, y a partir de ahi se
+ * repite cada N. Para "el dia X de cada mes" NO: ahi hay una fecha explicita
+ * y el recordatorio tiene que esperarla. Antes todos arrancaban en el
+ * momento de la creacion, asi que uno configurado para el 18 aparecia el
+ * mismo dia que se lo cargaba.
+ */
+export function calcularPrimeraAparicion(ciclo, desde = new Date()) {
+  if (ciclo?.tipo === TIPOS_CICLO.DIA_DEL_MES) {
+    return proximoDiaDelMes(ciclo.dia, desde, true);
+  }
+  return new Date(desde);
+}
+
 export function calcularProximaAparicion(ciclo, desde = new Date()) {
   const d = new Date(desde);
 
@@ -83,14 +140,12 @@ export function calcularProximaAparicion(ciclo, desde = new Date()) {
     }
     case TIPOS_CICLO.MENSUAL: {
       const meses = Math.max(1, ciclo.cada ?? 1);
-      d.setMonth(d.getMonth() + meses);
-      return d;
+      return sumarMeses(d, meses);
     }
     case TIPOS_CICLO.DIA_DEL_MES: {
-      const dia = Math.min(31, Math.max(1, ciclo.dia ?? 1));
-      d.setMonth(d.getMonth() + 1);
-      d.setDate(dia);
-      return d;
+      /* Antes esto hacia setMonth(+1) fijo, o sea que siempre saltaba al mes
+         siguiente aunque el dia todavia no hubiera llegado en el actual. */
+      return proximoDiaDelMes(ciclo.dia, d, false);
     }
     default:
       return d;
@@ -207,7 +262,8 @@ async function generarInstancias(recordatorioId, { consultorioId, titulo, descri
       creadaEn: Timestamp.fromDate(ahora),
       aceptadaEn: null,
       expiraEn: null,
-      proximaEn: Timestamp.fromDate(ahora),
+      // Respeta el ciclo: "el dia 18" espera al 18, no aparece al crearlo.
+      proximaEn: Timestamp.fromDate(calcularPrimeraAparicion(ciclo, ahora)),
     });
   }
   await batch.commit();

@@ -30,6 +30,7 @@ Sale con código 1 si algo falla, así que sirve para un pre-push hook.
 13. Selector de mes — estilos compartidos, visibles en las cinco pantallas
 14. Modal de gasto — usa los componentes de formulario del sistema
 15. Notificaciones push — service worker, manifest, cron y anti-repetición
+16. Ciclos de recordatorios — primera aparición, día del mes, desbordamiento
 
 ## Límite conocido
 
