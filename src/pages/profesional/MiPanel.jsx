@@ -18,6 +18,7 @@ import {
   desactivarNotificaciones,
   escucharEnPrimerPlano,
   estadoPermiso,
+  tieneTokenRegistrado,
 } from '../../lib/notificaciones.js';
 import {
   finDeMes,
@@ -418,16 +419,31 @@ function ControlNotificaciones({ uid }) {
   const [estado, setEstado] = useState(() => estadoPermiso());
   const [trabajando, setTrabajando] = useState(false);
   const [aviso, setAviso] = useState('');
+  /* null = todavia no se verifico. El permiso del navegador NO alcanza:
+     puede estar concedido y el token no haberse guardado nunca, y ahi la
+     UI decia "activados" mientras el cron no tenia a quien mandarle. */
+  const [registrado, setRegistrado] = useState(null);
+
+  useEffect(() => {
+    let vigente = true;
+    if (estado !== ESTADOS_PERMISO.CONCEDIDO) { setRegistrado(false); return undefined; }
+    tieneTokenRegistrado(uid).then((r) => { if (vigente) setRegistrado(r); });
+    return () => { vigente = false; };
+  }, [uid, estado]);
 
   async function activar() {
     setTrabajando(true);
     setAviso('');
     const r = await activarNotificaciones(uid);
     setEstado(r.estado);
-    if (!r.ok && r.estado === ESTADOS_PERMISO.BLOQUEADO) {
+    if (r.ok) {
+      setRegistrado(true);
+    } else if (r.estado === ESTADOS_PERMISO.BLOQUEADO) {
       setAviso('Las bloqueaste en este navegador. Se habilitan desde el candado de la barra de direcciones.');
-    } else if (!r.ok && r.error) {
-      setAviso('No se pudieron activar. Probá de nuevo en un rato.');
+    } else if (r.error) {
+      // El código crudo sirve para diagnosticar; sin esto solo quedaba
+      // un "probá de nuevo" que no decía nada.
+      setAviso(`No se pudieron activar (${r.error}).`);
     }
     setTrabajando(false);
   }
@@ -452,7 +468,7 @@ function ControlNotificaciones({ uid }) {
             solo permite avisos a las apps agregadas a la pantalla de inicio.
           </p>
         </>
-      ) : estado === ESTADOS_PERMISO.CONCEDIDO ? (
+      ) : estado === ESTADOS_PERMISO.CONCEDIDO && registrado === true ? (
         <>
           <span className="cp-notif-control__label">Avisos activados en este dispositivo</span>
           <button
@@ -464,12 +480,15 @@ function ControlNotificaciones({ uid }) {
             {trabajando ? 'Desactivando…' : 'Desactivar'}
           </button>
         </>
+      ) : estado === ESTADOS_PERMISO.CONCEDIDO && registrado === null ? (
+        <span className="cp-notif-control__hint">Verificando los avisos…</span>
       ) : (
         <>
           <span className="cp-notif-control__label">Avisos en el celular o la compu</span>
           <p className="cp-notif-control__hint">
-            Te llega una notificación cuando tengas un recordatorio nuevo, sin
-            necesidad de tener ConsulPay abierta.
+            {estado === ESTADOS_PERMISO.CONCEDIDO && registrado === false
+              ? 'Diste el permiso pero este dispositivo no quedó registrado. Tocá el botón para completarlo.'
+              : 'Te llega una notificación cuando tengas un recordatorio nuevo, sin necesidad de tener ConsulPay abierta.'}
           </p>
           <button
             type="button"

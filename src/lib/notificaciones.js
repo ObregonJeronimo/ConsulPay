@@ -16,7 +16,7 @@
    aprieta el boton.
    ============================================================ */
 
-import { arrayRemove, arrayUnion, doc, updateDoc } from 'firebase/firestore';
+import { arrayRemove, arrayUnion, doc, getDoc, updateDoc } from 'firebase/firestore';
 
 import { app, db } from './firebase.js';
 
@@ -134,7 +134,9 @@ export async function activarNotificaciones(uid) {
     return { ok: true, estado: ESTADOS_PERMISO.CONCEDIDO, token };
   } catch (err) {
     console.error('No se pudo activar las notificaciones:', err);
-    return { ok: false, estado: estadoPermiso(), error: err.message };
+    // El code de Firebase ('permission-denied', 'unavailable'...) dice mucho
+    // mas que el mensaje, y es lo que hace falta para diagnosticar.
+    return { ok: false, estado: estadoPermiso(), error: err.code || err.message };
   }
 }
 
@@ -145,15 +147,62 @@ export async function activarNotificaciones(uid) {
  * el token pelado en fcmTokens (para poder consultarlo desde el cron
  * sin parsear) y el detalle legible en fcmDispositivos.
  */
+/* Clave segura para el mapa de dispositivos.
+
+   Un token FCM tiene forma "abc123:APA91bH..." y puede traer ':' y '.'.
+   Firestore lee el punto como separador de niveles, asi que
+   `fcmDispositivos.abc:APA91bH` es un field path invalido y updateDoc
+   falla ENTERO: no se guardaba ni el token, que es lo unico que
+   importaba. Se deja solo lo que Firestore acepta en una clave. */
+function claveDispositivo(token) {
+  return token.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 24) || 'dispositivo';
+}
+
 async function guardarToken(uid, token) {
   const ref = doc(db, 'usuarios', uid);
-  await updateDoc(ref, {
-    fcmTokens: arrayUnion(token),
-    [`fcmDispositivos.${token.slice(0, 20)}`]: {
-      etiqueta: describirDispositivo(),
-      registradoEn: new Date().toISOString(),
-    },
-  });
+
+  /* Dos escrituras y no una: el array de tokens es lo que el cron
+     necesita para enviar, y no puede quedar sin guardar porque falle el
+     detalle de dispositivos, que es solo informativo. */
+  await updateDoc(ref, { fcmTokens: arrayUnion(token) });
+
+  try {
+    await updateDoc(ref, {
+      [`fcmDispositivos.${claveDispositivo(token)}`]: {
+        etiqueta: describirDispositivo(),
+        registradoEn: new Date().toISOString(),
+      },
+    });
+  } catch (err) {
+    console.warn('No se pudo guardar el detalle del dispositivo:', err);
+  }
+}
+
+/**
+ * ¿Este dispositivo esta realmente registrado para recibir avisos?
+ *
+ * No alcanza con Notification.permission: el permiso puede estar
+ * concedido y el token no haberse guardado nunca (por un fallo de red o
+ * de reglas). Sin este chequeo la UI decia "Avisos activados" mientras
+ * el cron reportaba "sin dispositivos registrados".
+ */
+export async function tieneTokenRegistrado(uid) {
+  if (!uid || estadoPermiso() !== ESTADOS_PERMISO.CONCEDIDO) return false;
+  try {
+    const messaging = await cargarMessaging();
+    if (!messaging) return false;
+    const { getToken } = await import('firebase/messaging');
+    const registro = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js');
+    if (!registro) return false;
+    const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: registro });
+    if (!token) return false;
+
+    const snap = await getDoc(doc(db, 'usuarios', uid));
+    return (snap.data()?.fcmTokens || []).includes(token);
+  } catch (err) {
+    console.error('No se pudo verificar el registro del dispositivo:', err);
+    return false;
+  }
 }
 
 /** Saca este dispositivo de la lista. El permiso del navegador queda igual. */
@@ -173,7 +222,7 @@ export async function desactivarNotificaciones(uid) {
     if (token) {
       await updateDoc(doc(db, 'usuarios', uid), {
         fcmTokens: arrayRemove(token),
-        [`fcmDispositivos.${token.slice(0, 20)}`]: null,
+        [`fcmDispositivos.${claveDispositivo(token)}`]: null,
       });
       await deleteToken(messaging);
     }

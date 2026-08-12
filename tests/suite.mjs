@@ -700,6 +700,34 @@ console.log('\n[15] Notificaciones push');
   chequeo('detecta el caso del iPhone sin instalar',
     notif.includes('REQUIERE_INSTALAR') && notif.includes('esPWAInstalada'));
   chequeo('limpia el token al desactivar', notif.includes('deleteToken'));
+
+  /* Un token FCM trae ':' y '.', y Firestore lee el punto como separador de
+     niveles: `fcmDispositivos.abc:APA91b` es un field path invalido y hace
+     fallar el updateDoc ENTERO, con lo cual no se guardaba ni el token. */
+  const clave = await import('data:text/javascript,' + encodeURIComponent(
+    notif.slice(notif.indexOf('function claveDispositivo'), notif.indexOf('async function guardarToken'))
+    + '\nexport { claveDispositivo };'));
+  for (const [nombre, tok] of [
+    ['token FCM tipico', 'fXm9_Ab-3kQ:APA91bHun4M.xP5cqWeRtY'],
+    ['token con barras y signos', 'ab/cd+ef=gh:APA91b/xyz+123'],
+    ['token solo simbolos', ':::...+++'],
+  ]) {
+    const k = clave.claveDispositivo(tok);
+    chequeo(`la clave del dispositivo es un field path valido (${nombre})`,
+      /^[A-Za-z0-9_-]+$/.test(k) && k.length > 0, `("${k}")`);
+  }
+  chequeo('el token se guarda en su propia escritura, aparte del detalle',
+    notif.includes('await updateDoc(ref, { fcmTokens: arrayUnion(token) })'));
+
+  /* La UI decia "Avisos activados" mirando solo Notification.permission,
+     mientras el cron reportaba "sin dispositivos registrados". */
+  chequeo('existe una verificacion del token realmente guardado',
+    notif.includes('export async function tieneTokenRegistrado'));
+  const panelUI = fs.readFileSync('/home/claude/ConsulPay/src/pages/profesional/MiPanel.jsx', 'utf8');
+  chequeo('la UI exige token guardado, no solo permiso',
+    panelUI.includes('registrado === true'));
+  chequeo('avisa cuando hay permiso pero falto el registro',
+    panelUI.includes('registrado === false'));
   /* Con la app abierta el service worker no corre: si el listener de primer
      plano no esta conectado, el push llega y no se ve por ningun lado. */
   chequeo('muestra la notificacion cuando la app esta en primer plano',
