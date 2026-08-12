@@ -191,11 +191,36 @@ export async function desactivarNotificaciones(uid) {
  */
 export async function escucharEnPrimerPlano(alRecibir) {
   try {
+    if (estadoPermiso() !== ESTADOS_PERMISO.CONCEDIDO) return () => {};
     const messaging = await cargarMessaging();
     if (!messaging) return () => {};
     const { onMessage } = await import('firebase/messaging');
-    return onMessage(messaging, (payload) => alRecibir(payload?.data ?? {}));
+    return onMessage(messaging, (payload) => {
+      const datos = payload?.data ?? {};
+      /* Con la app abierta el service worker NO corre, asi que la
+         notificacion hay que mostrarla a mano. Se usa el registro del SW
+         y no new Notification() porque en Android Chrome el constructor
+         directo tira error y no muestra nada. */
+      mostrarNotificacionLocal(datos);
+      if (typeof alRecibir === 'function') alRecibir(datos);
+    });
   } catch {
     return () => {};
+  }
+}
+
+async function mostrarNotificacionLocal(datos) {
+  try {
+    const registro = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js');
+    if (!registro) return;
+    await registro.showNotification(datos.titulo || 'ConsulPay', {
+      body: datos.cuerpo || '',
+      icon: '/favicon.svg',
+      badge: '/favicon.svg',
+      tag: datos.tag || 'consulpay',
+      data: { url: datos.url || '/' },
+    });
+  } catch (err) {
+    console.error('No se pudo mostrar la notificación:', err);
   }
 }

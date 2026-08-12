@@ -16,6 +16,7 @@ import {
   ESTADOS_PERMISO,
   activarNotificaciones,
   desactivarNotificaciones,
+  escucharEnPrimerPlano,
   estadoPermiso,
 } from '../../lib/notificaciones.js';
 import {
@@ -94,6 +95,19 @@ export default function MiPanel() {
   const [loadingSesiones, setLoadingSesiones] = useState(true);
   const [loadingPacientes, setLoadingPacientes] = useState(true);
   const [recordatoriosOpen, setRecordatoriosOpen] = useState(false);
+
+  /* Con ConsulPay abierta el service worker no corre, asi que el aviso hay
+     que mostrarlo desde acá. Sin esto, un push que llega mientras el
+     profesional esta usando la app no se ve por ningun lado. */
+  useEffect(() => {
+    let cancelar = () => {};
+    let vigente = true;
+    escucharEnPrimerPlano(() => {}).then((desuscribir) => {
+      if (vigente) cancelar = desuscribir;
+      else desuscribir();
+    });
+    return () => { vigente = false; cancelar(); };
+  }, []);
 
   // El mes en curso para mostrar "Sesiones de [mes]" e ingresos del mes.
   // Se calcula una sola vez al montar — si el user deja la pagina abierta

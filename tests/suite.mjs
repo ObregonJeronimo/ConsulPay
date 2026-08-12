@@ -700,6 +700,13 @@ console.log('\n[15] Notificaciones push');
   chequeo('detecta el caso del iPhone sin instalar',
     notif.includes('REQUIERE_INSTALAR') && notif.includes('esPWAInstalada'));
   chequeo('limpia el token al desactivar', notif.includes('deleteToken'));
+  /* Con la app abierta el service worker no corre: si el listener de primer
+     plano no esta conectado, el push llega y no se ve por ningun lado. */
+  chequeo('muestra la notificacion cuando la app esta en primer plano',
+    notif.includes('mostrarNotificacionLocal') && notif.includes('showNotification'));
+  const panel = fs.readFileSync('/home/claude/ConsulPay/src/pages/profesional/MiPanel.jsx', 'utf8');
+  chequeo('el listener de primer plano esta montado en la pagina',
+    panel.includes('escucharEnPrimerPlano('));
   chequeo('el cron limpia los tokens muertos',
     src.includes('registration-token-not-registered'));
 }
