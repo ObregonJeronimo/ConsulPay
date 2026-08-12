@@ -632,17 +632,42 @@ console.log('\n[15] Notificaciones push');
 
   // --- El cron registrado
   const vercel = JSON.parse(fs.readFileSync('/home/claude/ConsulPay/vercel.json', 'utf8'));
-  const cron = vercel.crons.find((c) => c.path === '/api/cron/recordatorios');
-  chequeo('el cron de recordatorios esta registrado', !!cron);
+  const cron = vercel.crons.find((c) => c.path === '/api/cron/diario');
+  chequeo('el cron diario esta registrado', !!cron);
   chequeo('corre una vez por dia (limite de Vercel Hobby)',
     !!cron && /^\d+ \d+ \* \* \*$/.test(cron.schedule), `(${cron?.schedule})`);
   chequeo('no se pasa de 2 crons, que es el tope de Hobby',
     vercel.crons.length <= 2, `(${vercel.crons.length})`);
 
+  /* El deploy fallo una vez por pasarse de 12 funciones serverless. Se
+     cuenta cada .js de api/ que no este en _lib, que es como las cuenta
+     Vercel, para que no vuelva a pasar sin aviso. */
+  function contarFunciones(dir) {
+    let n = 0;
+    for (const entrada of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entrada.isDirectory()) {
+        if (entrada.name === '_lib') continue;
+        n += contarFunciones(`${dir}/${entrada.name}`);
+      } else if (entrada.name.endsWith('.js')) n += 1;
+    }
+    return n;
+  }
+  const funciones = contarFunciones('/home/claude/ConsulPay/api');
+  chequeo('no se pasa de 12 funciones serverless (tope Hobby)',
+    funciones <= 12, `(${funciones})`);
+
+  chequeo('las dos tareas diarias viven en _lib, que no cuenta como funcion',
+    fs.existsSync('/home/claude/ConsulPay/api/_lib/tarea-recordatorios.js')
+    && fs.existsSync('/home/claude/ConsulPay/api/_lib/tarea-suscripciones.js'));
+
+  const diario = fs.readFileSync('/home/claude/ConsulPay/api/cron/diario.js', 'utf8');
+  chequeo('cada tarea corre en su propio try, para que una no tumbe a la otra',
+    (diario.match(/try \{/g) || []).length >= 3);
+
   // --- La logica que evita el spam diario, extraida del cron real
-  const src = fs.readFileSync('/home/claude/ConsulPay/api/cron/recordatorios.js', 'utf8');
+  const src = fs.readFileSync('/home/claude/ConsulPay/api/_lib/tarea-recordatorios.js', 'utf8');
   const desde = src.indexOf('function aFecha(valor) {');
-  const hasta = src.indexOf('export default async function handler');
+  const hasta = src.indexOf('export async function notificarRecordatorios');
   const mod = await import('data:text/javascript,' + encodeURIComponent(
     src.slice(desde, hasta) + '\nexport { hayQueNotificar, armarMensaje };'));
 

@@ -33,11 +33,7 @@
   ],
   "crons": [
     {
-      "path": "/api/cron/suscripciones-expiradas",
-      "schedule": "0 3 * * *"
-    },
-    {
-      "path": "/api/cron/recordatorios",
+      "path": "/api/cron/diario",
       "schedule": "0 12 * * *"
     }
   ]

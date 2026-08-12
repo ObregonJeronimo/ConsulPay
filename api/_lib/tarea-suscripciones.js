@@ -1,55 +1,26 @@
 /**
- * /api/cron/suscripciones-expiradas
+ * Tarea: bajar a Free los consultorios cuya suscripcion vencio.
  *
- * Cron job diario. Busca consultorios donde:
- *  - subscription.status == 'cancelled' (canceladas pero todavia Pro)
+ * Vivia en api/cron/suscripciones-expiradas.js como endpoint propio.
+ * Se movio a _lib porque Vercel Hobby permite 12 funciones serverless y
+ * el proyecto llego al tope: todo lo que esta en _lib no cuenta como
+ * funcion, asi que las dos tareas diarias comparten un solo endpoint
+ * (api/cron/diario.js). La logica no cambio.
+ *
+ * Busca consultorios donde:
  *  - subscription.currentPeriodEnd < ahora
- *  - plan == 'pro' (todavia no fueron bajadas)
+ *  - plan == 'pro' (todavia no fueron bajados)
  *
- * Y los baja a plan='free' + comisionConsulpay=6.
- *
- * Tambien maneja consultorios donde subscription.status == 'authorized'
- * pero currentPeriodEnd ya paso hace mas de N dias sin renovar (caso
- * de fallo silencioso de MP). Por las dudas.
- *
- * SEGURIDAD: este endpoint debe ser solo llamable por Vercel Cron.
- * Validamos el header `Authorization: Bearer <CRON_SECRET>` que
- * Vercel manda automaticamente.
- *
- * Configurar en vercel.json:
- *   "crons": [{
- *     "path": "/api/cron/suscripciones-expiradas",
- *     "schedule": "0 3 * * *"  // todos los dias a las 03:00 UTC
- *   }]
+ * Tambien cubre el caso de subscription.status == 'authorized' con el
+ * periodo vencido, que es un fallo silencioso de MP.
  */
 
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 
-import { initAdmin } from '../_lib/firebase-admin.js';
-import { jsonResponse } from '../_lib/http.js';
-
-export default async function handler(req, res) {
-  // Validar que sea Vercel Cron (mandamos un secret en el header)
-  const expected = process.env.CRON_SECRET;
-  if (expected) {
-    const auth = req.headers.authorization || '';
-    if (auth !== `Bearer ${expected}`) {
-      return jsonResponse(res, 401, { error: 'No autorizado.' });
-    }
-  } else if (process.env.NODE_ENV === 'production') {
-    console.error('CRON_SECRET no configurado en produccion');
-    return jsonResponse(res, 500, { error: 'CRON_SECRET no configurado' });
-  }
-  // En dev permitimos sin auth para que Thiago pueda probar manual.
-
-  try {
-    initAdmin();
-  } catch (err) {
-    console.error('initAdmin fallo:', err);
-    return jsonResponse(res, 500, { error: 'init_admin_fallo' });
-  }
-
+export async function bajarSuscripcionesVencidas() {
   const db = getFirestore();
+  const ahora = new Date();
+
 
   // En el modelo nuevo, cada consultorio ya tiene comisionFree configurada.
   // Al bajar a Free NO sobrescribimos: dejamos lo que cada consultorio tenga.
@@ -68,7 +39,6 @@ export default async function handler(req, res) {
     console.warn('No se pudo leer config/global, uso 1% default:', err.message);
   }
 
-  const ahora = new Date();
   const stats = {
     procesados: 0,
     bajadosAFree: 0,
@@ -132,9 +102,5 @@ export default async function handler(req, res) {
     }
   }
 
-  return jsonResponse(res, 200, {
-    ok: true,
-    ranAt: ahora.toISOString(),
-    ...stats,
-  });
+  return stats;
 }

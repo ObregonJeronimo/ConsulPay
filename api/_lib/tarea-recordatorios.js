@@ -1,39 +1,28 @@
 /**
- * /api/cron/recordatorios
+ * Tarea: avisar por push los recordatorios que le tocan a cada profesional.
  *
- * Cron diario. Busca instancias de recordatorio que le tocan al
- * profesional hoy y le manda un push a todos sus dispositivos.
+ * Vivia en api/cron/recordatorios.js como endpoint propio. Se movio a
+ * _lib porque Vercel Hobby permite 12 funciones serverless y el proyecto
+ * llego al tope: lo que esta en _lib no cuenta como funcion, asi que las
+ * dos tareas diarias comparten un solo endpoint (api/cron/diario.js).
  *
  * Una instancia se notifica cuando:
  *   - estado == 'pendiente'
  *   - proximaEn <= ahora   (ya le toca)
  *   - notificadaEn es null o de una vuelta anterior del ciclo
  *
- * Ese ultimo punto es el que evita el problema obvio: sin el, mientras
- * el profesional no acepte el recordatorio, el cron le mandaria el
- * mismo aviso TODOS los dias hasta que apague las notificaciones. Con
- * notificadaEn, cada aparicion del ciclo avisa una sola vez.
+ * Ese ultimo punto evita el problema obvio: sin el, mientras el
+ * profesional no acepte el recordatorio, se le mandaria el mismo aviso
+ * todos los dias hasta que apague las notificaciones.
  *
- * No usa Cloud Functions a proposito: eso obligaria a pasar el proyecto
- * de Firebase a plan Blaze. Enviar desde aca con firebase-admin y la
- * service account que ya existe es gratis y no agrega infraestructura.
- *
- * Configurado en vercel.json:
- *   { "path": "/api/cron/recordatorios", "schedule": "0 12 * * *" }
- *   12 UTC = 9 de la manana en Argentina. Vercel Hobby no garantiza la
- *   hora exacta (puede correr dentro de una ventana), lo cual para
- *   recordatorios semanales o mensuales es irrelevante.
+ * No usa Cloud Functions a proposito: eso obligaria a pasar Firebase a
+ * plan Blaze. Enviar desde aca con la service account que ya existe es
+ * gratis y no agrega infraestructura.
  */
 
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 
-import { initAdmin } from '../_lib/firebase-admin.js';
-import { jsonResponse } from '../_lib/http.js';
-
-/* Firestore no deja mandar mas de 30 valores en un 'in', y sendEachForMulticast
-   admite hasta 500 tokens por llamada. Ninguno de los dos es un problema al
-   volumen de un consultorio, pero conviene no asumirlo. */
 const MAX_TOKENS_POR_ENVIO = 500;
 
 function aFecha(valor) {
@@ -74,25 +63,7 @@ function armarMensaje(instancias) {
   };
 }
 
-export default async function handler(req, res) {
-  const expected = process.env.CRON_SECRET;
-  if (expected) {
-    const auth = req.headers.authorization || '';
-    if (auth !== `Bearer ${expected}`) {
-      return jsonResponse(res, 401, { error: 'No autorizado.' });
-    }
-  } else if (process.env.NODE_ENV === 'production') {
-    console.error('CRON_SECRET no configurado en produccion');
-    return jsonResponse(res, 500, { error: 'CRON_SECRET no configurado' });
-  }
-
-  try {
-    initAdmin();
-  } catch (err) {
-    console.error('initAdmin fallo:', err);
-    return jsonResponse(res, 500, { error: 'init_admin_fallo' });
-  }
-
+export async function notificarRecordatorios() {
   const db = getFirestore();
   const messaging = getMessaging();
   const ahora = new Date();
@@ -203,9 +174,9 @@ export default async function handler(req, res) {
     }
   } catch (err) {
     console.error('Error general del cron de recordatorios:', err);
-    return jsonResponse(res, 500, { error: 'cron_fallo', detalle: err.message, stats });
+    err.stats = stats;
+    throw err;
   }
 
-  console.log('Cron recordatorios:', JSON.stringify(stats));
-  return jsonResponse(res, 200, { ok: true, stats });
+  return stats;
 }
