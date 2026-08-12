@@ -623,12 +623,25 @@ console.log('\n[15] Notificaciones push');
 
   // --- El SW y el cliente tienen que apuntar al mismo proyecto
   const sw = fs.readFileSync('/home/claude/ConsulPay/public/firebase-messaging-sw.js', 'utf8');
+  const notifSrc = fs.readFileSync('/home/claude/ConsulPay/src/lib/notificaciones.js', 'utf8');
   const cliente = fs.readFileSync('/home/claude/ConsulPay/src/lib/firebase.js', 'utf8');
   const senderCliente = cliente.match(/messagingSenderId: '(\d+)'/)?.[1];
   chequeo('el sender id del SW coincide con el del cliente',
     !!senderCliente && sw.includes(senderCliente), `(${senderCliente})`);
   chequeo('el SW maneja los mensajes en background', sw.includes('onBackgroundMessage'));
   chequeo('el SW maneja el click en la notificacion', sw.includes('notificationclick'));
+
+  /* Android descarta el color del badge y se queda con la silueta del canal
+     alpha. Con el favicon —un cuadrado opaco de punta a punta— la silueta
+     terminaba siendo ese cuadrado y la C desaparecia adentro. */
+  chequeo('existe un badge dedicado, aparte del favicon',
+    fs.existsSync('/home/claude/ConsulPay/public/badge-notificacion.png'));
+  chequeo('el SW no usa el favicon como badge',
+    sw.includes("badge: '/badge-notificacion.png'"));
+  chequeo('el aviso en primer plano usa el mismo badge',
+    notifSrc.includes("badge: '/badge-notificacion.png'"));
+  chequeo('el badge es PNG, no SVG (Android no lo soporta bien)',
+    !sw.includes("badge: '/favicon.svg'"));
 
   // --- El cron registrado
   const vercel = JSON.parse(fs.readFileSync('/home/claude/ConsulPay/vercel.json', 'utf8'));

@@ -39,7 +39,12 @@ messaging.onBackgroundMessage((payload) => {
   const opciones = {
     body: datos.cuerpo || '',
     icon: '/favicon.svg',
-    badge: '/favicon.svg',
+    /* El badge NO puede ser el favicon: Android le descarta el color y se
+       queda con la silueta del canal alpha. El favicon es un cuadrado opaco
+       de punta a punta, asi que la silueta terminaba siendo ese cuadrado y
+       la C desaparecia adentro. badge-notificacion.png tiene la C calada
+       sobre fondo transparente, que es lo que Android espera. */
+    badge: '/badge-notificacion.png',
     /* tag agrupa: si llegan dos avisos del mismo recordatorio, el segundo
        reemplaza al primero en vez de apilarse. */
     tag: datos.tag || 'consulpay',

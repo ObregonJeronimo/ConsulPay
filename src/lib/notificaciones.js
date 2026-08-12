@@ -265,7 +265,8 @@ async function mostrarNotificacionLocal(datos) {
     await registro.showNotification(datos.titulo || 'ConsulPay', {
       body: datos.cuerpo || '',
       icon: '/favicon.svg',
-      badge: '/favicon.svg',
+      // Ver el comentario del badge en firebase-messaging-sw.js.
+      badge: '/badge-notificacion.png',
       tag: datos.tag || 'consulpay',
       data: { url: datos.url || '/' },
     });
