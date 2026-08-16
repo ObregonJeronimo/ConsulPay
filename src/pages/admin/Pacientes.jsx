@@ -991,6 +991,19 @@ function PacienteModal({ paciente, profesionales, metodos, onClose, onGuardar })
     setForm((prev) => ({ ...prev, [k]: v }));
   }
 
+  /* Las dos columnas del selector. Ambas alfabeticas: al pasar un
+     profesional de un lado al otro la lista se reordena sola, y sin un
+     orden estable no hay forma de saber donde cayo. */
+  const [disponibles, asignados] = useMemo(() => {
+    const porNombre = (a, b) => (a.displayName || a.email || '')
+      .localeCompare(b.displayName || b.email || '', 'es', { sensitivity: 'base' });
+    const elegidos = new Set(form.profesionalesUids);
+    return [
+      profesionales.filter((p) => !elegidos.has(p.uid)).sort(porNombre),
+      profesionales.filter((p) => elegidos.has(p.uid)).sort(porNombre),
+    ];
+  }, [profesionales, form.profesionalesUids]);
+
   function toggleProfesional(uid) {
     setForm((prev) => {
       const ya = prev.profesionalesUids.includes(uid);
@@ -1090,51 +1103,86 @@ function PacienteModal({ paciente, profesionales, metodos, onClose, onGuardar })
             onChange={(e) => setField('email', e.target.value)}
           />
 
-          {/* Profesionales asignados (multi-select) */}
+          {/* Profesionales asignados: dos listas, disponibles y asignados.
+              Antes era una sola lista de checkboxes: con 14 profesionales
+              habia que recorrerla entera para saber cuales estaban tildados.
+              Aca los elegidos estan siempre a la vista, en su propia columna. */}
           <div>
             <label className="cp-field__label" style={{ display: 'block', marginBottom: 6 }}>
               Profesionales asignados
-              <span className="cp-pac-multi__hint">
-                {' '}· {form.profesionalesUids.length} de {profesionales.length} seleccionado{form.profesionalesUids.length === 1 ? '' : 's'}
-              </span>
             </label>
-            <div className="cp-pac-multi">
-              {profesionales.length === 0 ? (
-                <div className="cp-pac-multi__empty">
-                  No hay profesionales activos en el consultorio.
+
+            {profesionales.length === 0 ? (
+              <div className="cp-pac-multi__empty">
+                No hay profesionales activos en el consultorio.
+              </div>
+            ) : (
+              <div className="cp-dual">
+                <div className="cp-dual__col">
+                  <div className="cp-dual__head">
+                    <span>Disponibles</span>
+                    <span className="cp-dual__count">{disponibles.length}</span>
+                  </div>
+                  <div className="cp-dual__lista">
+                    {disponibles.length === 0 ? (
+                      <p className="cp-dual__vacio">Ya están todos asignados.</p>
+                    ) : disponibles.map((p) => (
+                      <button
+                        key={p.uid}
+                        type="button"
+                        className="cp-dual__item"
+                        onClick={() => toggleProfesional(p.uid)}
+                        aria-label={`Asignar a ${p.displayName || p.email}`}
+                      >
+                        <Avatar
+                          initials={((p.displayName?.[0] ?? p.email?.[0]) ?? '·').toUpperCase()}
+                          size={22}
+                        />
+                        <span className="cp-dual__info">
+                          <span className="cp-dual__nombre">{p.displayName || p.email}</span>
+                          {/* El email solo de este lado: aca sirve para no
+                              confundir dos profesionales con el mismo nombre.
+                              Una vez asignado, es ruido. */}
+                          {p.email && p.displayName && (
+                            <span className="cp-dual__email" title={p.email}>{p.email}</span>
+                          )}
+                        </span>
+                        <span className="cp-dual__accion" aria-hidden="true">+</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              ) : (
-                profesionales.map((p) => {
-                  const checked = form.profesionalesUids.includes(p.uid);
-                  return (
-                    <label
-                      key={p.uid}
-                      className={`cp-pac-multi__option ${checked ? 'cp-pac-multi__option--checked' : ''}`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleProfesional(p.uid)}
-                      />
-                      <Avatar
-                        initials={
-                          ((p.displayName?.[0] ?? p.email?.[0]) ?? '·').toUpperCase()
-                        }
-                        size={26}
-                      />
-                      <div className="cp-pac-multi__info">
-                        <div className="cp-pac-multi__name">
-                          {p.displayName || p.email}
-                        </div>
-                        {p.email && p.displayName && (
-                          <div className="cp-pac-multi__email">{p.email}</div>
-                        )}
-                      </div>
-                    </label>
-                  );
-                })
-              )}
-            </div>
+
+                <div className="cp-dual__col">
+                  <div className="cp-dual__head">
+                    <span>Asignados</span>
+                    <span className="cp-dual__count cp-dual__count--on">{asignados.length}</span>
+                  </div>
+                  <div className="cp-dual__lista">
+                    {asignados.length === 0 ? (
+                      <p className="cp-dual__vacio">Tocá un profesional de la izquierda para asignarlo.</p>
+                    ) : asignados.map((p) => (
+                      <button
+                        key={p.uid}
+                        type="button"
+                        className="cp-dual__item cp-dual__item--on"
+                        onClick={() => toggleProfesional(p.uid)}
+                        aria-label={`Quitar a ${p.displayName || p.email}`}
+                      >
+                        <Avatar
+                          initials={((p.displayName?.[0] ?? p.email?.[0]) ?? '·').toUpperCase()}
+                          size={22}
+                        />
+                        <span className="cp-dual__info">
+                          <span className="cp-dual__nombre">{p.displayName || p.email}</span>
+                        </span>
+                        <span className="cp-dual__accion cp-dual__accion--quitar" aria-hidden="true">×</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div>

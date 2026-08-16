@@ -32,6 +32,7 @@ Sale con código 1 si algo falla, así que sirve para un pre-push hook.
 15. Notificaciones push — service worker, manifest, cron y anti-repetición
 16. Ciclos de recordatorios — primera aparición, día del mes, desbordamiento
 17. Dashboard — métricas del consultorio y totales por mes de la tabla anual
+18. Asignar profesionales — dos listas, orden alfabético, vacíos y accesibilidad
 
 ## Límite conocido
 

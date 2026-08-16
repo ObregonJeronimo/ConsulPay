@@ -944,6 +944,105 @@ console.log('\n[17] Dashboard');
   await act(async () => { root.unmount(); });
 }
 
+/* ============ 18. Selector de profesionales del paciente ============ */
+console.log('\n[18] Asignar profesionales a un paciente');
+{
+  const { default: Pacientes } = await import('/home/claude/ConsulPay/src/pages/admin/Pacientes.jsx');
+  const { MemoryRouter } = await import('react-router-dom');
+
+  globalThis.__USER__ = { uid: 'A', consultorioId: 'C1', rol: 'admin', displayName: 'Adriana' };
+  globalThis.__CONS__ = { nombre: 'CALA', adminUids: ['A'], mpConfigs: {},
+    metodosPagoPaciente: [{ id: 'part', nombre: 'Particular 20%', porcentajeConsultorio: 20, tipo: 'inmediato' }] };
+
+  const prof = (uid, nombre, email) => ({
+    id: uid, uid, displayName: nombre, email, consultorioId: 'C1', rol: 'profesional', estado: 'activo',
+  });
+  globalThis.__DATA__ = {
+    usuarios: [
+      prof('u1', 'Belen Herrera Portugal', 'lic.herreraportugalbelen@gmail.com'),
+      prof('u2', 'Mariana Karlen', 'mk180872@gmail.com'),
+      prof('u3', 'Daiana Albornos', 'dalbornos13@gmail.com'),
+      prof('u4', 'Lorena Arguello', 'lorenaarguello@gmail.com'),
+      prof('u5', 'Ana Álvarez', 'ana@gmail.com'),
+    ],
+    pacientes: [{
+      id: 'P1', consultorioId: 'C1', nombre: 'THIANO', apellido: 'ZZZ',
+      estado: 'activo', profesionalesUids: ['u3'], metodosPagoIds: ['part'],
+    }],
+    sesiones: [], solicitudes_sesion: [], pagos_consultorio: [], gastos: [],
+  };
+
+  const cont = document.createElement('div');
+  document.body.appendChild(cont);
+  const root = createRoot(cont);
+  await act(async () => { root.render(createElement(MemoryRouter, null, createElement(Pacientes))); });
+
+  await act(async () => {
+    clic([...cont.querySelectorAll('button')].find((b) => /Más acciones/i.test(b.textContent + (b.getAttribute('aria-label') || ''))));
+  });
+  await act(async () => {
+    clic([...cont.querySelectorAll('button, [role=menuitem]')].find((b) => /editar/i.test(b.textContent)));
+  });
+
+  const cols = () => [...cont.querySelectorAll('.cp-dual__col')].map((c) => ({
+    items: [...c.querySelectorAll('.cp-dual__nombre')].map((n) => n.textContent.trim()),
+    vacio: c.querySelector('.cp-dual__vacio')?.textContent.trim() ?? null,
+  }));
+  const porAria = (texto) => [...cont.querySelectorAll('.cp-dual__item')]
+    .find((x) => (x.getAttribute('aria-label') || '').includes(texto));
+
+  chequeo('hay dos columnas', cont.querySelectorAll('.cp-dual__col').length === 2);
+  let c = cols();
+  chequeo('el ya asignado arranca a la derecha', c[1].items.join() === 'Daiana Albornos', `(${c[1].items})`);
+  chequeo('los demas arrancan a la izquierda', c[0].items.length === 4, `(${c[0].items.length})`);
+  /* Al mover un item la lista se reordena sola; sin orden estable no se sabe
+     donde cayo. */
+  chequeo('la columna de disponibles va alfabetica',
+    c[0].items.join(' | ') === 'Ana Álvarez | Belen Herrera Portugal | Lorena Arguello | Mariana Karlen', `(${c[0].items})`);
+
+  await act(async () => { clic(porAria('Asignar a Lorena')); });
+  c = cols();
+  chequeo('asignar lo pasa a la derecha', c[1].items.includes('Lorena Arguello'));
+  chequeo('y lo saca de la izquierda', !c[0].items.includes('Lorena Arguello'));
+  chequeo('la derecha tambien queda alfabetica',
+    c[1].items.join(' | ') === 'Daiana Albornos | Lorena Arguello', `(${c[1].items})`);
+
+  await act(async () => { clic(porAria('Quitar a Daiana')); });
+  c = cols();
+  chequeo('quitar lo devuelve a la izquierda, en su lugar alfabetico',
+    c[0].items.join(' | ') === 'Ana Álvarez | Belen Herrera Portugal | Daiana Albornos | Mariana Karlen', `(${c[0].items})`);
+
+  await act(async () => { clic(porAria('Quitar a Lorena')); });
+  c = cols();
+  chequeo('sin asignados, la derecha invita a actuar',
+    (c[1].vacio || '').includes('Tocá un profesional'), `(${c[1].vacio})`);
+
+  for (const n of ['Ana', 'Belen', 'Daiana', 'Lorena', 'Mariana']) {
+    await act(async () => { const b = porAria(`Asignar a ${n}`); if (b) clic(b); });
+  }
+  c = cols();
+  chequeo('con todos asignados la izquierda lo dice',
+    (c[0].vacio || '').includes('todos asignados'), `(${c[0].vacio})`);
+  chequeo('y estan los cinco a la derecha', c[1].items.length === 5);
+
+  const items = [...cont.querySelectorAll('.cp-dual__item')];
+  chequeo('las filas son <button>, no divs', items.every((i) => i.tagName === 'BUTTON'));
+  chequeo('cada fila dice que accion hace',
+    items.every((i) => /^(Asignar|Quitar) a /.test(i.getAttribute('aria-label') || '')));
+  /* El email solo del lado de disponibles: ahi sirve para distinguir dos
+     profesionales con el mismo nombre; ya asignado, es ruido. */
+  chequeo('la columna de asignados no repite los emails',
+    cont.querySelectorAll('.cp-dual__col:last-child .cp-dual__email').length === 0);
+
+  const fsMod = await import('fs');
+  const css = fsMod.readFileSync('/home/claude/ConsulPay/src/pages/admin/Pacientes.css', 'utf8');
+  chequeo('se apila en mobile', /@media \(max-width: 640px\)[\s\S]*cp-dual \{ grid-template-columns: 1fr/.test(css));
+  chequeo('respeta prefers-reduced-motion', css.includes('prefers-reduced-motion'));
+  chequeo('el foco es visible', css.includes('.cp-dual__item:focus-visible'));
+
+  await act(async () => { root.unmount(); });
+}
+
 console.log(`\n${'='.repeat(52)}`);
 console.log(`${ok} chequeos OK, ${fallos.length} fallas`);
 if (fallos.length) { console.log('FALLAN:'); fallos.forEach((f) => console.log('  - ' + f)); }
