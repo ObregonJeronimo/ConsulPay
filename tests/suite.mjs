@@ -1034,13 +1034,80 @@ console.log('\n[18] Asignar profesionales a un paciente');
   chequeo('la columna de asignados no repite los emails',
     cont.querySelectorAll('.cp-dual__col:last-child .cp-dual__email').length === 0);
 
+  /* --- Buscador del selector --- */
+  const escribirProf = (texto) => {
+    const inp = cont.querySelector('.cp-dual__buscar');
+    const setter = Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set;
+    setter.call(inp, texto);
+    inp.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+  };
+  const conteos = () => [...cont.querySelectorAll('.cp-dual__count')].map((x) => x.textContent.trim());
+
+  chequeo('con 5 profesionales no aparece el buscador',
+    !cont.querySelector('.cp-dual__buscar'));
+
+  // Se suma un sexto para que cruce el umbral.
+  globalThis.__DATA__.usuarios.push({
+    id: 'u6', uid: 'u6', displayName: 'Muriel Serral', email: 'muriel@hotmail.com',
+    consultorioId: 'C1', rol: 'profesional', estado: 'activo',
+  });
+  await act(async () => { root.unmount(); });
+  const cont2 = document.createElement('div');
+  document.body.appendChild(cont2);
+  const root2 = createRoot(cont2);
+  await act(async () => { root2.render(createElement(MemoryRouter, null, createElement(Pacientes))); });
+  await act(async () => {
+    clic([...cont2.querySelectorAll('button')].find((b) => /Más acciones/i.test(b.textContent + (b.getAttribute('aria-label') || ''))));
+  });
+  await act(async () => {
+    clic([...cont2.querySelectorAll('button, [role=menuitem]')].find((b) => /editar/i.test(b.textContent)));
+  });
+  chequeo('con 6 aparece el buscador', !!cont2.querySelector('.cp-dual__buscar'));
+
+  const escribir2 = (texto) => {
+    const inp = cont2.querySelector('.cp-dual__buscar');
+    const setter = Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set;
+    setter.call(inp, texto);
+    inp.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+  };
+  const cols2 = () => [...cont2.querySelectorAll('.cp-dual__col')].map((c) => ({
+    items: [...c.querySelectorAll('.cp-dual__nombre')].map((n) => n.textContent.trim()),
+    vacio: c.querySelector('.cp-dual__vacio')?.textContent.trim() ?? null,
+    count: c.querySelector('.cp-dual__count').textContent.trim(),
+  }));
+
+  /* Si el buscador filtrara solo disponibles, buscar a alguien ya asignado
+     no daria resultado y pareceria que no existe. */
+  await act(async () => { escribir2('daiana'); });
+  let c2 = cols2();
+  chequeo('el buscador tambien filtra la columna de asignados',
+    c2[1].items.join() === 'Daiana Albornos', `(${c2[1].items})`);
+  chequeo('la otra columna avisa que es por el filtro, no que no hay nada',
+    (c2[0].vacio || '').includes('coincide'), `(${c2[0].vacio})`);
+  /* El encabezado decia "4" mientras la lista decia que ninguno coincidia. */
+  chequeo('el contador muestra visibles de total mientras se filtra',
+    c2[0].count === '0/5' && c2[1].count === '1/1', `(${c2.map((x) => x.count)})`);
+
+  await act(async () => { escribir2('hotmail'); });
+  chequeo('busca tambien por email',
+    cols2()[0].items.join() === 'Muriel Serral', `(${cols2()[0].items})`);
+
+  await act(async () => { escribir2('zzzz'); });
+  c2 = cols2();
+  chequeo('sin coincidencias las dos columnas lo dicen',
+    (c2[0].vacio || '').includes('coincide') && (c2[1].vacio || '').includes('coincide'));
+
+  await act(async () => { escribir2(''); });
+  c2 = cols2();
+  chequeo('al limpiar vuelve todo y el contador deja de ser una fraccion',
+    c2[0].items.length === 5 && c2[0].count === '5', `(${c2[0].count})`);
+  await act(async () => { root2.unmount(); });
+
   const fsMod = await import('fs');
   const css = fsMod.readFileSync('/home/claude/ConsulPay/src/pages/admin/Pacientes.css', 'utf8');
   chequeo('se apila en mobile', /@media \(max-width: 640px\)[\s\S]*cp-dual \{ grid-template-columns: 1fr/.test(css));
   chequeo('respeta prefers-reduced-motion', css.includes('prefers-reduced-motion'));
   chequeo('el foco es visible', css.includes('.cp-dual__item:focus-visible'));
-
-  await act(async () => { root.unmount(); });
 }
 
 /* ============ 19. Pacientes de un profesional ============ */

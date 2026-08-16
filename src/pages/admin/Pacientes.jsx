@@ -991,18 +991,35 @@ function PacienteModal({ paciente, profesionales, metodos, onClose, onGuardar })
     setForm((prev) => ({ ...prev, [k]: v }));
   }
 
+  const [buscaProf, setBuscaProf] = useState('');
+
   /* Las dos columnas del selector. Ambas alfabeticas: al pasar un
      profesional de un lado al otro la lista se reordena sola, y sin un
-     orden estable no hay forma de saber donde cayo. */
+     orden estable no hay forma de saber donde cayo.
+
+     El buscador filtra las DOS a la vez: si filtrara solo disponibles,
+     buscar a alguien ya asignado no daria resultado y pareceria que no
+     existe. */
   const [disponibles, asignados] = useMemo(() => {
     const porNombre = (a, b) => (a.displayName || a.email || '')
       .localeCompare(b.displayName || b.email || '', 'es', { sensitivity: 'base' });
     const elegidos = new Set(form.profesionalesUids);
+    const q = buscaProf.trim().toLowerCase();
+    const coincide = (p) => !q || `${p.displayName ?? ''} ${p.email ?? ''}`.toLowerCase().includes(q);
+    const visibles = profesionales.filter(coincide);
     return [
-      profesionales.filter((p) => !elegidos.has(p.uid)).sort(porNombre),
-      profesionales.filter((p) => elegidos.has(p.uid)).sort(porNombre),
+      visibles.filter((p) => !elegidos.has(p.uid)).sort(porNombre),
+      visibles.filter((p) => elegidos.has(p.uid)).sort(porNombre),
     ];
-  }, [profesionales, form.profesionalesUids]);
+  }, [profesionales, form.profesionalesUids, buscaProf]);
+
+  /* Los contadores muestran el total REAL de cada columna, no el filtrado:
+     son un dato del paciente y no pueden cambiar porque alguien escriba en
+     un buscador. Los usa tambien el vacio, para distinguir "no hay" de "el
+     filtro los escondio". */
+  const totalAsignados = form.profesionalesUids.length;
+  const totalDisponibles = profesionales.length - totalAsignados;
+  const filtrando = buscaProf.trim().length > 0;
 
   function toggleProfesional(uid) {
     setForm((prev) => {
@@ -1117,15 +1134,38 @@ function PacienteModal({ paciente, profesionales, metodos, onClose, onGuardar })
                 No hay profesionales activos en el consultorio.
               </div>
             ) : (
+              <>
+              {/* Solo si hay suficientes como para que buscar gane tiempo:
+                  con cuatro profesionales el input es un obstaculo, no una
+                  ayuda. */}
+              {profesionales.length > 5 && (
+                <input
+                  type="search"
+                  className="cp-dual__buscar"
+                  placeholder="Buscar profesional…"
+                  value={buscaProf}
+                  onChange={(e) => setBuscaProf(e.target.value)}
+                  aria-label="Buscar profesional"
+                />
+              )}
               <div className="cp-dual">
                 <div className="cp-dual__col">
                   <div className="cp-dual__head">
                     <span>Disponibles</span>
-                    <span className="cp-dual__count">{disponibles.length}</span>
+                    {/* Con filtro activo se muestra "visibles de total": sin
+                        eso el encabezado decia 4 mientras la lista decia que
+                        ninguno coincide, y se contradecian. */}
+                    <span className="cp-dual__count">
+                      {filtrando ? `${disponibles.length}/${totalDisponibles}` : totalDisponibles}
+                    </span>
                   </div>
                   <div className="cp-dual__lista">
                     {disponibles.length === 0 ? (
-                      <p className="cp-dual__vacio">Ya están todos asignados.</p>
+                      <p className="cp-dual__vacio">
+                        {filtrando
+                          ? 'Ninguno coincide con la búsqueda.'
+                          : 'Ya están todos asignados.'}
+                      </p>
                     ) : disponibles.map((p) => (
                       <button
                         key={p.uid}
@@ -1156,11 +1196,17 @@ function PacienteModal({ paciente, profesionales, metodos, onClose, onGuardar })
                 <div className="cp-dual__col">
                   <div className="cp-dual__head">
                     <span>Asignados</span>
-                    <span className="cp-dual__count cp-dual__count--on">{asignados.length}</span>
+                    <span className="cp-dual__count cp-dual__count--on">
+                      {filtrando ? `${asignados.length}/${totalAsignados}` : totalAsignados}
+                    </span>
                   </div>
                   <div className="cp-dual__lista">
                     {asignados.length === 0 ? (
-                      <p className="cp-dual__vacio">Tocá un profesional de la izquierda para asignarlo.</p>
+                      <p className="cp-dual__vacio">
+                        {filtrando && totalAsignados > 0
+                          ? 'Ninguno coincide con la búsqueda.'
+                          : 'Tocá un profesional de la izquierda para asignarlo.'}
+                      </p>
                     ) : asignados.map((p) => (
                       <button
                         key={p.uid}
@@ -1182,6 +1228,7 @@ function PacienteModal({ paciente, profesionales, metodos, onClose, onGuardar })
                   </div>
                 </div>
               </div>
+              </>
             )}
           </div>
 

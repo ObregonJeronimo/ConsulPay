@@ -932,6 +932,34 @@
    donde con 14 profesionales habia que recorrerla entera para saber
    cuales estaban tildados.
    ============================================================ */
+/* Buscador del selector. Deliberadamente chico: es una ayuda para llegar
+   antes a un nombre, no un campo del formulario, y el modal ya tiene siete.
+   Por eso va sin label, mas bajo que un cp-input y en gris hasta que se
+   usa. */
+.cp-dual__buscar {
+  width: 100%;
+  height: 32px;
+  margin-bottom: 8px;
+  padding: 0 11px;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  background: var(--cp-surface-sunken);
+  color: var(--cp-text);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  transition: border-color var(--cp-dur-fast) var(--cp-ease),
+              background var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-dual__buscar::placeholder { color: var(--cp-text-faint); }
+
+.cp-dual__buscar:focus {
+  background: var(--cp-surface);
+  border-color: var(--cp-accent);
+  box-shadow: var(--cp-shadow-focus);
+}
+
 .cp-dual {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1078,5 +1106,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cp-dual__item { transition: none; }
+  .cp-dual__item,
+  .cp-dual__buscar { transition: none; }
 }
