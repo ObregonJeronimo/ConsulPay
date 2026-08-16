@@ -592,7 +592,12 @@ console.log('\n[14] Formulario de registrar gasto');
   chequeo('el modal abre', !!modal);
   chequeo('los 4 campos usan la estructura del sistema',
     modal.querySelectorAll('.cp-field').length === 4, `(${modal.querySelectorAll('.cp-field').length})`);
-  chequeo('los 3 inputs usan cp-input', modal.querySelectorAll('.cp-input').length === 3);
+  /* Motivo y Fecha usan el componente del sistema. El monto tiene caja
+     propia porque lleva el signo afuera y va mas grande. */
+  chequeo('motivo y fecha usan cp-input', modal.querySelectorAll('.cp-input').length === 2,
+    `(${modal.querySelectorAll('.cp-input').length})`);
+  chequeo('el monto tiene su propia caja con el signo',
+    !!modal.querySelector('.cp-gasto__monto .cp-gasto__monto-input'));
   chequeo('el select usa cp-select', modal.querySelectorAll('.cp-select').length === 1);
   chequeo('los labels usan cp-field__label', modal.querySelectorAll('.cp-field__label').length === 4);
   chequeo('no quedo ningun campo con los estilos viejos',
@@ -603,6 +608,38 @@ console.log('\n[14] Formulario de registrar gasto');
     modal.querySelector('#g-monto')?.type === 'number');
   chequeo('el select ofrece las cajas del consultorio',
     modal.querySelectorAll('#g-cuenta option').length === 2);
+
+  /* El orden sigue lo que la persona trae en la cabeza: "pagué 85.000 de
+     alquiler". Antes fecha y monto iban primero, con el mismo peso los
+     cuatro campos. */
+  const etiquetas = [...modal.querySelectorAll('label')].map((l) => l.textContent.trim());
+  chequeo('el monto va primero y la fecha despues',
+    etiquetas.join(' > ') === 'Monto > Motivo > Fecha > Caja', `(${etiquetas})`);
+  chequeo('el signo $ esta afuera del input, visible mientras se escribe',
+    !!modal.querySelector('.cp-gasto__signo'));
+  chequeo('el monto sigue siendo un campo numerico',
+    modal.querySelector('#g-monto')?.type === 'number');
+  chequeo('la fecha viene precargada', !!modal.querySelector('#g-fecha')?.value);
+
+  const cssLibro = fs.readFileSync('/home/claude/ConsulPay/src/pages/admin/LibroCaja.css', 'utf8');
+  const altoMonto = Number(cssLibro.match(/\.cp-gasto__monto \{[^}]*height: (\d+)px/s)?.[1]);
+  chequeo('el campo del monto es mas alto que uno normal (40px)',
+    altoMonto > 40, `(${altoMonto}px)`);
+
+  /* Un cp-input se rellena de blanco; dentro de un modal, que tambien es
+     blanco, quedaba en 1.00:1 y la caja dependia de un borde de 1.36:1,
+     contra los 3:1 que pide WCAG 1.4.11 para el limite de un control. */
+  const cssInput = fs.readFileSync('/home/claude/ConsulPay/src/components/ui/Input.css', 'utf8');
+  chequeo('los inputs dentro de modales se rellenan para distinguirse',
+    /\.cp-modal \.cp-input[\s\S]{0,200}surface-sunken/.test(cssInput));
+  chequeo('y al enfocarlos vuelven a blanco',
+    /\.cp-modal \.cp-input:focus[\s\S]{0,200}var\(--cp-surface\)/.test(cssInput));
+
+  /* Toda la pantalla dice "caja": el filtro, la columna de la tabla, las
+     tarjetas. El subtitulo del modal decia "cuenta". */
+  const jsxLibro = fs.readFileSync('/home/claude/ConsulPay/src/pages/admin/LibroCaja.jsx', 'utf8');
+  chequeo('el modal habla de cajas, como el resto de la pantalla',
+    !jsxLibro.includes('restando de la cuenta'));
 }
 
 /* ============ 15. Notificaciones push ============ */

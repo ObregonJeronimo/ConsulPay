@@ -271,24 +271,91 @@
 }
 
 /* ---- Formulario del gasto ---- */
-/* El form usa el componente Input y la clase cp-select del sistema, asi que
-   aca solo queda la grilla. Los estilos propios de input/select que habia
-   se borraron: pisaban al sistema con fondo hundido y sin foco visible. */
-.cp-libro__form {
+/* ============================================================
+   Formulario de gasto
+   ----------------------------------------------------------------
+   El monto va primero y mas grande porque es el dato que la persona
+   trae en la cabeza; fecha y caja quedan abajo, como contexto. Los
+   inputs usan el componente del sistema; lo unico propio de aca es la
+   caja del monto con el signo.
+   ============================================================ */
+.cp-gasto__form {
   margin-top: 6px;
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-.cp-libro__row {
+.cp-gasto__monto {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 52px;
+  padding: 0 14px;
+  background: var(--cp-surface-sunken);
+  border: 1px solid var(--cp-border-strong);
+  border-radius: var(--cp-radius-md);
+  transition: border-color var(--cp-dur-fast) var(--cp-ease),
+              background var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-gasto__monto:hover { border-color: var(--cp-text-faint); }
+
+/* El foco se pinta en el contenedor y no en el input, porque el borde
+   visible es el del contenedor. */
+.cp-gasto__monto:focus-within {
+  background: var(--cp-surface);
+  border-color: var(--cp-accent);
+  box-shadow: var(--cp-shadow-focus);
+}
+
+.cp-gasto__signo {
+  font-family: var(--cp-font-mono);
+  font-size: 20px;
+  color: var(--cp-text-faint);
+  line-height: 1;
+}
+
+.cp-gasto__monto-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  background: none;
+  outline: none;
+  color: var(--cp-text);
+  font-family: var(--cp-font-mono);
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  padding: 0 0 0 6px;
+}
+
+.cp-gasto__monto-input::placeholder { color: var(--cp-text-faint); }
+
+/* Las flechitas del number roban ancho y nadie las usa para cargar plata. */
+.cp-gasto__monto-input::-webkit-outer-spin-button,
+.cp-gasto__monto-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.cp-gasto__monto-input[type='number'] { -moz-appearance: textfield; appearance: textfield; }
+
+.cp-gasto__fila {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 14px;
+  gap: 12px;
+}
+
+@media (max-width: 480px) {
+  .cp-gasto__fila { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cp-gasto__monto { transition: none; }
 }
 
 @media (max-width: 560px) {
-  .cp-libro__row { grid-template-columns: 1fr; }
   .cp-libro__cierre { justify-content: space-between; gap: 14px; }
   .cp-libro__resumen { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
 }

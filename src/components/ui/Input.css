@@ -113,3 +113,38 @@
 }
 
 .cp-field__ojo:disabled { opacity: 0.4; cursor: not-allowed; }
+
+
+/* ============================================================
+   Campos dentro de un modal
+   ----------------------------------------------------------------
+   Un cp-input se rellena con --cp-surface (blanco), que sobre el fondo
+   crema de una pagina se recorta solo. Dentro de un modal, que TAMBIEN
+   es blanco, el relleno queda en 1.00:1 —el mismo color exacto— y la
+   caja depende por completo de un borde que da 1.36:1. WCAG 1.4.11 pide
+   3:1 para el limite de un control.
+
+   Subir el borde hasta 3:1 exigiria un rgba(28,27,23,0.48), casi negro:
+   siete campos con ese marco compiten con el contenido. Se rellena en
+   cambio, para que el campo se distinga por area y no solo por linea, y
+   se marca un poco mas el borde. Al enfocar vuelve a blanco, que ademas
+   refuerza donde esta el cursor.
+   ============================================================ */
+.cp-modal .cp-input,
+.cp-modal .cp-select,
+.cp-modal textarea.cp-input {
+  background: var(--cp-surface-sunken);
+  border-color: var(--cp-border-strong);
+}
+
+.cp-modal .cp-input:hover:not(:disabled),
+.cp-modal .cp-select:hover:not(:disabled) {
+  border-color: var(--cp-text-faint);
+}
+
+.cp-modal .cp-input:focus-visible,
+.cp-modal .cp-input:focus,
+.cp-modal .cp-select:focus {
+  background: var(--cp-surface);
+  border-color: var(--cp-accent);
+}

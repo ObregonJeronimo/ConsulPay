@@ -474,45 +474,35 @@ function GastoModal({ consultorioId, uid, cuentas, onClose }) {
         <button className="cp-modal__close" onClick={onClose} aria-label="Cerrar">×</button>
         <h2 className="cp-modal__title">Registrar gasto</h2>
         <p className="cp-modal__sub">
-          Queda anotado en el libro de caja del mes, restando de la cuenta que elijas.
+          {/* 'caja' y no 'cuenta': es la palabra que usa toda la pantalla —el
+              filtro, la columna de la tabla, las tarjetas de arriba—. Dos
+              nombres para la misma cosa obligan a traducir mentalmente. */}
+          Queda anotado en el libro del mes, restando de la caja que elijas.
         </p>
 
-        {/* Se usan el componente Input y la clase cp-select del sistema. Antes
-            este modal traia sus propios estilos (cp-libro__field input), con
-            fondo --cp-bg en vez de --cp-surface, borde tenue, sin foco visible
-            y sin estados de hover: los campos se veian hundidos y apagados
-            comparados con los del resto de la app. */}
-        <div className="cp-libro__form">
-          <div className="cp-libro__row">
-            <Input
-              id="g-fecha"
-              label="Fecha"
-              type="date"
-              value={fecha}
-              onChange={(e) => setFecha(e.target.value)}
-            />
-            <Input
-              id="g-monto"
-              label="Monto"
-              type="number"
-              min="0"
-              step="any"
-              placeholder="0"
-              value={monto}
-              onChange={(e) => setMonto(e.target.value)}
-            />
-          </div>
-
+        {/* El orden sigue lo que la persona tiene en la cabeza al registrar
+            un gasto: "pagué 85.000 de alquiler". El monto y el motivo son el
+            contenido; la fecha ya viene en hoy y la caja casi siempre es la
+            misma, asi que van despues, como contexto. */}
+        <div className="cp-gasto__form">
           <div className="cp-field">
-            <label className="cp-field__label" htmlFor="g-cuenta">¿De qué caja salió?</label>
-            <select
-              id="g-cuenta"
-              className="cp-select"
-              value={cuenta}
-              onChange={(e) => setCuenta(e.target.value)}
-            >
-              {cuentas.map((c) => <option key={c.id} value={c.id}>{c.completo}</option>)}
-            </select>
+            <label className="cp-field__label" htmlFor="g-monto">Monto</label>
+            {/* El signo va afuera del input y no como placeholder: tiene que
+                seguir visible cuando la persona escribe. */}
+            <div className="cp-gasto__monto">
+              <span className="cp-gasto__signo" aria-hidden="true">$</span>
+              <input
+                id="g-monto"
+                type="number"
+                min="0"
+                step="any"
+                inputMode="decimal"
+                placeholder="0"
+                className="cp-gasto__monto-input"
+                value={monto}
+                onChange={(e) => setMonto(e.target.value)}
+              />
+            </div>
           </div>
 
           <Input
@@ -522,6 +512,27 @@ function GastoModal({ consultorioId, uid, cuentas, onClose }) {
             placeholder="Ej: alquiler, EPEC, insumos"
             onChange={(e) => setMotivo(e.target.value)}
           />
+
+          <div className="cp-gasto__fila">
+            <Input
+              id="g-fecha"
+              label="Fecha"
+              type="date"
+              value={fecha}
+              onChange={(e) => setFecha(e.target.value)}
+            />
+            <div className="cp-field">
+              <label className="cp-field__label" htmlFor="g-cuenta">Caja</label>
+              <select
+                id="g-cuenta"
+                className="cp-select"
+                value={cuenta}
+                onChange={(e) => setCuenta(e.target.value)}
+              >
+                {cuentas.map((c) => <option key={c.id} value={c.id}>{c.completo}</option>)}
+              </select>
+            </div>
+          </div>
         </div>
 
         {error && <div className="cp-modal__error">{error}</div>}
