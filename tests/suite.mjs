@@ -1043,6 +1043,103 @@ console.log('\n[18] Asignar profesionales a un paciente');
   await act(async () => { root.unmount(); });
 }
 
+/* ============ 19. Pacientes de un profesional ============ */
+console.log('\n[19] Modal de pacientes por profesional');
+{
+  const { default: Profesionales } = await import('/home/claude/ConsulPay/src/pages/admin/Profesionales.jsx');
+  const { MemoryRouter } = await import('react-router-dom');
+
+  /* React sobrescribe el setter de value en inputs controlados: asignarlo
+     directo no dispara onChange. */
+  const escribir = (el, texto) => {
+    const setter = Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set;
+    setter.call(el, texto);
+    el.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+  };
+
+  globalThis.__USER__ = { uid: 'A', consultorioId: 'C1', rol: 'admin', displayName: 'Adriana' };
+  globalThis.__CONS__ = { nombre: 'CALA', adminUids: ['A'], mpConfigs: {}, metodosPagoPaciente: [{ id: 'part', nombre: 'Particular' }] };
+
+  const pacientes = [];
+  for (let i = 1; i <= 25; i += 1) {
+    const deLorena = i <= 12;
+    pacientes.push({
+      id: 'P' + i, consultorioId: 'C1', estado: 'activo',
+      apellido: String.fromCharCode(65 + (i % 26)) + 'apellido' + i, nombre: 'Nombre' + i,
+      dni: '3000000' + i,
+      // P1 tiene SOLO a Lorena: no se puede quitar sin dejarlo huerfano.
+      profesionalesUids: deLorena ? (i === 1 ? ['u1'] : ['u1', 'u2']) : ['u2'],
+      metodosPagoIds: ['part'],
+    });
+  }
+  globalThis.__DATA__ = {
+    usuarios: [
+      { id: 'u1', uid: 'u1', displayName: 'Lorena Arguello', email: 'lor@g.com', consultorioId: 'C1', rol: 'profesional', estado: 'activo' },
+      { id: 'u2', uid: 'u2', displayName: 'Muriel Serral', email: 'mur@g.com', consultorioId: 'C1', rol: 'profesional', estado: 'activo' },
+    ],
+    pacientes, invitaciones: [], sesiones: [], solicitudes_sesion: [], pagos_consultorio: [],
+  };
+
+  const cont = document.createElement('div');
+  document.body.appendChild(cont);
+  const root = createRoot(cont);
+  await act(async () => { root.render(createElement(MemoryRouter, null, createElement(Profesionales))); });
+
+  const btnPac = [...cont.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Pacientes');
+  chequeo('cada profesional tiene un boton Pacientes', !!btnPac);
+  await act(async () => { clic(btnPac); });
+
+  const filas = () => [...cont.querySelectorAll('.cp-pdp__fila .cp-pdp__nombre')].map((n) => n.textContent.trim());
+  const paginaInfo = () => cont.querySelector('.cp-pdp__pag-info')?.textContent.trim() ?? null;
+
+  chequeo('el titulo es el nombre del profesional',
+    cont.querySelector('.cp-modal__title')?.textContent.trim() === 'Lorena Arguello');
+  chequeo('muestra 10 por pagina, no los 12', filas().length === 10, `(${filas().length})`);
+  chequeo('la paginacion dice el rango', paginaInfo() === '1–10 de 12', `(${paginaInfo()})`);
+  chequeo('las pestañas cuentan asignados y sin asignar', (() => {
+    const t = [...cont.querySelectorAll('.cp-pdp__tab')].map((x) => x.textContent.replace(/\s+/g, ' ').trim());
+    return t[0] === 'Asignados 12' && t[1] === 'Sin asignar 13';
+  })());
+
+  await act(async () => { clic(cont.querySelector('.cp-pdp__pag-btn:last-child')); });
+  chequeo('la pagina 2 trae el resto', filas().length === 2 && paginaInfo() === '11–12 de 12', `(${paginaInfo()})`);
+
+  await act(async () => { escribir(cont.querySelector('.cp-pdp__buscador'), 'Nombre1'); });
+  chequeo('el buscador filtra', filas().length === 4, `(${filas().length})`);
+  /* Buscar desde la pagina 2 sin resetear dejaba la lista en un rango que
+     ya no existe. */
+  chequeo('buscar vuelve a la primera pagina', paginaInfo() === null, `(${paginaInfo()})`);
+
+  await act(async () => { escribir(cont.querySelector('.cp-pdp__buscador'), 'zzzz'); });
+  chequeo('sin resultados lo dice con el termino buscado',
+    (cont.querySelector('.cp-pdp__vacio')?.textContent || '').includes('zzzz'));
+
+  await act(async () => { escribir(cont.querySelector('.cp-pdp__buscador'), ''); });
+  await act(async () => { clic([...cont.querySelectorAll('.cp-pdp__tab')][1]); });
+  chequeo('la pestaña sin asignar trae los otros', paginaInfo() === '1–10 de 13', `(${paginaInfo()})`);
+  chequeo('cambiar de pestaña vuelve a la primera pagina', filas().length === 10);
+
+  /* actualizarPaciente rechaza dejar a un paciente sin profesionales. Se
+     avisa antes de intentarlo: el error de la libreria no dice que hacer. */
+  await act(async () => { clic([...cont.querySelectorAll('.cp-pdp__tab')][0]); });
+  const soloUno = [...cont.querySelectorAll('.cp-pdp__fila')]
+    .find((f) => f.textContent.includes('Nombre1,') || (f.textContent.includes('Nombre1') && !f.textContent.includes('profesionales')));
+  await act(async () => { clic(soloUno.querySelector('.cp-pdp__btn')); });
+  const err = cont.querySelector('.cp-pdp__error')?.textContent || '';
+  chequeo('no deja al paciente sin profesional', err.includes('quedaría sin profesional'), `(${err})`);
+  chequeo('y dice como resolverlo', err.includes('Asignale otro'));
+
+  const botones = [...cont.querySelectorAll('.cp-pdp__btn')];
+  chequeo('cada fila dice que accion hace',
+    botones.every((b) => /^(Asignar|Quitar) a /.test(b.getAttribute('aria-label') || '')));
+
+  const cssProf = (await import('fs')).readFileSync('/home/claude/ConsulPay/src/pages/admin/Profesionales.css', 'utf8');
+  chequeo('el modal respeta prefers-reduced-motion', cssProf.includes('prefers-reduced-motion'));
+  chequeo('el foco es visible en la lista', cssProf.includes('.cp-pdp__btn:focus-visible'));
+
+  await act(async () => { root.unmount(); });
+}
+
 console.log(`\n${'='.repeat(52)}`);
 console.log(`${ok} chequeos OK, ${fallos.length} fallas`);
 if (fallos.length) { console.log('FALLAN:'); fallos.forEach((f) => console.log('  - ' + f)); }

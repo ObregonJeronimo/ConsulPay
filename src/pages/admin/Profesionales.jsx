@@ -9,7 +9,7 @@ import Input from '../../components/ui/Input.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
 
 import { useAuth } from '../../hooks/useAuth.js';
-import { ESTADOS_INVITACION, ESTADOS_USUARIO, formatoFechaLarga } from '../../lib/constants.js';
+import { ESTADOS_INVITACION, ESTADOS_PACIENTE, ESTADOS_USUARIO, formatoFechaLarga } from '../../lib/constants.js';
 import { cancelarInvitacion, enviarInvitacion, suscribirInvitaciones } from '../../lib/invitaciones.js';
 import {
   calcularDeudaProfesional,
@@ -20,6 +20,12 @@ import {
   setPermitirMarcarPagadas,
   suscribirProfesionales,
 } from '../../lib/profesionales.js';
+import {
+  actualizarPaciente,
+  getProfesionalesUids,
+  nombrePaciente,
+  suscribirPacientesConsultorio,
+} from '../../lib/pacientes.js';
 import { useConsultorio } from '../../hooks/useConsultorio.js';
 import { useOverlayClose } from '../../hooks/useOverlayClose.js';
 
@@ -75,6 +81,9 @@ export default function Profesionales() {
   const { consultorio } = useConsultorio();
   const [profesionales, setProfesionales] = useState([]);
   const [invitaciones, setInvitaciones] = useState([]);
+  // Para el modal de pacientes por profesional.
+  const [pacientes, setPacientes] = useState([]);
+  const [viendoPacientesDe, setViendoPacientesDe] = useState(null);
   const [loading, setLoading] = useState(true);
   const [openInvitar, setOpenInvitar] = useState(false);
 
@@ -96,7 +105,10 @@ export default function Profesionales() {
       checkDone();
     });
 
+    const unsubPacs = suscribirPacientesConsultorio(user.consultorioId, setPacientes);
+
     return () => {
+      unsubPacs();
       unsubProfs();
       unsubInvs();
     };
@@ -197,6 +209,7 @@ export default function Profesionales() {
                 profesionales={activos}
                 onSuspender={(uid) => cambiarEstadoProfesional(uid, ESTADOS_USUARIO.SUSPENDIDO)}
                 onRetirar={(p) => setRetirando(p)}
+                onVerPacientes={(p) => setViendoPacientesDe(p)}
               />
             </section>
           )}
@@ -240,6 +253,14 @@ export default function Profesionales() {
       )}
 
       {/* Modal de confirmacion de retiro */}
+      {viendoPacientesDe && (
+        <PacientesDeProfesionalModal
+          profesional={viendoPacientesDe}
+          pacientes={pacientes}
+          onClose={() => setViendoPacientesDe(null)}
+        />
+      )}
+
       {retirando && (
         <RetirarProfesionalModal
           profesional={retirando}
@@ -344,7 +365,209 @@ function InvitacionesLista({ invitaciones, onCancelar }) {
 /* ============================================================
    Tabla de profesionales activos/suspendidos
    ============================================================ */
-function ProfesionalesTabla({ profesionales, onSuspender, onReactivar, onRetirar }) {
+/* ============================================================
+   Pacientes de un profesional
+   ----------------------------------------------------------------
+   Antes la asignacion solo se podia tocar entrando a cada paciente, uno
+   por uno. Aca se ve de una la cartera del profesional y se agrega o se
+   quita desde el mismo lugar.
+
+   La lista es la MISMA para asignados y disponibles, filtrada con las
+   dos pestanas: mantenerlas separadas obligaba a dos buscadores y dos
+   paginaciones para la misma tarea.
+   ============================================================ */
+const POR_PAGINA = 10;
+
+function PacientesDeProfesionalModal({ profesional, pacientes, onClose }) {
+  const overlayProps = useOverlayClose(onClose);
+  const [busqueda, setBusqueda] = useState('');
+  const [pestana, setPestana] = useState('asignados');
+  const [pagina, setPagina] = useState(0);
+  const [guardando, setGuardando] = useState(null);
+  const [error, setError] = useState('');
+
+  const nombreProf = profesional.displayName || profesional.email || 'Profesional';
+
+  const activos = useMemo(
+    () => pacientes.filter((p) => p.estado === ESTADOS_PACIENTE.ACTIVO),
+    [pacientes],
+  );
+
+  const asignados = useMemo(
+    () => activos.filter((p) => getProfesionalesUids(p).includes(profesional.uid)),
+    [activos, profesional.uid],
+  );
+
+  const visibles = useMemo(() => {
+    const base = pestana === 'asignados'
+      ? asignados
+      : activos.filter((p) => !getProfesionalesUids(p).includes(profesional.uid));
+
+    const q = busqueda.trim().toLowerCase();
+    const filtrados = q
+      ? base.filter((p) => `${nombrePaciente(p)} ${p.dni ?? ''}`.toLowerCase().includes(q))
+      : base;
+
+    return [...filtrados].sort((a, b) => nombrePaciente(a)
+      .localeCompare(nombrePaciente(b), 'es', { sensitivity: 'base' }));
+  }, [pestana, asignados, activos, profesional.uid, busqueda]);
+
+  // Al cambiar de pestana o de busqueda la pagina 3 puede no existir.
+  const totalPaginas = Math.max(1, Math.ceil(visibles.length / POR_PAGINA));
+  const paginaSegura = Math.min(pagina, totalPaginas - 1);
+  const enPantalla = visibles.slice(paginaSegura * POR_PAGINA, (paginaSegura + 1) * POR_PAGINA);
+
+  function cambiarPestana(cual) {
+    setPestana(cual);
+    setPagina(0);
+    setError('');
+  }
+
+  async function alternar(paciente) {
+    const uids = getProfesionalesUids(paciente);
+    const yaEsta = uids.includes(profesional.uid);
+
+    /* Un paciente no puede quedar sin profesional: actualizarPaciente lo
+       rechaza. Se avisa antes de intentarlo, porque el mensaje que tira la
+       libreria no dice a quien reasignarlo. */
+    if (yaEsta && uids.length === 1) {
+      setError(`${nombrePaciente(paciente)} quedaría sin profesional. Asignale otro antes de sacarlo de acá.`);
+      return;
+    }
+
+    setError('');
+    setGuardando(paciente.id);
+    try {
+      await actualizarPaciente(paciente.id, {
+        profesionalesUids: yaEsta
+          ? uids.filter((u) => u !== profesional.uid)
+          : [...uids, profesional.uid],
+      });
+    } catch (err) {
+      setError(err.message || 'No se pudo guardar el cambio.');
+    } finally {
+      setGuardando(null);
+    }
+  }
+
+  return (
+    <div className="cp-modal-overlay" {...overlayProps}>
+      <div className="cp-modal cp-modal--ancho" onClick={(e) => e.stopPropagation()}>
+        <button className="cp-modal__close" onClick={onClose} aria-label="Cerrar">×</button>
+
+        <h2 className="cp-modal__title">{nombreProf}</h2>
+        <p className="cp-modal__sub">
+          {asignados.length === 0
+            ? 'Todavía no tiene pacientes asignados.'
+            : `${asignados.length} ${asignados.length === 1 ? 'paciente asignado' : 'pacientes asignados'}.`}
+          {' '}Sacalos con la ×, o sumá otros desde &quot;Sin asignar&quot;.
+        </p>
+
+        <div className="cp-pdp__barra" role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={pestana === 'asignados'}
+            className={`cp-pdp__tab ${pestana === 'asignados' ? 'cp-pdp__tab--on' : ''}`}
+            onClick={() => cambiarPestana('asignados')}
+          >
+            Asignados <span className="cp-pdp__tab-n">{asignados.length}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={pestana === 'disponibles'}
+            className={`cp-pdp__tab ${pestana === 'disponibles' ? 'cp-pdp__tab--on' : ''}`}
+            onClick={() => cambiarPestana('disponibles')}
+          >
+            Sin asignar <span className="cp-pdp__tab-n">{activos.length - asignados.length}</span>
+          </button>
+        </div>
+
+        <input
+          type="search"
+          className="cp-input cp-pdp__buscador"
+          placeholder="Buscar por nombre o DNI…"
+          value={busqueda}
+          onChange={(e) => { setBusqueda(e.target.value); setPagina(0); }}
+          aria-label="Buscar paciente"
+        />
+
+        {error && <p className="cp-pdp__error">{error}</p>}
+
+        {enPantalla.length === 0 ? (
+          <p className="cp-pdp__vacio">
+            {busqueda.trim()
+              ? `Ningún paciente coincide con "${busqueda.trim()}".`
+              : pestana === 'asignados'
+                ? 'Sin pacientes asignados. Buscalos en "Sin asignar".'
+                : 'Todos los pacientes del consultorio ya están asignados a este profesional.'}
+          </p>
+        ) : (
+          <ul className="cp-pdp__lista">
+            {enPantalla.map((p) => {
+              const uids = getProfesionalesUids(p);
+              const yaEsta = uids.includes(profesional.uid);
+              const soloEste = yaEsta && uids.length === 1;
+              return (
+                <li key={p.id} className="cp-pdp__fila">
+                  <Avatar initials={(nombrePaciente(p)[0] || '·').toUpperCase()} size={26} />
+                  <div className="cp-pdp__info">
+                    <span className="cp-pdp__nombre">{nombrePaciente(p)}</span>
+                    <span className="cp-pdp__meta">
+                      {p.dni ? `DNI ${p.dni}` : 'Sin DNI'}
+                      {uids.length > 1 && ` · ${uids.length} profesionales`}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className={`cp-pdp__btn ${yaEsta ? 'cp-pdp__btn--quitar' : ''}`}
+                    onClick={() => alternar(p)}
+                    disabled={guardando === p.id}
+                    title={soloEste ? 'Es su único profesional' : undefined}
+                    aria-label={`${yaEsta ? 'Quitar' : 'Asignar'} a ${nombrePaciente(p)}`}
+                  >
+                    {guardando === p.id ? '…' : (yaEsta ? '×' : '+')}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        {totalPaginas > 1 && (
+          <div className="cp-pdp__paginacion">
+            <button
+              type="button"
+              className="cp-pdp__pag-btn"
+              onClick={() => setPagina((n) => Math.max(0, n - 1))}
+              disabled={paginaSegura === 0}
+            >
+              ‹
+            </button>
+            <span className="cp-pdp__pag-info">
+              {paginaSegura * POR_PAGINA + 1}–{Math.min((paginaSegura + 1) * POR_PAGINA, visibles.length)} de {visibles.length}
+            </span>
+            <button
+              type="button"
+              className="cp-pdp__pag-btn"
+              onClick={() => setPagina((n) => Math.min(totalPaginas - 1, n + 1))}
+              disabled={paginaSegura >= totalPaginas - 1}
+            >
+              ›
+            </button>
+          </div>
+        )}
+
+        <div className="cp-modal__actions">
+          <Button variant="secondary" type="button" onClick={onClose}>Listo</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProfesionalesTabla({ profesionales, onSuspender, onReactivar, onRetirar, onVerPacientes }) {
   return (
     <DualScrollTable className="cp-compact-list">
       <table className="cp-table">
@@ -395,6 +618,7 @@ function ProfesionalesTabla({ profesionales, onSuspender, onReactivar, onRetirar
                   catch { alert('No se pudo cambiar la configuración.'); }
                 },
               }] : []),
+              ...(onVerPacientes ? [{ label: 'Pacientes', onClick: () => onVerPacientes(p) }] : []),
               ...(onSuspender ? [{ label: 'Suspender', onClick: () => onSuspender(p.uid) }] : []),
               ...(onReactivar ? [{ label: 'Reactivar', onClick: () => onReactivar(p.uid) }] : []),
               ...(onRetirar ? [{ label: 'Retirar', onClick: () => onRetirar(p), danger: true }] : []),
@@ -419,7 +643,10 @@ function ProfesionalesTabla({ profesionales, onSuspender, onReactivar, onRetirar
                 {onSuspender && <td data-label="Carga pacientes"><ToggleCargaPacientes profesional={p} /></td>}
                 {onSuspender && <td data-label="Marcar pagadas"><ToggleMarcarPagadas profesional={p} /></td>}
                 <td className="cp-prof-tabla__actions" style={{ textAlign: 'right' }}>
-                  {onSuspender && <button className="cp-prof-action" onClick={() => onSuspender(p.uid)}>Suspender</button>}
+                  {onVerPacientes && (
+                    <button className="cp-prof-action" onClick={() => onVerPacientes(p)}>Pacientes</button>
+                  )}
+                  {onSuspender && <button className="cp-prof-action" onClick={() => onSuspender(p.uid)} style={{ marginLeft: 6 }}>Suspender</button>}
                   {onReactivar && <button className="cp-prof-action" onClick={() => onReactivar(p.uid)}>Reactivar</button>}
                   {onRetirar && <button className="cp-prof-action cp-prof-action--danger" onClick={() => onRetirar(p)} style={{ marginLeft: 6 }}>Retirar</button>}
                 </td>

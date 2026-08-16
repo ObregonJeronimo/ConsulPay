@@ -348,3 +348,195 @@
     font-size: 13.5px !important;
   }
 }
+
+/* ============================================================
+   Modal de pacientes de un profesional
+   ----------------------------------------------------------------
+   Una sola lista para asignados y sin asignar, con dos pestañas: son
+   la misma tarea, y separarlas obligaba a dos buscadores y dos
+   paginaciones.
+   ============================================================ */
+.cp-modal--ancho { max-width: 560px; }
+
+.cp-pdp__barra {
+  display: flex;
+  gap: 6px;
+  margin: 14px 0 10px;
+}
+
+.cp-pdp__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-pill);
+  background: var(--cp-surface);
+  color: var(--cp-text-muted);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: color var(--cp-dur-fast) var(--cp-ease),
+              border-color var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-pdp__tab:hover { color: var(--cp-text); }
+
+.cp-pdp__tab--on {
+  background: var(--cp-accent);
+  border-color: var(--cp-accent);
+  color: var(--cp-text-on-accent);
+}
+
+.cp-pdp__tab:focus-visible { outline: none; box-shadow: var(--cp-shadow-focus); }
+
+.cp-pdp__tab-n {
+  font-family: var(--cp-font-mono);
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.cp-pdp__buscador { width: 100%; margin-bottom: 10px; }
+
+.cp-pdp__error {
+  margin: 0 0 10px;
+  padding: 9px 12px;
+  border-radius: var(--cp-radius-md);
+  background: var(--cp-danger-bg);
+  color: var(--cp-danger);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.cp-pdp__lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  overflow: hidden;
+}
+
+/* Diez filas fijas: la altura del modal no cambia al pasar de página, así
+   los botones no se mueven bajo el cursor. */
+.cp-pdp__fila {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 11px;
+  min-height: 46px;
+  border-bottom: 1px solid var(--cp-border);
+  background: var(--cp-surface);
+}
+
+.cp-pdp__fila:last-child { border-bottom: none; }
+.cp-pdp__fila:hover { background: var(--cp-surface-sunken); }
+
+.cp-pdp__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.cp-pdp__nombre {
+  font-size: 13.5px;
+  color: var(--cp-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cp-pdp__meta {
+  font-size: 11.5px;
+  color: var(--cp-text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cp-pdp__btn {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  background: var(--cp-surface);
+  color: var(--cp-text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--cp-dur-fast) var(--cp-ease),
+              border-color var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-pdp__btn:hover:not(:disabled) {
+  background: var(--cp-accent);
+  border-color: var(--cp-accent);
+  color: var(--cp-text-on-accent);
+}
+
+.cp-pdp__btn--quitar:hover:not(:disabled) {
+  background: var(--cp-danger);
+  border-color: var(--cp-danger);
+}
+
+.cp-pdp__btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.cp-pdp__btn:focus-visible { outline: none; box-shadow: var(--cp-shadow-focus); }
+
+.cp-pdp__vacio {
+  margin: 0;
+  padding: 26px 16px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--cp-text-muted);
+  border: 1px dashed var(--cp-border);
+  border-radius: var(--cp-radius-md);
+}
+
+.cp-pdp__paginacion {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.cp-pdp__pag-btn {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  background: var(--cp-surface);
+  color: var(--cp-text);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.cp-pdp__pag-btn:hover:not(:disabled) { border-color: var(--cp-border-strong); }
+.cp-pdp__pag-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.cp-pdp__pag-btn:focus-visible { outline: none; box-shadow: var(--cp-shadow-focus); }
+
+.cp-pdp__pag-info {
+  font-family: var(--cp-font-mono);
+  font-size: 12px;
+  color: var(--cp-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 560px) {
+  .cp-pdp__barra { flex-wrap: wrap; }
+  .cp-pdp__fila { padding: 9px; }
+  .cp-pdp__btn { width: 36px; height: 36px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cp-pdp__tab,
+  .cp-pdp__btn { transition: none; }
+}
