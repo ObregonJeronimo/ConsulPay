@@ -463,6 +463,10 @@ function PacientesDeProfesionalModal({ profesional, pacientes, onClose }) {
           {' '}Sacalos con la ×, o sumá otros desde &quot;Sin asignar&quot;.
         </p>
 
+        {/* Todo el cuerpo va dentro de cp-modal__form: es el contenedor que
+            aporta el padding lateral del sistema (32px, 24px en mobile) y el
+            scroll. Sin el, los elementos quedaban pegados a los bordes. */}
+        <div className="cp-modal__form">
         <div className="cp-pdp__barra" role="tablist">
           <button
             type="button"
@@ -561,6 +565,7 @@ function PacientesDeProfesionalModal({ profesional, pacientes, onClose }) {
 
         <div className="cp-modal__actions">
           <Button variant="secondary" type="button" onClick={onClose}>Listo</Button>
+        </div>
         </div>
       </div>
     </div>

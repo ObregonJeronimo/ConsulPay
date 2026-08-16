@@ -1304,6 +1304,62 @@ console.log('\n[19] Modal de pacientes por profesional');
   await act(async () => { root.unmount(); });
 }
 
+/* ============ 20. Padding de los modales ============ */
+console.log('\n[20] Los modales no pegan el contenido al borde');
+{
+  const fsM = await import('fs');
+  const shared = fsM.readFileSync('/home/claude/ConsulPay/src/styles/shared-ui.css', 'utf8');
+  const { JSDOM: JD } = await import('jsdom');
+  const tokens = ':root{--cp-surface:#fff;--cp-border:#ddd;--cp-radius-lg:12px;--cp-text:#111;}';
+
+  /* .cp-modal no tiene padding propio: lo aplican __title, __sub, __form y
+     __actions, para que el form pueda scrollear y los botones queden
+     sticky. Cualquier elemento colgado directo del modal quedaba pegado al
+     borde, que es lo que pasaba en el modal de pacientes. */
+  function separacion(html, css) {
+    const d = new JD(`<!doctype html><html><head><style>${tokens}${css}</style></head><body>${html}</body></html>`);
+    const el = d.window.document.querySelector('#x');
+    const cs = d.window.getComputedStyle(el);
+    const padre = d.window.getComputedStyle(el.parentElement);
+    return (parseFloat(cs.marginLeft) || 0) + (parseFloat(padre.paddingLeft) || 0);
+  }
+  const modalCon = (clase, dentroDelForm) => dentroDelForm
+    ? `<div class="cp-modal"><h2 class="cp-modal__title">T</h2><div class="cp-modal__form"><div class="${clase}" id="x"></div></div><div class="cp-modal__actions"></div></div>`
+    : `<div class="cp-modal"><h2 class="cp-modal__title">T</h2><div class="${clase}" id="x"></div><div class="cp-modal__actions"></div></div>`;
+
+  for (const [nombre, clase] of [
+    ['planilla de pacientes', 'cp-planilla-opciones'],
+    ['marcar mes como pagado', 'cp-seleccion-meses'],
+    ['liquidar obra social', 'cp-liquidar-lista'],
+    ['confirmar archivado', 'cp-confirm-archive'],
+    ['registrar gasto', 'cp-gasto__form'],
+  ]) {
+    chequeo(`${nombre}: el contenido no toca el borde`,
+      separacion(modalCon(clase, false), shared) >= 24,
+      `(${separacion(modalCon(clase, false), shared)}px)`);
+  }
+
+  chequeo('el contenido dentro de cp-modal__form no recibe margen doble',
+    separacion(modalCon('cp-pdp__lista', true), shared) === 32,
+    `(${separacion(modalCon('cp-pdp__lista', true), shared)}px)`);
+
+  /* Se usa margin y no padding a proposito: padding pisaria el que esos
+     bloques ya tienen (una tarjeta con fondo y borde necesita el suyo). */
+  chequeo('la regla usa margin, no padding',
+    /\.cp-modal > \*:not[^{]*\{\s*margin-left/.test(shared));
+  /* Se busca la regla dentro del bloque del media query, no a N caracteres
+     fijos: la distancia cambia cada vez que se agrega algo al media. */
+  chequeo('en mobile el margen acompaña al del sistema (24px)', (() => {
+    const i = shared.indexOf('@media (max-width: 640px)');
+    const bloque = shared.slice(i, shared.indexOf('\n}', i));
+    return /\.cp-modal > \*:not[^{]*\{\s*margin-left: 24px/.test(bloque);
+  })());
+
+  const jsxProf = fsM.readFileSync('/home/claude/ConsulPay/src/pages/admin/Profesionales.jsx', 'utf8');
+  chequeo('el modal de pacientes usa el contenedor del sistema',
+    jsxProf.includes('<div className="cp-modal__form">'));
+}
+
 console.log(`\n${'='.repeat(52)}`);
 console.log(`${ok} chequeos OK, ${fallos.length} fallas`);
 if (fallos.length) { console.log('FALLAN:'); fallos.forEach((f) => console.log('  - ' + f)); }

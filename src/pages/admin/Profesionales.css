@@ -358,10 +358,13 @@
    ============================================================ */
 .cp-modal--ancho { max-width: 560px; }
 
+/* Sin margenes propios: el espaciado vertical lo da el gap de
+   cp-modal__form, que es el contenedor. Dos fuentes de separacion se
+   suman y descuadran el ritmo del modal. */
 .cp-pdp__barra {
   display: flex;
   gap: 6px;
-  margin: 14px 0 10px;
+  flex-wrap: wrap;
 }
 
 .cp-pdp__tab {
@@ -396,10 +399,10 @@
   opacity: 0.75;
 }
 
-.cp-pdp__buscador { width: 100%; margin-bottom: 10px; }
+.cp-pdp__buscador { width: 100%; }
 
 .cp-pdp__error {
-  margin: 0 0 10px;
+  margin: 0;
   padding: 9px 12px;
   border-radius: var(--cp-radius-md);
   background: var(--cp-danger-bg);
@@ -504,7 +507,6 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
-  margin-top: 10px;
 }
 
 .cp-pdp__pag-btn {
@@ -531,7 +533,6 @@
 }
 
 @media (max-width: 560px) {
-  .cp-pdp__barra { flex-wrap: wrap; }
   .cp-pdp__fila { padding: 9px; }
   .cp-pdp__btn { width: 36px; height: 36px; }
 }

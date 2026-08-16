@@ -526,6 +526,22 @@
    espacio disponible. Padding lateral mantiene el ritmo visual y
    bottom padding evita que el ultimo campo toque el borde de las
    acciones sticky. */
+/* Red de seguridad del padding lateral.
+   ----------------------------------------------------------------
+   .cp-modal no tiene padding propio: lo aplican __title, __sub, __form
+   y __actions, para que el form pueda scrollear y los botones quedar
+   sticky. El efecto colateral es que cualquier elemento colgado directo
+   del modal —una lista, un aviso, un bloque de totales— queda pegado a
+   los bordes, que es justo lo que pasaba en el modal de pacientes.
+
+   Se usa margin y no padding a proposito: padding pisaria el padding
+   interno que esos bloques ya tienen (una tarjeta con fondo y borde
+   necesita el suyo). El margin los separa del borde sin tocarlo. */
+.cp-modal > *:not(.cp-modal__title):not(.cp-modal__sub):not(.cp-modal__form):not(.cp-modal__actions):not(.cp-modal__close) {
+  margin-left: 32px;
+  margin-right: 32px;
+}
+
 .cp-modal__form {
   display: flex;
   flex-direction: column;
@@ -690,6 +706,10 @@
   }
   .cp-modal__sub {
     padding: 0 24px;
+  }
+  .cp-modal > *:not(.cp-modal__title):not(.cp-modal__sub):not(.cp-modal__form):not(.cp-modal__actions):not(.cp-modal__close) {
+    margin-left: 24px;
+    margin-right: 24px;
   }
   .cp-modal__form {
     padding: 0 24px 24px;
