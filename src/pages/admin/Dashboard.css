@@ -587,3 +587,40 @@
   font-size: 0.85em;
   vertical-align: 1px;
 }
+
+/* ============================================================
+   Metodos de pago que no entran en las cards
+   ----------------------------------------------------------------
+   Las dos primeras van como Metric; el resto en una linea de chips,
+   para no llenar la pantalla de cards en consultorios con muchas
+   obras sociales.
+   ============================================================ */
+.cp-metodos-resto {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.cp-metodos-resto__item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 5px 12px;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-pill);
+  background: var(--cp-surface);
+  font-size: 12.5px;
+  color: var(--cp-text-muted);
+}
+
+.cp-metodos-resto__item strong {
+  font-family: var(--cp-font-mono);
+  font-size: 13px;
+  color: var(--cp-text);
+}
+
+@media (max-width: 640px) {
+  .cp-metodos-resto { gap: 6px; }
+  .cp-metodos-resto__item { font-size: 12px; padding: 5px 10px; }
+}

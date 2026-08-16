@@ -31,6 +31,7 @@ Sale con código 1 si algo falla, así que sirve para un pre-push hook.
 14. Modal de gasto — usa los componentes de formulario del sistema
 15. Notificaciones push — service worker, manifest, cron y anti-repetición
 16. Ciclos de recordatorios — primera aparición, día del mes, desbordamiento
+17. Dashboard — métricas del consultorio y totales por mes de la tabla anual
 
 ## Límite conocido
 

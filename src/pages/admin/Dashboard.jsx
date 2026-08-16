@@ -7,16 +7,10 @@ import { SkeletonBox } from '../../components/ui/Skeleton.jsx';
 
 import { useAuth } from '../../hooks/useAuth.js';
 import { useConsultorio } from '../../hooks/useConsultorio.js';
-import { ESTADOS_PAGO_SESION, formatoARS } from '../../lib/constants.js';
+import { ESTADOS_PACIENTE } from '../../lib/constants.js';
 import { suscribirProfesionales } from '../../lib/profesionales.js';
 import { suscribirInvitaciones } from '../../lib/invitaciones.js';
-import {
-  finDeMes,
-  getCantidadSesiones,
-  inicioDeMes,
-  suscribirSesionesConsultorio,
-  totalesGlobales,
-} from '../../lib/sesiones.js';
+import { getMetodosPagoIds, suscribirPacientesConsultorio } from '../../lib/pacientes.js';
 
 import ResumenProfesionales from './ResumenProfesionales.jsx';
 import './Dashboard.css';
@@ -39,7 +33,7 @@ export default function Dashboard() {
 
   const [profesionales, setProfesionales] = useState([]);
   const [invitaciones, setInvitaciones] = useState([]);
-  const [sesionesMes, setSesionesMes] = useState([]);
+  const [pacientes, setPacientes] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -51,97 +45,32 @@ export default function Dashboard() {
     const unsubP = suscribirProfesionales(user.consultorioId, (data) => { setProfesionales(data); check(); });
     const unsubI = suscribirInvitaciones(user.consultorioId, (data) => { setInvitaciones(data); check(); });
 
-    return () => { unsubP(); unsubI(); };
+    const unsubPac = suscribirPacientesConsultorio(user.consultorioId, setPacientes);
+
+    return () => { unsubP(); unsubI(); unsubPac(); };
   }, [user?.consultorioId]);
-
-  // Suscripcion a sesiones del mes en curso para alimentar las metricas.
-  // Se filtra en el query por rango [inicioDeMes, finDeMes] para no
-  // traer datos de meses anteriores. Cuando alguien marca/desmarca
-  // pagada, el snapshot se actualiza solo y las metricas refrescan.
-  useEffect(() => {
-    if (!user?.consultorioId) return;
-    const ahora = new Date();
-    const desde = inicioDeMes(ahora);
-    const hasta = finDeMes(ahora);
-    const unsub = suscribirSesionesConsultorio(
-      user.consultorioId,
-      (data) => setSesionesMes(data),
-      { desde, hasta },
-    );
-    return unsub;
-  }, [user?.consultorioId]);
-
-  // Stats del mes (mismas reglas que la pagina de Sesiones):
-  // - porCobrar = suma de montoConsultorio de sesiones DEBIDA
-  //   (lo que el profesional aun no le pago al consultorio)
-  // - cobrado   = suma de montoConsultorio de sesiones PAGADA
-  // - cantidad  = cantidad de "encuentros" (con cantidadSesiones)
-  const stats = useMemo(() => totalesGlobales(sesionesMes), [sesionesMes]);
-  const cobrado = stats.totalConsultorio - stats.debido;
-  const porCobrar = stats.debido;
-  const cantidadEncuentros = stats.cantidad;
-  const cantidadRegistros = stats.cantidadRegistros;
-
-  // Profesionales con deuda abierta del mes (agrupado).
-  // Mostramos los top 5 con mayor deuda, cada uno con su monto y cantidad
-  // de sesiones impagas. Si hay 0, fallback al placeholder original.
-  const deudaPorProfesional = useMemo(() => {
-    const mapa = new Map();
-    for (const s of sesionesMes) {
-      if (s.estadoPago !== ESTADOS_PAGO_SESION.DEBIDO) continue;
-      const uid = s.profesionalUid;
-      if (!uid) continue;
-      const prev = mapa.get(uid) || { uid, monto: 0, pacientes: new Set(), encuentros: 0 };
-      prev.monto += Number(s.montoConsultorio || 0);
-      // La unidad de deuda es el paciente (cada registro es un paciente con
-      // sus N sesiones adentro). Los encuentros se muestran como contexto.
-      if (s.pacienteId) prev.pacientes.add(s.pacienteId);
-      prev.encuentros += getCantidadSesiones(s);
-      mapa.set(uid, prev);
-    }
-    const arr = Array.from(mapa.values());
-    arr.sort((a, b) => b.monto - a.monto);
-    return arr.slice(0, 5);
-  }, [sesionesMes]);
-
-  // Mapa profesionalUid -> displayName/email para mostrar nombres
-  const mapaProfesionales = useMemo(() => {
-    const m = {};
-    for (const p of profesionales) m[p.uid] = p;
-    return m;
-  }, [profesionales]);
-
-  // Calcular el mes una sola vez, sin Firestore. Se usa en el skeleton y en el render final.
-  const mesActual = new Intl.DateTimeFormat('es-AR', { month: 'long' }).format(new Date());
-
-  if (loadingConsultorio || loading) {
-    // Skeleton que reserva el espacio del dashboard real para evitar CLS.
-    // El h1 se muestra inmediatamente con el mes calculado localmente (sin esperar Firestore),
-    // lo que convierte ese elemento en el LCP real y lo adelanta de ~6.7s a ~2s.
-    return (
-      <div className="cp-dashboard">
-        <header className="cp-page-header">
-          <div style={{ flex: 1 }}>
-            <h1 className="cp-page-title">Resumen de {mesActual}</h1>
-            <SkeletonBox width="180px" height="16px" style={{ marginTop: 12 }} />
-          </div>
-          <SkeletonBox width="151px" height="38px" radius="8px" />
-        </header>
-        <section className="cp-metrics-grid">
-          <SkeletonBox height="100px" radius="12px" />
-          <SkeletonBox height="100px" radius="12px" />
-          <SkeletonBox height="100px" radius="12px" />
-          <SkeletonBox height="100px" radius="12px" />
-        </section>
-        <section className="cp-section" style={{ marginTop: 32 }}>
-          <SkeletonBox width="240px" height="22px" style={{ marginBottom: 16 }} />
-          <SkeletonBox height="120px" radius="12px" />
-        </section>
-      </div>
-    );
-  }
 
   const profesionalesActivos = profesionales.filter((p) => p.estado === 'activo');
+
+  /* Pacientes activos y como se reparten por metodo de pago. Un paciente
+     con dos metodos suma en los dos, asi que el desglose puede dar mas que
+     el total: es la misma logica que la planilla de Pacientes. */
+  const pacientesActivos = useMemo(
+    () => pacientes.filter((p) => p.estado === ESTADOS_PACIENTE.ACTIVO),
+    [pacientes],
+  );
+
+  const porMetodo = useMemo(() => {
+    const metodos = consultorio?.metodosPagoPaciente ?? [];
+    return metodos
+      .map((m) => ({
+        id: m.id,
+        nombre: m.nombre,
+        cantidad: pacientesActivos.filter((p) => getMetodosPagoIds(p).includes(m.id)).length,
+      }))
+      .filter((m) => m.cantidad > 0)
+      .sort((a, b) => b.cantidad - a.cantidad);
+  }, [consultorio?.metodosPagoPaciente, pacientesActivos]);
   const invitacionesPendientes = invitaciones.filter((i) => i.estado === 'pendiente');
 
   // Si no hay profesionales ni invitaciones, mostrar onboarding
@@ -164,14 +93,41 @@ export default function Dashboard() {
     );
   }
 
+  if (loadingConsultorio || loading) {
+    /* Skeleton que reserva el espacio del dashboard real para evitar CLS.
+       El titulo se pinta ya con el nombre del consultorio si esta, asi que
+       ese elemento sigue siendo el LCP y no espera a Firestore. */
+    return (
+      <div className="cp-dashboard">
+        <header className="cp-page-header">
+          <div style={{ flex: 1 }}>
+            {consultorio?.nombre
+              ? <h1 className="cp-page-title">{consultorio.nombre}</h1>
+              : <SkeletonBox width="260px" height="32px" />}
+          </div>
+          <SkeletonBox width="151px" height="38px" radius="8px" />
+        </header>
+        <section className="cp-metrics-grid">
+          <SkeletonBox height="100px" radius="12px" />
+          <SkeletonBox height="100px" radius="12px" />
+          <SkeletonBox height="100px" radius="12px" />
+          <SkeletonBox height="100px" radius="12px" />
+        </section>
+        <section className="cp-section" style={{ marginTop: 32 }}>
+          <SkeletonBox width="240px" height="22px" style={{ marginBottom: 16 }} />
+          <SkeletonBox height="120px" radius="12px" />
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="cp-dashboard">
       <header className="cp-page-header">
         <div>
-          <h1 className="cp-page-title">Resumen de {mesActual}</h1>
-          <p className="cp-page-sub">
-            {consultorio?.nombre}
-          </p>
+          {/* El titulo es el consultorio. Antes decia "Resumen de agosto",
+              pero lo que hay abajo no es del mes: la tabla es anual. */}
+          <h1 className="cp-page-title">{consultorio?.nombre}</h1>
         </div>
         <Link to="/admin/sesiones" state={{ abrirNueva: true }}>
           <Button variant="primary" icon={<PlusIcon />}>
@@ -180,76 +136,46 @@ export default function Dashboard() {
         </Link>
       </header>
 
-      {/* Metricas del mes en curso. Las sesiones se suscriben en useEffect
-          y se totalizan con totalesGlobales(), igual que en /admin/sesiones.
-          Si no hay sesiones todavia, mostramos el sub helper "Sin sesiones
-          todavía" para no dejar cards en blanco. */}
+      {/* Metricas del consultorio, no del mes: las de "este mes" (por cobrar,
+          cobrado, sesiones) daban una foto parcial al lado de una tabla que
+          muestra el ano entero, y para el mes ya esta /admin/sesiones. */}
       <section className="cp-metrics-grid">
-        <Metric
-          label="Por cobrar"
-          value={formatoARS.format(porCobrar)}
-          sub={cantidadRegistros === 0
-            ? 'Sin sesiones todavía'
-            : (porCobrar > 0
-              ? `${deudaPorProfesional.length} ${deudaPorProfesional.length === 1 ? 'profesional debe' : 'profesionales deben'}`
-              : 'Todo cobrado este mes')}
-        />
-        <Metric
-          label="Cobrado este mes"
-          value={formatoARS.format(cobrado)}
-          sub={cantidadRegistros === 0 ? 'Sin sesiones todavía' : 'ya recibido por el consultorio'}
-        />
         <Metric
           label="Profesionales activos"
           value={profesionalesActivos.length}
-          sub={invitacionesPendientes.length > 0 ? `${invitacionesPendientes.length} pendiente${invitacionesPendientes.length === 1 ? '' : 's'}` : null}
+          sub={invitacionesPendientes.length > 0
+            ? `${invitacionesPendientes.length} invitación${invitacionesPendientes.length === 1 ? '' : 'es'} pendiente${invitacionesPendientes.length === 1 ? '' : 's'}`
+            : null}
         />
         <Metric
-          label="Sesiones del mes"
-          value={cantidadEncuentros}
-          sub={cantidadRegistros === 0
-            ? 'Sin registros todavía'
-            : `${cantidadRegistros} ${cantidadRegistros === 1 ? 'registro' : 'registros'}`}
+          label="Pacientes activos"
+          value={pacientesActivos.length}
+          sub={pacientes.length > pacientesActivos.length
+            ? `${pacientes.length - pacientesActivos.length} archivado${pacientes.length - pacientesActivos.length === 1 ? '' : 's'}`
+            : null}
         />
+        {porMetodo.slice(0, 2).map((m) => (
+          <Metric
+            key={m.id}
+            label={m.nombre}
+            value={m.cantidad}
+            sub={`${m.cantidad === 1 ? 'paciente' : 'pacientes'} con este método`}
+          />
+        ))}
       </section>
 
-      {/* Profesionales con deuda abierta */}
-      <section className="cp-section">
-        <div className="cp-section-head">
-          <h2 className="cp-section-title">Profesionales con deuda abierta</h2>
-          <Link to="/admin/sesiones" className="cp-section-link">Ver todos →</Link>
+      {/* El resto de los metodos, que no entran en las cards. Un paciente con
+          dos metodos cuenta en los dos, por eso la suma puede superar el total. */}
+      {porMetodo.length > 2 && (
+        <div className="cp-metodos-resto">
+          {porMetodo.slice(2).map((m) => (
+            <span key={m.id} className="cp-metodos-resto__item">
+              {m.nombre}
+              <strong>{m.cantidad}</strong>
+            </span>
+          ))}
         </div>
-        {deudaPorProfesional.length === 0 ? (
-          <div className="cp-placeholder-box">
-            <p style={{ color: 'var(--cp-text-muted)', fontSize: 14 }}>
-              {cantidadRegistros === 0
-                ? 'Todavía no se registraron sesiones este mes. Cuando tus profesionales hagan sesiones con pacientes, la deuda acumulada va a aparecer acá.'
-                : '✓ No hay deuda abierta este mes. Todos los profesionales están al día con sus pagos.'}
-            </p>
-          </div>
-        ) : (
-          <ul className="cp-deuda-list">
-            {deudaPorProfesional.map((d) => {
-              const prof = mapaProfesionales[d.uid];
-              const nombre = prof?.displayName || prof?.email || 'Profesional sin nombre';
-              return (
-                <li key={d.uid} className="cp-deuda-item">
-                  <div className="cp-deuda-item__info">
-                    <div className="cp-deuda-item__name">{nombre}</div>
-                    <div className="cp-deuda-item__sub">
-                      {d.pacientes.size} {d.pacientes.size === 1 ? 'paciente impago' : 'pacientes impagos'}
-                      {d.encuentros !== d.pacientes.size && ` · ${d.encuentros} ${d.encuentros === 1 ? 'sesión' : 'sesiones'}`}
-                    </div>
-                  </div>
-                  <div className="cp-deuda-item__monto">
-                    {formatoARS.format(d.monto)}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
+      )}
 
       {/* Resumen rápido: estado de cada profesional, mes a mes */}
       {profesionales.length > 0 && (

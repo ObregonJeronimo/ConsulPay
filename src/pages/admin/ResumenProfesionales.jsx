@@ -105,6 +105,21 @@ export default function ResumenProfesionales({ consultorioId, profesionales }) {
   const mesActual = new Date().getFullYear() === anio ? new Date().getMonth() : -1;
   const totalGeneral = filas.reduce((acc, f) => acc + f.totalDebe, 0);
 
+  /* Total de cada mes: cuanto debe el consultorio entero en esa columna.
+     El pie de la tabla tenia un colSpan={12} vacio y solo mostraba el total
+     del anio, asi que para saber cuanto se debia en, digamos, junio, habia
+     que sumar la columna a ojo. */
+  const totalesPorMes = useMemo(() => {
+    const tot = Array.from({ length: 12 }, () => ({ debe: 0, porLiquidar: 0 }));
+    for (const f of filas) {
+      f.meses.forEach((c, i) => {
+        tot[i].debe += c.debe;
+        tot[i].porLiquidar += c.porLiquidar;
+      });
+    }
+    return tot;
+  }, [filas]);
+
   return (
     <section className="cp-rp">
       <header className="cp-rp__head">
@@ -199,8 +214,23 @@ export default function ResumenProfesionales({ consultorioId, profesionales }) {
               </tbody>
               <tfoot>
                 <tr>
-                  <td className="cp-rp__td-prof cp-rp__foot-label">Total del año</td>
-                  <td colSpan={12} />
+                  <td className="cp-rp__td-prof cp-rp__foot-label">Total del mes</td>
+                  {totalesPorMes.map((t, i) => (
+                    <td
+                      key={i}
+                      className={`cp-rp__celda cp-rp__foot-mes ${i === mesActual ? 'cp-rp__celda--actual' : ''}`}
+                      title={
+                        t.debe === 0 && t.porLiquidar === 0
+                          ? 'Sin deuda en este mes'
+                          : `${formatoARS.format(t.debe)} de deuda`
+                            + (t.porLiquidar > 0 ? ` · ${t.porLiquidar} a liquidar` : '')
+                      }
+                    >
+                      {t.debe > 0
+                        ? <span className="cp-rp__debe">{montoCompacto(t.debe)}</span>
+                        : <span className="cp-rp__vacio">·</span>}
+                    </td>
+                  ))}
                   <td className="cp-rp__td-total cp-rp__foot-total">
                     {formatoARS.format(totalGeneral)}
                   </td>

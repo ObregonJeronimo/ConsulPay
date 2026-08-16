@@ -860,6 +860,90 @@ console.log('\n[16] Cuando aparece cada recordatorio');
     lib.includes('proximaEn: Timestamp.fromDate(calcularPrimeraAparicion(ciclo, ahora))'));
 }
 
+/* ============ 17. Dashboard del admin ============ */
+console.log('\n[17] Dashboard');
+{
+  const { default: Dashboard } = await import('/home/claude/ConsulPay/src/pages/admin/Dashboard.jsx');
+  const { MemoryRouter } = await import('react-router-dom');
+
+  globalThis.__USER__ = { uid: 'A', consultorioId: 'C1', rol: 'admin' };
+  globalThis.__CONS__ = { nombre: 'CALA Espacio terapéutico', adminUids: ['A'], mpConfigs: {},
+    metodosPagoPaciente: [
+      { id: 'apross', nombre: 'APROSS', porcentajeConsultorio: 22 },
+      { id: 'part', nombre: 'Particular', porcentajeConsultorio: 25 },
+      { id: 'osde', nombre: 'OSDE', porcentajeConsultorio: 20 },
+    ] };
+
+  const anio = new Date().getFullYear();
+  const ses = (id, prof, mes, monto, estado = 'debido') => ({
+    id, consultorioId: 'C1', profesionalUid: prof, pacienteId: 'P1', estadoPago: estado,
+    montoConsultorio: monto, cantidadSesiones: 1, fecha: { toDate: () => new Date(anio, mes, 10) },
+  });
+  const pac = (id, mets, estado = 'activo') => ({
+    id, consultorioId: 'C1', nombre: 'N' + id, apellido: 'A' + id, estado, metodosPagoIds: mets,
+  });
+
+  globalThis.__DATA__ = {
+    sesiones: [
+      ses('s1', 'LOR', 0, 100000), ses('s2', 'GAB', 0, 200000),          // ene = 300k
+      ses('s3', 'LOR', 1, 50000), ses('s4', 'GAB', 1, 30000), ses('s5', 'MUR', 1, 20000), // feb = 100k
+      ses('s6', 'LOR', 2, 90000, 'pagado'),                              // mar = 0
+    ],
+    usuarios: [
+      { id: 'LOR', uid: 'LOR', displayName: 'Lorena', consultorioId: 'C1', rol: 'profesional', estado: 'activo' },
+      { id: 'GAB', uid: 'GAB', displayName: 'Gabriela', consultorioId: 'C1', rol: 'profesional', estado: 'activo' },
+      { id: 'MUR', uid: 'MUR', displayName: 'Muriel', consultorioId: 'C1', rol: 'profesional', estado: 'activo' },
+    ],
+    pacientes: [
+      pac('P1', ['apross']), pac('P2', ['apross']), pac('P3', ['apross', 'part']),
+      pac('P4', ['part']), pac('P5', ['osde']), pac('P6', ['apross'], 'archivado'),
+    ],
+    invitaciones: [], solicitudes_sesion: [], pagos_consultorio: [], gastos: [],
+  };
+
+  const cont = document.createElement('div');
+  document.body.appendChild(cont);
+  const root = createRoot(cont);
+  await act(async () => { root.render(createElement(MemoryRouter, null, createElement(Dashboard))); });
+
+  chequeo('el titulo es el consultorio, no "Resumen de <mes>"',
+    cont.querySelector('.cp-page-title')?.textContent.trim() === 'CALA Espacio terapéutico');
+  chequeo('no quedan metricas del mes en curso',
+    !cont.textContent.includes('Cobrado este mes') && !cont.textContent.includes('Sesiones del mes'));
+  chequeo('muestra profesionales activos', cont.textContent.includes('Profesionales activos'));
+  chequeo('muestra pacientes activos', cont.textContent.includes('Pacientes activos'));
+
+  const metricas = [...cont.querySelectorAll('.cp-metrics-grid > *')].map((m) => m.textContent.replace(/\s+/g, ' ').trim());
+  chequeo('cuenta bien los pacientes activos (el archivado no va)',
+    metricas.some((m) => m.startsWith('Pacientes activos5')), `(${metricas})`);
+  /* Un paciente con dos metodos cuenta en los dos, asi que el desglose puede
+     superar el total de pacientes. */
+  chequeo('APROSS cuenta 3 (dos propios mas uno compartido)',
+    metricas.some((m) => m.startsWith('APROSS3')), `(${metricas})`);
+  const chips = [...cont.querySelectorAll('.cp-metodos-resto__item')].map((c) => c.textContent.replace(/\s+/g, ' ').trim());
+  chequeo('los metodos que no entran en cards van como chips',
+    chips.some((c) => c.startsWith('OSDE')), `(${chips})`);
+  chequeo('los metodos sin pacientes no se muestran',
+    !cont.textContent.includes('Swiss Medical'));
+
+  chequeo('se saco la lista de deuda abierta, redundante con la tabla',
+    !cont.textContent.includes('deuda abierta'));
+  chequeo('la tabla anual sigue estando', !!cont.querySelector('.cp-rp'));
+
+  /* El pie tenia un colSpan={12} vacio: habia que sumar cada columna a ojo. */
+  const pie = cont.querySelector('.cp-rp__tabla tfoot tr');
+  const celdas = [...pie.querySelectorAll('td')].map((t) => t.textContent.trim());
+  chequeo('el pie dice "Total del mes"', celdas[0] === 'Total del mes');
+  chequeo('enero suma los dos profesionales', celdas[1] === '300 mil', `(${celdas[1]})`);
+  chequeo('febrero suma los tres', celdas[2] === '100 mil', `(${celdas[2]})`);
+  chequeo('marzo queda vacio: esa sesion esta pagada', celdas[3] === '·', `(${celdas[3]})`);
+  /* Intl.NumberFormat separa con espacio no-rompible (U+00A0), no con el
+     espacio comun, asi que la comparacion directa contra '$ 400.000' falla. */
+  chequeo('el total del año sigue al final',
+    celdas[13].replace(/\s/g, ' ') === '$ 400.000', `(${JSON.stringify(celdas[13])})`);
+  await act(async () => { root.unmount(); });
+}
+
 console.log(`\n${'='.repeat(52)}`);
 console.log(`${ok} chequeos OK, ${fallos.length} fallas`);
 if (fallos.length) { console.log('FALLAN:'); fallos.forEach((f) => console.log('  - ' + f)); }

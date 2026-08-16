@@ -237,6 +237,13 @@
   letter-spacing: 0.05em;
   padding-top: 9px !important;
 }
+/* Los totales por mes van en el pie, con el mismo peso que el total del
+   anio: es la lectura vertical de la tabla y tiene que distinguirse de los
+   montos por profesional. */
+.cp-rp__foot-mes {
+  font-weight: 600;
+}
+
 .cp-rp__foot-total {
   font-family: var(--cp-font-mono);
   font-size: 14px;
