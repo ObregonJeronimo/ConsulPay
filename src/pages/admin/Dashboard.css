@@ -589,38 +589,69 @@
 }
 
 /* ============================================================
-   Metodos de pago que no entran en las cards
+   Pacientes por metodo de pago
    ----------------------------------------------------------------
-   Las dos primeras van como Metric; el resto en una linea de chips,
-   para no llenar la pantalla de cards en consultorios con muchas
-   obras sociales.
+   Todos los metodos con el mismo tratamiento. auto-fit + minmax hace
+   que la grilla se acomode sola: con tres entran holgados en una fila,
+   con diez se reparten en las que hagan falta sin que ninguno quede
+   desproporcionado.
    ============================================================ */
-.cp-metodos-resto {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
+.cp-metodos {
+  margin-top: 22px;
 }
 
-.cp-metodos-resto__item {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 7px;
-  padding: 5px 12px;
-  border: 1px solid var(--cp-border);
-  border-radius: var(--cp-radius-pill);
-  background: var(--cp-surface);
-  font-size: 12.5px;
+.cp-metodos__titulo {
+  margin: 0 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
   color: var(--cp-text-muted);
 }
 
-.cp-metodos-resto__item strong {
-  font-family: var(--cp-font-mono);
-  font-size: 13px;
-  color: var(--cp-text);
+.cp-metodos__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 10px;
 }
 
+.cp-metodos__item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  padding: 13px 15px;
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-lg);
+}
+
+/* Los nombres largos ('PARTICULAR ESPECIAL 20%') se cortan con puntos
+   suspensivos en vez de estirar su columna y descuadrar la grilla. El
+   title lo deja leer completo al pasar el mouse. */
+.cp-metodos__nombre {
+  font-size: 11.5px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--cp-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cp-metodos__valor {
+  font-family: var(--cp-font-serif);
+  font-size: 26px;
+  line-height: 1;
+  color: var(--cp-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* En pantallas chicas, dos por fila: uno solo desperdicia el ancho y
+   diez apilados serian un scroll interminable. */
 @media (max-width: 640px) {
-  .cp-metodos-resto { gap: 6px; }
-  .cp-metodos-resto__item { font-size: 12px; padding: 5px 10px; }
+  .cp-metodos__grid { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+  .cp-metodos__item { padding: 11px 12px; }
+  .cp-metodos__valor { font-size: 22px; }
 }

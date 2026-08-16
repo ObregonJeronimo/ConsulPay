@@ -953,13 +953,20 @@ console.log('\n[17] Dashboard');
   const metricas = [...cont.querySelectorAll('.cp-metrics-grid > *')].map((m) => m.textContent.replace(/\s+/g, ' ').trim());
   chequeo('cuenta bien los pacientes activos (el archivado no va)',
     metricas.some((m) => m.startsWith('Pacientes activos5')), `(${metricas})`);
+
+  const tarjetas = () => [...cont.querySelectorAll('.cp-metodos__item')].map((el) => ({
+    nombre: el.querySelector('.cp-metodos__nombre').textContent.trim(),
+    valor: el.querySelector('.cp-metodos__valor').textContent.trim(),
+    title: el.querySelector('.cp-metodos__nombre').getAttribute('title'),
+  }));
   /* Un paciente con dos metodos cuenta en los dos, asi que el desglose puede
      superar el total de pacientes. */
   chequeo('APROSS cuenta 3 (dos propios mas uno compartido)',
-    metricas.some((m) => m.startsWith('APROSS3')), `(${metricas})`);
-  const chips = [...cont.querySelectorAll('.cp-metodos-resto__item')].map((c) => c.textContent.replace(/\s+/g, ' ').trim());
-  chequeo('los metodos que no entran en cards van como chips',
-    chips.some((c) => c.startsWith('OSDE')), `(${chips})`);
+    tarjetas().some((t) => t.nombre === 'APROSS' && t.valor === '3'), `(${JSON.stringify(tarjetas())})`);
+  /* Antes los dos primeros metodos iban como cards grandes y el resto como
+     chips chicos: sugeria una jerarquia que no existe, el corte era arbitrario. */
+  chequeo('todos los metodos tienen el mismo tratamiento',
+    cont.querySelectorAll('.cp-metodos-resto__item').length === 0);
   chequeo('los metodos sin pacientes no se muestran',
     !cont.textContent.includes('Swiss Medical'));
 
@@ -979,6 +986,59 @@ console.log('\n[17] Dashboard');
   chequeo('el total del año sigue al final',
     celdas[13].replace(/\s/g, ' ') === '$ 400.000', `(${JSON.stringify(celdas[13])})`);
   await act(async () => { root.unmount(); });
+
+  /* Lo que importa de la grilla es que aguante cualquier cantidad: un
+     consultorio puede tener una obra social o diez. */
+  const NOMBRES = ['APROSS 22%', 'PARTICULAR 20%', 'OBRA SOCIAL 24%', 'DAI 10% (obra social)',
+    'PARTICULAR ESPECIAL 20%', 'OSDE 210 Plan Superador 18%', 'SWISS MEDICAL SMG02 20%',
+    'GALENO AZUL 15%', 'MEDIFE INTEGRAL 19%', 'PAMI Prestación Básica 12%'];
+
+  async function conNMetodos(n) {
+    const mets = NOMBRES.slice(0, n).map((nombre, i) => ({ id: 'm' + i, nombre, porcentajeConsultorio: 20 }));
+    globalThis.__CONS__ = { nombre: 'CALA', adminUids: ['A'], mpConfigs: {}, metodosPagoPaciente: mets };
+    const pacs = [];
+    let k = 0;
+    mets.forEach((m, i) => {
+      for (let j = 0; j < 40 - i * 3; j += 1) {
+        pacs.push({ id: 'P' + (k += 1), consultorioId: 'C1', estado: 'activo', nombre: 'N', apellido: 'A', metodosPagoIds: [m.id] });
+      }
+    });
+    globalThis.__DATA__ = { ...globalThis.__DATA__, pacientes: pacs };
+    const c = document.createElement('div');
+    document.body.appendChild(c);
+    const r = createRoot(c);
+    await act(async () => { r.render(createElement(MemoryRouter, null, createElement(Dashboard))); });
+    const items = [...c.querySelectorAll('.cp-metodos__item')];
+    const res = {
+      cantidad: items.length,
+      seccion: !!c.querySelector('.cp-metodos'),
+      conTitle: items.every((el) => !!el.querySelector('.cp-metodos__nombre').getAttribute('title')),
+    };
+    await act(async () => { r.unmount(); });
+    return res;
+  }
+
+  for (const n of [1, 3, 5, 10]) {
+    const r = await conNMetodos(n);
+    chequeo(`con ${n} metodo${n === 1 ? '' : 's'} muestra ${n} tarjeta${n === 1 ? '' : 's'}`,
+      r.cantidad === n, `(${r.cantidad})`);
+  }
+  const diez = await conNMetodos(10);
+  /* Los nombres largos se cortan con ellipsis para no descuadrar la grilla;
+     el title los deja leer completos. */
+  chequeo('con nombres largos, cada uno conserva el nombre completo en el title', diez.conTitle);
+  const cero = await conNMetodos(0);
+  chequeo('sin metodos no aparece la seccion vacia', cero.seccion === false);
+
+  const cssDash = (await import('fs')).readFileSync('/home/claude/ConsulPay/src/pages/admin/Dashboard.css', 'utf8');
+  /* auto-fit + minmax es lo que hace que la grilla se acomode sola: con
+     tres entran holgados en una fila, con diez se reparten. */
+  chequeo('la grilla se acomoda sola segun cuantos haya',
+    /\.cp-metodos__grid[\s\S]{0,160}repeat\(auto-fit, minmax\(/.test(cssDash));
+  chequeo('los nombres largos no estiran su columna',
+    /\.cp-metodos__nombre[\s\S]{0,220}text-overflow: ellipsis/.test(cssDash));
+  chequeo('en mobile la grilla usa un minimo mas chico',
+    /@media \(max-width: 640px\)[\s\S]{0,240}cp-metodos__grid[\s\S]{0,120}minmax\(120px/.test(cssDash));
 }
 
 /* ============ 18. Selector de profesionales del paciente ============ */

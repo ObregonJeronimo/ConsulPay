@@ -154,27 +154,25 @@ export default function Dashboard() {
             ? `${pacientes.length - pacientesActivos.length} archivado${pacientes.length - pacientesActivos.length === 1 ? '' : 's'}`
             : null}
         />
-        {porMetodo.slice(0, 2).map((m) => (
-          <Metric
-            key={m.id}
-            label={m.nombre}
-            value={m.cantidad}
-            sub={`${m.cantidad === 1 ? 'paciente' : 'pacientes'} con este método`}
-          />
-        ))}
       </section>
 
-      {/* El resto de los metodos, que no entran en las cards. Un paciente con
-          dos metodos cuenta en los dos, por eso la suma puede superar el total. */}
-      {porMetodo.length > 2 && (
-        <div className="cp-metodos-resto">
-          {porMetodo.slice(2).map((m) => (
-            <span key={m.id} className="cp-metodos-resto__item">
-              {m.nombre}
-              <strong>{m.cantidad}</strong>
-            </span>
-          ))}
-        </div>
+      {/* Todos los metodos con el mismo peso. Antes los dos primeros iban
+          como cards grandes y el resto como chips chicos, lo que sugeria que
+          APROSS importaba mas que OBRA SOCIAL cuando el corte era arbitrario.
+          La grilla se acomoda sola: con tres metodos ocupan una fila, con
+          diez se reparten en las que hagan falta. */}
+      {porMetodo.length > 0 && (
+        <section className="cp-metodos">
+          <h2 className="cp-metodos__titulo">Pacientes por método de pago</h2>
+          <div className="cp-metodos__grid">
+            {porMetodo.map((m) => (
+              <div key={m.id} className="cp-metodos__item">
+                <span className="cp-metodos__nombre" title={m.nombre}>{m.nombre}</span>
+                <span className="cp-metodos__valor">{m.cantidad}</span>
+              </div>
+            ))}
+          </div>
+        </section>
       )}
 
       {/* Resumen rápido: estado de cada profesional, mes a mes */}
