@@ -223,13 +223,33 @@ export default function MisSesiones() {
   );
 
   const sesionesOrdenadas = useMemo(() => {
-    if (orden !== 'paciente') return sesiones;
-    return [...sesiones].sort((a, b) => {
-      const na = mapaPacientes[a.pacienteId] ? nombrePaciente(mapaPacientes[a.pacienteId]) : (a.pacienteNombre || '');
-      const nb = mapaPacientes[b.pacienteId] ? nombrePaciente(mapaPacientes[b.pacienteId]) : (b.pacienteNombre || '');
-      return na.localeCompare(nb, 'es', { sensitivity: 'base' });
-    });
-  }, [sesiones, orden, mapaPacientes]);
+    const nombreDe = (x) => (mapaPacientes[x.pacienteId]
+      ? nombrePaciente(mapaPacientes[x.pacienteId])
+      : (x.pacienteNombre || ''));
+
+    if (orden === 'paciente') {
+      return [...sesiones].sort((a, b) => nombreDe(a).localeCompare(nombreDe(b), 'es', { sensitivity: 'base' }));
+    }
+
+    /* Igual que en la vista del admin: primero los de pago inmediato y
+       despues los diferidos, cada bloque alfabetico por metodo, y adentro
+       de cada metodo los pacientes tambien alfabeticos. Lo inmediato ya
+       tiene numeros y lo diferido espera a la obra social; mezclados
+       obligan a saltear filas. */
+    if (orden === 'metodo') {
+      const esDiferido = (x) => (x.metodoPagoTipo === TIPOS_METODO_PAGO.DIFERIDO ? 1 : 0);
+      return [...sesiones].sort((a, b) => {
+        const porTipo = esDiferido(a) - esDiferido(b);
+        if (porTipo !== 0) return porTipo;
+        const porMetodo = nombreMetodoDeSesion(a, mapaMetodos)
+          .localeCompare(nombreMetodoDeSesion(b, mapaMetodos), 'es', { sensitivity: 'base' });
+        if (porMetodo !== 0) return porMetodo;
+        return nombreDe(a).localeCompare(nombreDe(b), 'es', { sensitivity: 'base' });
+      });
+    }
+
+    return sesiones;
+  }, [sesiones, orden, mapaPacientes, mapaMetodos]);
 
   const sesionesConPendiente = useMemo(() => {
     const set = new Set();
@@ -476,6 +496,7 @@ export default function MisSesiones() {
           >
             <option value="fecha">Por fecha</option>
             <option value="paciente">Por paciente (A-Z)</option>
+            <option value="metodo">Por método de pago</option>
           </select>
           <Button variant="secondary" onClick={() => setCargaRapidaOpen(true)} disabled={!hayPrereqs} style={{ flex: 1 }}>
             Carga rápida

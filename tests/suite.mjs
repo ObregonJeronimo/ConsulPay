@@ -1360,6 +1360,107 @@ console.log('\n[20] Los modales no pegan el contenido al borde');
     jsxProf.includes('<div className="cp-modal__form">'));
 }
 
+/* ============ 21. Orden por metodo de pago ============ */
+console.log('\n[21] Agrupar las sesiones por metodo');
+{
+  const { default: Sesiones } = await import('/home/claude/ConsulPay/src/pages/admin/Sesiones.jsx');
+  const { MemoryRouter } = await import('react-router-dom');
+
+  globalThis.__USER__ = { uid: 'A', consultorioId: 'C1', rol: 'admin' };
+  globalThis.__CONS__ = { nombre: 'CALA', adminUids: ['A'], mpConfigs: {}, metodosPagoPaciente: [
+    { id: 'part', nombre: 'Particular 20%', porcentajeConsultorio: 20, tipo: 'inmediato' },
+    { id: 'parte', nombre: 'PARTICULAR ESPECIAL 20%', porcentajeConsultorio: 20, tipo: 'inmediato' },
+    { id: 'apross', nombre: 'APROSS 22%', porcentajeConsultorio: 22, tipo: 'diferido' },
+    { id: 'os', nombre: 'OBRA SOCIAL 24%', porcentajeConsultorio: 24, tipo: 'diferido' },
+    { id: 'dai', nombre: 'DAI 10% (obra social)', porcentajeConsultorio: 10, tipo: 'diferido' },
+  ] };
+
+  const hoy = new Date();
+  let n = 0;
+  const ses = (metodoId, tipo, pac, dia) => {
+    n += 1;
+    return {
+      id: 's' + n, consultorioId: 'C1', profesionalUid: 'LU', pacienteId: 'P' + n,
+      metodoPagoId: metodoId, metodoPagoNombre: 'NOMBRE VIEJO', metodoPagoTipo: tipo,
+      estadoPago: tipo === 'diferido' ? 'pendiente_monto' : 'pagado',
+      valorTotal: 30000, porcentajeConsultorio: 20, montoConsultorio: 6000, montoProfesional: 24000,
+      cantidadSesiones: 1, fecha: { toDate: () => new Date(hoy.getFullYear(), hoy.getMonth(), dia, 10, 0) },
+      _pac: pac,
+    };
+  };
+  const filas = [
+    ses('os', 'diferido', 'CIRO, GOMEZ', 15),
+    ses('part', 'inmediato', 'RAMOS, GUSTAVO', 24),
+    ses('apross', 'diferido', 'YANCE, ZOE', 15),
+    ses('parte', 'inmediato', 'MARTINEZ, JULIETA', 15),
+    ses('os', 'diferido', 'BARRIONUEVO, EMILY', 15),
+    ses('part', 'inmediato', 'FARIAS, MARIA', 31),
+    ses('apross', 'diferido', 'GARCIA, EZEQUIEL', 15),
+    ses('dai', 'diferido', 'ZURITA, ANA', 15),
+    ses('parte', 'inmediato', 'GOMEZ, LORENZO', 15),
+    ses('part', 'inmediato', 'PERALTA, LUCAS', 15),
+  ];
+  globalThis.__DATA__ = {
+    sesiones: filas,
+    pacientes: filas.map((f) => ({
+      id: f.pacienteId, consultorioId: 'C1', estado: 'activo',
+      apellido: f._pac.split(',')[0], nombre: (f._pac.split(',')[1] || '').trim(), profesionalesUids: ['LU'],
+    })),
+    usuarios: [{ id: 'LU', uid: 'LU', displayName: 'Lucrecia Moscardi', consultorioId: 'C1', rol: 'profesional', estado: 'activo' }],
+    solicitudes_sesion: [], pagos_consultorio: [], gastos: [],
+  };
+
+  const cont = document.createElement('div');
+  document.body.appendChild(cont);
+  const root = createRoot(cont);
+  await act(async () => { root.render(createElement(MemoryRouter, null, createElement(Sesiones))); });
+
+  const sel = [...cont.querySelectorAll('select')].find((x) => x.getAttribute('aria-label') === 'Ordenar sesiones');
+  chequeo('existe la opcion de ordenar por metodo',
+    [...sel.options].some((o) => o.value === 'metodo'));
+
+  await act(async () => { sel.value = 'metodo'; sel.dispatchEvent(new dom.window.Event('change', { bubbles: true })); });
+  const leidas = [...cont.querySelectorAll('tbody tr')].map((tr) => ({
+    met: tr.querySelector('td[data-label="Método"]')?.textContent.replace('diferido', '').trim(),
+    pac: tr.querySelector('td[data-label="Paciente"] .cp-prof-name')?.textContent.trim(),
+  })).filter((x) => x.met);
+
+  const metodosEnOrden = leidas.map((f) => f.met).filter((m, i, a) => m !== a[i - 1]);
+  /* Inmediato antes que diferido no es alfabetico a proposito: lo inmediato
+     ya se cobro y tiene numeros, lo diferido espera a la obra social y
+     muestra guiones. Mezclados obligan a saltear filas. */
+  chequeo('los inmediatos van primero, despues los diferidos',
+    metodosEnOrden.join(' > ') === 'Particular 20% > PARTICULAR ESPECIAL 20% > APROSS 22% > DAI 10% (obra social) > OBRA SOCIAL 24%',
+    `(${metodosEnOrden})`);
+  chequeo('cada metodo aparece una sola vez, las filas quedan juntas',
+    metodosEnOrden.length === new Set(metodosEnOrden).size);
+  chequeo('dentro de cada metodo los pacientes van alfabeticos', (() => {
+    const porMetodo = {};
+    for (const f of leidas) (porMetodo[f.met] ??= []).push(f.pac);
+    return Object.values(porMetodo).every((lista) => {
+      const ordenada = [...lista].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+      return lista.join() === ordenada.join();
+    });
+  })());
+
+  /* El nombre sale de nombreMetodoDeSesion y no del guardado en la sesion:
+     los datos de prueba traen 'NOMBRE VIEJO' en metodoPagoNombre, y si se
+     usara ese, todas las sesiones caerian en un mismo grupo. */
+  chequeo('agrupa por el nombre actual del metodo, no por el guardado',
+    !leidas.some((f) => f.met.includes('NOMBRE VIEJO')));
+
+  await act(async () => { sel.value = 'fecha'; sel.dispatchEvent(new dom.window.Event('change', { bubbles: true })); });
+  const porFecha = [...cont.querySelectorAll('tbody tr')].map((tr) => tr.querySelector('td[data-label="Método"]')?.textContent.replace('diferido', '').trim()).filter(Boolean);
+  chequeo('volver a fecha deshace el agrupado',
+    porFecha.join() !== leidas.map((f) => f.met).join());
+
+  const jsxProf = (await import('fs')).readFileSync('/home/claude/ConsulPay/src/pages/profesional/MisSesiones.jsx', 'utf8');
+  chequeo('la vista del profesional tiene el mismo orden',
+    jsxProf.includes("<option value=\"metodo\">"));
+
+  await act(async () => { root.unmount(); });
+}
+
 console.log(`\n${'='.repeat(52)}`);
 console.log(`${ok} chequeos OK, ${fallos.length} fallas`);
 if (fallos.length) { console.log('FALLAN:'); fallos.forEach((f) => console.log('  - ' + f)); }

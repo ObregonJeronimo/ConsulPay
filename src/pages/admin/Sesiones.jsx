@@ -286,8 +286,36 @@ export default function Sesiones() {
         .localeCompare(nombreDePaciente(mapaPacientes[b.pacienteId], b.pacienteId), 'es', { sensitivity: 'base' }));
     }
 
+    /* Agrupa por metodo dejando las filas del mismo metodo juntas: primero
+       los de pago inmediato y despues los diferidos, cada bloque alfabetico,
+       y adentro de cada metodo los pacientes tambien alfabeticos.
+
+       El orden inmediato -> diferido no es alfabetico a proposito: son dos
+       realidades distintas. Lo inmediato ya se cobro y tiene numeros; lo
+       diferido espera a que la obra social liquide y muestra guiones. Verlos
+       mezclados obliga a saltear filas todo el tiempo.
+
+       El nombre sale de nombreMetodoDeSesion y no del que quedo guardado en
+       la sesion: si se renombro el metodo, el guardado es el viejo y dos
+       tandas del mismo metodo se ordenarian por separado. */
+    if (orden === 'metodo') {
+      const esDiferido = (x) => (x.metodoPagoTipo === TIPOS_METODO_PAGO.DIFERIDO ? 1 : 0);
+      list = [...list].sort((a, b) => {
+        const porTipo = esDiferido(a) - esDiferido(b);
+        if (porTipo !== 0) return porTipo;
+
+        const porMetodo = nombreMetodoDeSesion(a, mapaMetodos)
+          .localeCompare(nombreMetodoDeSesion(b, mapaMetodos), 'es', { sensitivity: 'base' });
+        if (porMetodo !== 0) return porMetodo;
+
+        return nombreDePaciente(mapaPacientes[a.pacienteId], a.pacienteId)
+          .localeCompare(nombreDePaciente(mapaPacientes[b.pacienteId], b.pacienteId), 'es', { sensitivity: 'base' });
+      });
+    }
+
     return list;
-  }, [sesiones, busqueda, filtroProfesional, filtroMetodo, filtroEstado, orden, mapaPacientes, mapaProfesionales]);
+  }, [sesiones, busqueda, filtroProfesional, filtroMetodo, filtroEstado, orden,
+    mapaPacientes, mapaProfesionales, mapaMetodos]);
 
   const stats = useMemo(() => totalesGlobales(sesionesFiltradas), [sesionesFiltradas]);
   const cobrado = stats.totalConsultorio - stats.debido;
@@ -526,6 +554,7 @@ export default function Sesiones() {
             >
               <option value="fecha">Por fecha</option>
               <option value="paciente">Por paciente (A-Z)</option>
+              <option value="metodo">Por método de pago</option>
             </select>
           </div>
 

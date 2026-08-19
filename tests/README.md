@@ -35,6 +35,7 @@ Sale con código 1 si algo falla, así que sirve para un pre-push hook.
 18. Asignar profesionales — dos listas, orden alfabético, vacíos y accesibilidad
 19. Pacientes por profesional — buscador, paginación y regla de no dejar huérfanos
 20. Padding de modales — el contenido nunca toca el borde
+21. Orden por método de pago — inmediatos antes que diferidos, agrupados
 
 ## Límite conocido
 
