@@ -665,6 +665,7 @@ export default function Sesiones() {
           profesionales={profesionalesActivos}
           pacientes={pacientesActivos}
           mapaPacientes={mapaPacientes}
+          mapaMetodos={mapaMetodos}
           admins={admins}
           uid={user.uid}
           onClose={() => setPagarMesOpen(false)}
@@ -1617,7 +1618,43 @@ export function QuienRecibioModal({ admins, sesion, paciente, onClose, onConfirm
    resumen de sesiones por paciente y marcar todas como pagadas
    de una vez (excepto las de obra social sin valor).
    ============================================================ */
-export function PagarMesModal({ consultorioId, profesionales, mapaPacientes, admins, uid, onClose }) {
+/* Fila de paciente en el selector de "marcar mes como pagado".
+   Compacta pero con lo que hace falta para decidir: quien es, cuantas
+   sesiones se cobran, por que metodo y cuanto. Lo que esta a liquidar se
+   muestra aparte porque NO entra en el pago. */
+function FilaPacientePago({ fila, mapaMetodos, accion, onClick }) {
+  const nombre = fila.pac
+    ? `${fila.pac.apellido ?? ''}${fila.pac.apellido && fila.pac.nombre ? ', ' : ''}${fila.pac.nombre ?? ''}`.trim()
+    : (fila.pacienteNombre || 'Paciente eliminado');
+
+  // Los metodos de las sesiones que SI se cobran.
+  const metodos = [...new Set(fila.debidas.map((x) => nombreMetodoDeSesion(x, mapaMetodos)))];
+
+  return (
+    <button
+      type="button"
+      className={`cp-sel__fila ${accion === '×' ? 'cp-sel__fila--on' : ''}`}
+      onClick={onClick}
+      aria-label={`${accion === '×' ? 'Sacar del pago a' : 'Sumar al pago a'} ${nombre}`}
+    >
+      <Avatar initials={(nombre[0] || '?').toUpperCase()} size={24} />
+      <span className="cp-sel__info">
+        <span className="cp-sel__nombre">{nombre}</span>
+        <span className="cp-sel__meta">
+          {fila.debidas.length} {fila.debidas.length === 1 ? 'sesión' : 'sesiones'}
+          {metodos.length > 0 && ` · ${metodos.join(' / ')}`}
+          {fila.aLiquidar.length > 0 && (
+            <span className="cp-sel__liq"> · {fila.aLiquidar.length} sin liquidar</span>
+          )}
+        </span>
+      </span>
+      <span className="cp-sel__monto">{formatoARS.format(fila.totalDebe)}</span>
+      <span className="cp-sel__accion" aria-hidden="true">{accion}</span>
+    </button>
+  );
+}
+
+export function PagarMesModal({ consultorioId, profesionales, mapaPacientes, mapaMetodos, admins, uid, onClose }) {
   const overlayProps = useOverlayClose(onClose);
   const [profUid, setProfUid] = useState('');
   const [mes, setMes] = useState(() => inicioDeMes(new Date()));
@@ -1666,9 +1703,72 @@ export function PagarMesModal({ consultorioId, profesionales, mapaPacientes, adm
         .localeCompare(nombreDePaciente(b.pac, b.pacienteId), 'es', { sensitivity: 'base' }));
   }, [sesiones, mapaPacientes]);
 
-  const sesionesPagables = useMemo(
-    () => porPaciente.flatMap((r) => r.debidas),
+  /* Solo los que tienen algo que cobrar entran en la seleccion. Un paciente
+     con todo a liquidar aparece en la lista pero no se puede marcar: no hay
+     monto todavia. */
+  const pagables = useMemo(
+    () => porPaciente.filter((r) => r.debidas.length > 0),
     [porPaciente],
+  );
+
+  /* Que metodos hay entre lo cobrable, con cuantos pacientes cada uno. Un
+     paciente con sesiones de dos metodos cuenta en los dos: en la practica
+     es raro, pero si pasa tiene que poder alcanzarse desde cualquiera. */
+  const grupos = useMemo(() => {
+    const m = new Map();
+    for (const r of pagables) {
+      for (const ses of r.debidas) {
+        const id = ses.metodoPagoId || '__sin__';
+        if (!m.has(id)) {
+          m.set(id, { id, nombre: nombreMetodoDeSesion(ses, mapaMetodos), pacientes: new Set() });
+        }
+        m.get(id).pacientes.add(r.pacienteId);
+      }
+    }
+    return [...m.values()]
+      .map((g) => ({ ...g, cantidad: g.pacientes.size }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+  }, [pagables, mapaMetodos]);
+
+  /* Arranca con todo marcado: el caso normal es cobrar el mes entero, y
+     obligar a tildar trece pacientes para eso seria trabajo de mas. */
+  const [elegidos, setElegidos] = useState(() => new Set());
+  const [tocado, setTocado] = useState(false);
+
+  useEffect(() => {
+    if (tocado) return;
+    setElegidos(new Set(pagables.map((r) => r.pacienteId)));
+  }, [pagables, tocado]);
+
+  // Cambiar de profesional o de mes empieza de cero.
+  useEffect(() => { setTocado(false); }, [profUid, mes]);
+
+  function alternar(pacienteId) {
+    setTocado(true);
+    setElegidos((prev) => {
+      const n = new Set(prev);
+      if (n.has(pacienteId)) n.delete(pacienteId); else n.add(pacienteId);
+      return n;
+    });
+  }
+
+  function elegirGrupo(g) {
+    setTocado(true);
+    setElegidos(new Set(g ? g.pacientes : pagables.map((r) => r.pacienteId)));
+  }
+
+  const sinMarcar = useMemo(
+    () => pagables.filter((r) => !elegidos.has(r.pacienteId)),
+    [pagables, elegidos],
+  );
+  const aMarcar = useMemo(
+    () => pagables.filter((r) => elegidos.has(r.pacienteId)),
+    [pagables, elegidos],
+  );
+
+  const sesionesPagables = useMemo(
+    () => aMarcar.flatMap((r) => r.debidas),
+    [aMarcar],
   );
   const totalAPagar = useMemo(
     () => sesionesPagables.reduce((acc, s) => acc + (s.montoConsultorio || 0), 0),
@@ -1765,60 +1865,83 @@ export function PagarMesModal({ consultorioId, profesionales, mapaPacientes, adm
               </p>
             ) : (
               <>
-                <div className="cp-pagar-mes__tabla">
-                  <div className="cp-pagar-mes__tabla-head">
-                    <span>Paciente</span>
-                    <span style={{ textAlign: 'center' }}>Sesiones</span>
-                    <span style={{ textAlign: 'right' }}>Total al consultorio</span>
-                  </div>
-                  <div className="cp-pagar-mes__filas">
-                    {porPaciente.map((r) => (
-                      <div key={r.pacienteId} className="cp-pagar-mes__row">
-                        <div className="cp-prof-cell">
-                          <Avatar
-                            initials={r.pac ? `${r.pac.nombre?.[0] || ''}${r.pac.apellido?.[0] || ''}`.toUpperCase() : '?'}
-                            size={28}
-                          />
-                          <div>
-                            <div className="cp-prof-name" style={{ fontSize: 13.5 }}>
-                              {r.pac ? `${r.pac.nombre || ''} ${r.pac.apellido || ''}`.trim() : (r.pacienteNombre || r.pacienteId || '—')}
-                            </div>
-                            {r.pagadas.length > 0 && (
-                              <div style={{ fontSize: 11.5, color: 'var(--cp-text-faint)' }}>
-                                {r.pagadas.length} ya pagada{r.pagadas.length === 1 ? '' : 's'}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <div style={{ textAlign: 'center' }}>
-                          {r.debidas.length > 0 && (
-                            <span style={{ fontSize: 13.5, fontWeight: 500, color: 'var(--cp-text)' }}>
-                              {r.debidas.length} deben
-                            </span>
-                          )}
-                          {r.aLiquidar.length > 0 && (
-                            <div style={{ fontSize: 11.5, color: 'var(--cp-warning, #b8860b)', marginTop: 2 }}>
-                              {r.aLiquidar.length} sin valor (OS)
-                            </div>
-                          )}
-                        </div>
-                        <div style={{ textAlign: 'right', fontWeight: 500, fontSize: 14 }}>
-                          {r.debidas.length > 0
-                            ? formatoARS.format(r.totalDebe)
-                            : <span style={{ color: 'var(--cp-text-faint)' }}>—</span>}
-                        </div>
-                      </div>
+                {/* Atajos por metodo. Sin esto, cobrar solo lo de una obra
+                    social obligaba a destildar de a uno. */}
+                {grupos.length > 1 && (
+                  <div className="cp-sel__atajos" role="group" aria-label="Seleccionar por método">
+                    <button
+                      type="button"
+                      className="cp-sel__atajo"
+                      onClick={() => elegirGrupo(null)}
+                    >
+                      Todos <span className="cp-sel__atajo-n">{pagables.length}</span>
+                    </button>
+                    {grupos.map((g) => (
+                      <button
+                        key={g.id}
+                        type="button"
+                        className="cp-sel__atajo"
+                        onClick={() => elegirGrupo(g)}
+                        title={`Marcar solo los de ${g.nombre}`}
+                      >
+                        {g.nombre} <span className="cp-sel__atajo-n">{g.cantidad}</span>
+                      </button>
                     ))}
                   </div>
+                )}
 
-                  {/* Total fijo fuera del scroll */}
-                  <div className="cp-pagar-mes__total">
-                    <span>Total a pagar</span>
-                    <span />
-                    <span style={{ textAlign: 'right', fontSize: 18, fontWeight: 600, color: 'var(--cp-success)' }}>
-                      {formatoARS.format(totalAPagar)}
-                    </span>
+                <div className="cp-sel">
+                  <div className="cp-sel__col">
+                    <div className="cp-sel__head">
+                      <span>Sin marcar</span>
+                      <span className="cp-sel__n">{sinMarcar.length}</span>
+                    </div>
+                    <div className="cp-sel__lista">
+                      {sinMarcar.length === 0 ? (
+                        <p className="cp-sel__vacio">Todos van a quedar pagados.</p>
+                      ) : sinMarcar.map((r) => (
+                        <FilaPacientePago
+                          key={r.pacienteId}
+                          fila={r}
+                          mapaMetodos={mapaMetodos}
+                          accion="+"
+                          onClick={() => alternar(r.pacienteId)}
+                        />
+                      ))}
+                    </div>
                   </div>
+
+                  <div className="cp-sel__col">
+                    <div className="cp-sel__head">
+                      <span>Se marcan como pagados</span>
+                      <span className="cp-sel__n cp-sel__n--on">{aMarcar.length}</span>
+                    </div>
+                    <div className="cp-sel__lista">
+                      {aMarcar.length === 0 ? (
+                        <p className="cp-sel__vacio">Elegí de la izquierda a quién cobrarle.</p>
+                      ) : aMarcar.map((r) => (
+                        <FilaPacientePago
+                          key={r.pacienteId}
+                          fila={r}
+                          mapaMetodos={mapaMetodos}
+                          accion="×"
+                          onClick={() => alternar(r.pacienteId)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="cp-sel__total">
+                  <span className="cp-sel__total-label">
+                    Total a pagar
+                    {aMarcar.length !== pagables.length && (
+                      <span className="cp-sel__total-nota">
+                        {' '}· {aMarcar.length} de {pagables.length} pacientes
+                      </span>
+                    )}
+                  </span>
+                  <strong className="cp-sel__total-val">{formatoARS.format(totalAPagar)}</strong>
                 </div>
 
                 {totalALiquidar > 0 && (

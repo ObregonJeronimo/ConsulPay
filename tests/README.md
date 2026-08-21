@@ -37,6 +37,7 @@ Sale con código 1 si algo falla, así que sirve para un pre-push hook.
 20. Padding de modales — el contenido nunca toca el borde
 21. Orden por método de pago — inmediatos antes que diferidos, agrupados
 22. Estado por paciente — matriz pacientes × meses de un profesional
+23. Marcar mes como pagado — selección por paciente, atajos por método
 
 ## Límite conocido
 

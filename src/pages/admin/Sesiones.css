@@ -915,3 +915,246 @@
 .cp-liquidar-masivo__row:last-child {
   border-bottom: none;
 }
+
+/* ============================================================
+   Selector de pacientes a marcar como pagados
+   ----------------------------------------------------------------
+   Dos columnas: sin marcar a la izquierda, a marcar a la derecha. Se
+   pasa de un lado al otro con un clic. Antes la lista era de solo
+   lectura y se marcaba todo el mes o nada.
+
+   El modal usa cp-modal--wide (640px). Las dos columnas entran recién a
+   partir de ahí, así que el apilado NO va por ancho de viewport sino
+   por el del modal: en una tablet de 800px el modal ya está a 640 y las
+   columnas entran, mientras que a 600 de viewport el modal se achica y
+   hay que apilar.
+   ============================================================ */
+.cp-sel__atajos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.cp-sel__atajo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-pill);
+  background: var(--cp-surface);
+  color: var(--cp-text-muted);
+  font-family: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: color var(--cp-dur-fast) var(--cp-ease),
+              border-color var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-sel__atajo:hover { color: var(--cp-text); border-color: var(--cp-border-strong); }
+.cp-sel__atajo:focus-visible { outline: none; box-shadow: var(--cp-shadow-focus); }
+
+.cp-sel__atajo-n {
+  font-family: var(--cp-font-mono);
+  font-size: 11.5px;
+  padding: 1px 6px;
+  border-radius: var(--cp-radius-pill);
+  background: var(--cp-surface-sunken);
+  color: var(--cp-text);
+}
+
+.cp-sel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.cp-sel__col {
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  background: var(--cp-surface);
+  overflow: hidden;
+  min-width: 0;
+}
+
+.cp-sel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 7px 10px;
+  background: var(--cp-surface-sunken);
+  border-bottom: 1px solid var(--cp-border);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--cp-text-muted);
+}
+
+.cp-sel__n {
+  font-family: var(--cp-font-mono);
+  font-size: 11px;
+  letter-spacing: 0;
+  padding: 1px 7px;
+  border-radius: var(--cp-radius-pill);
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  color: var(--cp-text-muted);
+}
+
+.cp-sel__n--on {
+  background: var(--cp-accent);
+  border-color: var(--cp-accent);
+  color: var(--cp-text-on-accent);
+}
+
+.cp-sel__lista {
+  max-height: 260px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.cp-sel__fila {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 9px;
+  border: none;
+  border-bottom: 1px solid var(--cp-border);
+  background: none;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-sel__fila:last-child { border-bottom: none; }
+.cp-sel__fila:hover { background: var(--cp-surface-sunken); }
+.cp-sel__fila--on:hover { background: var(--cp-danger-bg); }
+
+.cp-sel__fila:focus-visible {
+  outline: none;
+  box-shadow: var(--cp-shadow-focus);
+  position: relative;
+  z-index: 1;
+}
+
+.cp-sel__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.cp-sel__nombre {
+  font-size: 13px;
+  color: var(--cp-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cp-sel__meta {
+  font-size: 11px;
+  color: var(--cp-text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cp-sel__liq { color: var(--cp-warning); }
+
+.cp-sel__monto {
+  flex-shrink: 0;
+  font-family: var(--cp-font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--cp-text);
+}
+
+/* Visible siempre y no solo en hover: es lo que dice que la fila se
+   puede tocar, y en pantalla táctil no hay hover que lo revele. */
+.cp-sel__accion {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--cp-radius-sm);
+  font-size: 14px;
+  line-height: 1;
+  color: var(--cp-text-faint);
+}
+
+.cp-sel__fila:hover .cp-sel__accion {
+  background: var(--cp-accent);
+  color: var(--cp-text-on-accent);
+}
+
+.cp-sel__fila--on:hover .cp-sel__accion {
+  background: var(--cp-danger);
+  color: var(--cp-text-on-accent);
+}
+
+.cp-sel__vacio {
+  margin: 0;
+  padding: 20px 12px;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--cp-text-muted);
+}
+
+.cp-sel__total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  background: var(--cp-surface-sunken);
+  font-size: 13px;
+}
+
+.cp-sel__total-nota { color: var(--cp-text-muted); font-size: 12px; }
+
+.cp-sel__total-val {
+  font-family: var(--cp-font-mono);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  color: var(--cp-success);
+}
+
+/* El modal llega a 640px y a partir de los 700 de viewport ya no se
+   achica, así que ese es el punto donde las dos columnas dejan de
+   entrar cómodas. Apiladas, cada lista se acorta para que el modal no
+   se vuelva un scroll interminable. */
+@media (max-width: 700px) {
+  .cp-sel { grid-template-columns: 1fr; gap: 8px; }
+  .cp-sel__lista { max-height: 190px; }
+}
+
+/* En celular la fila necesita altura táctil y el monto baja junto al
+   resto de los datos: a 360px, nombre + método + monto en una línea no
+   entran sin cortar el nombre a la mitad. */
+@media (max-width: 460px) {
+  .cp-sel__fila { padding: 10px 9px; min-height: 46px; flex-wrap: wrap; }
+  .cp-sel__info { flex: 1 1 100%; order: 1; }
+  .cp-sel__monto { order: 2; margin-left: 32px; }
+  .cp-sel__accion { order: 3; margin-left: auto; width: 26px; height: 26px; }
+  .cp-sel__atajo { font-size: 12px; padding: 6px 10px; }
+  .cp-sel__lista { max-height: 220px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cp-sel__fila,
+  .cp-sel__atajo { transition: none; }
+}

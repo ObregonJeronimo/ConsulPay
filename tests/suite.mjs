@@ -1561,6 +1561,110 @@ console.log('\n[22] Matriz de pacientes de un profesional');
   await act(async () => { root.unmount(); });
 }
 
+/* ============ 23. Elegir a quien marcar como pagado ============ */
+console.log('\n[23] Selector del modal "Marcar mes como pagado"');
+{
+  const { default: Sesiones } = await import('/home/claude/ConsulPay/src/pages/admin/Sesiones.jsx');
+  const { MemoryRouter } = await import('react-router-dom');
+
+  globalThis.__USER__ = { uid: 'A', consultorioId: 'C1', rol: 'admin' };
+  globalThis.__CONS__ = { nombre: 'CALA', adminUids: ['A', 'R'], mpConfigs: {}, metodosPagoPaciente: [
+    { id: 'apross', nombre: 'APROSS 22%', porcentajeConsultorio: 22, tipo: 'diferido' },
+    { id: 'part', nombre: 'Particular 20%', porcentajeConsultorio: 20, tipo: 'inmediato' },
+  ] };
+
+  const hoyB = new Date();
+  let nb = 0;
+  const sesB = (pac, metodo, monto, estado = 'debido') => ({
+    id: 's' + (nb += 1), consultorioId: 'C1', profesionalUid: 'JO', pacienteId: pac,
+    metodoPagoId: metodo, metodoPagoTipo: metodo === 'apross' ? 'diferido' : 'inmediato',
+    estadoPago: estado, montoConsultorio: monto, valorTotal: monto * 5, cantidadSesiones: 1,
+    fecha: { toDate: () => new Date(hoyB.getFullYear(), hoyB.getMonth(), 10) },
+  });
+  const listaB = [];
+  for (let i = 1; i <= 8; i += 1) listaB.push(sesB('PA' + i, 'apross', 33374));
+  for (let i = 1; i <= 5; i += 1) listaB.push(sesB('PP' + i, 'part', 37926));
+  listaB.push(sesB('PL1', 'apross', 0, 'pendiente_monto'));
+
+  globalThis.__DATA__ = {
+    sesiones: listaB,
+    pacientes: [...Array(8)].map((_, i) => ({ id: 'PA' + (i + 1), consultorioId: 'C1', apellido: 'Apross' + (i + 1), nombre: 'Ana', estado: 'activo' }))
+      .concat([...Array(5)].map((_, i) => ({ id: 'PP' + (i + 1), consultorioId: 'C1', apellido: 'Part' + (i + 1), nombre: 'Beto', estado: 'activo' })))
+      .concat([{ id: 'PL1', consultorioId: 'C1', apellido: 'Liquidar', nombre: 'Caro', estado: 'activo' }]),
+    usuarios: [
+      { id: 'JO', uid: 'JO', displayName: 'Josefina Sosa', consultorioId: 'C1', rol: 'profesional', estado: 'activo' },
+      { id: 'A', uid: 'A', displayName: 'Adriana Barrozo', consultorioId: 'C1', rol: 'admin', estado: 'activo' },
+      { id: 'R', uid: 'R', displayName: 'Romina Sulaiman', consultorioId: 'C1', rol: 'admin', estado: 'activo' },
+    ],
+    solicitudes_sesion: [], pagos_consultorio: [], gastos: [],
+  };
+
+  const cont = document.createElement('div');
+  document.body.appendChild(cont);
+  const root = createRoot(cont);
+  await act(async () => { root.render(createElement(MemoryRouter, null, createElement(Sesiones))); });
+  await act(async () => {
+    clic([...cont.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Marcar mes como pagado'));
+  });
+  const selProf = cont.querySelector('.cp-modal select');
+  await act(async () => { selProf.value = 'JO'; selProf.dispatchEvent(new dom.window.Event('change', { bubbles: true })); });
+
+  const cols = () => [...cont.querySelectorAll('.cp-sel__col')].map((c) => c.querySelectorAll('.cp-sel__fila').length);
+  const totalTxt = () => cont.querySelector('.cp-sel__total')?.textContent.replace(/\s+/g, ' ').trim() ?? '';
+  const botonTxt = () => ([...cont.querySelectorAll('.cp-modal__actions button')]
+    .find((b) => /Marcar|Confirmar/.test(b.textContent))?.textContent.trim() ?? '');
+  const atajos = () => [...cont.querySelectorAll('.cp-sel__atajo')].map((a) => a.textContent.replace(/\s+/g, ' ').trim());
+
+  chequeo('hay atajos por metodo con su cantidad',
+    atajos().join(' | ') === 'Todos 13 | APROSS 22% 8 | Particular 20% 5', `(${atajos()})`);
+  /* Lo normal es cobrar el mes entero; obligar a tildar trece pacientes
+     para eso seria trabajo de mas. */
+  chequeo('arranca con todos marcados', cols()[0] === 0 && cols()[1] === 13, `(${cols()})`);
+  chequeo('el paciente sin liquidar no entra en la seleccion',
+    !cont.querySelector('.cp-sel').textContent.includes('Liquidar'));
+
+  const atajo = (t) => [...cont.querySelectorAll('.cp-sel__atajo')].find((a) => a.textContent.includes(t));
+  await act(async () => { clic(atajo('APROSS')); });
+  chequeo('el atajo deja solo los de ese metodo', cols()[0] === 5 && cols()[1] === 8, `(${cols()})`);
+  chequeo('el total sigue a la seleccion', totalTxt().includes('266.992'), `(${totalTxt()})`);
+  chequeo('el total avisa que no estan todos', totalTxt().includes('8 de 13'), `(${totalTxt()})`);
+  chequeo('el boton dice cuantos se van a marcar',
+    botonTxt() === 'Marcar 8 pacientes como pagados', `(${botonTxt()})`);
+
+  await act(async () => { clic(cont.querySelectorAll('.cp-sel__col')[1].querySelector('.cp-sel__fila')); });
+  chequeo('la X saca uno solo del pago', cols()[0] === 6 && cols()[1] === 7, `(${cols()})`);
+  chequeo('y el total baja', totalTxt().includes('233.618'), `(${totalTxt()})`);
+
+  await act(async () => { clic(cont.querySelectorAll('.cp-sel__col')[0].querySelector('.cp-sel__fila')); });
+  chequeo('desde la izquierda se vuelve a sumar', cols()[1] === 8);
+
+  await act(async () => { clic(atajo('Todos')); });
+  chequeo('el atajo Todos restablece', cols()[0] === 0 && cols()[1] === 13);
+  chequeo('con todos marcados el total no aclara nada',
+    !totalTxt().includes(' de 13'), `(${totalTxt()})`);
+
+  const filas = [...cont.querySelectorAll('.cp-sel__fila')];
+  chequeo('cada fila dice a quien suma o saca',
+    filas.every((f) => /^(Sacar del pago a|Sumar al pago a) /.test(f.getAttribute('aria-label') || '')));
+  /* Compacta pero con lo necesario para decidir: quien, cuantas sesiones,
+     por que metodo y cuanto. */
+  chequeo('la fila muestra sesiones, metodo y monto', (() => {
+    const t = filas[0].textContent.replace(/\s+/g, ' ');
+    return t.includes('sesión') && t.includes('APROSS') && t.includes('33.374');
+  })(), `(${filas[0].textContent.replace(/\s+/g, ' ')})`);
+
+  const cssSes = (await import('fs')).readFileSync('/home/claude/ConsulPay/src/pages/admin/Sesiones.css', 'utf8');
+  /* El modal llega a 640px: a menos de 700 de viewport ya se achica y las
+     dos columnas dejan de entrar comodas. */
+  chequeo('se apila cuando el modal deja de entrar',
+    /@media \(max-width: 700px\)[\s\S]{0,200}\.cp-sel \{ grid-template-columns: 1fr/.test(cssSes));
+  chequeo('en celular la fila tiene altura tactil',
+    /@media \(max-width: 460px\)[\s\S]{0,300}min-height: 46px/.test(cssSes));
+  chequeo('respeta prefers-reduced-motion', cssSes.includes('.cp-sel__fila,\n  .cp-sel__atajo { transition: none; }'));
+
+  await act(async () => { root.unmount(); });
+}
+
 console.log(`\n${'='.repeat(52)}`);
 console.log(`${ok} chequeos OK, ${fallos.length} fallas`);
 if (fallos.length) { console.log('FALLAN:'); fallos.forEach((f) => console.log('  - ' + f)); }
