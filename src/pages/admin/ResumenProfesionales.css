@@ -284,3 +284,32 @@
   .cp-rp__th-total, .cp-rp__td-total { min-width: 80px; }
   .cp-rp__leyenda { gap: 10px; }
 }
+
+/* ============================================================
+   Selector de profesional (ResumenPacientes)
+   ----------------------------------------------------------------
+   Lo usa la segunda matriz, la de pacientes. Va entre el encabezado y
+   la tabla porque define QUE se esta mirando: sin elegir profesional,
+   la tabla no tiene sentido.
+   ============================================================ */
+.cp-rp__selector {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.cp-rp__selector .cp-select {
+  /* Ancho acotado: los nombres con la deuda al lado son largos, pero
+     estirarlo a todo el ancho de la tabla lo haria ver como un campo de
+     formulario y no como un filtro. */
+  max-width: 420px;
+  flex: 1;
+  min-width: 220px;
+}
+
+@media (max-width: 560px) {
+  .cp-rp__selector { flex-direction: column; align-items: stretch; gap: 6px; }
+  .cp-rp__selector .cp-select { max-width: none; }
+}

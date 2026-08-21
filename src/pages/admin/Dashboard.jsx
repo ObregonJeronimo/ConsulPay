@@ -13,6 +13,7 @@ import { suscribirInvitaciones } from '../../lib/invitaciones.js';
 import { getMetodosPagoIds, suscribirPacientesConsultorio } from '../../lib/pacientes.js';
 
 import ResumenProfesionales from './ResumenProfesionales.jsx';
+import ResumenPacientes from './ResumenPacientes.jsx';
 import './Dashboard.css';
 
 const PlusIcon = () => (
@@ -177,10 +178,19 @@ export default function Dashboard() {
 
       {/* Resumen rápido: estado de cada profesional, mes a mes */}
       {profesionales.length > 0 && (
-        <ResumenProfesionales
-          consultorioId={user?.consultorioId}
-          profesionales={profesionales}
-        />
+        <>
+          <ResumenProfesionales
+            consultorioId={user?.consultorioId}
+            profesionales={profesionales}
+          />
+          {/* Un nivel mas abajo: la misma matriz pero de los pacientes de un
+              profesional. La de arriba dice cuanto debe cada uno; esta, de
+              quien viene. */}
+          <ResumenPacientes
+            consultorioId={user?.consultorioId}
+            profesionales={profesionales}
+          />
+        </>
       )}
     </div>
   );

@@ -19,25 +19,8 @@ import Spinner from '../../components/ui/Spinner.jsx';
 import { ESTADOS_PAGO_SESION, formatoARS } from '../../lib/constants.js';
 import { getCantidadSesiones, suscribirSesionesConsultorio } from '../../lib/sesiones.js';
 
+import { MESES_CORTOS, fechaDeSesion, montoCompacto } from './resumenAnual.js';
 import './ResumenProfesionales.css';
-
-const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-
-function fechaDeSesion(s) {
-  const f = s.fecha;
-  if (!f) return null;
-  if (f.toDate) return f.toDate();
-  if (f.seconds !== undefined) return new Date(f.seconds * 1000);
-  const d = new Date(f);
-  return isNaN(d.getTime()) ? null : d;
-}
-
-/* Monto compacto legible: 45.200 → "45 mil" (para que entren 12 columnas) */
-function montoCompacto(n) {
-  if (n >= 1000000) return `${(n / 1000000).toFixed(1).replace('.', ',')} M`;
-  if (n >= 1000) return `${Math.round(n / 1000)} mil`;
-  return String(n);
-}
 
 const CheckMini = () => (
   <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"

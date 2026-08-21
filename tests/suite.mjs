@@ -1461,6 +1461,106 @@ console.log('\n[21] Agrupar las sesiones por metodo');
   await act(async () => { root.unmount(); });
 }
 
+/* ============ 22. Estado por paciente ============ */
+console.log('\n[22] Matriz de pacientes de un profesional');
+{
+  const { default: ResumenPacientes } = await import('/home/claude/ConsulPay/src/pages/admin/ResumenPacientes.jsx');
+
+  const anioA = new Date().getFullYear();
+  const tsA = (mes, dia) => ({ toDate: () => new Date(anioA, mes, dia) });
+  let nn = 0;
+  const sesA = (prof, pac, mes, monto, estado = 'debido') => ({
+    id: 's' + (nn += 1), consultorioId: 'C1', profesionalUid: prof, pacienteId: pac,
+    estadoPago: estado, montoConsultorio: monto, cantidadSesiones: 2, fecha: tsA(mes, 10),
+  });
+
+  globalThis.__DATA__ = {
+    sesiones: [
+      sesA('LU', 'P1', 0, 50000), sesA('LU', 'P2', 0, 30000),   // ene = 80k
+      sesA('LU', 'P1', 1, 20000),                                // feb = 20k
+      sesA('LU', 'P1', 2, 90000, 'pagado'),                      // mar: pagada
+      sesA('LU', 'P3', 2, 0, 'pendiente_monto'),                 // mar: a liquidar
+      sesA('MU', 'P4', 0, 999000),                               // otro profesional
+      sesA('LU', 'PX', 3, 15000),                                // paciente borrado
+    ],
+    pacientes: [
+      { id: 'P1', consultorioId: 'C1', apellido: 'Alvarez', nombre: 'Ana', estado: 'activo' },
+      { id: 'P2', consultorioId: 'C1', apellido: 'Bravo', nombre: 'Beto', estado: 'activo' },
+      { id: 'P3', consultorioId: 'C1', apellido: 'Caro', nombre: 'Carla', estado: 'activo' },
+      { id: 'P4', consultorioId: 'C1', apellido: 'Diaz', nombre: 'Dani', estado: 'activo' },
+    ],
+    usuarios: [], invitaciones: [],
+  };
+  const profs = [
+    { uid: 'LU', displayName: 'Lucrecia Moscardi', estado: 'activo' },
+    { uid: 'MU', displayName: 'Muriel Serral', estado: 'activo' },
+  ];
+
+  const cont = document.createElement('div');
+  document.body.appendChild(cont);
+  const root = createRoot(cont);
+  await act(async () => { root.render(createElement(ResumenPacientes, { consultorioId: 'C1', profesionales: profs })); });
+
+  const sel = cont.querySelector('#rp-prof');
+  chequeo('hay un selector de profesional', !!sel);
+  /* El efecto de eleccion inicial corria antes de que llegaran las sesiones,
+     con deudaPorProfesional vacio: prometia "el que mas debe" y abria en el
+     primero de la lista. */
+  chequeo('arranca en el profesional que mas debe', sel.value === 'MU', `(${sel.value})`);
+  chequeo('el selector muestra cuanto debe cada uno',
+    [...sel.options].some((o) => o.textContent.includes('999.000')));
+
+  await act(async () => { sel.value = 'LU'; sel.dispatchEvent(new dom.window.Event('change', { bubbles: true })); });
+
+  const leerTabla = () => {
+    const filas = [...cont.querySelectorAll('tbody tr')].map((tr) => ({
+      nom: tr.querySelector('.cp-rp__prof-nombre')?.textContent.trim(),
+      celdas: [...tr.querySelectorAll('.cp-rp__celda')].slice(0, 12).map((td) => td.textContent.trim() || '·'),
+      total: tr.querySelector('.cp-rp__td-total')?.textContent.trim(),
+    }));
+    const pie = cont.querySelector('tfoot tr');
+    return {
+      filas,
+      pieCeldas: [...pie.querySelectorAll('.cp-rp__celda')].map((td) => td.textContent.trim() || '·'),
+      pieTotal: pie.querySelector('.cp-rp__td-total').textContent.trim(),
+    };
+  };
+  const t = leerTabla();
+
+  chequeo('las filas son los pacientes del profesional elegido',
+    t.filas.length === 4, `(${t.filas.map((f) => f.nom)})`);
+  chequeo('no se cuelan pacientes de otro profesional',
+    !t.filas.some((f) => (f.nom || '').includes('Diaz')));
+  chequeo('enero suma los dos pacientes (50k + 30k)', t.pieCeldas[0] === '80 mil', `(${t.pieCeldas[0]})`);
+  chequeo('febrero trae solo el de Ana', t.pieCeldas[1] === '20 mil', `(${t.pieCeldas[1]})`);
+  /* Una sesion pagada no es deuda, y una de obra social sin monto tampoco:
+     todavia no se sabe cuanto va a liquidar. */
+  chequeo('marzo no suma: una pagada y una sin liquidar', t.pieCeldas[2] === '·', `(${t.pieCeldas[2]})`);
+  chequeo('la de obra social sin monto se marca con ?',
+    t.filas.some((f) => f.celdas.includes('?')));
+  chequeo('el total del año cierra (50+30+20+15)',
+    t.pieTotal.replace(/\s/g, ' ') === '$ 115.000', `(${t.pieTotal})`);
+  /* Sin esta fila, la plata de un paciente borrado desapareceria y los
+     totales no cerrarian con la tabla de profesionales. */
+  chequeo('el paciente borrado aparece nombrado, no como dato faltante',
+    t.filas.some((f) => f.nom === 'Paciente eliminado'), `(${t.filas.map((f) => f.nom)})`);
+  chequeo('los pacientes van de mayor deuda a menor',
+    t.filas[0].nom === 'Alvarez, Ana');
+
+  const cssRp = (await import('fs')).readFileSync('/home/claude/ConsulPay/src/pages/admin/ResumenProfesionales.css', 'utf8');
+  chequeo('el selector tiene estilo propio', cssRp.includes('.cp-rp__selector'));
+  /* Los helpers estaban dentro de ResumenProfesionales; al aparecer la
+     segunda matriz se movieron a un modulo para que no diverjan. */
+  const compartido = (await import('fs')).readFileSync('/home/claude/ConsulPay/src/pages/admin/resumenAnual.js', 'utf8');
+  chequeo('las dos matrices comparten los criterios de celda',
+    compartido.includes('export function acumularSesion'));
+  const jsxProfs = (await import('fs')).readFileSync('/home/claude/ConsulPay/src/pages/admin/ResumenProfesionales.jsx', 'utf8');
+  chequeo('la tabla original ya no define los helpers por su cuenta',
+    !jsxProfs.includes('function montoCompacto') && jsxProfs.includes("from './resumenAnual.js'"));
+
+  await act(async () => { root.unmount(); });
+}
+
 console.log(`\n${'='.repeat(52)}`);
 console.log(`${ok} chequeos OK, ${fallos.length} fallas`);
 if (fallos.length) { console.log('FALLAN:'); fallos.forEach((f) => console.log('  - ' + f)); }
