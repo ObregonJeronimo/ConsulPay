@@ -1654,6 +1654,49 @@ function FilaPacientePago({ fila, mapaMetodos, accion, onClick }) {
   );
 }
 
+/* Lo que se copia termina pegado en la planilla del consultorio, asi que
+   sale como TSV: una fila por paciente y cuatro columnas (nombre, metodo,
+   total que se le cobra al paciente, parte del consultorio).
+
+   Los montos van pelados a proposito. Con el formato lindo ("$ 48.000") la
+   planilla los toma como texto, quedan alineados a la izquierda y despues no
+   suman; sin puntos ni signo entran como numero. Se redondean porque un
+   decimal con punto se lee como separador de miles y multiplica por mil. */
+function filasComoTsv(filas, mapaMetodos) {
+  return filas.map((r) => {
+    const nombre = nombreDePaciente(r.pac, r.pacienteNombre || 'Paciente eliminado');
+    const metodos = [...new Set(r.debidas.map((s) => nombreMetodoDeSesion(s, mapaMetodos)))].join(' / ');
+    const total = r.debidas.reduce((acc, s) => acc + (s.valorTotal || 0), 0);
+    return [nombre, metodos, Math.round(total), Math.round(r.totalDebe)].join('\t');
+  }).join('\n');
+}
+
+function BotonCopiarColumna({ filas, mapaMetodos, queCopia }) {
+  const [copiado, setCopiado] = useState(false);
+
+  function copiar() {
+    navigator.clipboard.writeText(filasComoTsv(filas, mapaMetodos)).then(() => {
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    }).catch(() => {
+      console.error('No se pudo copiar al portapapeles');
+    });
+  }
+
+  if (filas.length === 0) return null;
+
+  return (
+    <button
+      type="button"
+      className="cp-sel__copiar"
+      onClick={copiar}
+      title={`Copiar ${queCopia} para pegar en la planilla`}
+    >
+      {copiado ? '¡Copiado!' : 'Copiar'}
+    </button>
+  );
+}
+
 export function PagarMesModal({ consultorioId, profesionales, mapaPacientes, mapaMetodos, admins, uid, onClose }) {
   const overlayProps = useOverlayClose(onClose);
   const [profUid, setProfUid] = useState('');
@@ -1894,7 +1937,14 @@ export function PagarMesModal({ consultorioId, profesionales, mapaPacientes, map
                   <div className="cp-sel__col">
                     <div className="cp-sel__head">
                       <span>Sin marcar</span>
-                      <span className="cp-sel__n">{sinMarcar.length}</span>
+                      <span className="cp-sel__head-fin">
+                        <BotonCopiarColumna
+                          filas={sinMarcar}
+                          mapaMetodos={mapaMetodos}
+                          queCopia="los que quedan sin marcar"
+                        />
+                        <span className="cp-sel__n">{sinMarcar.length}</span>
+                      </span>
                     </div>
                     <div className="cp-sel__lista">
                       {sinMarcar.length === 0 ? (
@@ -1914,7 +1964,14 @@ export function PagarMesModal({ consultorioId, profesionales, mapaPacientes, map
                   <div className="cp-sel__col">
                     <div className="cp-sel__head">
                       <span>Se marcan como pagados</span>
-                      <span className="cp-sel__n cp-sel__n--on">{aMarcar.length}</span>
+                      <span className="cp-sel__head-fin">
+                        <BotonCopiarColumna
+                          filas={aMarcar}
+                          mapaMetodos={mapaMetodos}
+                          queCopia="los que se marcan como pagados"
+                        />
+                        <span className="cp-sel__n cp-sel__n--on">{aMarcar.length}</span>
+                      </span>
                     </div>
                     <div className="cp-sel__lista">
                       {aMarcar.length === 0 ? (

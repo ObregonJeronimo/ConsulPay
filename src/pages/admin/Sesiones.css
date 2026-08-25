@@ -978,6 +978,32 @@
   min-width: 0;
 }
 
+/* El boton de copiar y el contador comparten la punta derecha del header. */
+.cp-sel__head-fin {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cp-sel__copiar {
+  padding: 2px 8px;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-pill);
+  background: var(--cp-surface);
+  color: var(--cp-text-muted);
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: color var(--cp-dur-fast) var(--cp-ease),
+              border-color var(--cp-dur-fast) var(--cp-ease);
+}
+
+.cp-sel__copiar:hover { color: var(--cp-text); border-color: var(--cp-border-strong); }
+.cp-sel__copiar:focus-visible { outline: none; box-shadow: var(--cp-shadow-focus); }
+
 .cp-sel__head {
   display: flex;
   align-items: center;
@@ -1156,5 +1182,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .cp-sel__fila,
-  .cp-sel__atajo { transition: none; }
+  .cp-sel__atajo,
+  .cp-sel__copiar { transition: none; }
 }

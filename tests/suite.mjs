@@ -1653,6 +1653,31 @@ console.log('\n[23] Selector del modal "Marcar mes como pagado"');
     return t.includes('sesión') && t.includes('APROSS') && t.includes('33.374');
   })(), `(${filas[0].textContent.replace(/\s+/g, ' ')})`);
 
+  /* Copiar la columna para pegarla en la planilla del consultorio. Con la
+     columna vacia no hay nada que copiar, asi que el boton no esta. */
+  const copiarDe = (i) => cont.querySelectorAll('.cp-sel__col')[i].querySelector('.cp-sel__copiar');
+  chequeo('la columna vacia no ofrece copiar', !copiarDe(0));
+  chequeo('la columna con pacientes si', !!copiarDe(1));
+
+  let copiado = '';
+  Object.defineProperty(globalThis.navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText: (txt) => { copiado = txt; return Promise.resolve(); } },
+  });
+  await act(async () => { clic(copiarDe(1)); });
+  const lineas = copiado.split('\n');
+  chequeo('copia una fila por paciente marcado', lineas.length === 13, `(${lineas.length})`);
+  chequeo('cada fila trae nombre, metodo, total y monto al consultorio',
+    lineas.every((l) => l.split('\t').length === 4), `(${lineas[0]})`);
+  /* Con "$ 33.374" la planilla lo toma como texto y despues la columna no
+     suma: los montos van pelados. */
+  chequeo('los montos van sin signo ni puntos', lineas.every((l) => {
+    const c = l.split('\t');
+    return /^[0-9]+$/.test(c[2]) && /^[0-9]+$/.test(c[3]);
+  }), `(${lineas[0]})`);
+  chequeo('el metodo viaja con el nombre que se ve',
+    lineas.every((l) => /APROSS 22%|Particular 20%/.test(l.split('\t')[1])), `(${lineas[0]})`);
+
   const cssSes = (await import('fs')).readFileSync('/home/claude/ConsulPay/src/pages/admin/Sesiones.css', 'utf8');
   /* El modal llega a 640px: a menos de 700 de viewport ya se achica y las
      dos columnas dejan de entrar comodas. */
@@ -1660,7 +1685,8 @@ console.log('\n[23] Selector del modal "Marcar mes como pagado"');
     /@media \(max-width: 700px\)[\s\S]{0,200}\.cp-sel \{ grid-template-columns: 1fr/.test(cssSes));
   chequeo('en celular la fila tiene altura tactil',
     /@media \(max-width: 460px\)[\s\S]{0,300}min-height: 46px/.test(cssSes));
-  chequeo('respeta prefers-reduced-motion', cssSes.includes('.cp-sel__fila,\n  .cp-sel__atajo { transition: none; }'));
+  chequeo('respeta prefers-reduced-motion',
+    /\.cp-sel__fila,\r?\n\s*\.cp-sel__atajo,\r?\n\s*\.cp-sel__copiar \{ transition: none; \}/.test(cssSes));
 
   await act(async () => { root.unmount(); });
 }
