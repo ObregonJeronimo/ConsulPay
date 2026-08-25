@@ -123,7 +123,6 @@ export function tieneAlgunMpConectado(consData) {
  *   razon = 'unico-slot' | 'reparto-no-iniciado' | 'reparto-rotacion'
  */
 export function elegirSlotQueCobra(consData, fecha = new Date()) {
-  const tienePrimary = !!leerMpConfigDelSlot(consData, 'primary');
   const tieneSecondary = !!leerMpConfigDelSlot(consData, 'secondary');
 
   // Caso 1: solo hay primary (o ninguno)
