@@ -33,7 +33,7 @@ const slot = (uid) => ({ ownerAdminUid: uid, userIdMP: '1' });
 /* ============ 1. mpHabilitado ============ */
 console.log('\n[1] Regla de habilitacion de Mercado Pago');
 {
-  const { mpHabilitado } = await import('/home/claude/ConsulPay/src/lib/mpIntegracion.js');
+  const { mpHabilitado } = await import('../src/lib/mpIntegracion.js');
   chequeo('2 admins sin vincular -> false', mpHabilitado({ adminUids: ['A', 'R'], mpConfigs: {} }) === false);
   chequeo('2 admins, 1 vinculada -> false', mpHabilitado({ adminUids: ['A', 'R'], mpConfigs: { primary: slot('A') } }) === false);
   chequeo('2 admins, las 2 -> true', mpHabilitado({ adminUids: ['A', 'R'], mpConfigs: { primary: slot('A'), secondary: slot('R') } }) === true);
@@ -46,7 +46,7 @@ console.log('\n[1] Regla de habilitacion de Mercado Pago');
 /* ============ 2. nombrePaciente centralizado ============ */
 console.log('\n[2] nombrePaciente unico');
 {
-  const { nombrePaciente } = await import('/home/claude/ConsulPay/src/lib/pacientes.js');
+  const { nombrePaciente } = await import('../src/lib/pacientes.js');
   chequeo('formato Apellido, Nombre', nombrePaciente({ nombre: 'Ana', apellido: 'Alvarez' }) === 'Alvarez, Ana');
   chequeo('solo apellido', nombrePaciente({ apellido: 'Alvarez' }) === 'Alvarez');
   chequeo('null no explota', nombrePaciente(null) === '');
@@ -55,7 +55,7 @@ console.log('\n[2] nombrePaciente unico');
 /* ============ 3. Libro de caja ============ */
 console.log('\n[3] Libro de caja');
 {
-  const { default: LibroCaja } = await import('/home/claude/ConsulPay/src/pages/admin/LibroCaja.jsx');
+  const { default: LibroCaja } = await import('../src/pages/admin/LibroCaja.jsx');
   const ses = (id, monto, r, dia, pid, c = 1) => ({
     id, consultorioId: 'C1', estadoPago: 'pagado', montoConsultorio: monto, receptorUid: r,
     fechaPago: new Date(`2026-07-${dia}T12:00:00`), pacienteId: pid, cantidadSesiones: c,
@@ -102,7 +102,7 @@ console.log('\n[3] Libro de caja');
 /* ============ 4. Mis sesiones: acciones y orden ============ */
 console.log('\n[4] Mis sesiones');
 {
-  const { default: MisSesiones } = await import('/home/claude/ConsulPay/src/pages/profesional/MisSesiones.jsx');
+  const { default: MisSesiones } = await import('../src/pages/profesional/MisSesiones.jsx');
   globalThis.__USER__ = { uid: 'PRO', consultorioId: 'C1', permitirMarcarPagadas: true, displayName: 'Gabriela' };
   globalThis.__CONS__ = { adminUids: ['A'], mpConfigs: {},
     metodosPagoPaciente: [{ id: 'm1', nombre: 'Particular', porcentajeConsultorio: 20, tipo: 'inmediato' }],
@@ -152,7 +152,7 @@ console.log('\n[4] Mis sesiones');
 /* ============ 5. Modal multi-mes (abierto desde la pagina) ============ */
 console.log('\n[5] Marcar como pagado, multi-mes');
 {
-  const { default: MisSesiones } = await import('/home/claude/ConsulPay/src/pages/profesional/MisSesiones.jsx');
+  const { default: MisSesiones } = await import('../src/pages/profesional/MisSesiones.jsx');
   globalThis.__USER__ = { uid: 'PRO', consultorioId: 'C1', permitirMarcarPagadas: true, displayName: 'Gabriela' };
   globalThis.__CONS__ = { adminUids: ['A', 'R'], mpConfigs: {},
     metodosPagoPaciente: [{ id: 'm1', nombre: 'Particular', porcentajeConsultorio: 20, tipo: 'inmediato' }],
@@ -214,7 +214,7 @@ console.log('\n[5] Marcar como pagado, multi-mes');
 /* ============ 6. Aprobacion del admin ============ */
 console.log('\n[6] Aprobacion: el admin ve lo declarado');
 {
-  const { AprobarGrupoModal } = await import('/home/claude/ConsulPay/src/pages/admin/Solicitudes.jsx');
+  const { AprobarGrupoModal } = await import('../src/pages/admin/Solicitudes.jsx');
   const admins = [{ uid: 'A', displayName: 'Adriana Barrozo' }, { uid: 'R', displayName: 'Romina Sulaiman' }];
   const sol = (id, receptor, fechaISO) => ({
     id, tipo: 'marcar_pagada', estado: 'pendiente', profesionalNombre: 'Gabriela Zambrano',
@@ -249,7 +249,7 @@ console.log('\n[6] Aprobacion: el admin ve lo declarado');
 /* ============ 7. Mis pagos ============ */
 console.log('\n[7] Mis pagos del profesional');
 {
-  const { default: MisPagos } = await import('/home/claude/ConsulPay/src/pages/profesional/MisPagos.jsx');
+  const { default: MisPagos } = await import('../src/pages/profesional/MisPagos.jsx');
   globalThis.__USER__ = { uid: 'PRO', consultorioId: 'C1', permitirMarcarPagadas: true, displayName: 'Gabriela' };
   globalThis.__DATA__ = { sesiones: [], pagos_consultorio: [], pacientes: [], solicitudes_sesion: [], usuarios: [] };
 
@@ -267,7 +267,7 @@ console.log('\n[7] Mis pagos del profesional');
 /* ============ 8. Pagina de Pagos del admin ============ */
 console.log('\n[8] Pagos del admin');
 {
-  const { default: Pagos } = await import('/home/claude/ConsulPay/src/pages/admin/Pagos.jsx');
+  const { default: Pagos } = await import('../src/pages/admin/Pagos.jsx');
   globalThis.__USER__ = { uid: 'A', consultorioId: 'C1' };
   globalThis.__DATA__ = { sesiones: [], pagos_consultorio: [], pacientes: [], usuarios: [], gastos: [] };
 
@@ -287,7 +287,7 @@ console.log('\n[8] Pagos del admin');
 console.log('\n[9] Directorio de admins (nombres para el profesional)');
 {
   // Se ejercitan los helpers del alta/baja tal cual estan en lib/admins.js.
-  const src = await import('fs').then((fs) => fs.readFileSync('/home/claude/ConsulPay/src/lib/admins.js', 'utf8'));
+  const src = await import('fs').then((fs) => fs.readFileSync('../src/lib/admins.js', 'utf8'));
   const ini = src.indexOf('function directorioCon(');
   const fin = src.indexOf('export async function promoverAAdmin');
   const mod = await import('data:text/javascript,' + encodeURIComponent(
@@ -307,7 +307,7 @@ console.log('\n[9] Directorio de admins (nombres para el profesional)');
     mod.directorioCon(cons, 'R', null).every((x) => x.uid !== 'R'));
 
   // Y que el alta del consultorio lo siembre.
-  const consultorios = await import('fs').then((fs) => fs.readFileSync('/home/claude/ConsulPay/src/lib/consultorios.js', 'utf8'));
+  const consultorios = await import('fs').then((fs) => fs.readFileSync('../src/lib/consultorios.js', 'utf8'));
   chequeo('crearConsultorio siembra el directorio', consultorios.includes('adminsDirectorio: [{'));
   chequeo('promoverAAdmin escribe el directorio',
     src.includes('adminsDirectorio: directorioCon(consData, nuevoUid'));
@@ -318,7 +318,7 @@ console.log('\n[9] Directorio de admins (nombres para el profesional)');
 /* ============ 10. Exportacion de la planilla de pacientes ============ */
 console.log('\n[10] Planilla de pacientes (xlsx)');
 {
-  const { construirXlsx } = await import('/home/claude/ConsulPay/src/lib/xlsx.js');
+  const { construirXlsx } = await import('../src/lib/xlsx.js');
 
   // El generador produce un ZIP con la estructura minima que pide Excel.
   const filas = [['PACIENTES', 'PROFESIONALES'], ['Muñoz, Ángel', ''], ['Perez & Cia, Juan', '']];
@@ -351,7 +351,7 @@ console.log('\n[10] Planilla de pacientes (xlsx)');
   chequeo('sanea el nombre de la solapa', t2.includes('name="Pacientes2026"'), '');
 
   // ---- Helper de metodos: el bug del filtro que solo miraba el campo viejo
-  const { getMetodosPagoIds } = await import('/home/claude/ConsulPay/src/lib/pacientes.js');
+  const { getMetodosPagoIds } = await import('../src/lib/pacientes.js');
   chequeo('lee el array metodosPagoIds',
     getMetodosPagoIds({ metodosPagoIds: ['apross', 'part'] }).length === 2);
   chequeo('cae al campo viejo metodoPagoId',
@@ -361,7 +361,7 @@ console.log('\n[10] Planilla de pacientes (xlsx)');
   chequeo('paciente sin metodos no explota', getMetodosPagoIds({}).length === 0);
 
   // ---- Flujo real: abrir el modal, elegir metodo y bajar el archivo
-  const { default: Pacientes } = await import('/home/claude/ConsulPay/src/pages/admin/Pacientes.jsx');
+  const { default: Pacientes } = await import('../src/pages/admin/Pacientes.jsx');
   globalThis.__USER__ = { uid: 'A', consultorioId: 'C1', rol: 'admin', displayName: 'Adriana' };
   globalThis.__CONS__ = { adminUids: ['A'], mpConfigs: {}, metodosPagoPaciente: [
     { id: 'apross', nombre: 'APROSS', porcentajeConsultorio: 22, tipo: 'diferido' },
@@ -453,7 +453,7 @@ console.log('\n[10] Planilla de pacientes (xlsx)');
 /* ============ 11. Nombre del metodo renombrado ============ */
 console.log('\n[11] Metodo de pago renombrado');
 {
-  const { nombreMetodoDeSesion } = await import('/home/claude/ConsulPay/src/lib/sesiones.js');
+  const { nombreMetodoDeSesion } = await import('../src/lib/sesiones.js');
   const mapa = { apross: { id: 'apross', nombre: 'APROSS 22%', porcentajeConsultorio: 22 } };
 
   chequeo('sesion vieja muestra el nombre actual',
@@ -478,7 +478,7 @@ console.log('\n[11] Metodo de pago renombrado');
 /* ============ 12. Navegacion de meses en los modales de cobro ============ */
 console.log('\n[12] Meses futuros en Marcar mes como pagado');
 {
-  const { default: Sesiones } = await import('/home/claude/ConsulPay/src/pages/admin/Sesiones.jsx');
+  const { default: Sesiones } = await import('../src/pages/admin/Sesiones.jsx');
   const { MemoryRouter } = await import('react-router-dom');
   globalThis.__USER__ = { uid: 'A', consultorioId: 'C1', rol: 'admin', displayName: 'Adriana' };
   globalThis.__CONS__ = { adminUids: ['A'], mpConfigs: {}, metodosPagoPaciente: [
@@ -524,8 +524,8 @@ console.log('\n[13] Estilos del selector de mes');
 {
   const fs = await import('fs');
   const leer = (f) => fs.readFileSync(f, 'utf8');
-  const shared = leer('/home/claude/ConsulPay/src/styles/shared-ui.css');
-  const sesionesCss = leer('/home/claude/ConsulPay/src/pages/admin/Sesiones.css');
+  const shared = leer('../src/styles/shared-ui.css');
+  const sesionesCss = leer('../src/pages/admin/Sesiones.css');
 
   chequeo('la regla base vive en shared-ui', shared.includes('.cp-mes-selector {'));
   chequeo('los botones tambien', shared.includes('.cp-mes-selector__btn {'));
@@ -558,9 +558,9 @@ console.log('\n[13] Estilos del selector de mes');
   }
 
   for (const [pantalla, archivo] of [
-    ['admin/Pagos', '/home/claude/ConsulPay/src/pages/admin/Pagos.css'],
-    ['admin/Reparto', '/home/claude/ConsulPay/src/pages/admin/Reparto.css'],
-    ['profesional/MisPagos', '/home/claude/ConsulPay/src/pages/profesional/MisPagos.css'],
+    ['admin/Pagos', '../src/pages/admin/Pagos.css'],
+    ['admin/Reparto', '../src/pages/admin/Reparto.css'],
+    ['profesional/MisPagos', '../src/pages/profesional/MisPagos.css'],
   ]) {
     const r = caja(leer(archivo) + shared);
     chequeo(`${pantalla}: el selector tiene caja`, r.borde.includes('1px solid') && r.ancho === '28px', `(${r.borde}|${r.ancho})`);
@@ -571,12 +571,12 @@ console.log('\n[13] Estilos del selector de mes');
 console.log('\n[14] Formulario de registrar gasto');
 {
   const fs = await import('fs');
-  const css = fs.readFileSync('/home/claude/ConsulPay/src/pages/admin/LibroCaja.css', 'utf8');
+  const css = fs.readFileSync('../src/pages/admin/LibroCaja.css', 'utf8');
   chequeo('el libro ya no define sus propios inputs',
     !css.includes('.cp-libro__field input'));
   chequeo('tampoco sus propios labels', !css.includes('.cp-libro__field label'));
 
-  const { default: LibroCaja } = await import('/home/claude/ConsulPay/src/pages/admin/LibroCaja.jsx');
+  const { default: LibroCaja } = await import('../src/pages/admin/LibroCaja.jsx');
   globalThis.__DATA__ = { sesiones: [], gastos: [], pagos_consultorio: [], pacientes: [],
     usuarios: [{ id: 'A', uid: 'A', displayName: 'Adriana Barrozo', consultorioId: 'C1', rol: 'admin' },
                { id: 'R', uid: 'R', displayName: 'Romina Sulaiman', consultorioId: 'C1', rol: 'admin' }] };
@@ -621,7 +621,7 @@ console.log('\n[14] Formulario de registrar gasto');
     modal.querySelector('#g-monto')?.type === 'number');
   chequeo('la fecha viene precargada', !!modal.querySelector('#g-fecha')?.value);
 
-  const cssLibro = fs.readFileSync('/home/claude/ConsulPay/src/pages/admin/LibroCaja.css', 'utf8');
+  const cssLibro = fs.readFileSync('../src/pages/admin/LibroCaja.css', 'utf8');
   const altoMonto = Number(cssLibro.match(/\.cp-gasto__monto \{[^}]*height: (\d+)px/s)?.[1]);
   chequeo('el campo del monto es mas alto que uno normal (40px)',
     altoMonto > 40, `(${altoMonto}px)`);
@@ -629,7 +629,7 @@ console.log('\n[14] Formulario de registrar gasto');
   /* Un cp-input se rellena de blanco; dentro de un modal, que tambien es
      blanco, quedaba en 1.00:1 y la caja dependia de un borde de 1.36:1,
      contra los 3:1 que pide WCAG 1.4.11 para el limite de un control. */
-  const cssInput = fs.readFileSync('/home/claude/ConsulPay/src/components/ui/Input.css', 'utf8');
+  const cssInput = fs.readFileSync('../src/components/ui/Input.css', 'utf8');
   chequeo('los inputs dentro de modales se rellenan para distinguirse',
     /\.cp-modal \.cp-input[\s\S]{0,200}surface-sunken/.test(cssInput));
   chequeo('y al enfocarlos vuelven a blanco',
@@ -637,7 +637,7 @@ console.log('\n[14] Formulario de registrar gasto');
 
   /* Toda la pantalla dice "caja": el filtro, la columna de la tabla, las
      tarjetas. El subtitulo del modal decia "cuenta". */
-  const jsxLibro = fs.readFileSync('/home/claude/ConsulPay/src/pages/admin/LibroCaja.jsx', 'utf8');
+  const jsxLibro = fs.readFileSync('../src/pages/admin/LibroCaja.jsx', 'utf8');
   chequeo('el modal habla de cajas, como el resto de la pantalla',
     !jsxLibro.includes('restando de la cuenta'));
 }
@@ -649,19 +649,19 @@ console.log('\n[15] Notificaciones push');
 
   // --- Piezas que tienen que existir con nombre exacto
   chequeo('el service worker esta en la raiz publica',
-    fs.existsSync('/home/claude/ConsulPay/public/firebase-messaging-sw.js'));
+    fs.existsSync('../public/firebase-messaging-sw.js'));
   chequeo('hay manifest para que iOS pueda instalar la app',
-    fs.existsSync('/home/claude/ConsulPay/public/manifest.json'));
-  const html = fs.readFileSync('/home/claude/ConsulPay/index.html', 'utf8');
+    fs.existsSync('../public/manifest.json'));
+  const html = fs.readFileSync('../index.html', 'utf8');
   chequeo('el manifest esta enlazado en el html', html.includes('rel="manifest"'));
 
-  const manifest = JSON.parse(fs.readFileSync('/home/claude/ConsulPay/public/manifest.json', 'utf8'));
+  const manifest = JSON.parse(fs.readFileSync('../public/manifest.json', 'utf8'));
   chequeo('el manifest es standalone (requisito de iOS)', manifest.display === 'standalone');
 
   // --- El SW y el cliente tienen que apuntar al mismo proyecto
-  const sw = fs.readFileSync('/home/claude/ConsulPay/public/firebase-messaging-sw.js', 'utf8');
-  const notifSrc = fs.readFileSync('/home/claude/ConsulPay/src/lib/notificaciones.js', 'utf8');
-  const cliente = fs.readFileSync('/home/claude/ConsulPay/src/lib/firebase.js', 'utf8');
+  const sw = fs.readFileSync('../public/firebase-messaging-sw.js', 'utf8');
+  const notifSrc = fs.readFileSync('../src/lib/notificaciones.js', 'utf8');
+  const cliente = fs.readFileSync('../src/lib/firebase.js', 'utf8');
   const senderCliente = cliente.match(/messagingSenderId: '(\d+)'/)?.[1];
   chequeo('el sender id del SW coincide con el del cliente',
     !!senderCliente && sw.includes(senderCliente), `(${senderCliente})`);
@@ -672,7 +672,7 @@ console.log('\n[15] Notificaciones push');
      alpha. Con el favicon —un cuadrado opaco de punta a punta— la silueta
      terminaba siendo ese cuadrado y la C desaparecia adentro. */
   chequeo('existe un badge dedicado, aparte del favicon',
-    fs.existsSync('/home/claude/ConsulPay/public/badge-notificacion.png'));
+    fs.existsSync('../public/badge-notificacion.png'));
   chequeo('el SW no usa el favicon como badge',
     sw.includes("badge: '/badge-notificacion.png'"));
   chequeo('el aviso en primer plano usa el mismo badge',
@@ -689,7 +689,7 @@ console.log('\n[15] Notificaciones push');
     notifSrc.includes('registro.update()'));
 
   // --- El cron registrado
-  const vercel = JSON.parse(fs.readFileSync('/home/claude/ConsulPay/vercel.json', 'utf8'));
+  const vercel = JSON.parse(fs.readFileSync('../vercel.json', 'utf8'));
   const cron = vercel.crons.find((c) => c.path === '/api/cron/diario');
   chequeo('el cron diario esta registrado', !!cron);
   chequeo('corre una vez por dia (limite de Vercel Hobby)',
@@ -710,20 +710,20 @@ console.log('\n[15] Notificaciones push');
     }
     return n;
   }
-  const funciones = contarFunciones('/home/claude/ConsulPay/api');
+  const funciones = contarFunciones('../api');
   chequeo('no se pasa de 12 funciones serverless (tope Hobby)',
     funciones <= 12, `(${funciones})`);
 
   chequeo('las dos tareas diarias viven en _lib, que no cuenta como funcion',
-    fs.existsSync('/home/claude/ConsulPay/api/_lib/tarea-recordatorios.js')
-    && fs.existsSync('/home/claude/ConsulPay/api/_lib/tarea-suscripciones.js'));
+    fs.existsSync('../api/_lib/tarea-recordatorios.js')
+    && fs.existsSync('../api/_lib/tarea-suscripciones.js'));
 
-  const diario = fs.readFileSync('/home/claude/ConsulPay/api/cron/diario.js', 'utf8');
+  const diario = fs.readFileSync('../api/cron/diario.js', 'utf8');
   chequeo('cada tarea corre en su propio try, para que una no tumbe a la otra',
     (diario.match(/try \{/g) || []).length >= 3);
 
   // --- La logica que evita el spam diario, extraida del cron real
-  const src = fs.readFileSync('/home/claude/ConsulPay/api/_lib/tarea-recordatorios.js', 'utf8');
+  const src = fs.readFileSync('../api/_lib/tarea-recordatorios.js', 'utf8');
   const desde = src.indexOf('function aFecha(valor) {');
   const hasta = src.indexOf('export async function notificarRecordatorios');
   const mod = await import('data:text/javascript,' + encodeURIComponent(
@@ -765,7 +765,7 @@ console.log('\n[15] Notificaciones push');
       === 'Tenés 5 recordatorios: A · B · C y 2 más');
 
   // --- El cliente no puede pedir permiso solo
-  const notif = fs.readFileSync('/home/claude/ConsulPay/src/lib/notificaciones.js', 'utf8');
+  const notif = fs.readFileSync('../src/lib/notificaciones.js', 'utf8');
   chequeo('el permiso se pide dentro de activarNotificaciones, no al importar', (() => {
     const i = notif.indexOf('requestPermission');
     const j = notif.indexOf('export async function activarNotificaciones');
@@ -797,7 +797,7 @@ console.log('\n[15] Notificaciones push');
      mientras el cron reportaba "sin dispositivos registrados". */
   chequeo('existe una verificacion del token realmente guardado',
     notif.includes('export async function tieneTokenRegistrado'));
-  const panelUI = fs.readFileSync('/home/claude/ConsulPay/src/pages/profesional/MiPanel.jsx', 'utf8');
+  const panelUI = fs.readFileSync('../src/pages/profesional/MiPanel.jsx', 'utf8');
   chequeo('la UI exige token guardado, no solo permiso',
     panelUI.includes('registrado === true'));
   chequeo('avisa cuando hay permiso pero falto el registro',
@@ -806,7 +806,7 @@ console.log('\n[15] Notificaciones push');
      plano no esta conectado, el push llega y no se ve por ningun lado. */
   chequeo('muestra la notificacion cuando la app esta en primer plano',
     notif.includes('mostrarNotificacionLocal') && notif.includes('showNotification'));
-  const panel = fs.readFileSync('/home/claude/ConsulPay/src/pages/profesional/MiPanel.jsx', 'utf8');
+  const panel = fs.readFileSync('../src/pages/profesional/MiPanel.jsx', 'utf8');
   chequeo('el listener de primer plano esta montado en la pagina',
     panel.includes('escucharEnPrimerPlano('));
   chequeo('el cron limpia los tokens muertos',
@@ -834,7 +834,7 @@ console.log('\n[15] Notificaciones push');
 console.log('\n[16] Cuando aparece cada recordatorio');
 {
   const fs = await import('fs');
-  const src = fs.readFileSync('/home/claude/ConsulPay/src/lib/recordatorios.js', 'utf8');
+  const src = fs.readFileSync('../src/lib/recordatorios.js', 'utf8');
   const desde = src.indexOf('export const TIPOS_CICLO');
   const hasta = src.indexOf('/* ============================================================\n   Texto legible del ciclo');
   const mod = await import('data:text/javascript,' + encodeURIComponent(src.slice(desde, hasta)));
@@ -892,7 +892,7 @@ console.log('\n[16] Cuando aparece cada recordatorio');
   chequeo('la fecha calculada queda a las 00:00',
     nocturno.getHours() === 0 && nocturno.getMinutes() === 0);
 
-  const lib = fs.readFileSync('/home/claude/ConsulPay/src/lib/recordatorios.js', 'utf8');
+  const lib = fs.readFileSync('../src/lib/recordatorios.js', 'utf8');
   chequeo('la primera instancia usa el ciclo y no la fecha de creacion',
     lib.includes('proximaEn: Timestamp.fromDate(calcularPrimeraAparicion(ciclo, ahora))'));
 }
@@ -900,7 +900,7 @@ console.log('\n[16] Cuando aparece cada recordatorio');
 /* ============ 17. Dashboard del admin ============ */
 console.log('\n[17] Dashboard');
 {
-  const { default: Dashboard } = await import('/home/claude/ConsulPay/src/pages/admin/Dashboard.jsx');
+  const { default: Dashboard } = await import('../src/pages/admin/Dashboard.jsx');
   const { MemoryRouter } = await import('react-router-dom');
 
   globalThis.__USER__ = { uid: 'A', consultorioId: 'C1', rol: 'admin' };
@@ -1033,7 +1033,7 @@ console.log('\n[17] Dashboard');
   const cero = await conNMetodos(0);
   chequeo('sin metodos no aparece la seccion vacia', cero.seccion === false);
 
-  const cssDash = (await import('fs')).readFileSync('/home/claude/ConsulPay/src/pages/admin/Dashboard.css', 'utf8');
+  const cssDash = (await import('fs')).readFileSync('../src/pages/admin/Dashboard.css', 'utf8');
   /* auto-fit + minmax es lo que hace que la grilla se acomode sola: con
      tres entran holgados en una fila, con diez se reparten. */
   chequeo('la grilla se acomoda sola segun cuantos haya',
@@ -1047,7 +1047,7 @@ console.log('\n[17] Dashboard');
 /* ============ 18. Selector de profesionales del paciente ============ */
 console.log('\n[18] Asignar profesionales a un paciente');
 {
-  const { default: Pacientes } = await import('/home/claude/ConsulPay/src/pages/admin/Pacientes.jsx');
+  const { default: Pacientes } = await import('../src/pages/admin/Pacientes.jsx');
   const { MemoryRouter } = await import('react-router-dom');
 
   globalThis.__USER__ = { uid: 'A', consultorioId: 'C1', rol: 'admin', displayName: 'Adriana' };
@@ -1204,7 +1204,7 @@ console.log('\n[18] Asignar profesionales a un paciente');
   await act(async () => { root2.unmount(); });
 
   const fsMod = await import('fs');
-  const css = fsMod.readFileSync('/home/claude/ConsulPay/src/pages/admin/Pacientes.css', 'utf8');
+  const css = fsMod.readFileSync('../src/pages/admin/Pacientes.css', 'utf8');
   chequeo('se apila en mobile', /@media \(max-width: 640px\)[\s\S]*cp-dual \{ grid-template-columns: 1fr/.test(css));
   chequeo('respeta prefers-reduced-motion', css.includes('prefers-reduced-motion'));
   chequeo('el foco es visible', css.includes('.cp-dual__item:focus-visible'));
@@ -1213,7 +1213,7 @@ console.log('\n[18] Asignar profesionales a un paciente');
 /* ============ 19. Pacientes de un profesional ============ */
 console.log('\n[19] Modal de pacientes por profesional');
 {
-  const { default: Profesionales } = await import('/home/claude/ConsulPay/src/pages/admin/Profesionales.jsx');
+  const { default: Profesionales } = await import('../src/pages/admin/Profesionales.jsx');
   const { MemoryRouter } = await import('react-router-dom');
 
   /* React sobrescribe el setter de value en inputs controlados: asignarlo
@@ -1300,7 +1300,7 @@ console.log('\n[19] Modal de pacientes por profesional');
   chequeo('cada fila dice que accion hace',
     botones.every((b) => /^(Asignar|Quitar) a /.test(b.getAttribute('aria-label') || '')));
 
-  const cssProf = (await import('fs')).readFileSync('/home/claude/ConsulPay/src/pages/admin/Profesionales.css', 'utf8');
+  const cssProf = (await import('fs')).readFileSync('../src/pages/admin/Profesionales.css', 'utf8');
   chequeo('el modal respeta prefers-reduced-motion', cssProf.includes('prefers-reduced-motion'));
   chequeo('el foco es visible en la lista', cssProf.includes('.cp-pdp__btn:focus-visible'));
 
@@ -1311,7 +1311,7 @@ console.log('\n[19] Modal de pacientes por profesional');
 console.log('\n[20] Los modales no pegan el contenido al borde');
 {
   const fsM = await import('fs');
-  const shared = fsM.readFileSync('/home/claude/ConsulPay/src/styles/shared-ui.css', 'utf8');
+  const shared = fsM.readFileSync('../src/styles/shared-ui.css', 'utf8');
   const { JSDOM: JD } = await import('jsdom');
   const tokens = ':root{--cp-surface:#fff;--cp-border:#ddd;--cp-radius-lg:12px;--cp-text:#111;}';
 
@@ -1358,7 +1358,7 @@ console.log('\n[20] Los modales no pegan el contenido al borde');
     return /\.cp-modal > \*:not[^{]*\{\s*margin-left: 24px/.test(bloque);
   })());
 
-  const jsxProf = fsM.readFileSync('/home/claude/ConsulPay/src/pages/admin/Profesionales.jsx', 'utf8');
+  const jsxProf = fsM.readFileSync('../src/pages/admin/Profesionales.jsx', 'utf8');
   chequeo('el modal de pacientes usa el contenedor del sistema',
     jsxProf.includes('<div className="cp-modal__form">'));
 }
@@ -1366,7 +1366,7 @@ console.log('\n[20] Los modales no pegan el contenido al borde');
 /* ============ 21. Orden por metodo de pago ============ */
 console.log('\n[21] Agrupar las sesiones por metodo');
 {
-  const { default: Sesiones } = await import('/home/claude/ConsulPay/src/pages/admin/Sesiones.jsx');
+  const { default: Sesiones } = await import('../src/pages/admin/Sesiones.jsx');
   const { MemoryRouter } = await import('react-router-dom');
 
   globalThis.__USER__ = { uid: 'A', consultorioId: 'C1', rol: 'admin' };
@@ -1457,7 +1457,7 @@ console.log('\n[21] Agrupar las sesiones por metodo');
   chequeo('volver a fecha deshace el agrupado',
     porFecha.join() !== leidas.map((f) => f.met).join());
 
-  const jsxProf = (await import('fs')).readFileSync('/home/claude/ConsulPay/src/pages/profesional/MisSesiones.jsx', 'utf8');
+  const jsxProf = (await import('fs')).readFileSync('../src/pages/profesional/MisSesiones.jsx', 'utf8');
   chequeo('la vista del profesional tiene el mismo orden',
     jsxProf.includes("<option value=\"metodo\">"));
 
@@ -1467,7 +1467,7 @@ console.log('\n[21] Agrupar las sesiones por metodo');
 /* ============ 22. Estado por paciente ============ */
 console.log('\n[22] Matriz de pacientes de un profesional');
 {
-  const { default: ResumenPacientes } = await import('/home/claude/ConsulPay/src/pages/admin/ResumenPacientes.jsx');
+  const { default: ResumenPacientes } = await import('../src/pages/admin/ResumenPacientes.jsx');
 
   const anioA = new Date().getFullYear();
   const tsA = (mes, dia) => ({ toDate: () => new Date(anioA, mes, dia) });
@@ -1564,14 +1564,14 @@ console.log('\n[22] Matriz de pacientes de un profesional');
   chequeo('los pacientes van de mayor deuda a menor',
     t.filas[0].nom === 'Alvarez, Ana');
 
-  const cssRp = (await import('fs')).readFileSync('/home/claude/ConsulPay/src/pages/admin/ResumenProfesionales.css', 'utf8');
+  const cssRp = (await import('fs')).readFileSync('../src/pages/admin/ResumenProfesionales.css', 'utf8');
   chequeo('el selector tiene estilo propio', cssRp.includes('.cp-rp__selector'));
   /* Los helpers estaban dentro de ResumenProfesionales; al aparecer la
      segunda matriz se movieron a un modulo para que no diverjan. */
-  const compartido = (await import('fs')).readFileSync('/home/claude/ConsulPay/src/pages/admin/resumenAnual.js', 'utf8');
+  const compartido = (await import('fs')).readFileSync('../src/pages/admin/resumenAnual.js', 'utf8');
   chequeo('las dos matrices comparten los criterios de celda',
     compartido.includes('export function acumularSesion'));
-  const jsxProfs = (await import('fs')).readFileSync('/home/claude/ConsulPay/src/pages/admin/ResumenProfesionales.jsx', 'utf8');
+  const jsxProfs = (await import('fs')).readFileSync('../src/pages/admin/ResumenProfesionales.jsx', 'utf8');
   chequeo('la tabla original ya no define los helpers por su cuenta',
     !jsxProfs.includes('function montoCompacto') && jsxProfs.includes("from './resumenAnual.js'"));
 
@@ -1581,7 +1581,7 @@ console.log('\n[22] Matriz de pacientes de un profesional');
 /* ============ 23. Elegir a quien marcar como pagado ============ */
 console.log('\n[23] Selector del modal "Marcar mes como pagado"');
 {
-  const { default: Sesiones } = await import('/home/claude/ConsulPay/src/pages/admin/Sesiones.jsx');
+  const { default: Sesiones } = await import('../src/pages/admin/Sesiones.jsx');
   const { MemoryRouter } = await import('react-router-dom');
 
   globalThis.__USER__ = { uid: 'A', consultorioId: 'C1', rol: 'admin' };
@@ -1695,7 +1695,7 @@ console.log('\n[23] Selector del modal "Marcar mes como pagado"');
   chequeo('el metodo viaja con el nombre que se ve',
     lineas.every((l) => /APROSS 22%|Particular 20%/.test(l.split('\t')[1])), `(${lineas[0]})`);
 
-  const cssSes = (await import('fs')).readFileSync('/home/claude/ConsulPay/src/pages/admin/Sesiones.css', 'utf8');
+  const cssSes = (await import('fs')).readFileSync('../src/pages/admin/Sesiones.css', 'utf8');
   /* El modal llega a 640px: a menos de 700 de viewport ya se achica y las
      dos columnas dejan de entrar comodas. */
   chequeo('se apila cuando el modal deja de entrar',

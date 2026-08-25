@@ -7,9 +7,13 @@ memoria. No toca la base ni necesita credenciales.
 
 ```bash
 cd tests
-npm install esbuild react react-dom jsdom react-router-dom
+npm install --no-save esbuild react react-dom jsdom react-router-dom
 node build.mjs && node suite.bundle.mjs
 ```
+
+`tests/` no tiene `package.json` propio, asi que npm resuelve hacia arriba
+y sin `--no-save` el install termina escribiendo el `package-lock.json` de
+la raiz. Las rutas son relativas a `tests/`: hay que correrlo desde ahi.
 
 Sale con código 1 si algo falla, así que sirve para un pre-push hook.
 
