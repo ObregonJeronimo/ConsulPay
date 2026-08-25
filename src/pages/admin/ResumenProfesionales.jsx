@@ -233,7 +233,9 @@ export default function ResumenProfesionales({ consultorioId, profesionales }) {
                   <td className="cp-rp__td-total cp-rp__foot-total">
                     {totalGeneral > 0
                       ? formatoARS.format(totalGeneral)
-                      : <span className="cp-rp__total-cobrado">{formatoARS.format(cobradoGeneral)}</span>}
+                      : cobradoGeneral > 0
+                        ? <span className="cp-rp__total-cobrado">{formatoARS.format(cobradoGeneral)}</span>
+                        : formatoARS.format(0)}
                   </td>
                 </tr>
               </tfoot>
