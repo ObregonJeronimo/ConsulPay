@@ -5,8 +5,9 @@
   arriba no puede contestar porque agrega todo en un número por mes.
 
   Comparte el CSS y los criterios de celda con ResumenProfesionales (ver
-  resumenAnual.js): monto en coral es deuda, check es saldado, "?" es obra
-  social sin liquidar, punto es que no hubo sesiones.
+  resumenAnual.js): monto en coral es deuda, monto en verde es lo que ya se
+  cobró, check es saldado sin plata de por medio, "?" es obra social sin
+  liquidar, punto es que no hubo sesiones.
 */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -132,12 +133,19 @@ export default function ResumenPacientes({ consultorioId, profesionales }) {
             : (s.pacienteNombre || 'Paciente eliminado'),
           meses: Array.from({ length: 12 }, celdaVacia),
           totalDebe: 0,
+          totalCobrado: 0,
         };
       }
       const fila = base[clave];
       fila.totalDebe += acumularSesion(
         fila.meses[d.getMonth()], s, getCantidadSesiones(s), ESTADOS_PAGO_SESION,
       );
+    }
+
+    /* El cobrado del año se saca de los doce meses en vez de acumularlo a
+       mano: acumularSesion ya lo dejó en cada celda. */
+    for (const f of Object.values(base)) {
+      f.totalCobrado = f.meses.reduce((acc, c) => acc + c.cobrado, 0);
     }
 
     // Primero los que más deben, después alfabético, igual que la de arriba.
@@ -149,12 +157,14 @@ export default function ResumenPacientes({ consultorioId, profesionales }) {
 
   const mesActual = new Date().getFullYear() === anio ? new Date().getMonth() : -1;
   const totalGeneral = filas.reduce((acc, f) => acc + f.totalDebe, 0);
+  const cobradoGeneral = filas.reduce((acc, f) => acc + f.totalCobrado, 0);
 
   const totalesPorMes = useMemo(() => {
-    const tot = Array.from({ length: 12 }, () => ({ debe: 0, porLiquidar: 0 }));
+    const tot = Array.from({ length: 12 }, () => ({ debe: 0, cobrado: 0, porLiquidar: 0 }));
     for (const f of filas) {
       f.meses.forEach((c, i) => {
         tot[i].debe += c.debe;
+        tot[i].cobrado += c.cobrado;
         tot[i].porLiquidar += c.porLiquidar;
       });
     }
@@ -239,6 +249,7 @@ export default function ResumenPacientes({ consultorioId, profesionales }) {
                             ? 'Sin sesiones este mes'
                             : `${c.encuentros} ${c.encuentros === 1 ? 'sesión' : 'sesiones'}`
                               + (c.debe > 0 ? ` · debe ${formatoARS.format(c.debe)}` : '')
+                              + (c.cobrado > 0 ? ` · cobrado ${formatoARS.format(c.cobrado)}` : '')
                               + (c.porLiquidar > 0 ? ` · ${c.porLiquidar} a liquidar` : '')
                         }
                       >
@@ -248,7 +259,9 @@ export default function ResumenPacientes({ consultorioId, profesionales }) {
                           <span className="cp-rp__celda-in">
                             {c.debe > 0 && <span className="cp-rp__debe">{montoCompacto(c.debe)}</span>}
                             {c.debe === 0 && c.porLiquidar === 0 && (
-                              <span className="cp-rp__ok"><CheckMini /></span>
+                              c.cobrado > 0
+                                ? <span className="cp-rp__cobrado">{montoCompacto(c.cobrado)}</span>
+                                : <span className="cp-rp__ok"><CheckMini /></span>
                             )}
                             {c.porLiquidar > 0 && (
                               <span className="cp-rp__liq" title={`${c.porLiquidar} a liquidar`}>?</span>
@@ -260,7 +273,9 @@ export default function ResumenPacientes({ consultorioId, profesionales }) {
                     <td className="cp-rp__td-total">
                       {f.totalDebe > 0
                         ? <span className="cp-rp__total-val">{formatoARS.format(f.totalDebe)}</span>
-                        : <span className="cp-rp__total-ok"><CheckMini /> al día</span>}
+                        : f.totalCobrado > 0
+                          ? <span className="cp-rp__total-cobrado">{formatoARS.format(f.totalCobrado)}</span>
+                          : <span className="cp-rp__total-ok"><CheckMini /> al día</span>}
                     </td>
                   </tr>
                 ))}
@@ -273,19 +288,24 @@ export default function ResumenPacientes({ consultorioId, profesionales }) {
                       key={i}
                       className={`cp-rp__celda cp-rp__foot-mes ${i === mesActual ? 'cp-rp__celda--actual' : ''}`}
                       title={
-                        t.debe === 0 && t.porLiquidar === 0
-                          ? 'Sin deuda en este mes'
-                          : `${formatoARS.format(t.debe)} de deuda`
-                            + (t.porLiquidar > 0 ? ` · ${t.porLiquidar} a liquidar` : '')
+                        (t.debe > 0
+                          ? `${formatoARS.format(t.debe)} de deuda`
+                          : 'Sin deuda en este mes')
+                        + (t.cobrado > 0 ? ` · cobrado ${formatoARS.format(t.cobrado)}` : '')
+                        + (t.porLiquidar > 0 ? ` · ${t.porLiquidar} a liquidar` : '')
                       }
                     >
                       {t.debe > 0
                         ? <span className="cp-rp__debe">{montoCompacto(t.debe)}</span>
-                        : <span className="cp-rp__vacio">·</span>}
+                        : t.cobrado > 0
+                          ? <span className="cp-rp__cobrado">{montoCompacto(t.cobrado)}</span>
+                          : <span className="cp-rp__vacio">·</span>}
                     </td>
                   ))}
                   <td className="cp-rp__td-total cp-rp__foot-total">
-                    {formatoARS.format(totalGeneral)}
+                    {totalGeneral > 0
+                      ? formatoARS.format(totalGeneral)
+                      : <span className="cp-rp__total-cobrado">{formatoARS.format(cobradoGeneral)}</span>}
                   </td>
                 </tr>
               </tfoot>
@@ -294,6 +314,7 @@ export default function ResumenPacientes({ consultorioId, profesionales }) {
 
           <p className="cp-rp__leyenda">
             <span className="cp-rp__debe">45 mil</span> debe al consultorio
+            <span className="cp-rp__cobrado">80 mil</span> ya cobrado
             <span className="cp-rp__ok"><CheckMini /> al día</span>
             <span className="cp-rp__liq">?</span> a liquidar (obra social sin monto)
           </p>

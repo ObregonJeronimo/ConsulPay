@@ -31,7 +31,7 @@ export function montoCompacto(n) {
 
 /** Celda vacía de la matriz: doce por fila. */
 export function celdaVacia() {
-  return { debe: 0, porLiquidar: 0, encuentros: 0, registros: 0 };
+  return { debe: 0, cobrado: 0, porLiquidar: 0, encuentros: 0, registros: 0 };
 }
 
 /**
@@ -41,6 +41,10 @@ export function celdaVacia() {
  * Una sesión de obra social sin monto NO suma deuda: todavía no se sabe
  * cuánto va a liquidar. Se cuenta aparte como "a liquidar" para que la
  * celda no parezca saldada.
+ *
+ * Lo ya pagado se guarda en 'cobrado'. Antes se descartaba y la celda
+ * saldada mostraba un tilde, que dice "no debe nada" pero no dice cuánto
+ * entró: un mes de $80.000 cobrados y uno de $0 se veían igual.
  */
 export function acumularSesion(celda, sesion, cantidadSesiones, ESTADOS) {
   celda.registros += 1;
@@ -54,6 +58,9 @@ export function acumularSesion(celda, sesion, cantidadSesiones, ESTADOS) {
     const monto = sesion.montoConsultorio || 0;
     celda.debe += monto;
     return monto;
+  }
+  if (sesion.estadoPago === ESTADOS.PAGADO) {
+    celda.cobrado += sesion.montoConsultorio || 0;
   }
   return 0;
 }

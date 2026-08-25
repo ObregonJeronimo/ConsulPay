@@ -980,7 +980,10 @@ console.log('\n[17] Dashboard');
   chequeo('el pie dice "Total del mes"', celdas[0] === 'Total del mes');
   chequeo('enero suma los dos profesionales', celdas[1] === '300 mil', `(${celdas[1]})`);
   chequeo('febrero suma los tres', celdas[2] === '100 mil', `(${celdas[2]})`);
-  chequeo('marzo queda vacio: esa sesion esta pagada', celdas[3] === '·', `(${celdas[3]})`);
+  /* Marzo no tiene deuda, pero decir "·" escondia que entraron 90 mil. */
+  chequeo('marzo muestra lo cobrado en vez de un vacio', celdas[3] === '90 mil', `(${celdas[3]})`);
+  chequeo('y lo cobrado va en verde, no en coral',
+    !!pie.querySelector('.cp-rp__cobrado'));
   /* Intl.NumberFormat separa con espacio no-rompible (U+00A0), no con el
      espacio comun, asi que la comparacion directa contra '$ 400.000' falla. */
   chequeo('el total del año sigue al final',
@@ -1534,8 +1537,22 @@ console.log('\n[22] Matriz de pacientes de un profesional');
   chequeo('enero suma los dos pacientes (50k + 30k)', t.pieCeldas[0] === '80 mil', `(${t.pieCeldas[0]})`);
   chequeo('febrero trae solo el de Ana', t.pieCeldas[1] === '20 mil', `(${t.pieCeldas[1]})`);
   /* Una sesion pagada no es deuda, y una de obra social sin monto tampoco:
-     todavia no se sabe cuanto va a liquidar. */
-  chequeo('marzo no suma: una pagada y una sin liquidar', t.pieCeldas[2] === '·', `(${t.pieCeldas[2]})`);
+     todavia no se sabe cuanto va a liquidar. Pero la pagada si es plata que
+     entro, asi que marzo la muestra en verde en vez de quedar vacio. */
+  chequeo('marzo no suma deuda pero muestra los 90 mil cobrados',
+    t.pieCeldas[2] === '90 mil', `(${t.pieCeldas[2]})`);
+
+  const filaDe = (ape) => [...cont.querySelectorAll('tbody tr')]
+    .find((tr) => (tr.querySelector('.cp-rp__prof-nombre')?.textContent || '').includes(ape));
+  const marzoDeAna = filaDe('Alvarez').querySelectorAll('.cp-rp__celda')[2];
+  chequeo('la celda de Ana en marzo dice cuanto se cobro, no un tilde',
+    marzoDeAna.textContent.trim() === '90 mil', `(${marzoDeAna.textContent.trim()})`);
+  chequeo('y usa el verde de cobrado', !!marzoDeAna.querySelector('.cp-rp__cobrado'));
+  /* Sin deuda y sin plata cobrada el tilde sigue siendo lo unico que se
+     puede decir: el monto en verde no lo reemplaza siempre. */
+  chequeo('sin deuda y sin nada cobrado queda el tilde',
+    !!filaDe('Caro').querySelector('.cp-rp__total-ok')
+    && !filaDe('Caro').querySelector('.cp-rp__total-cobrado'));
   chequeo('la de obra social sin monto se marca con ?',
     t.filas.some((f) => f.celdas.includes('?')));
   chequeo('el total del año cierra (50+30+20+15)',
