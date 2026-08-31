@@ -1285,24 +1285,48 @@ function DetalleSolicitud({ solicitud: s, pacienteNombre }) {
     filas.push({ label, valor });
   };
 
+  /* Number(null) es 0, no NaN. Varios snapshots guardan los montos como
+     null cuando no aplican, asi que sin esto el detalle mostraba "$ 0"
+     como si fuera un dato. */
+  const num = (v) => {
+    if (v === null || v === undefined || v === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+
   push('Paciente', pacienteNombre !== '—' ? pacienteNombre : null);
   push('Fecha de la sesión', prop.fecha || snap.fecha
     ? fmtFechaLarga(prop.fecha || snap.fecha) : null);
   push('Método', prop.metodoPagoNombre || snap.metodoPagoNombre);
-  if (Number.isFinite(Number(prop.cantidadSesiones)) && Number(prop.cantidadSesiones) > 1) {
-    push('Sesiones agrupadas', prop.cantidadSesiones);
+
+  const cantidadSol = num(prop.cantidadSesiones) ?? num(snap.cantidadSesiones);
+  if (cantidadSol > 1) push('Sesiones agrupadas', cantidadSol);
+
+  /* El total del que se reparte. En una liquidacion de obra social la sesion
+     todavia no tiene valor: el que manda es el que se propone liquidar. */
+  const totalLiquidado = num(prop.monto) ?? num(prop.valorLiquidado);
+  const total = totalLiquidado ?? num(prop.valorTotal) ?? num(snap.valorTotal);
+  if (total !== null) {
+    push(totalLiquidado !== null ? 'Total a liquidar' : 'Valor total', formatoARS.format(total));
   }
-  if (Number.isFinite(Number(prop.valorTotal ?? snap.valorTotal))) {
-    push('Valor total', formatoARS.format(Number(prop.valorTotal ?? snap.valorTotal)));
-  }
-  if (Number.isFinite(Number(prop.montoConsultorio))) {
-    push('Al consultorio', formatoARS.format(Number(prop.montoConsultorio)));
-  }
-  if (Number.isFinite(Number(prop.monto))) {
-    push('Monto liquidado', formatoARS.format(Number(prop.monto)));
-  }
-  if (prop.valorLiquidado !== undefined) {
-    push('Monto liquidado', formatoARS.format(Number(prop.valorLiquidado) || 0));
+
+  /* Cuanto se lleva cada uno. El detalle decia el total y nada mas: de
+     "$ 20.551 liquidados" el profesional no sabia cuanto le quedaba, que es
+     justo el dato que va a mirar. */
+  const pctSol = num(snap.porcentajeConsultorio) ?? num(prop.porcentajeConsultorio);
+  const alConsultorio = num(prop.montoConsultorio) ?? num(snap.montoConsultorio)
+    ?? (total !== null && pctSol !== null ? Math.round(total * pctSol / 100) : null);
+  if (alConsultorio !== null) {
+    const pctVisible = pctSol > 0
+      ? pctSol
+      : (total > 0 ? Math.round(alConsultorio / total * 100) : null);
+    push(
+      pctVisible !== null ? `Al consultorio (${pctVisible}%)` : 'Al consultorio',
+      formatoARS.format(alConsultorio),
+    );
+    const miParte = num(prop.montoProfesional) ?? num(snap.montoProfesional)
+      ?? (total !== null ? total - alConsultorio : null);
+    if (miParte !== null) push('Mi parte', formatoARS.format(miParte));
   }
   if (s.tipo === TIPOS_SOLICITUD_SESION.CARGA_RAPIDA) {
     push('Sesiones en la carga', prop.sesiones?.length);

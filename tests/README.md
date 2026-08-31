@@ -43,6 +43,8 @@ Sale con código 1 si algo falla, así que sirve para un pre-push hook.
 22. Estado por paciente — matriz pacientes × meses de un profesional
 23. Marcar mes como pagado — selección por paciente, atajos por método
 24. Solicitudes — de qué total sale el monto que va al consultorio
+25. Mis solicitudes del profesional — el reparto de lo que se liquida
+26. Grupos de solicitudes — los totales alineados entre sí
 
 ## Límite conocido
 

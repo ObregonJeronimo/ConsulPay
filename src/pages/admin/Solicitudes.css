@@ -899,6 +899,10 @@
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  /* Igual de ancho diga "Aprobar" o "Marcar pagado": es lo que mantiene la
+     columna de totales en su lugar. */
+  min-width: 132px;
   gap: 5px;
   margin: 7px 10px 7px 0;
   padding: 0 11px;
@@ -1061,7 +1065,9 @@
 @media (max-width: 640px) {
   .cp-sol-prof-bloque__nombre { font-size: 15px; }
   .cp-sol-grupo__aprobar-btn-txt { display: none; }
-  .cp-sol-grupo__aprobar-btn { padding: 0 9px; }
+  /* En mobile el boton queda solo con el icono: reservarle 132px seria
+     media pantalla vacia. */
+  .cp-sol-grupo__aprobar-btn { padding: 0 9px; min-width: auto; }
   .cp-res-prof__nombre { font-size: 14px; }
 }
 
@@ -1134,8 +1140,15 @@
   color: var(--cp-text-muted);
 }
 
+/* Los tres bloques de la derecha van a ancho fijo para que la plata quede
+   en una columna. Sin esto el total se corria de un grupo a otro segun
+   cuantos digitos tuviera el contador (3 vs 10) y segun si el boton decia
+   "Aprobar" o "Marcar pagado", que no miden lo mismo: tres grupos de la
+   misma pantalla terminaban con el monto en tres lugares distintos. */
 .cp-sol-grupo__cant {
   flex-shrink: 0;
+  min-width: 34px;
+  text-align: center;
   font-size: 12px;
   color: var(--cp-text-muted);
   background: var(--cp-surface-sunken);
@@ -1145,6 +1158,7 @@
 }
 .cp-sol-grupo__total {
   flex-shrink: 0;
+  min-width: 104px;
   font-family: var(--cp-font-mono, monospace);
   font-size: 14px;
   font-weight: 600;

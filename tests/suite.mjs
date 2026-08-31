@@ -1805,6 +1805,79 @@ console.log('\n[24] Contexto del monto en Solicitudes');
   await act(async () => { root.unmount(); });
 }
 
+/* ============ 25. El profesional ve su parte ============ */
+console.log('\n[25] Detalle de mis solicitudes (profesional)');
+{
+  const { default: MisSesiones } = await import('../src/pages/profesional/MisSesiones.jsx');
+
+  globalThis.__USER__ = { uid: 'PRO', consultorioId: 'C1', displayName: 'Muriel' };
+  globalThis.__CONS__ = { adminUids: ['A'], mpConfigs: {},
+    metodosPagoPaciente: [{ id: 'os', nombre: 'OBRA SOCIAL 24%', porcentajeConsultorio: 24, tipo: 'diferido' }],
+    adminsDirectorio: [{ uid: 'A', nombre: 'Adriana Barrozo' }] };
+
+  const hoyP = new Date();
+  const fechaP = { toDate: () => new Date(hoyP.getFullYear(), hoyP.getMonth(), 10, 10, 0) };
+  globalThis.__DATA__ = {
+    sesiones: [], usuarios: [], pagos_consultorio: [],
+    pacientes: [{ id: 'P1', nombre: 'Lorenzo', apellido: 'Trancon', consultorioId: 'C1', profesionalesUids: ['PRO'], estado: 'activo' }],
+    solicitudes_sesion: [
+      {
+        id: 'r1', consultorioId: 'C1', tipo: 'liquidar_os', estado: 'pendiente',
+        profesionalUid: 'PRO', profesionalNombre: 'Muriel', sesionId: 'z1',
+        createdAt: ts('2026-08-31T12:00:00'),
+        payloadPropuesto: {
+          monto: 20551,
+          sesionSnapshot: {
+            pacienteNombre: 'Trancon, Lorenzo', fecha: fechaP,
+            metodoPagoNombre: 'OBRA SOCIAL 24%', porcentajeConsultorio: 24,
+            cantidadSesiones: 2,
+          },
+        },
+      },
+    ],
+  };
+
+  const { cont } = await montar(MisSesiones, {});
+  const fila = cont.querySelector('.cp-solicitud-row--btn');
+  chequeo('la solicitud aparece en el panel del profesional', !!fila);
+  await act(async () => { clic(fila); });
+
+  const det = [...cont.querySelectorAll('.cp-solicitud-detalle__item')].map((it) => ({
+    label: it.querySelector('.cp-solicitud-detalle__label')?.textContent.trim(),
+    valor: (it.querySelector('.cp-solicitud-detalle__valor')?.textContent || '').replace(/\s+/g, ' ').trim(),
+  }));
+  const dato = (l) => det.find((d) => d.label === l)?.valor;
+
+  /* Antes esto decia "Monto liquidado: $ 20.551" y se terminaba ahi: el
+     profesional no veia cuanto de eso se queda el consultorio ni cuanto le
+     queda a el, que es el numero que va a mirar. */
+  chequeo('dice el total que se liquida',
+    dato('Total a liquidar') === '$ 20.551'.replace(/\s/g, ' '), `(${dato('Total a liquidar')})`);
+  chequeo('dice cuanto va al consultorio y con que %',
+    (dato('Al consultorio (24%)') || '').includes('4.932'), `(${det.map((d) => d.label)})`);
+  chequeo('y cuanto le queda a el',
+    (dato('Mi parte') || '').includes('15.619'), `(${dato('Mi parte')})`);
+  chequeo('dice cuantas sesiones cubre',
+    String(dato('Sesiones agrupadas')) === '2', `(${dato('Sesiones agrupadas')})`);
+  chequeo('sigue diciendo el metodo',
+    dato('Método') === 'OBRA SOCIAL 24%', `(${dato('Método')})`);
+}
+
+/* ============ 26. Los totales de los grupos alineados ============ */
+console.log('\n[26] Alineacion de los grupos de solicitudes');
+{
+  const cssSol = (await import('fs')).readFileSync('../src/pages/admin/Solicitudes.css', 'utf8');
+  /* El total se corria segun los digitos del contador y segun si el boton
+     decia "Aprobar" o "Marcar pagado". Los tres anchos fijos son lo que
+     mantiene la columna de plata en su lugar. */
+  chequeo('el contador tiene ancho fijo', /\.cp-sol-grupo__cant \{[^}]*min-width:/.test(cssSol));
+  chequeo('el total tiene ancho fijo', /\.cp-sol-grupo__total \{[^}]*min-width:/.test(cssSol));
+  chequeo('el boton mide igual diga lo que diga',
+    /\.cp-sol-grupo__aprobar-btn \{[^}]*min-width: 132px/.test(cssSol));
+  chequeo('en mobile se libera el ancho del boton',
+    /@media \(max-width: 640px\)[\s\S]*\.cp-sol-grupo__aprobar-btn \{[^}]*min-width: auto/.test(cssSol));
+}
+
 console.log(`\n${'='.repeat(52)}`);
 console.log(`${ok} chequeos OK, ${fallos.length} fallas`);
 if (fallos.length) { console.log('FALLAN:'); fallos.forEach((f) => console.log('  - ' + f)); }
