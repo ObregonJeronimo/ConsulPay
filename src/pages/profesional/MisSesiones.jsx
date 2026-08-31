@@ -844,6 +844,7 @@ export function MarcarMesPagadoModal({ sesiones, mapaPacientes, mes, user, consu
             metodoPagoNombre: ses.metodoPagoNombre || '',
             valorTotal: ses.valorTotal || 0,
             montoConsultorio: Number(ses.montoConsultorio) || 0,
+            cantidadSesiones: getCantidadSesiones(ses),
           },
           /* El receptor y la fecha son lo que DECLARA el profesional, no la
              verdad final: el admin los ve precargados al aprobar y confirma
@@ -1050,6 +1051,9 @@ function LiquidarOSMasivoModal({ sesiones, mapaPacientes, mapaMetodos, mes, user
             fecha: ses.fecha,
             metodoPagoNombre: ses.metodoPagoNombre || '',
             porcentajeConsultorio: Number(ses.porcentajeConsultorio) || 0,
+            /* El admin aprueba mirando el detalle: sin esto no sabe si el
+               total que informo la obra social cubre una sesion o seis. */
+            cantidadSesiones: getCantidadSesiones(ses),
           },
         });
         hechas += 1;

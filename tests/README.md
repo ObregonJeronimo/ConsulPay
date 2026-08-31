@@ -42,6 +42,7 @@ Sale con código 1 si algo falla, así que sirve para un pre-push hook.
 21. Orden por método de pago — inmediatos antes que diferidos, agrupados
 22. Estado por paciente — matriz pacientes × meses de un profesional
 23. Marcar mes como pagado — selección por paciente, atajos por método
+24. Solicitudes — de qué total sale el monto que va al consultorio
 
 ## Límite conocido
 

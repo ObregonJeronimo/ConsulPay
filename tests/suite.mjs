@@ -1708,6 +1708,103 @@ console.log('\n[23] Selector del modal "Marcar mes como pagado"');
   await act(async () => { root.unmount(); });
 }
 
+/* ============ 24. De donde sale el monto de una solicitud ============ */
+console.log('\n[24] Contexto del monto en Solicitudes');
+{
+  const { default: Solicitudes } = await import('../src/pages/admin/Solicitudes.jsx');
+  const { MemoryRouter } = await import('react-router-dom');
+
+  globalThis.__USER__ = { uid: 'A', consultorioId: 'C1', rol: 'admin' };
+  globalThis.__CONS__ = { nombre: 'CALA', adminUids: ['A'], mpConfigs: {}, metodosPagoPaciente: [] };
+
+  const anioS = new Date().getFullYear();
+  const fechaS = { toDate: () => new Date(anioS, 7, 31) };
+  const baseSol = (id, tipo, payloadPropuesto) => ({
+    id, consultorioId: 'C1', tipo, estado: 'pendiente',
+    profesionalUid: 'MU', profesionalNombre: 'Muriel Serral', sesionId: 'x' + id,
+    createdAt: ts('2026-08-31T12:00:00'), payloadPropuesto,
+  });
+
+  globalThis.__DATA__ = {
+    solicitudes_sesion: [
+      /* Obra social: el snapshot no puede traer montoConsultorio (la sesion
+         sigue en pendiente_monto), sale de monto x porcentaje.
+         20.551 al 24% = 4.932, que es lo unico que se veia en la lista. */
+      baseSol('q1', 'liquidar_os', {
+        monto: 20551,
+        sesionSnapshot: {
+          pacienteNombre: 'TRANCON, LORENZO', fecha: fechaS,
+          metodoPagoNombre: 'OBRA SOCIAL 24%', porcentajeConsultorio: 24,
+          cantidadSesiones: 2,
+        },
+      }),
+      /* Marcar pagada: aca si hay montoConsultorio y el % se deduce. */
+      baseSol('q2', 'marcar_pagada', {
+        sesionSnapshot: {
+          pacienteNombre: 'RAFAEL, BENJAMIN', fecha: fechaS,
+          metodoPagoNombre: 'Particular', valorTotal: 189630, montoConsultorio: 37926,
+        },
+      }),
+    ],
+    pacientes: [], usuarios: [], logs_sesion: [],
+  };
+
+  const cont = document.createElement('div');
+  document.body.appendChild(cont);
+  const root = createRoot(cont);
+  await act(async () => { root.render(createElement(MemoryRouter, null, createElement(Solicitudes))); });
+
+  const cabeceras = [...cont.querySelectorAll('.cp-sol-grupo__head')];
+  chequeo('agrupa por mes y tipo', cabeceras.length === 2, `(${cabeceras.length})`);
+  for (const h of cabeceras) await act(async () => { clic(h); });
+
+  const limpio = (el) => (el?.textContent || '').replace(/\s+/g, ' ').trim();
+  const filasSol = [...cont.querySelectorAll('.cp-solicitudes-tabla__row')];
+  const leerFila = (tr) => ({
+    tr,
+    paciente: limpio(tr.querySelector('td[data-label="Paciente"]')),
+    consultorio: limpio(tr.querySelector('td[data-label="Al consultorio"]')),
+  });
+  const filas = filasSol.map(leerFila);
+  chequeo('se ven las dos solicitudes', filas.length === 2, `(${filas.length})`);
+
+  /* El admin veia diez filas de "$ 4.932" y nada mas: no podia saber si era
+     el 24% de una liquidacion o el total de una sesion particular chica. */
+  const liq = filas.find((f) => f.paciente.includes('TRANCON'));
+  chequeo('la liquidacion muestra lo que va al consultorio',
+    liq.consultorio.includes('$ 4.932'), `(${liq.consultorio})`);
+  chequeo('y de que total sale',
+    liq.consultorio.includes('24% de $ 20.551'), `(${liq.consultorio})`);
+  chequeo('la fila dice de que obra social es',
+    liq.paciente.includes('OBRA SOCIAL 24%'), `(${liq.paciente})`);
+  chequeo('sin perder la fecha de la sesion',
+    liq.paciente.includes('31-ago'), `(${liq.paciente})`);
+
+  const pag = filas.find((f) => f.paciente.includes('RAFAEL'));
+  chequeo('marcar pagada tambien dice de donde sale',
+    pag.consultorio.includes('20% de $ 189.630'), `(${pag.consultorio})`);
+  chequeo('y con que metodo se cobro',
+    pag.paciente.includes('Particular'), `(${pag.paciente})`);
+
+  /* El detalle mostraba paciente, metodo y el total informado. Ni el reparto
+     ni cuantas sesiones cubre ese total: el admin aprobaba a ciegas. */
+  await act(async () => { clic(liq.tr); });
+  const detalle = limpio(cont.querySelector('.cp-diff'));
+  chequeo('el detalle abre con el diff', !!detalle, `(${detalle})`);
+  chequeo('dice el total que informo la obra social',
+    detalle.includes('$ 20.551'), `(${detalle})`);
+  chequeo('dice cuanto queda para el consultorio y con que %',
+    detalle.includes('AL CONSULTORIO (24%)') && detalle.includes('$ 4.932'), `(${detalle})`);
+  chequeo('dice cuanto queda para el profesional',
+    detalle.includes('$ 15.619'), `(${detalle})`);
+  chequeo('dice cuantas sesiones cubre ese total',
+    detalle.includes('2 sesiones'), `(${detalle})`);
+  chequeo('y la fecha de la sesion',
+    /31 de agosto/i.test(detalle), `(${detalle})`);
+
+  await act(async () => { root.unmount(); });
+}
+
 console.log(`\n${'='.repeat(52)}`);
 console.log(`${ok} chequeos OK, ${fallos.length} fallas`);
 if (fallos.length) { console.log('FALLAN:'); fallos.forEach((f) => console.log('  - ' + f)); }

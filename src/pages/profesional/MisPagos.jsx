@@ -21,6 +21,7 @@ import { calcularDeudaProfesional, retirarProfesional } from '../../lib/profesio
 import {
   nombreMetodoDeSesion,
   finDeMes,
+  getCantidadSesiones,
   inicioDeMes,
   nombreDelMes,
   suscribirSesionesProfesional,
@@ -264,6 +265,7 @@ export default function MisPagos() {
             porcentajeConsultorio: s.porcentajeConsultorio ?? null,
             montoConsultorio: s.montoConsultorio ?? null,
             montoProfesional: s.montoProfesional ?? null,
+            cantidadSesiones: getCantidadSesiones(s),
           },
           receptor: { uid: user.uid, nombre: user.displayName || user.email || user.uid },
         });

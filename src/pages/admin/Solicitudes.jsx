@@ -406,6 +406,27 @@ function montoConsultorioDeSolicitud(s) {
   }
   return 0;
 }
+/* De donde sale el numero de la columna "Al consultorio".
+
+   Sin esto el admin ve diez filas de "$ 4.932" y no tiene con que decidir:
+   ese numero puede ser el 22% de una liquidacion de obra social o el total
+   de una sesion particular chica, y en la lista se ven igual. */
+function origenDelMonto(s) {
+  const snap = s.payloadPropuesto?.sesionSnapshot || {};
+  const total = s.tipo === TIPOS_SOLICITUD_SESION.LIQUIDAR_OS
+    ? Number(s.payloadPropuesto?.monto)
+    : Number(snap.valorTotal);
+  if (!Number.isFinite(total) || total <= 0) return null;
+
+  /* El % viaja en el snapshot para liquidar_os. Para marcar_pagada no
+     siempre esta, pero ahi si hay montoConsultorio, asi que se deduce. */
+  const pctSnap = Number(snap.porcentajeConsultorio);
+  const pct = Number.isFinite(pctSnap) && pctSnap > 0
+    ? pctSnap
+    : Math.round((montoConsultorioDeSolicitud(s) / total) * 100);
+  return `${pct}% de ${formatoARS.format(total)}`;
+}
+
 const MESES_LARGO = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 const MESES_TITULO = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
 function claveMesSol(d) {
@@ -1030,6 +1051,14 @@ function FilaSolicitudGrupo({ s, onSeleccionar }) {
   const resuelta = s.estado !== ESTADOS_SOLICITUD_SESION.PENDIENTE;
   const monto = montoConsultorioDeSolicitud(s);
   const d = fechaSesionDeSolicitud(s);
+  const metodo = snap.metodoPagoNombre || '';
+  const origen = origenDelMonto(s);
+  /* La obra social al lado de la fecha: en un grupo de "liquidar" todas las
+     filas dicen lo mismo en la columna Tipo, y la que cambia es esta. */
+  const subPaciente = [
+    d && d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' }),
+    metodo,
+  ].filter(Boolean).join(' · ');
 
   return (
     <tr
@@ -1044,14 +1073,19 @@ function FilaSolicitudGrupo({ s, onSeleccionar }) {
       </td>
       <td data-label="Paciente">
         <span style={{ fontSize: 13.5, fontWeight: 500 }}>{nombrePac}</span>
-        {d && (
+        {subPaciente && (
           <span style={{ display: 'block', fontSize: 11.5, color: 'var(--cp-text-muted)' }}>
-            {d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })}
+            {subPaciente}
           </span>
         )}
       </td>
       <td data-label="Al consultorio" className="cp-num" style={{ color: 'var(--cp-accent)' }}>
         {formatoARS.format(monto)}
+        {origen && (
+          <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color: 'var(--cp-text-muted)' }}>
+            {origen}
+          </span>
+        )}
       </td>
       <td data-label="Solicitada" style={{ fontSize: 13, color: 'var(--cp-text-muted)' }}>
         {formatoRelativo(s.createdAt)}
@@ -1074,9 +1108,10 @@ function FilaSolicitudGrupo({ s, onSeleccionar }) {
         </div>
         <div className="cp-row-mobile__mid">
           {LABELS_TIPO_SOLICITUD[s.tipo]} · {formatoARS.format(monto)}
+          {origen && <span style={{ color: 'var(--cp-text-muted)' }}> · {origen}</span>}
         </div>
         <div className="cp-row-mobile__bot">
-          {formatoRelativo(s.createdAt)}
+          {metodo ? `${metodo} · ` : ''}{formatoRelativo(s.createdAt)}
         </div>
       </td>
       <td className="cp-td-mobile-badge">{badgeEstado(s.estado)}</td>
@@ -1583,6 +1618,31 @@ function Diff({ solicitud, pac, mapaMetodos }) {
   return <DiffDoble anterior={payloadAnterior} propuesto={payloadPropuesto} pac={pac} />;
 }
 
+/* La fecha y la cantidad de sesiones que viajan en el snapshot. La segunda
+   solo esta en las solicitudes nuevas: las viejas se guardaron sin ella y
+   la fila se omite en vez de mentir un "1". */
+function fechaDeSnapshot(snap) {
+  const f = snap?.fecha;
+  if (!f) return null;
+  const d = f.toDate ? f.toDate()
+    : (f.seconds !== undefined ? new Date(f.seconds * 1000) : new Date(f));
+  return isNaN(d?.getTime?.()) ? null : d;
+}
+
+function filasDeContexto(snap) {
+  const d = fechaDeSnapshot(snap);
+  const cant = Number(snap?.cantidadSesiones);
+  return [
+    ...(d ? [{
+      label: 'Fecha de la sesión',
+      valor: d.toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' }),
+    }] : []),
+    ...(Number.isFinite(cant) && cant >= 1
+      ? [{ label: 'Sesiones', valor: `${cant} ${cant === 1 ? 'sesión' : 'sesiones'}` }]
+      : []),
+  ];
+}
+
 function DiffMarcarPagada({ payload }) {
   const snap = payload?.sesionSnapshot ?? {};
   const total = snap.valorTotal ?? 0;
@@ -1592,6 +1652,7 @@ function DiffMarcarPagada({ payload }) {
 
   const filas = [
     { label: 'Paciente', valor: snap.pacienteNombre || '—' },
+    ...filasDeContexto(snap),
     { label: 'Método', valor: snap.metodoPagoNombre || '—' },
     { label: 'Total sesión', valor: total != null ? formatoARS.format(total) : '—' },
     ...(montoConsultorio != null ? [{ label: `Al consultorio${pct != null ? ` (${pct}%)` : ''}`, valor: formatoARS.format(montoConsultorio) }] : []),
@@ -1611,10 +1672,22 @@ function DiffMarcarPagada({ payload }) {
 
 function DiffLiquidarOS({ payload }) {
   const snap = payload?.sesionSnapshot ?? {};
+  const total = Number(payload?.monto);
+  const pct = Number(snap.porcentajeConsultorio);
+  /* El detalle mostraba solo el total que informo la obra social. Es el
+     numero que el profesional propone, no el que le queda al consultorio:
+     el admin aprobaba sin ver el reparto que despues aparece en la lista. */
+  const hayReparto = Number.isFinite(total) && Number.isFinite(pct) && pct > 0;
+  const alConsultorio = hayReparto ? Math.round(total * pct / 100) : null;
   const filas = [
     { label: 'Paciente', valor: snap.pacienteNombre || '—' },
+    ...filasDeContexto(snap),
     { label: 'Método', valor: snap.metodoPagoNombre || '—' },
-    { label: 'Monto a liquidar', valor: payload?.monto != null ? formatoARS.format(payload.monto) : '—' },
+    { label: 'Total a liquidar', valor: payload?.monto != null ? formatoARS.format(payload.monto) : '—' },
+    ...(hayReparto ? [
+      { label: `Al consultorio (${pct}%)`, valor: formatoARS.format(alConsultorio) },
+      { label: 'Al profesional', valor: formatoARS.format(total - alConsultorio) },
+    ] : []),
   ];
   return (
     <div className="cp-diff">
