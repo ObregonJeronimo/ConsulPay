@@ -12,6 +12,7 @@ import { suscribirProfesionales } from '../../lib/profesionales.js';
 import { suscribirInvitaciones } from '../../lib/invitaciones.js';
 import { getMetodosPagoIds, suscribirPacientesConsultorio } from '../../lib/pacientes.js';
 
+import PlanillaAnualModal from './PlanillaAnualModal.jsx';
 import ResumenProfesionales from './ResumenProfesionales.jsx';
 import ResumenPacientes from './ResumenPacientes.jsx';
 import './Dashboard.css';
@@ -36,6 +37,10 @@ export default function Dashboard() {
   const [invitaciones, setInvitaciones] = useState([]);
   const [pacientes, setPacientes] = useState([]);
   const [loading, setLoading] = useState(true);
+  /* { profUid, anio } de la planilla abierta, o null. Vive acá y no dentro
+     de la matriz porque el modal necesita pacientes y metodos, que ya los
+     tiene esta pagina. */
+  const [planilla, setPlanilla] = useState(null);
 
   useEffect(() => {
     if (!user?.consultorioId) return;
@@ -59,6 +64,11 @@ export default function Dashboard() {
   const pacientesActivos = useMemo(
     () => pacientes.filter((p) => p.estado === ESTADOS_PACIENTE.ACTIVO),
     [pacientes],
+  );
+
+  const mapaMetodos = useMemo(
+    () => Object.fromEntries((consultorio?.metodosPagoPaciente ?? []).map((m) => [m.id, m])),
+    [consultorio?.metodosPagoPaciente],
   );
 
   const porMetodo = useMemo(() => {
@@ -189,8 +199,22 @@ export default function Dashboard() {
           <ResumenPacientes
             consultorioId={user?.consultorioId}
             profesionales={profesionales}
+            onCargarSesiones={(profUid, anio) => setPlanilla({ profUid, anio })}
           />
         </>
+      )}
+
+      {planilla && (
+        <PlanillaAnualModal
+          consultorioId={user?.consultorioId}
+          profesionales={profesionalesActivos}
+          pacientes={pacientes}
+          mapaMetodos={mapaMetodos}
+          uid={user?.uid}
+          profUidInicial={planilla.profUid}
+          anioContexto={planilla.anio}
+          onClose={() => setPlanilla(null)}
+        />
       )}
     </div>
   );

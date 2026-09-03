@@ -45,6 +45,7 @@ Sale con código 1 si algo falla, así que sirve para un pre-push hook.
 24. Solicitudes — de qué total sale el monto que va al consultorio
 25. Mis solicitudes del profesional — el reparto de lo que se liquida
 26. Grupos de solicitudes — los totales alineados entre sí
+27. Planilla anual — grilla de carga, validaciones y lo que se escribe
 
 ## Límite conocido
 

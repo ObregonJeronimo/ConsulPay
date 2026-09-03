@@ -35,7 +35,7 @@ function nombreDePaciente(p, fallback) {
   return s || fallback || 'Paciente';
 }
 
-export default function ResumenPacientes({ consultorioId, profesionales }) {
+export default function ResumenPacientes({ consultorioId, profesionales, onCargarSesiones }) {
   const [sesiones, setSesiones] = useState([]);
   const [pacientes, setPacientes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -182,10 +182,26 @@ export default function ResumenPacientes({ consultorioId, profesionales }) {
             De quién viene lo que un profesional debe al consultorio, mes a mes.
           </p>
         </div>
-        <div className="cp-rp__anio">
-          <button className="cp-rp__anio-btn" onClick={() => setAnio((a) => a - 1)} aria-label="Año anterior">‹</button>
-          <span className="cp-rp__anio-val">{anio}</span>
-          <button className="cp-rp__anio-btn" onClick={() => setAnio((a) => a + 1)} aria-label="Año siguiente">›</button>
+        <div className="cp-rp__acciones">
+          {/* La planilla de carga es la version editable de esta misma
+              matriz, asi que se abre desde acá con el profesional y el año
+              que ya estan elegidos arriba. */}
+          {onCargarSesiones && (
+            <button
+              type="button"
+              className="cp-rp__cargar"
+              onClick={() => onCargarSesiones(profUid, anio)}
+              disabled={!profUid}
+              title="Cargar sesiones de este profesional, mes a mes"
+            >
+              Cargar sesiones
+            </button>
+          )}
+          <div className="cp-rp__anio">
+            <button className="cp-rp__anio-btn" onClick={() => setAnio((a) => a - 1)} aria-label="Año anterior">‹</button>
+            <span className="cp-rp__anio-val">{anio}</span>
+            <button className="cp-rp__anio-btn" onClick={() => setAnio((a) => a + 1)} aria-label="Año siguiente">›</button>
+          </div>
         </div>
       </header>
 

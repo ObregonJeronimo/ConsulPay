@@ -1817,6 +1817,10 @@ console.log('\n[25] Detalle de mis solicitudes (profesional)');
 
   const hoyP = new Date();
   const fechaP = { toDate: () => new Date(hoyP.getFullYear(), hoyP.getMonth(), 10, 10, 0) };
+  /* El panel del profesional muestra las solicitudes del mes que esta
+     mirando y arranca en el mes en curso. Con un createdAt fijo el test
+     pasa hasta que se da vuelta el mes y despues falla solo. */
+  const creadaHoy = { toDate: () => new Date(hoyP) };
   globalThis.__DATA__ = {
     sesiones: [], usuarios: [], pagos_consultorio: [],
     pacientes: [{ id: 'P1', nombre: 'Lorenzo', apellido: 'Trancon', consultorioId: 'C1', profesionalesUids: ['PRO'], estado: 'activo' }],
@@ -1824,7 +1828,7 @@ console.log('\n[25] Detalle de mis solicitudes (profesional)');
       {
         id: 'r1', consultorioId: 'C1', tipo: 'liquidar_os', estado: 'pendiente',
         profesionalUid: 'PRO', profesionalNombre: 'Muriel', sesionId: 'z1',
-        createdAt: ts('2026-08-31T12:00:00'),
+        createdAt: creadaHoy,
         payloadPropuesto: {
           monto: 20551,
           sesionSnapshot: {
@@ -1876,6 +1880,186 @@ console.log('\n[26] Alineacion de los grupos de solicitudes');
     /\.cp-sol-grupo__aprobar-btn \{[^}]*min-width: 132px/.test(cssSol));
   chequeo('en mobile se libera el ancho del boton',
     /@media \(max-width: 640px\)[\s\S]*\.cp-sol-grupo__aprobar-btn \{[^}]*min-width: auto/.test(cssSol));
+}
+
+/* ============ 27. Planilla anual ============ */
+console.log('\n[27] Planilla anual: cargar un año de sesiones');
+{
+  const { default: PlanillaAnualModal } = await import('../src/pages/admin/PlanillaAnualModal.jsx');
+
+  const escribir = (el, texto) => {
+    const setter = Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set;
+    setter.call(el, texto);
+    el.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+  };
+  const elegir = (el, valor) => {
+    el.value = valor;
+    el.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+  };
+
+  const ANIO = 2026;
+  const metodos = [
+    { id: 'part', nombre: 'Particular', tipo: 'inmediato', porcentajeConsultorio: 20, valorSesionDefault: 10000 },
+    { id: 'os', nombre: 'OBRA SOCIAL 24%', tipo: 'diferido', porcentajeConsultorio: 24 },
+  ];
+  const mapaMetodos = Object.fromEntries(metodos.map((m) => [m.id, m]));
+  const pac = (id, apellido, nombre, mets, prof = 'MU') => ({
+    id, consultorioId: 'C1', apellido, nombre, estado: 'activo',
+    profesionalesUids: [prof], metodosPagoIds: mets,
+  });
+  const pacientesPA = [
+    pac('P1', 'Alvarez', 'Ana', ['part']),
+    pac('P2', 'Bravo', 'Beto', ['os']),
+    pac('P3', 'Caro', 'Carla', ['os']),
+    pac('P4', 'Duarte', 'Dora', ['part', 'os']),
+    pac('P5', 'Diaz', 'Dani', ['part'], 'OT'),
+  ];
+
+  /* Una sesion ya cargada: la planilla tiene que avisar que marzo de Ana no
+     esta vacio, o se carga dos veces lo mismo. */
+  globalThis.__DATA__ = {
+    sesiones: [{
+      id: 'vieja', consultorioId: 'C1', profesionalUid: 'MU', pacienteId: 'P1',
+      estadoPago: 'debido', montoConsultorio: 6000, valorTotal: 30000, cantidadSesiones: 3,
+      fecha: { toDate: () => new Date(ANIO, 2, 10) },
+    }],
+    pacientes: pacientesPA, usuarios: [],
+  };
+  globalThis.__ESCRITOS__ = {};
+
+  const { cont } = await montar(PlanillaAnualModal, {
+    consultorioId: 'C1',
+    profesionales: [{ uid: 'MU', displayName: 'Muriel Serral' }, { uid: 'OT', displayName: 'Otra' }],
+    pacientes: pacientesPA,
+    mapaMetodos,
+    uid: 'A',
+    profUidInicial: 'MU',
+    anioContexto: ANIO,
+    onClose: () => {},
+  });
+
+  const filasPA = () => [...cont.querySelectorAll('.cp-pa__fila')];
+  const filaDe = (ape) => filasPA().find((tr) => (tr.querySelector('.cp-pa__pac-nombre')?.textContent || '').includes(ape));
+  const celdas = (tr) => [...tr.querySelectorAll('.cp-pa__cant')];
+  const resumenTxt = () => (cont.querySelector('.cp-pa__resumen')?.textContent || '').replace(/\s+/g, ' ').trim();
+  const botonGuardar = () => [...cont.querySelectorAll('.cp-modal__actions button')]
+    .find((b) => /Cargar/.test(b.textContent));
+
+  chequeo('arranca en el profesional que venia elegido',
+    cont.querySelector('#pa-prof')?.value === 'MU');
+  chequeo('solo lista los pacientes de ese profesional',
+    filasPA().length === 4, `(${filasPA().length})`);
+  chequeo('el paciente de otro profesional no se cuela',
+    !filaDe('Diaz'), '(Diaz)');
+  chequeo('cada fila tiene los doce meses', celdas(filaDe('Alvarez')).length === 12);
+  chequeo('avisa lo que ya esta cargado ese mes',
+    filaDe('Alvarez').querySelectorAll('.cp-pa__ya')[0]?.textContent.trim() === '3',
+    `(${filaDe('Alvarez').querySelector('.cp-pa__ya')?.textContent})`);
+  chequeo('con un solo metodo se precarga y trae su valor',
+    filaDe('Alvarez').querySelector('.cp-pa__select').value === 'part'
+    && filaDe('Alvarez').querySelector('.cp-pa__valor').value === '10000');
+  /* Obra social: el default NO se precarga. Si se precargara, la sesion
+     nace liquidada sin que nadie lo haya pedido. */
+  chequeo('la obra social arranca sin valor',
+    filaDe('Bravo').querySelector('.cp-pa__valor').value === '');
+  chequeo('con dos metodos hay que elegir',
+    filaDe('Duarte').querySelector('.cp-pa__select').value === '');
+  chequeo('sin nada cargado no se puede guardar', botonGuardar().disabled);
+
+  // Ana: 4 sesiones particulares en enero.
+  await act(async () => { escribir(celdas(filaDe('Alvarez'))[0], '4'); });
+  chequeo('una celda cargada ya es un registro',
+    /1 registro · 4 sesiones/.test(resumenTxt()), `(${resumenTxt()})`);
+  chequeo('y calcula el reparto',
+    resumenTxt().includes('40.000') && resumenTxt().includes('8.000'), `(${resumenTxt()})`);
+
+  // Beto: obra social ya informada, se liquida en el acto.
+  await act(async () => { escribir(celdas(filaDe('Bravo'))[2], '2'); });
+  chequeo('la obra social sin valor queda pendiente de monto',
+    /2 sesiones de obra social sin valor/.test(cont.querySelector('.cp-pa__resumen-nota')?.textContent.replace(/\s+/g, ' ') || ''),
+    `(${cont.querySelector('.cp-pa__resumen-nota')?.textContent})`);
+  await act(async () => { escribir(filaDe('Bravo').querySelector('.cp-pa__valor'), '5000'); });
+  chequeo('cargarle el valor la saca de pendiente',
+    !cont.querySelector('.cp-pa__resumen-nota'));
+  chequeo('y suma al reparto con su propio porcentaje',
+    resumenTxt().includes('50.000') && resumenTxt().includes('10.400'), `(${resumenTxt()})`);
+
+  // Carla: obra social que todavia no informo.
+  await act(async () => { escribir(celdas(filaDe('Caro'))[2], '3'); });
+  chequeo('vuelve a avisar por las que quedan sin monto',
+    /3 sesiones de obra social sin valor/.test(cont.querySelector('.cp-pa__resumen-nota')?.textContent.replace(/\s+/g, ' ') || ''));
+
+  // Dora: sin metodo elegido, no se puede guardar.
+  await act(async () => { escribir(celdas(filaDe('Duarte'))[1], '1'); });
+  chequeo('una fila con cantidad y sin metodo se marca',
+    (filaDe('Duarte').querySelector('.cp-pa__error-fila')?.textContent || '').includes('método'),
+    `(${filaDe('Duarte').querySelector('.cp-pa__error-fila')?.textContent})`);
+  chequeo('y bloquea el guardado', botonGuardar().disabled);
+  await act(async () => { elegir(filaDe('Duarte').querySelector('.cp-pa__select'), 'part'); });
+  chequeo('al elegir el metodo se destraba', !botonGuardar().disabled);
+  chequeo('y trae el valor por defecto de ese metodo',
+    filaDe('Duarte').querySelector('.cp-pa__valor').value === '10000');
+
+  // Una cantidad imposible se marca en la celda, no se guarda en silencio.
+  await act(async () => { escribir(celdas(filaDe('Alvarez'))[5], '999'); });
+  chequeo('una cantidad fuera de rango se marca',
+    !!filaDe('Alvarez').querySelector('.cp-pa__cant--error'));
+  chequeo('y no deja guardar', botonGuardar().disabled);
+  await act(async () => { escribir(celdas(filaDe('Alvarez'))[5], ''); });
+  chequeo('borrarla destraba', !botonGuardar().disabled);
+
+  // Buscar esconde filas, no descarta lo cargado.
+  await act(async () => { escribir(cont.querySelector('.cp-pa__buscar'), 'bravo'); });
+  chequeo('el buscador filtra las filas', filasPA().length === 1, `(${filasPA().length})`);
+  chequeo('pero lo cargado sigue contando',
+    /Cargar 4 registros/.test(botonGuardar().textContent), `(${botonGuardar().textContent})`);
+  await act(async () => { escribir(cont.querySelector('.cp-pa__buscar'), ''); });
+  chequeo('al limpiar vuelven todas con lo suyo',
+    filasPA().length === 4 && celdas(filaDe('Alvarez'))[0].value === '4');
+
+  chequeo('el pie dice cuanto se carga en cada mes', (() => {
+    const pie = [...cont.querySelectorAll('.cp-pa__foot-mes')].map((td) => td.textContent.trim());
+    return pie[0] === '4' && pie[1] === '1' && pie[2] === '5' && pie[3] === '·';
+  })(), `(${[...cont.querySelectorAll('.cp-pa__foot-mes')].map((td) => td.textContent.trim())})`);
+
+  // ---- Guardar ----
+  await act(async () => { clic(botonGuardar()); });
+  const escritas = globalThis.__ESCRITOS__.sesiones || [];
+  chequeo('escribe una sesion por celda cargada', escritas.length === 4, `(${escritas.length})`);
+
+  const porPac = Object.fromEntries(escritas.map((s) => [s.pacienteId, s]));
+  chequeo('todas van al profesional y consultorio correctos',
+    escritas.every((s) => s.profesionalUid === 'MU' && s.consultorioId === 'C1'));
+  chequeo('la cantidad va en el registro, no en filas repetidas',
+    porPac.P1?.cantidadSesiones === 4 && porPac.P3?.cantidadSesiones === 3);
+  chequeo('la fecha cae en el mes de la celda y en el dia elegido', (() => {
+    const d = porPac.P1.fecha.toDate();
+    return d.getFullYear() === ANIO && d.getMonth() === 0 && d.getDate() === 15;
+  })());
+  chequeo('el particular queda debido con su reparto',
+    porPac.P1?.estadoPago === 'debido' && porPac.P1?.valorTotal === 40000
+    && porPac.P1?.montoConsultorio === 8000, `(${JSON.stringify(porPac.P1?.montoConsultorio)})`);
+  /* El punto del pedido: una sesion de obra social con el monto ya
+     informado no tiene por que nacer pendiente. */
+  chequeo('la obra social con valor nace liquidada',
+    porPac.P2?.estadoPago === 'debido' && porPac.P2?.metodoPagoTipo === 'diferido'
+    && porPac.P2?.valorTotal === 10000 && porPac.P2?.montoConsultorio === 2400,
+    `(${JSON.stringify({ e: porPac.P2?.estadoPago, t: porPac.P2?.valorTotal, c: porPac.P2?.montoConsultorio })})`);
+  chequeo('la obra social sin valor nace pendiente de monto',
+    porPac.P3?.estadoPago === 'pendiente_monto' && porPac.P3?.valorTotal === 0,
+    `(${porPac.P3?.estadoPago})`);
+  chequeo('el mes de cada celda se respeta por fila',
+    porPac.P2.fecha.toDate().getMonth() === 2 && porPac.P4.fecha.toDate().getMonth() === 1);
+
+  chequeo('avisa cuantos registros se cargaron',
+    /Se cargaron 4 registros/.test(cont.querySelector('.cp-pa__resultado')?.textContent || ''),
+    `(${cont.querySelector('.cp-pa__resultado')?.textContent})`);
+  /* Despues de guardar la grilla se vacia: dejar los numeros puestos invita
+     a apretar de nuevo y cargar todo dos veces. */
+  chequeo('la grilla queda limpia para no duplicar',
+    celdas(filaDe('Alvarez'))[0].value === '' && botonGuardar().disabled);
+
+  delete globalThis.__ESCRITOS__;
 }
 
 console.log(`\n${'='.repeat(52)}`);

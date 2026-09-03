@@ -178,6 +178,35 @@
 
 .cp-rp__vacio { color: var(--cp-text-faint); opacity: 0.5; }
 
+/* La accion y el selector de año comparten la punta derecha del header. */
+.cp-rp__acciones {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cp-rp__cargar {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-pill);
+  background: var(--cp-surface);
+  color: var(--cp-text-muted);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--cp-dur-fast) var(--cp-ease),
+              border-color var(--cp-dur-fast) var(--cp-ease);
+}
+.cp-rp__cargar:hover:not(:disabled) { color: var(--cp-text); border-color: var(--cp-border-strong); }
+.cp-rp__cargar:focus-visible { outline: none; box-shadow: var(--cp-shadow-focus); }
+.cp-rp__cargar:disabled { opacity: 0.45; cursor: not-allowed; }
+
 .cp-rp__debe {
   font-family: var(--cp-font-mono);
   font-size: 11px;

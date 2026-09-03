@@ -21,7 +21,17 @@ export async function getDocs(q) {
   const raw = (globalThis.__DATA__ && globalThis.__DATA__[q && q.__col]) || [];
   return { docs: raw.map((d) => ({ id: d.id, data: () => d })), size: raw.length, forEach(f) { this.docs.forEach(f); } };
 }
-export async function addDoc() { return { id: 'nuevo' }; }
+/* Registra lo escrito cuando el test lo pide (globalThis.__ESCRITOS__ = {}),
+   para poder verificar que se guardo lo que se ve en pantalla y no solo
+   que la pantalla se veia bien. */
+export async function addDoc(ref, data) {
+  const col = ref && ref.__col;
+  if (globalThis.__ESCRITOS__ && col) {
+    if (!globalThis.__ESCRITOS__[col]) globalThis.__ESCRITOS__[col] = [];
+    globalThis.__ESCRITOS__[col].push(data);
+  }
+  return { id: 'nuevo' };
+}
 export async function updateDoc() {}
 export async function deleteDoc() {}
 export async function setDoc() {}
