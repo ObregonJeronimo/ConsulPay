@@ -2070,19 +2070,26 @@ console.log('\n[28] Copiar la lista de pacientes de la tabla');
 
   const hoyC = new Date();
   const fechaC = (dia) => ({ toDate: () => new Date(hoyC.getFullYear(), hoyC.getMonth(), dia, 10, 0) });
-  const sesC = (id, prof, pacId, cantidad, dia) => ({
-    id, consultorioId: 'C1', profesionalUid: prof, pacienteId: pacId,
-    metodoPagoId: 'os', metodoPagoNombre: 'OBRA SOCIAL 24%', metodoPagoTipo: 'diferido',
-    estadoPago: 'debido', valorTotal: 10000 * cantidad, valorSesion: 10000,
-    porcentajeConsultorio: 24, montoConsultorio: 2400 * cantidad, montoProfesional: 7600 * cantidad,
-    cantidadSesiones: cantidad, fecha: fechaC(dia),
-  });
+  const sesC = (id, prof, pacId, cantidad, dia, estadoPago = 'debido') => {
+    const sinMonto = estadoPago === 'pendiente_monto';
+    return {
+      id, consultorioId: 'C1', profesionalUid: prof, pacienteId: pacId,
+      metodoPagoId: 'os', metodoPagoNombre: 'OBRA SOCIAL 24%', metodoPagoTipo: 'diferido',
+      estadoPago,
+      valorTotal: sinMonto ? 0 : 10000 * cantidad,
+      valorSesion: sinMonto ? 0 : 10000,
+      porcentajeConsultorio: 24,
+      montoConsultorio: sinMonto ? 0 : 2400 * cantidad,
+      montoProfesional: sinMonto ? 0 : 7600 * cantidad,
+      cantidadSesiones: cantidad, fecha: fechaC(dia),
+    };
+  };
 
   const datosC = () => ({
     sesiones: [
       sesC('c1', 'BE', 'PA1', 8, 15),
-      sesC('c2', 'BE', 'PA2', 8, 15),
-      sesC('c3', 'OT', 'PA3', 32, 3),
+      sesC('c2', 'BE', 'PA2', 8, 15, 'pagado'),
+      sesC('c3', 'OT', 'PA3', 32, 3, 'pendiente_monto'),
     ],
     pacientes: [
       { id: 'PA1', consultorioId: 'C1', nombre: 'Geronimo', apellido: 'Pais', estado: 'activo' },
@@ -2138,12 +2145,24 @@ console.log('\n[28] Copiar la lista de pacientes de la tabla');
   })();
   chequeo('el titulo es el mes', lineas[0] === `${mesEsperado}:`, `(${lineas[0]})`);
   chequeo('una linea por registro de la tabla', lineas.length === 4, `(${lineas.length})`);
-  chequeo('cada linea es nombre apellido y la cantidad entre parentesis',
-    lineas.slice(1).every((l) => /^[^()]+\(\d+\)$/.test(l)), `(${lineas.slice(1)})`);
+  chequeo('cada linea es numero, paciente, cantidad y estado',
+    lineas.slice(1).every((l) => /^\d+- [^()]+\(\d+\) (Pago|NoPago|PorLiquidar)$/.test(l)),
+    `(${lineas.slice(1)})`);
+  /* La numeracion es por linea y arranca en 1: es para contar pacientes de
+     un vistazo, no un id de nada. */
+  chequeo('numera de 1 en adelante, sin saltos',
+    lineas.slice(1).every((l, i) => l.startsWith(`${i + 1}- `)), `(${lineas.slice(1)})`);
   chequeo('sale el nombre antes que el apellido',
-    lineas.includes('Geronimo Pais(8)'), `(${lineas})`);
+    lineas.some((l) => /^\d+- Geronimo Pais\(8\) /.test(l)), `(${lineas})`);
   chequeo('la cantidad es la del registro agrupado',
-    lineas.includes('Catalina Trancon(32)'), `(${lineas})`);
+    lineas.some((l) => /^\d+- Catalina Trancon\(32\) /.test(l)), `(${lineas})`);
+  /* Los tres estados que puede tener una sesion, cada uno con su palabra. */
+  chequeo('la debida sale NoPago',
+    lineas.some((l) => /Geronimo Pais\(8\) NoPago$/.test(l)), `(${lineas})`);
+  chequeo('la pagada sale Pago',
+    lineas.some((l) => /Benjamín Rafael\(8\) Pago$/.test(l)), `(${lineas})`);
+  chequeo('la de obra social sin monto sale PorLiquidar',
+    lineas.some((l) => /Catalina Trancon\(32\) PorLiquidar$/.test(l)), `(${lineas})`);
   /* Es una lista para mandar por chat: la plata y el metodo no van. */
   chequeo('no se copia plata ni metodo',
     !copiado.includes('$') && !copiado.includes('OBRA SOCIAL'), `(${copiado})`);
@@ -2158,6 +2177,11 @@ console.log('\n[28] Copiar la lista de pacientes de la tabla');
   await act(async () => { clic(r.cont.querySelector('.cp-copiar-tabla')); });
   chequeo('respeta el filtro de profesional',
     copiado.split('\n').length === 3 && !copiado.includes('Catalina'), `(${copiado.replace(/\n/g, ' | ')})`);
+  /* Con menos filas la numeracion vuelve a empezar: numera la lista que se
+     copia, no la posicion que tenia la fila en la tabla sin filtrar. */
+  chequeo('y renumera lo que queda',
+    copiado.split('\n').slice(1).every((l, i) => l.startsWith(`${i + 1}- `)),
+    `(${copiado.replace(/\n/g, ' | ')})`);
 
   await act(async () => { r.root.unmount(); });
 }

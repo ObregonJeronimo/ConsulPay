@@ -715,10 +715,20 @@ function nombreYApellido(pac, fallback) {
   return s || fallback || 'Paciente';
 }
 
+/* El estado, en una palabra sola. El badge de la tabla dice "Debe" /
+   "Pagada" / "A liquidar", pero en la lista conviene que no tenga espacios:
+   se lee de un vistazo pegada al parentesis. */
+const ESTADO_EN_LISTA = {
+  [ESTADOS_PAGO_SESION.PAGADO]: 'Pago',
+  [ESTADOS_PAGO_SESION.DEBIDO]: 'NoPago',
+  [ESTADOS_PAGO_SESION.PENDIENTE_MONTO]: 'PorLiquidar',
+};
+
 function textoTablaSesiones(sesiones, mapaPacientes, mes) {
-  const lineas = sesiones.map((s) => {
+  const lineas = sesiones.map((s, i) => {
     const nombre = nombreYApellido(mapaPacientes[s.pacienteId], s.pacienteNombre);
-    return `${nombre}(${getCantidadSesiones(s)})`;
+    const estado = ESTADO_EN_LISTA[s.estadoPago] || s.estadoPago;
+    return `${i + 1}- ${nombre}(${getCantidadSesiones(s)}) ${estado}`;
   });
   return `${nombreDeMesSolo(mes)}:\n${lineas.join('\n')}`;
 }
