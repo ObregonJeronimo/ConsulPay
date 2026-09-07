@@ -46,6 +46,7 @@ Sale con código 1 si algo falla, así que sirve para un pre-push hook.
 25. Mis solicitudes del profesional — el reparto de lo que se liquida
 26. Grupos de solicitudes — los totales alineados entre sí
 27. Planilla anual — grilla de carga, validaciones y lo que se escribe
+28. Copiar la tabla de sesiones — solo admin, formato y filtros
 
 ## Límite conocido
 

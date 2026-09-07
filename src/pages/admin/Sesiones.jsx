@@ -19,6 +19,7 @@ import {
   ESTADOS_PAGO_SESION,
   ESTADOS_USUARIO,
   formatoARS,
+  ROLES,
   TIPOS_METODO_PAGO,
 } from '../../lib/constants.js';
 import { getMetodosPaciente, suscribirPacientesConsultorio } from '../../lib/pacientes.js';
@@ -320,6 +321,10 @@ export default function Sesiones() {
   const stats = useMemo(() => totalesGlobales(sesionesFiltradas), [sesionesFiltradas]);
   const cobrado = stats.totalConsultorio - stats.debido;
 
+  /* El coadmin entra a esta pantalla igual que el admin (ProtectedRoute lo
+     deja pasar), asi que no alcanza con estar en /admin para asumir admin. */
+  const esAdminEstricto = user?.rol === ROLES.ADMIN || user?.rol === ROLES.SUPERADMIN;
+
   /* ---- Handlers ---- */
 
   async function handleGuardar(input) {
@@ -585,16 +590,29 @@ export default function Sesiones() {
               </p>
             </div>
           ) : (
-            <TablaSesiones
-              sesiones={sesionesFiltradas}
-              mapaPacientes={mapaPacientes}
-              mapaProfesionales={mapaProfesionales}
-              mapaMetodos={mapaMetodos}
-              onEditar={(s) => setEditando(s)}
-              onEliminar={handleEliminar}
-              onTogglePagado={handleTogglePagado}
-              onLiquidar={handleAbrirLiquidar}
-            />
+            <>
+              {/* Solo el admin: el coadmin no reparte plata ni maneja las
+                  listas que se le pasan a la obra social. */}
+              {esAdminEstricto && (
+                <div className="cp-sesiones-tabla-barra">
+                  <BotonCopiarTabla
+                    sesiones={sesionesFiltradas}
+                    mapaPacientes={mapaPacientes}
+                    mes={mes}
+                  />
+                </div>
+              )}
+              <TablaSesiones
+                sesiones={sesionesFiltradas}
+                mapaPacientes={mapaPacientes}
+                mapaProfesionales={mapaProfesionales}
+                mapaMetodos={mapaMetodos}
+                onEditar={(s) => setEditando(s)}
+                onEliminar={handleEliminar}
+                onTogglePagado={handleTogglePagado}
+                onLiquidar={handleAbrirLiquidar}
+              />
+            </>
           )}
         </>
       )}
@@ -672,6 +690,60 @@ export default function Sesiones() {
         />
       )}
     </div>
+  );
+}
+
+/* ============================================================
+   Copiar la tabla como lista de pacientes
+   ----------------------------------------------------------------
+   Lo que se copia va a un chat, no a una planilla: el mes como titulo y
+   una linea por registro con el paciente y cuantas sesiones tiene. Nada
+   de plata — es la lista para chequear contra la planilla de la obra
+   social o para pasarle al profesional.
+
+   Copia lo que se esta viendo, filtros y orden incluidos: si la tabla
+   esta filtrada por profesional, la lista sale de ese profesional.
+   ============================================================ */
+function nombreDeMesSolo(mes) {
+  const m = mes.toLocaleDateString('es-AR', { month: 'long' });
+  return m.charAt(0).toUpperCase() + m.slice(1);
+}
+
+function nombreYApellido(pac, fallback) {
+  if (!pac) return fallback || 'Paciente eliminado';
+  const s = `${pac.nombre ?? ''} ${pac.apellido ?? ''}`.trim();
+  return s || fallback || 'Paciente';
+}
+
+function textoTablaSesiones(sesiones, mapaPacientes, mes) {
+  const lineas = sesiones.map((s) => {
+    const nombre = nombreYApellido(mapaPacientes[s.pacienteId], s.pacienteNombre);
+    return `${nombre}(${getCantidadSesiones(s)})`;
+  });
+  return `${nombreDeMesSolo(mes)}:\n${lineas.join('\n')}`;
+}
+
+function BotonCopiarTabla({ sesiones, mapaPacientes, mes }) {
+  const [copiado, setCopiado] = useState(false);
+
+  function copiar() {
+    navigator.clipboard.writeText(textoTablaSesiones(sesiones, mapaPacientes, mes)).then(() => {
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    }).catch(() => {
+      console.error('No se pudo copiar al portapapeles');
+    });
+  }
+
+  return (
+    <button
+      type="button"
+      className="cp-copiar-tabla"
+      onClick={copiar}
+      title={`Copiar los ${sesiones.length} pacientes de la tabla con su cantidad de sesiones`}
+    >
+      {copiado ? '¡Copiado!' : 'Copiar lista'}
+    </button>
   );
 }
 

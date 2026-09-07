@@ -978,6 +978,34 @@
   min-width: 0;
 }
 
+/* La barra que corona la tabla: por ahora solo el boton de copiar, alineado
+   a la derecha para que no compita con los filtros de arriba. */
+.cp-sesiones-tabla-barra {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+.cp-copiar-tabla {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-pill);
+  background: var(--cp-surface);
+  color: var(--cp-text-muted);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--cp-dur-fast) var(--cp-ease),
+              border-color var(--cp-dur-fast) var(--cp-ease);
+}
+.cp-copiar-tabla:hover { color: var(--cp-text); border-color: var(--cp-border-strong); }
+.cp-copiar-tabla:focus-visible { outline: none; box-shadow: var(--cp-shadow-focus); }
+
 /* El boton de copiar y el contador comparten la punta derecha del header. */
 .cp-sel__head-fin {
   display: inline-flex;
@@ -1183,5 +1211,6 @@
 @media (prefers-reduced-motion: reduce) {
   .cp-sel__fila,
   .cp-sel__atajo,
-  .cp-sel__copiar { transition: none; }
+  .cp-sel__copiar,
+  .cp-copiar-tabla { transition: none; }
 }

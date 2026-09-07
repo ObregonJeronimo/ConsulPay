@@ -1703,7 +1703,7 @@ console.log('\n[23] Selector del modal "Marcar mes como pagado"');
   chequeo('en celular la fila tiene altura tactil',
     /@media \(max-width: 460px\)[\s\S]{0,300}min-height: 46px/.test(cssSes));
   chequeo('respeta prefers-reduced-motion',
-    /\.cp-sel__fila,\r?\n\s*\.cp-sel__atajo,\r?\n\s*\.cp-sel__copiar \{ transition: none; \}/.test(cssSes));
+    /\.cp-sel__fila,\r?\n\s*\.cp-sel__atajo,\r?\n\s*\.cp-sel__copiar,\r?\n\s*\.cp-copiar-tabla \{ transition: none; \}/.test(cssSes));
 
   await act(async () => { root.unmount(); });
 }
@@ -2060,6 +2060,106 @@ console.log('\n[27] Planilla anual: cargar un año de sesiones');
     celdas(filaDe('Alvarez'))[0].value === '' && botonGuardar().disabled);
 
   delete globalThis.__ESCRITOS__;
+}
+
+/* ============ 28. Copiar la tabla de sesiones ============ */
+console.log('\n[28] Copiar la lista de pacientes de la tabla');
+{
+  const { default: Sesiones } = await import('../src/pages/admin/Sesiones.jsx');
+  const { MemoryRouter } = await import('react-router-dom');
+
+  const hoyC = new Date();
+  const fechaC = (dia) => ({ toDate: () => new Date(hoyC.getFullYear(), hoyC.getMonth(), dia, 10, 0) });
+  const sesC = (id, prof, pacId, cantidad, dia) => ({
+    id, consultorioId: 'C1', profesionalUid: prof, pacienteId: pacId,
+    metodoPagoId: 'os', metodoPagoNombre: 'OBRA SOCIAL 24%', metodoPagoTipo: 'diferido',
+    estadoPago: 'debido', valorTotal: 10000 * cantidad, valorSesion: 10000,
+    porcentajeConsultorio: 24, montoConsultorio: 2400 * cantidad, montoProfesional: 7600 * cantidad,
+    cantidadSesiones: cantidad, fecha: fechaC(dia),
+  });
+
+  const datosC = () => ({
+    sesiones: [
+      sesC('c1', 'BE', 'PA1', 8, 15),
+      sesC('c2', 'BE', 'PA2', 8, 15),
+      sesC('c3', 'OT', 'PA3', 32, 3),
+    ],
+    pacientes: [
+      { id: 'PA1', consultorioId: 'C1', nombre: 'Geronimo', apellido: 'Pais', estado: 'activo' },
+      { id: 'PA2', consultorioId: 'C1', nombre: 'Benjamín', apellido: 'Rafael', estado: 'activo' },
+      { id: 'PA3', consultorioId: 'C1', nombre: 'Catalina', apellido: 'Trancon', estado: 'activo' },
+    ],
+    usuarios: [
+      { id: 'BE', uid: 'BE', displayName: 'Belen Herrera', consultorioId: 'C1', rol: 'profesional', estado: 'activo' },
+      { id: 'OT', uid: 'OT', displayName: 'Otra Profesional', consultorioId: 'C1', rol: 'profesional', estado: 'activo' },
+      { id: 'A', uid: 'A', displayName: 'Adriana', consultorioId: 'C1', rol: 'admin', estado: 'activo' },
+    ],
+    solicitudes_sesion: [], pagos_consultorio: [], gastos: [],
+  });
+
+  const consC = { nombre: 'CALA', adminUids: ['A'], mpConfigs: {}, metodosPagoPaciente: [
+    { id: 'os', nombre: 'OBRA SOCIAL 24%', porcentajeConsultorio: 24, tipo: 'diferido' },
+  ] };
+
+  const montarSesiones = async (rol) => {
+    globalThis.__USER__ = { uid: 'A', consultorioId: 'C1', rol, displayName: 'Adriana' };
+    globalThis.__CONS__ = consC;
+    globalThis.__DATA__ = datosC();
+    const cont = document.createElement('div');
+    document.body.appendChild(cont);
+    const root = createRoot(cont);
+    await act(async () => { root.render(createElement(MemoryRouter, null, createElement(Sesiones))); });
+    return { cont, root };
+  };
+
+  /* El coadmin entra a /admin/sesiones igual que el admin, asi que estar en
+     la pantalla no alcanza: el boton se gatea por rol. */
+  let r = await montarSesiones('coadmin');
+  chequeo('el coadmin no ve el boton de copiar', !r.cont.querySelector('.cp-copiar-tabla'));
+  await act(async () => { r.root.unmount(); });
+
+  r = await montarSesiones('admin');
+  const boton = r.cont.querySelector('.cp-copiar-tabla');
+  chequeo('el admin si lo ve', !!boton);
+  chequeo('esta arriba de la tabla, alineado a la derecha',
+    !!r.cont.querySelector('.cp-sesiones-tabla-barra .cp-copiar-tabla'));
+
+  let copiado = '';
+  Object.defineProperty(globalThis.navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText: (txt) => { copiado = txt; return Promise.resolve(); } },
+  });
+  await act(async () => { clic(boton); });
+
+  const lineas = copiado.split('\n');
+  const mesEsperado = (() => {
+    const m = hoyC.toLocaleDateString('es-AR', { month: 'long' });
+    return m.charAt(0).toUpperCase() + m.slice(1);
+  })();
+  chequeo('el titulo es el mes', lineas[0] === `${mesEsperado}:`, `(${lineas[0]})`);
+  chequeo('una linea por registro de la tabla', lineas.length === 4, `(${lineas.length})`);
+  chequeo('cada linea es nombre apellido y la cantidad entre parentesis',
+    lineas.slice(1).every((l) => /^[^()]+\(\d+\)$/.test(l)), `(${lineas.slice(1)})`);
+  chequeo('sale el nombre antes que el apellido',
+    lineas.includes('Geronimo Pais(8)'), `(${lineas})`);
+  chequeo('la cantidad es la del registro agrupado',
+    lineas.includes('Catalina Trancon(32)'), `(${lineas})`);
+  /* Es una lista para mandar por chat: la plata y el metodo no van. */
+  chequeo('no se copia plata ni metodo',
+    !copiado.includes('$') && !copiado.includes('OBRA SOCIAL'), `(${copiado})`);
+
+  // Copia lo que se ve: si la tabla esta filtrada, la lista tambien.
+  const selProfC = [...r.cont.querySelectorAll('.cp-sesiones-filtros__select')]
+    .find((s) => [...s.options].some((o) => o.textContent.includes('Belen')));
+  await act(async () => {
+    selProfC.value = 'BE';
+    selProfC.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+  });
+  await act(async () => { clic(r.cont.querySelector('.cp-copiar-tabla')); });
+  chequeo('respeta el filtro de profesional',
+    copiado.split('\n').length === 3 && !copiado.includes('Catalina'), `(${copiado.replace(/\n/g, ' | ')})`);
+
+  await act(async () => { r.root.unmount(); });
 }
 
 console.log(`\n${'='.repeat(52)}`);
