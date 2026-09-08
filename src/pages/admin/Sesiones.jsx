@@ -724,8 +724,21 @@ const ESTADO_EN_LISTA = {
   [ESTADOS_PAGO_SESION.PENDIENTE_MONTO]: 'PorLiquidar',
 };
 
+/* La lista se lee de arriba hacia abajo buscando lo que falta, asi que lo
+   cerrado va primero y lo que se debe queda al final, que es donde se mira.
+   El sort de JS es estable: dentro de cada estado se mantiene el orden de
+   la tabla (fecha, paciente o metodo, lo que este elegido). */
+const ORDEN_ESTADO_LISTA = {
+  [ESTADOS_PAGO_SESION.PAGADO]: 0,
+  [ESTADOS_PAGO_SESION.PENDIENTE_MONTO]: 1,
+  [ESTADOS_PAGO_SESION.DEBIDO]: 2,
+};
+
 function textoTablaSesiones(sesiones, mapaPacientes, mes) {
-  const lineas = sesiones.map((s, i) => {
+  const ordenadas = [...sesiones].sort(
+    (a, b) => (ORDEN_ESTADO_LISTA[a.estadoPago] ?? 9) - (ORDEN_ESTADO_LISTA[b.estadoPago] ?? 9),
+  );
+  const lineas = ordenadas.map((s, i) => {
     const nombre = nombreYApellido(mapaPacientes[s.pacienteId], s.pacienteNombre);
     const estado = ESTADO_EN_LISTA[s.estadoPago] || s.estadoPago;
     return `${i + 1}- ${nombre}(${getCantidadSesiones(s)}) ${estado}`;

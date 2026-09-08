@@ -2156,6 +2156,10 @@ console.log('\n[28] Copiar la lista de pacientes de la tabla');
     lineas.some((l) => /^\d+- Geronimo Pais\(8\) /.test(l)), `(${lineas})`);
   chequeo('la cantidad es la del registro agrupado',
     lineas.some((l) => /^\d+- Catalina Trancon\(32\) /.test(l)), `(${lineas})`);
+  /* Lo cerrado arriba y lo que falta abajo, que es donde se va a mirar. */
+  chequeo('ordena de pago a no pago',
+    lineas.slice(1).map((l) => l.split(' ').pop()).join('|') === 'Pago|PorLiquidar|NoPago',
+    `(${lineas.slice(1)})`);
   /* Los tres estados que puede tener una sesion, cada uno con su palabra. */
   chequeo('la debida sale NoPago',
     lineas.some((l) => /Geronimo Pais\(8\) NoPago$/.test(l)), `(${lineas})`);
@@ -2181,6 +2185,9 @@ console.log('\n[28] Copiar la lista de pacientes de la tabla');
      copia, no la posicion que tenia la fila en la tabla sin filtrar. */
   chequeo('y renumera lo que queda',
     copiado.split('\n').slice(1).every((l, i) => l.startsWith(`${i + 1}- `)),
+    `(${copiado.replace(/\n/g, ' | ')})`);
+  chequeo('y sigue ordenando por estado',
+    copiado.split('\n').slice(1).map((l) => l.split(' ').pop()).join('|') === 'Pago|NoPago',
     `(${copiado.replace(/\n/g, ' | ')})`);
 
   await act(async () => { r.root.unmount(); });
