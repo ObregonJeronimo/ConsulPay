@@ -84,6 +84,12 @@ const TrashIcon = () => (
     <path d="M19 6l-2 14a2 2 0 01-2 2H9a2 2 0 01-2-2L5 6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
   </svg>
 );
+const CopyIcon = () => (
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="9" y="9" width="13" height="13" rx="2" />
+    <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+  </svg>
+);
 const CheckIcon = () => (
   <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="20 6 9 17 4 12" />
@@ -611,6 +617,7 @@ export default function Sesiones() {
                 onEliminar={handleEliminar}
                 onTogglePagado={handleTogglePagado}
                 onLiquidar={handleAbrirLiquidar}
+                puedeCopiar={esAdminEstricto}
               />
             </>
           )}
@@ -756,6 +763,56 @@ function textoTablaSesiones(sesiones, mapaPacientes, mes) {
     + `\n\nTotal NoPago (al consultorio): ${formatoARS.format(totalNoPago)}`;
 }
 
+/* Una fila sola, en una frase. Es para pegar en un chat cuando se discute
+   una sesion puntual: quien, cuantas, cuanto y como se reparte.
+
+   El apellido va primero y sin coma, que es como se nombra al paciente
+   cuando se lo escribe en una frase. Los montos van pegados al signo
+   ("$151.699") porque es un texto para leer, no una planilla. */
+function textoFilaSesion(sesion, mapaPacientes) {
+  const pac = mapaPacientes[sesion.pacienteId];
+  const nombre = pac
+    ? `${pac.apellido ?? ''} ${pac.nombre ?? ''}`.trim()
+    : (sesion.pacienteNombre || 'Paciente eliminado');
+  const cantidad = getCantidadSesiones(sesion);
+  const sesiones = `${cantidad} ${cantidad === 1 ? 'sesión' : 'sesiones'}`;
+  const plata = (n) => formatoARS.format(Number(n) || 0).replace(/\s/g, '');
+
+  /* Una de obra social sin liquidar tiene los tres montos en cero. Decir
+     "le corresponde $0 al consultorio" seria mentir: todavia no se sabe. */
+  if (sesion.estadoPago === ESTADOS_PAGO_SESION.PENDIENTE_MONTO) {
+    return `${nombre} | ${sesiones} | sin monto liquidado todavía.`;
+  }
+
+  return `${nombre} | ${sesiones} | ${plata(sesion.valorTotal)}, `
+    + `le corresponde ${plata(sesion.montoConsultorio)} al consultorio `
+    + `y ${plata(sesion.montoProfesional)} al profesional.`;
+}
+
+function BotonCopiarFila({ sesion, mapaPacientes }) {
+  const [copiado, setCopiado] = useState(false);
+
+  function copiar() {
+    navigator.clipboard.writeText(textoFilaSesion(sesion, mapaPacientes)).then(() => {
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 1500);
+    }).catch(() => {
+      console.error('No se pudo copiar al portapapeles');
+    });
+  }
+
+  return (
+    <button
+      className={`cp-icon-btn ${copiado ? 'cp-icon-btn--success' : ''}`}
+      onClick={copiar}
+      title="Copiar el detalle de esta sesión"
+      aria-label="Copiar detalle de la sesión"
+    >
+      {copiado ? <CheckIcon /> : <CopyIcon />}
+    </button>
+  );
+}
+
 function BotonCopiarTabla({ sesiones, mapaPacientes, mes }) {
   const [copiado, setCopiado] = useState(false);
 
@@ -867,7 +924,7 @@ export function GroupBadge({ cantidad }) {
 /* ============================================================
    Tabla de sesiones (vista admin)
    ============================================================ */
-function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, mapaMetodos, onEditar, onEliminar, onTogglePagado, onLiquidar }) {
+function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, mapaMetodos, onEditar, onEliminar, onTogglePagado, onLiquidar, puedeCopiar }) {
   return (
     <DualScrollTable className="cp-compact-list">
       <table className="cp-table cp-sesiones-tabla">
@@ -1002,6 +1059,9 @@ function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, mapaMetodos
                     >
                       <EditIcon />
                     </button>
+                    {puedeCopiar && (
+                      <BotonCopiarFila sesion={s} mapaPacientes={mapaPacientes} />
+                    )}
                     <button
                       className="cp-icon-btn cp-icon-btn--danger"
                       onClick={() => onEliminar(s)}
@@ -1072,6 +1132,16 @@ function TablaSesiones({ sesiones, mapaPacientes, mapaProfesionales, mapaMetodos
                         },
                       ]),
                       { label: 'Editar', icon: <EditIcon />, onClick: () => onEditar(s) },
+                      /* En mobile los botones de fila viven en este menu, asi
+                         que el de copiar entra aca, tambien antes de borrar. */
+                      ...(puedeCopiar ? [{
+                        label: 'Copiar detalle',
+                        icon: <CopyIcon />,
+                        onClick: () => {
+                          navigator.clipboard.writeText(textoFilaSesion(s, mapaPacientes))
+                            .catch(() => console.error('No se pudo copiar al portapapeles'));
+                        },
+                      }] : []),
                       { label: 'Eliminar', icon: <TrashIcon />, onClick: () => onEliminar(s), danger: true },
                     ]}
                   />

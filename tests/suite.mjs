@@ -2123,6 +2123,8 @@ console.log('\n[28] Copiar la lista de pacientes de la tabla');
      la pantalla no alcanza: el boton se gatea por rol. */
   let r = await montarSesiones('coadmin');
   chequeo('el coadmin no ve el boton de copiar', !r.cont.querySelector('.cp-copiar-tabla'));
+  chequeo('ni el de copiar cada fila',
+    !r.cont.querySelector('[aria-label="Copiar detalle de la sesión"]'));
   await act(async () => { r.root.unmount(); });
 
   r = await montarSesiones('admin');
@@ -2188,6 +2190,33 @@ console.log('\n[28] Copiar la lista de pacientes de la tabla');
   /* Una linea en blanco antes del total: si no, se lee como un item mas. */
   chequeo('el total va separado de la lista',
     copiado.split('\n').at(-2) === '', `(${JSON.stringify(copiado.split('\n').slice(-3))})`);
+
+  /* ---- El boton de copiar una fila sola ---- */
+  const copiarFilaDe = (ape) => [...r.cont.querySelectorAll('.cp-sesiones-tabla__row')]
+    .find((tr) => (tr.querySelector('.cp-prof-name')?.textContent || '').includes(ape))
+    ?.querySelector('[aria-label="Copiar detalle de la sesión"]');
+
+  chequeo('hay un boton de copiar por fila',
+    r.cont.querySelectorAll('[aria-label="Copiar detalle de la sesión"]').length === 3,
+    `(${r.cont.querySelectorAll('[aria-label="Copiar detalle de la sesión"]').length})`);
+  /* Pedido explicito: va antes del de borrar. */
+  chequeo('el boton va justo antes del de eliminar', (() => {
+    const acciones = [...r.cont.querySelector('.cp-sesiones-tabla__actions').children];
+    const iCopiar = acciones.findIndex((b) => b.getAttribute('aria-label') === 'Copiar detalle de la sesión');
+    const iBorrar = acciones.findIndex((b) => b.getAttribute('aria-label') === 'Eliminar');
+    return iCopiar >= 0 && iBorrar === iCopiar + 1;
+  })());
+
+  await act(async () => { clic(copiarFilaDe('Pais')); });
+  chequeo('copia el detalle de esa sesion en una frase',
+    copiado === 'Pais Geronimo | 8 sesiones | $80.000, le corresponde $19.200 al consultorio y $60.800 al profesional.',
+    `(${copiado})`);
+
+  /* Una de obra social sin liquidar tiene los tres montos en cero: decir
+     "le corresponde $0" seria mentir, todavia no se sabe cuanto liquida. */
+  await act(async () => { clic(copiarFilaDe('Trancon')); });
+  chequeo('la que no se liquido lo dice en vez de poner ceros',
+    copiado === 'Trancon Catalina | 32 sesiones | sin monto liquidado todavía.', `(${copiado})`);
 
   // Copia lo que se ve: si la tabla esta filtrada, la lista tambien.
   const selProfC = [...r.cont.querySelectorAll('.cp-sesiones-filtros__select')]
