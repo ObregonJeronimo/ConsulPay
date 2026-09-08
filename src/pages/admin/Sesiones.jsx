@@ -743,7 +743,17 @@ function textoTablaSesiones(sesiones, mapaPacientes, mes) {
     const estado = ESTADO_EN_LISTA[s.estadoPago] || s.estadoPago;
     return `${i + 1}- ${nombre}(${getCantidadSesiones(s)}) ${estado}`;
   });
-  return `${nombreDeMesSolo(mes)}:\n${lineas.join('\n')}`;
+
+  /* Cierra con lo que todavia no entro, en la parte del consultorio: es el
+     numero que se busca despues de leer la lista. Las de obra social sin
+     monto no suman — todavia no se sabe cuanto van a liquidar — y por eso
+     el total dice "NoPago" y no "lo que falta". */
+  const totalNoPago = ordenadas
+    .filter((s) => s.estadoPago === ESTADOS_PAGO_SESION.DEBIDO)
+    .reduce((acc, s) => acc + (Number(s.montoConsultorio) || 0), 0);
+
+  return `${nombreDeMesSolo(mes)}:\n${lineas.join('\n')}`
+    + `\n\nTotal NoPago (al consultorio): ${formatoARS.format(totalNoPago)}`;
 }
 
 function BotonCopiarTabla({ sesiones, mapaPacientes, mes }) {

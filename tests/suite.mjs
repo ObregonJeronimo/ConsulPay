@@ -2143,23 +2143,27 @@ console.log('\n[28] Copiar la lista de pacientes de la tabla');
     const m = hoyC.toLocaleDateString('es-AR', { month: 'long' });
     return m.charAt(0).toUpperCase() + m.slice(1);
   })();
+  const filasCopia = (txt) => txt.split('\n').filter((l) => /^\d+- /.test(l));
+  const estadosDe = (txt) => filasCopia(txt).map((l) => l.split(' ').pop()).join('|');
+  const totalDe = (txt) => txt.split('\n').at(-1);
+
   chequeo('el titulo es el mes', lineas[0] === `${mesEsperado}:`, `(${lineas[0]})`);
-  chequeo('una linea por registro de la tabla', lineas.length === 4, `(${lineas.length})`);
+  chequeo('una linea por registro de la tabla', filasCopia(copiado).length === 3,
+    `(${filasCopia(copiado).length})`);
   chequeo('cada linea es numero, paciente, cantidad y estado',
-    lineas.slice(1).every((l) => /^\d+- [^()]+\(\d+\) (Pago|NoPago|PorLiquidar)$/.test(l)),
-    `(${lineas.slice(1)})`);
+    filasCopia(copiado).every((l) => /^\d+- [^()]+\(\d+\) (Pago|NoPago|PorLiquidar)$/.test(l)),
+    `(${filasCopia(copiado)})`);
   /* La numeracion es por linea y arranca en 1: es para contar pacientes de
      un vistazo, no un id de nada. */
   chequeo('numera de 1 en adelante, sin saltos',
-    lineas.slice(1).every((l, i) => l.startsWith(`${i + 1}- `)), `(${lineas.slice(1)})`);
+    filasCopia(copiado).every((l, i) => l.startsWith(`${i + 1}- `)), `(${filasCopia(copiado)})`);
   chequeo('sale el nombre antes que el apellido',
     lineas.some((l) => /^\d+- Geronimo Pais\(8\) /.test(l)), `(${lineas})`);
   chequeo('la cantidad es la del registro agrupado',
     lineas.some((l) => /^\d+- Catalina Trancon\(32\) /.test(l)), `(${lineas})`);
   /* Lo cerrado arriba y lo que falta abajo, que es donde se va a mirar. */
   chequeo('ordena de pago a no pago',
-    lineas.slice(1).map((l) => l.split(' ').pop()).join('|') === 'Pago|PorLiquidar|NoPago',
-    `(${lineas.slice(1)})`);
+    estadosDe(copiado) === 'Pago|PorLiquidar|NoPago', `(${estadosDe(copiado)})`);
   /* Los tres estados que puede tener una sesion, cada uno con su palabra. */
   chequeo('la debida sale NoPago',
     lineas.some((l) => /Geronimo Pais\(8\) NoPago$/.test(l)), `(${lineas})`);
@@ -2167,9 +2171,23 @@ console.log('\n[28] Copiar la lista de pacientes de la tabla');
     lineas.some((l) => /Benjamín Rafael\(8\) Pago$/.test(l)), `(${lineas})`);
   chequeo('la de obra social sin monto sale PorLiquidar',
     lineas.some((l) => /Catalina Trancon\(32\) PorLiquidar$/.test(l)), `(${lineas})`);
-  /* Es una lista para mandar por chat: la plata y el metodo no van. */
-  chequeo('no se copia plata ni metodo',
-    !copiado.includes('$') && !copiado.includes('OBRA SOCIAL'), `(${copiado})`);
+  /* Es una lista para mandar por chat: en las filas no va ni plata ni
+     metodo. La unica cifra es el total del final. */
+  chequeo('las filas no llevan plata ni metodo',
+    filasCopia(copiado).every((l) => !l.includes('$') && !l.includes('OBRA SOCIAL')),
+    `(${filasCopia(copiado)})`);
+  /* Cierra con lo que falta cobrar: 8 sesiones debidas x 2.400 = 19.200.
+     La pagada no suma y la de obra social sin monto tampoco. */
+  chequeo('termina con el total de lo no pagado',
+    /^Total NoPago \(al consultorio\): /.test(totalDe(copiado)), `(${totalDe(copiado)})`);
+  chequeo('el total es la parte del consultorio de lo debido',
+    totalDe(copiado).replace(/\s/g, ' ').endsWith('$ 19.200'), `(${totalDe(copiado)})`);
+  chequeo('lo pagado y lo pendiente de monto no entran en ese total',
+    !totalDe(copiado).includes('38.400') && !totalDe(copiado).includes('0.000'),
+    `(${totalDe(copiado)})`);
+  /* Una linea en blanco antes del total: si no, se lee como un item mas. */
+  chequeo('el total va separado de la lista',
+    copiado.split('\n').at(-2) === '', `(${JSON.stringify(copiado.split('\n').slice(-3))})`);
 
   // Copia lo que se ve: si la tabla esta filtrada, la lista tambien.
   const selProfC = [...r.cont.querySelectorAll('.cp-sesiones-filtros__select')]
@@ -2180,15 +2198,19 @@ console.log('\n[28] Copiar la lista de pacientes de la tabla');
   });
   await act(async () => { clic(r.cont.querySelector('.cp-copiar-tabla')); });
   chequeo('respeta el filtro de profesional',
-    copiado.split('\n').length === 3 && !copiado.includes('Catalina'), `(${copiado.replace(/\n/g, ' | ')})`);
+    filasCopia(copiado).length === 2 && !copiado.includes('Catalina'),
+    `(${copiado.replace(/\n/g, ' | ')})`);
   /* Con menos filas la numeracion vuelve a empezar: numera la lista que se
      copia, no la posicion que tenia la fila en la tabla sin filtrar. */
   chequeo('y renumera lo que queda',
-    copiado.split('\n').slice(1).every((l, i) => l.startsWith(`${i + 1}- `)),
+    filasCopia(copiado).every((l, i) => l.startsWith(`${i + 1}- `)),
     `(${copiado.replace(/\n/g, ' | ')})`);
   chequeo('y sigue ordenando por estado',
-    copiado.split('\n').slice(1).map((l) => l.split(' ').pop()).join('|') === 'Pago|NoPago',
-    `(${copiado.replace(/\n/g, ' | ')})`);
+    estadosDe(copiado) === 'Pago|NoPago', `(${estadosDe(copiado)})`);
+  /* El total tambien es el de lo que se ve: la que quedo afuera del filtro
+     no tenia monto, asi que el numero no cambia. */
+  chequeo('y el total sigue siendo el de lo que se ve',
+    totalDe(copiado).replace(/\s/g, ' ').endsWith('$ 19.200'), `(${totalDe(copiado)})`);
 
   await act(async () => { r.root.unmount(); });
 }
