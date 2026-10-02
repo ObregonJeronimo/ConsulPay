@@ -106,6 +106,28 @@ function formatoFechaHoraCorta(date) {
   return { dia, hora };
 }
 
+
+/* Cuando se marco pagada, en corto. Va en la fila misma: es lo que se
+   pregunta cuando alguien discute un pago, y hasta ahora habia que abrir
+   el modal de edicion para verlo.
+
+   El anio solo aparece si no es el corriente: la tabla ya esta parada en
+   un mes, asi que repetirlo seria ruido. Las sesiones marcadas pagadas
+   antes de que existiera fechaPago no tienen el dato y no muestran nada —
+   mejor vacio que una fecha inventada. */
+function fechaDePagoCorta(sesion) {
+  const f = sesion?.fechaPago;
+  if (!f) return null;
+  const d = f.toDate ? f.toDate() : new Date(f);
+  if (!(d instanceof Date) || isNaN(d.getTime())) return null;
+  const corta = d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
+  const anio = d.getFullYear();
+  return {
+    corta: anio === new Date().getFullYear() ? corta : `${corta} ${String(anio).slice(-2)}`,
+    larga: d.toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' }),
+  };
+}
+
 function SelectorMes({ mes, setMes }) {
   const hoy = inicioDeMes(new Date());
   const esEsteMes = mes.getFullYear() === hoy.getFullYear() && mes.getMonth() === hoy.getMonth();
@@ -1456,6 +1478,7 @@ function TablaMisSesiones({ sesiones, mapaPacientes, mapaMetodos, sesionesConPen
             const accionesDisabled = pagada || tienePendiente;
             const cantidad = getCantidadSesiones(s);
             const esAgrupada = cantidad > 1;
+            const pagoEl = pagada ? fechaDePagoCorta(s) : null;
 
             return (
               <tr
@@ -1530,6 +1553,11 @@ function TablaMisSesiones({ sesiones, mapaPacientes, mapaMetodos, sesionesConPen
                     <span className={`cp-badge ${pagada ? 'cp-badge--pagada' : 'cp-badge--debido'}`}>
                       <span className="cp-badge__dot" />
                       {pagada ? 'Pagada' : 'Debe'}
+                    </span>
+                  )}
+                  {pagada && pagoEl && (
+                    <span className="cp-fecha-pago" title={`Pagada el ${pagoEl.larga}`}>
+                      pago {pagoEl.corta}
                     </span>
                   )}
                 </td>
@@ -1613,6 +1641,13 @@ function TablaMisSesiones({ sesiones, mapaPacientes, mapaMetodos, sesionesConPen
                   </div>
                   <div className="cp-row-mobile__bot">
                     {pendienteMonto ? 'Pendiente de liquidar' : `Mi parte: ${formatoARS.format(s.montoProfesional)} · Total: ${formatoARS.format(s.valorTotal)}`}
+                    {/* En mobile el badge vive en su propia celda angosta, asi
+                        que la fecha de pago entra en esta linea. */}
+                    {pagada && pagoEl && (
+                      <span className="cp-fecha-pago cp-fecha-pago--inline" title={`Pagada el ${pagoEl.larga}`}>
+                        pago {pagoEl.corta}
+                      </span>
+                    )}
                   </div>
                 </td>
                 <td className="cp-td-mobile-badge">

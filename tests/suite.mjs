@@ -2244,6 +2244,97 @@ console.log('\n[28] Copiar la lista de pacientes de la tabla');
   await act(async () => { r.root.unmount(); });
 }
 
+/* ============ 29. La fecha de pago en la fila ============ */
+console.log('\n[29] Fecha de pago visible en la fila');
+{
+  const { default: Sesiones } = await import('../src/pages/admin/Sesiones.jsx');
+  const { default: MisSesiones } = await import('../src/pages/profesional/MisSesiones.jsx');
+  const { MemoryRouter } = await import('react-router-dom');
+
+  const hoyF = new Date();
+  const enEsteMes = (dia) => ({ toDate: () => new Date(hoyF.getFullYear(), hoyF.getMonth(), dia, 10, 0) });
+  const esperado = new Date(hoyF.getFullYear(), hoyF.getMonth(), 15, 12, 0)
+    .toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
+
+  const sesF = (id, pacId, estadoPago, fechaPago) => ({
+    id, consultorioId: 'C1', profesionalUid: 'PRO', pacienteId: pacId,
+    metodoPagoId: 'part', metodoPagoNombre: 'Particular', metodoPagoTipo: 'inmediato',
+    estadoPago, valorTotal: 10000, valorSesion: 10000, porcentajeConsultorio: 20,
+    montoConsultorio: 2000, montoProfesional: 8000, cantidadSesiones: 1,
+    fecha: enEsteMes(10), ...(fechaPago ? { fechaPago } : {}),
+  });
+
+  const datosF = {
+    sesiones: [
+      sesF('f1', 'PF1', 'pagado', enEsteMes(15)),
+      /* Las marcadas pagadas antes de que existiera fechaPago no tienen el
+         dato: mejor no mostrar nada que inventar una fecha. */
+      sesF('f2', 'PF2', 'pagado', null),
+      sesF('f3', 'PF3', 'debido', null),
+    ],
+    pacientes: [
+      { id: 'PF1', consultorioId: 'C1', nombre: 'Ana', apellido: 'Conpago', estado: 'activo', profesionalesUids: ['PRO'] },
+      { id: 'PF2', consultorioId: 'C1', nombre: 'Beto', apellido: 'Sinfecha', estado: 'activo', profesionalesUids: ['PRO'] },
+      { id: 'PF3', consultorioId: 'C1', nombre: 'Carla', apellido: 'Debe', estado: 'activo', profesionalesUids: ['PRO'] },
+    ],
+    usuarios: [
+      { id: 'PRO', uid: 'PRO', displayName: 'Muriel', consultorioId: 'C1', rol: 'profesional', estado: 'activo' },
+      { id: 'A', uid: 'A', displayName: 'Adriana', consultorioId: 'C1', rol: 'admin', estado: 'activo' },
+    ],
+    solicitudes_sesion: [], pagos_consultorio: [], gastos: [],
+  };
+  const consF = { nombre: 'CALA', adminUids: ['A'], mpConfigs: {}, metodosPagoPaciente: [
+    { id: 'part', nombre: 'Particular', porcentajeConsultorio: 20, tipo: 'inmediato' },
+  ] };
+
+  const chipDe = (cont, ape) => [...cont.querySelectorAll('.cp-sesiones-tabla__row')]
+    .find((tr) => (tr.textContent || '').includes(ape))
+    ?.querySelector('.cp-fecha-pago');
+
+  /* ---- Admin ---- */
+  globalThis.__USER__ = { uid: 'A', consultorioId: 'C1', rol: 'admin', displayName: 'Adriana' };
+  globalThis.__CONS__ = consF;
+  globalThis.__DATA__ = datosF;
+
+  const contA = document.createElement('div');
+  document.body.appendChild(contA);
+  const rootA = createRoot(contA);
+  await act(async () => { rootA.render(createElement(MemoryRouter, null, createElement(Sesiones))); });
+
+  chequeo('el admin ve la fecha de pago en la fila', !!chipDe(contA, 'Conpago'));
+  chequeo('dice el dia en que se pago',
+    chipDe(contA, 'Conpago')?.textContent.replace(/\s+/g, ' ').trim() === `pago ${esperado}`,
+    `(${chipDe(contA, 'Conpago')?.textContent})`);
+  chequeo('y la fecha completa queda en el title',
+    /^Pagada el /.test(chipDe(contA, 'Conpago')?.getAttribute('title') || ''),
+    `(${chipDe(contA, 'Conpago')?.getAttribute('title')})`);
+  /* Sin fechaPago no hay nada que mostrar, y una sesion que todavia se debe
+     no tiene fecha de pago por definicion. */
+  chequeo('una pagada vieja sin fecha no muestra nada', !chipDe(contA, 'Sinfecha'));
+  chequeo('una que se debe tampoco', !chipDe(contA, 'Debe'));
+  await act(async () => { rootA.unmount(); });
+
+  /* ---- Profesional ---- */
+  globalThis.__USER__ = { uid: 'PRO', consultorioId: 'C1', displayName: 'Muriel', permitirMarcarPagadas: true };
+  globalThis.__CONS__ = consF;
+  globalThis.__DATA__ = datosF;
+
+  const rProf = await montar(MisSesiones, {});
+  chequeo('el profesional tambien la ve', !!chipDe(rProf.cont, 'Conpago'));
+  chequeo('con el mismo formato',
+    chipDe(rProf.cont, 'Conpago')?.textContent.replace(/\s+/g, ' ').trim() === `pago ${esperado}`,
+    `(${chipDe(rProf.cont, 'Conpago')?.textContent})`);
+  chequeo('y tampoco la inventa cuando no esta', !chipDe(rProf.cont, 'Sinfecha'));
+  await act(async () => { rProf.root.unmount(); });
+
+  /* Azul y no verde: al lado del badge "Pagada", que ya es verde, otro
+     verde se confunde con el. */
+  const cssShared = (await import('fs')).readFileSync('../src/styles/shared-ui.css', 'utf8');
+  chequeo('el estilo es global, para las dos pantallas', /\.cp-fecha-pago \{/.test(cssShared));
+  chequeo('y usa un color que se despega del badge',
+    /\.cp-fecha-pago \{[^}]*color: var\(--cp-info\)/.test(cssShared));
+}
+
 console.log(`\n${'='.repeat(52)}`);
 console.log(`${ok} chequeos OK, ${fallos.length} fallas`);
 if (fallos.length) { console.log('FALLAN:'); fallos.forEach((f) => console.log('  - ' + f)); }

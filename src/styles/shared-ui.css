@@ -1038,6 +1038,33 @@
 /* Los tds mobile NUNCA se muestran en desktop — solo en mobile.
    Esta regla va FUERA del media query para tener mayor especificidad. */
 .cp-td-mobile-main,
+/* ============================================================
+   Fecha de pago en la fila
+   ----------------------------------------------------------------
+   Azul y no verde a proposito: al lado del badge "Pagada", que ya es
+   verde, otro verde se confunde con el. El azul separa el dato (cuando)
+   del estado (que), y se lee de un vistazo sin abrir nada.
+   ============================================================ */
+.cp-fecha-pago {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 4px;
+  padding: 1px 7px;
+  border-radius: var(--cp-radius-pill);
+  background: var(--cp-info-bg);
+  color: var(--cp-info);
+  font-family: var(--cp-font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* En mobile va pegada a una linea de texto, no debajo del badge. */
+.cp-fecha-pago--inline {
+  margin-top: 0;
+  margin-left: 6px;
+}
+
 .cp-td-mobile-badge,
 .cp-td-mobile-actions {
   display: none !important;
