@@ -2256,26 +2256,34 @@ console.log('\n[29] Fecha de pago visible en la fila');
   const esperado = new Date(hoyF.getFullYear(), hoyF.getMonth(), 15, 12, 0)
     .toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
 
-  const sesF = (id, pacId, estadoPago, fechaPago) => ({
+  const sesF = (id, pacId, estadoPago, fechaPago, receptorNombre) => ({
     id, consultorioId: 'C1', profesionalUid: 'PRO', pacienteId: pacId,
     metodoPagoId: 'part', metodoPagoNombre: 'Particular', metodoPagoTipo: 'inmediato',
     estadoPago, valorTotal: 10000, valorSesion: 10000, porcentajeConsultorio: 20,
     montoConsultorio: 2000, montoProfesional: 8000, cantidadSesiones: 1,
-    fecha: enEsteMes(10), ...(fechaPago ? { fechaPago } : {}),
+    fecha: enEsteMes(10),
+    ...(fechaPago ? { fechaPago } : {}),
+    ...(receptorNombre ? { receptorNombre } : {}),
   });
 
   const datosF = {
     sesiones: [
-      sesF('f1', 'PF1', 'pagado', enEsteMes(15)),
+      sesF('f1', 'PF1', 'pagado', enEsteMes(15), 'Adriana Barrozo'),
       /* Las marcadas pagadas antes de que existiera fechaPago no tienen el
          dato: mejor no mostrar nada que inventar una fecha. */
       sesF('f2', 'PF2', 'pagado', null),
       sesF('f3', 'PF3', 'debido', null),
+      // Pagada sin receptor guardado: la fecha sola sigue valiendo.
+      sesF('f4', 'PF4', 'pagado', enEsteMes(15)),
+      // Un nombre corto no se recorta: los puntos sobrarian.
+      sesF('f5', 'PF5', 'pagado', enEsteMes(15), 'Ana'),
     ],
     pacientes: [
       { id: 'PF1', consultorioId: 'C1', nombre: 'Ana', apellido: 'Conpago', estado: 'activo', profesionalesUids: ['PRO'] },
       { id: 'PF2', consultorioId: 'C1', nombre: 'Beto', apellido: 'Sinfecha', estado: 'activo', profesionalesUids: ['PRO'] },
       { id: 'PF3', consultorioId: 'C1', nombre: 'Carla', apellido: 'Debe', estado: 'activo', profesionalesUids: ['PRO'] },
+      { id: 'PF4', consultorioId: 'C1', nombre: 'Dora', apellido: 'Sinreceptor', estado: 'activo', profesionalesUids: ['PRO'] },
+      { id: 'PF5', consultorioId: 'C1', nombre: 'Eva', apellido: 'Cortito', estado: 'activo', profesionalesUids: ['PRO'] },
     ],
     usuarios: [
       { id: 'PRO', uid: 'PRO', displayName: 'Muriel', consultorioId: 'C1', rol: 'profesional', estado: 'activo' },
@@ -2302,12 +2310,23 @@ console.log('\n[29] Fecha de pago visible en la fila');
   await act(async () => { rootA.render(createElement(MemoryRouter, null, createElement(Sesiones))); });
 
   chequeo('el admin ve la fecha de pago en la fila', !!chipDe(contA, 'Conpago'));
-  chequeo('dice el dia en que se pago',
-    chipDe(contA, 'Conpago')?.textContent.replace(/\s+/g, ' ').trim() === `pago ${esperado}`,
+  chequeo('dice el dia y a quien se le pago, recortado',
+    chipDe(contA, 'Conpago')?.textContent.replace(/\s+/g, ' ').trim() === `pago ${esperado} Adri...`,
     `(${chipDe(contA, 'Conpago')?.textContent})`);
-  chequeo('y la fecha completa queda en el title',
+  /* Cuatro letras alcanzan para distinguir admins en la fila; el nombre
+     entero se ve al pasar el mouse. */
+  chequeo('el nombre completo queda en el title',
+    (chipDe(contA, 'Conpago')?.getAttribute('title') || '').endsWith('· Adriana Barrozo'),
+    `(${chipDe(contA, 'Conpago')?.getAttribute('title')})`);
+  chequeo('y la fecha larga sigue ahi',
     /^Pagada el /.test(chipDe(contA, 'Conpago')?.getAttribute('title') || ''),
     `(${chipDe(contA, 'Conpago')?.getAttribute('title')})`);
+  chequeo('sin receptor guardado muestra solo la fecha',
+    chipDe(contA, 'Sinreceptor')?.textContent.replace(/\s+/g, ' ').trim() === `pago ${esperado}`,
+    `(${chipDe(contA, 'Sinreceptor')?.textContent})`);
+  chequeo('un nombre corto no se recorta',
+    chipDe(contA, 'Cortito')?.textContent.replace(/\s+/g, ' ').trim() === `pago ${esperado} Ana`,
+    `(${chipDe(contA, 'Cortito')?.textContent})`);
   /* Sin fechaPago no hay nada que mostrar, y una sesion que todavia se debe
      no tiene fecha de pago por definicion. */
   chequeo('una pagada vieja sin fecha no muestra nada', !chipDe(contA, 'Sinfecha'));
@@ -2322,8 +2341,11 @@ console.log('\n[29] Fecha de pago visible en la fila');
   const rProf = await montar(MisSesiones, {});
   chequeo('el profesional tambien la ve', !!chipDe(rProf.cont, 'Conpago'));
   chequeo('con el mismo formato',
-    chipDe(rProf.cont, 'Conpago')?.textContent.replace(/\s+/g, ' ').trim() === `pago ${esperado}`,
+    chipDe(rProf.cont, 'Conpago')?.textContent.replace(/\s+/g, ' ').trim() === `pago ${esperado} Adri...`,
     `(${chipDe(rProf.cont, 'Conpago')?.textContent})`);
+  chequeo('y el mismo title',
+    (chipDe(rProf.cont, 'Conpago')?.getAttribute('title') || '').endsWith('· Adriana Barrozo'),
+    `(${chipDe(rProf.cont, 'Conpago')?.getAttribute('title')})`);
   chequeo('y tampoco la inventa cuando no esta', !chipDe(rProf.cont, 'Sinfecha'));
   await act(async () => { rProf.root.unmount(); });
 

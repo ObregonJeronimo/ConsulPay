@@ -122,9 +122,22 @@ function fechaDePagoCorta(sesion) {
   if (!(d instanceof Date) || isNaN(d.getTime())) return null;
   const corta = d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
   const anio = d.getFullYear();
+  const dia = anio === new Date().getFullYear() ? corta : `${corta} ${String(anio).slice(-2)}`;
+  const larga = d.toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' });
+
+  /* A quien se le pago, recortado. En una celda angosta un "Adriana
+     Barrozo" entero empuja la columna, y con dos o tres admins las
+     primeras cuatro letras ya alcanzan para distinguirlos. El nombre
+     completo queda en el title, que es donde se va a mirar si hay duda. */
+  const receptor = (sesion.receptorNombre || '').trim();
+  const corto = receptor.length > 4 ? `${receptor.slice(0, 4)}...` : receptor;
+
   return {
-    corta: anio === new Date().getFullYear() ? corta : `${corta} ${String(anio).slice(-2)}`,
-    larga: d.toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' }),
+    dia,
+    larga,
+    receptor,
+    texto: corto ? `pago ${dia} ${corto}` : `pago ${dia}`,
+    title: receptor ? `Pagada el ${larga} · ${receptor}` : `Pagada el ${larga}`,
   };
 }
 
@@ -1556,8 +1569,8 @@ function TablaMisSesiones({ sesiones, mapaPacientes, mapaMetodos, sesionesConPen
                     </span>
                   )}
                   {pagada && pagoEl && (
-                    <span className="cp-fecha-pago" title={`Pagada el ${pagoEl.larga}`}>
-                      pago {pagoEl.corta}
+                    <span className="cp-fecha-pago" title={pagoEl.title}>
+                      {pagoEl.texto}
                     </span>
                   )}
                 </td>
@@ -1644,8 +1657,8 @@ function TablaMisSesiones({ sesiones, mapaPacientes, mapaMetodos, sesionesConPen
                     {/* En mobile el badge vive en su propia celda angosta, asi
                         que la fecha de pago entra en esta linea. */}
                     {pagada && pagoEl && (
-                      <span className="cp-fecha-pago cp-fecha-pago--inline" title={`Pagada el ${pagoEl.larga}`}>
-                        pago {pagoEl.corta}
+                      <span className="cp-fecha-pago cp-fecha-pago--inline" title={pagoEl.title}>
+                        {pagoEl.texto}
                       </span>
                     )}
                   </div>
