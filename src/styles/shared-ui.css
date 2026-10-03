@@ -1038,6 +1038,11 @@
 /* Los tds mobile NUNCA se muestran en desktop — solo en mobile.
    Esta regla va FUERA del media query para tener mayor especificidad. */
 .cp-td-mobile-main,
+.cp-td-mobile-badge,
+.cp-td-mobile-actions {
+  display: none !important;
+}
+
 /* ============================================================
    Fecha de pago en la fila
    ----------------------------------------------------------------
@@ -1063,11 +1068,6 @@
 .cp-fecha-pago--inline {
   margin-top: 0;
   margin-left: 6px;
-}
-
-.cp-td-mobile-badge,
-.cp-td-mobile-actions {
-  display: none !important;
 }
 
 /* Modo tarjeta en pantallas donde la tabla completa no entra.

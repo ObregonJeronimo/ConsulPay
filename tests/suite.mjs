@@ -2331,6 +2331,12 @@ console.log('\n[29] Fecha de pago visible en la fila');
      verde se confunde con el. */
   const cssShared = (await import('fs')).readFileSync('../src/styles/shared-ui.css', 'utf8');
   chequeo('el estilo es global, para las dos pantallas', /\.cp-fecha-pago \{/.test(cssShared));
+  /* El bloque del chip se habia colado ENTRE los selectores de la regla que
+     oculta los tds mobile en desktop: .cp-td-mobile-main se quedaba sin su
+     display:none y la fila mobile aparecia encima de la tabla. jsdom no
+     calcula layout, asi que lo unico que lo agarra es mirar la regla. */
+  chequeo('no rompe la regla que oculta los tds mobile en desktop',
+    /\.cp-td-mobile-main,\r?\n\.cp-td-mobile-badge,\r?\n\.cp-td-mobile-actions \{\r?\n\s*display: none !important;/.test(cssShared));
   chequeo('y usa un color que se despega del badge',
     /\.cp-fecha-pago \{[^}]*color: var\(--cp-info\)/.test(cssShared));
 }
