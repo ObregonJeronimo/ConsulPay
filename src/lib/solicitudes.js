@@ -336,6 +336,30 @@ export async function aprobarSolicitudesEnLote({
   return resultado;
 }
 
+/**
+ * Rechaza varias solicitudes de una. Mismo contrato que el lote de
+ * aprobacion: una por una, sin transaccion, devolviendo cuantas salieron
+ * y cuales no. Si una ya fue resuelta por otro camino falla sola y las
+ * demas siguen.
+ */
+export async function rechazarSolicitudesEnLote({
+  solicitudIds,
+  adminUid,
+  adminNombre,
+  motivo,
+}) {
+  const resultado = { ok: 0, fallidas: [] };
+  for (const solicitudId of solicitudIds) {
+    try {
+      await rechazarSolicitud({ solicitudId, adminUid, adminNombre, motivo });
+      resultado.ok += 1;
+    } catch (err) {
+      resultado.fallidas.push({ solicitudId, motivo: err.message || 'Error desconocido' });
+    }
+  }
+  return resultado;
+}
+
 export async function aprobarSolicitud({
   solicitudId,
   adminUid,

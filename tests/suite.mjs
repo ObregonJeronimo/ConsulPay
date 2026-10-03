@@ -2341,6 +2341,92 @@ console.log('\n[29] Fecha de pago visible en la fila');
     /\.cp-fecha-pago \{[^}]*color: var\(--cp-info\)/.test(cssShared));
 }
 
+/* ============ 30. Rechazar un grupo entero ============ */
+console.log('\n[30] Rechazar todas las solicitudes de un grupo');
+{
+  const { default: Solicitudes } = await import('../src/pages/admin/Solicitudes.jsx');
+  const { MemoryRouter } = await import('react-router-dom');
+
+  globalThis.__USER__ = { uid: 'A', consultorioId: 'C1', rol: 'admin', displayName: 'Adriana' };
+  globalThis.__CONS__ = { nombre: 'CALA', adminUids: ['A'], mpConfigs: {}, metodosPagoPaciente: [] };
+
+  const anioR = new Date().getFullYear();
+  const fechaR = { toDate: () => new Date(anioR, 6, 15) };
+  const solR = (id, pacienteNombre) => ({
+    id, consultorioId: 'C1', tipo: 'marcar_pagada', estado: 'pendiente',
+    profesionalUid: 'MU', profesionalNombre: 'Muriel Serral', sesionId: 'y' + id,
+    createdAt: { toDate: () => new Date() },
+    payloadPropuesto: {
+      sesionSnapshot: {
+        pacienteNombre, fecha: fechaR, metodoPagoNombre: 'Particular',
+        valorTotal: 100000, montoConsultorio: 20000,
+      },
+    },
+  });
+
+  globalThis.__DATA__ = {
+    solicitudes_sesion: [solR('w1', 'Uno, Pac'), solR('w2', 'Dos, Pac'), solR('w3', 'Tres, Pac')],
+    pacientes: [], usuarios: [], logs_sesion: [],
+  };
+  globalThis.__ESCRITOS__ = {};
+
+  const contR = document.createElement('div');
+  document.body.appendChild(contR);
+  const rootR = createRoot(contR);
+  await act(async () => { rootR.render(createElement(MemoryRouter, null, createElement(Solicitudes))); });
+
+  const btnRechazar = contR.querySelector('.cp-sol-grupo__rechazar-btn');
+  chequeo('cada grupo tiene boton de rechazar todas', !!btnRechazar);
+  /* Aprobar es la accion esperada, rechazar la salida: va primero y sin
+     relleno para que no compitan. */
+  chequeo('va antes del boton de aprobar', (() => {
+    const wrap = contR.querySelector('.cp-sol-grupo__head-wrap');
+    const hijos = [...wrap.children];
+    return hijos.findIndex((n) => n.classList.contains('cp-sol-grupo__rechazar-btn'))
+      < hijos.findIndex((n) => n.classList.contains('cp-sol-grupo__aprobar-btn'));
+  })());
+
+  await act(async () => { clic(btnRechazar); });
+  const modalR = () => [...document.querySelectorAll('.cp-modal')]
+    .find((m) => (m.querySelector('.cp-modal__title')?.textContent || '').includes('Rechazar todas'));
+  chequeo('abre un modal de confirmacion', !!modalR());
+  chequeo('dice cuantas se rechazan',
+    (modalR()?.textContent || '').replace(/\s+/g, ' ').includes('3 solicitudes'),
+    `(${modalR()?.querySelector('.cp-lote-resumen')?.textContent})`);
+  /* Rechazar no toca las sesiones: conviene decirlo antes de confirmar. */
+  chequeo('aclara que no cambia las sesiones',
+    /No cambia ninguna sesión/.test(modalR()?.textContent || ''));
+  chequeo('deja poner un motivo', !!modalR()?.querySelector('#motivo-lote'));
+
+  const escribirR = (el, texto) => {
+    const setter = Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set;
+    setter.call(el, texto);
+    el.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+  };
+  await act(async () => { escribirR(modalR().querySelector('#motivo-lote'), 'mes equivocado'); });
+
+  const confirmar = [...modalR().querySelectorAll('.cp-modal__actions button')]
+    .find((b) => /^Rechazar 3$/.test(b.textContent.trim()));
+  chequeo('el boton dice cuantas va a rechazar', !!confirmar,
+    `(${[...modalR().querySelectorAll('.cp-modal__actions button')].map((b) => b.textContent.trim())})`);
+  await act(async () => { clic(confirmar); });
+
+  const updates = globalThis.__ESCRITOS__['solicitudes_sesion:update'] || [];
+  chequeo('rechaza las tres', updates.length === 3, `(${updates.length})`);
+  chequeo('las deja en estado rechazada',
+    updates.every((u) => u.estado === 'rechazada'), `(${updates.map((u) => u.estado)})`);
+  chequeo('con el motivo que se escribio',
+    updates.every((u) => u.motivoRechazo === 'mes equivocado'), `(${updates.map((u) => u.motivoRechazo)})`);
+  chequeo('y queda registrado quien lo hizo',
+    updates.every((u) => u.resolvedByUid === 'A'), `(${updates.map((u) => u.resolvedByUid)})`);
+  chequeo('avisa cuantas se rechazaron',
+    /Se rechazaron 3 solicitudes/.test(modalR()?.textContent || ''),
+    `(${modalR()?.querySelector('.cp-lote-resultado')?.textContent})`);
+
+  delete globalThis.__ESCRITOS__;
+  await act(async () => { rootR.unmount(); });
+}
+
 console.log(`\n${'='.repeat(52)}`);
 console.log(`${ok} chequeos OK, ${fallos.length} fallas`);
 if (fallos.length) { console.log('FALLAN:'); fallos.forEach((f) => console.log('  - ' + f)); }

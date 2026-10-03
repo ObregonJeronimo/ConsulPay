@@ -24,6 +24,7 @@ import {
   aprobarSolicitud,
   aprobarSolicitudesEnLote,
   rechazarSolicitud,
+  rechazarSolicitudesEnLote,
   suscribirTodasSolicitudes,
 } from '../../lib/solicitudes.js';
 
@@ -70,6 +71,12 @@ const InfoIcon = () => (
     <circle cx="12" cy="12" r="10" />
     <line x1="12" y1="16" x2="12" y2="12" />
     <line x1="12" y1="8" x2="12.01" y2="8" />
+  </svg>
+);
+const XIcon = () => (
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18" />
+    <line x1="6" y1="6" x2="18" y2="18" />
   </svg>
 );
 const CheckIcon = () => (
@@ -774,6 +781,7 @@ function FilaResuelta({ s, onSeleccionar }) {
 function GrupoSolicitudes({ grupo, onSeleccionar, admins, adminUid, adminNombre }) {
   const [abierto, setAbierto] = useState(false);
   const [modalLote, setModalLote] = useState(false);
+  const [modalRechazo, setModalRechazo] = useState(false);
   const cant = grupo.solicitudes.length;
   const esMarcarPagada = grupo.tipo === TIPOS_SOLICITUD_SESION.MARCAR_PAGADA;
 
@@ -805,14 +813,26 @@ function GrupoSolicitudes({ grupo, onSeleccionar, admins, adminUid, adminNombre 
           <span className="cp-sol-grupo__total">{formatoARS.format(grupo.total)}</span>
         </button>
         {puedeAprobarLote && (
-          <button
-            className="cp-sol-grupo__aprobar-btn"
-            onClick={() => setModalLote(true)}
-            title={esMarcarPagada ? 'Marcar el mes como pagado' : 'Aprobar todas las liquidaciones'}
-          >
-            {iconoTipo(grupo.tipo)}
-            <span className="cp-sol-grupo__aprobar-btn-txt">{labelBoton}</span>
-          </button>
+          <>
+            {/* Rechazar va antes de aprobar y en gris: la accion esperada es
+                aprobar, esta es la salida. */}
+            <button
+              className="cp-sol-grupo__rechazar-btn"
+              onClick={() => setModalRechazo(true)}
+              title="Rechazar todas las solicitudes del grupo"
+            >
+              <XIcon />
+              <span className="cp-sol-grupo__aprobar-btn-txt">Rechazar</span>
+            </button>
+            <button
+              className="cp-sol-grupo__aprobar-btn"
+              onClick={() => setModalLote(true)}
+              title={esMarcarPagada ? 'Marcar el mes como pagado' : 'Aprobar todas las liquidaciones'}
+            >
+              {iconoTipo(grupo.tipo)}
+              <span className="cp-sol-grupo__aprobar-btn-txt">{labelBoton}</span>
+            </button>
+          </>
         )}
       </div>
 
@@ -853,6 +873,120 @@ function GrupoSolicitudes({ grupo, onSeleccionar, admins, adminUid, adminNombre 
           onClose={() => setModalLote(false)}
         />
       )}
+
+      {modalRechazo && (
+        <RechazarGrupoModal
+          grupo={grupo}
+          pendientes={pendientesDelGrupo}
+          adminUid={adminUid}
+          adminNombre={adminNombre}
+          onClose={() => setModalRechazo(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   Modal: rechazar un grupo entero
+   ----------------------------------------------------------------
+   Rechazar no toca las sesiones: solo cierra las solicitudes. Aun asi
+   se confirma, porque son muchas de una y el profesional las ve
+   rechazadas sin saber por que — de ahi el motivo, opcional pero a la
+   vista.
+   ============================================================ */
+export function RechazarGrupoModal({ grupo, pendientes, adminUid, adminNombre, onClose }) {
+  const overlayProps = useOverlayClose(onClose);
+  const [motivo, setMotivo] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [resultado, setResultado] = useState(null);
+
+  async function handleRechazar() {
+    setSubmitting(true);
+    try {
+      const res = await rechazarSolicitudesEnLote({
+        solicitudIds: pendientes.map((s) => s.id),
+        adminUid,
+        adminNombre,
+        motivo,
+      });
+      setResultado(res);
+      if (res.fallidas.length === 0) setTimeout(onClose, 900);
+    } catch (err) {
+      setResultado({ ok: 0, fallidas: [{ motivo: err.message || 'Error inesperado' }] });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="cp-modal-overlay" {...overlayProps}>
+      <div className="cp-modal cp-modal--detalle" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 460 }}>
+        <button className="cp-modal__close" onClick={onClose} aria-label="Cerrar">×</button>
+        <h2 className="cp-modal__title">Rechazar todas</h2>
+        <p className="cp-modal__sub">
+          {grupo.profesionalNombre} · {nombreMesSol(grupo.mesClave)}
+        </p>
+
+        <div className="cp-lote-resumen">
+          <div className="cp-lote-resumen__fila">
+            <span>Se rechazan</span>
+            <strong>{pendientes.length} solicitud{pendientes.length === 1 ? '' : 'es'}</strong>
+          </div>
+        </div>
+
+        <p className="cp-rechazo-nota">
+          No cambia ninguna sesión: quedan como están y el profesional las ve
+          rechazadas. Si querés, puede volver a pedirlas.
+        </p>
+
+        {!resultado && (
+          <div className="cp-receptor-selector" style={{ marginTop: 12 }}>
+            <label className="cp-receptor-selector__label" htmlFor="motivo-lote">
+              Motivo (opcional)
+            </label>
+            <p className="cp-receptor-selector__hint">
+              Lo ve {grupo.profesionalNombre || 'el profesional'} en cada solicitud rechazada.
+            </p>
+            <input
+              id="motivo-lote"
+              className="cp-input"
+              type="text"
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              placeholder="Ej: las cargo en el mes equivocado"
+              disabled={submitting}
+            />
+          </div>
+        )}
+
+        {resultado && (
+          <div className={`cp-lote-resultado ${resultado.fallidas.length === 0 ? 'cp-lote-resultado--ok' : 'cp-lote-resultado--parcial'}`}>
+            <strong>
+              {resultado.ok > 0 && `Se rechazaron ${resultado.ok} solicitud${resultado.ok === 1 ? '' : 'es'}.`}
+            </strong>
+            {resultado.fallidas.length > 0 && (
+              <div style={{ marginTop: 4 }}>
+                {resultado.fallidas.length} no se pudo{resultado.fallidas.length === 1 ? '' : 'ieron'} rechazar
+                {' '}(probablemente ya estaban resueltas).
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="cp-modal__actions">
+          <Button type="button" variant="ghost" onClick={onClose} disabled={submitting}>
+            {resultado ? 'Cerrar' : 'Cancelar'}
+          </Button>
+          {!resultado && (
+            <Button type="button" variant="danger" onClick={handleRechazar} disabled={submitting}>
+              {submitting
+                ? <><Spinner size={14} /> Rechazando…</>
+                : `Rechazar ${pendientes.length}`}
+            </Button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

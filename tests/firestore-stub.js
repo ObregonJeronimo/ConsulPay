@@ -32,7 +32,14 @@ export async function addDoc(ref, data) {
   }
   return { id: 'nuevo' };
 }
-export async function updateDoc() {}
+export async function updateDoc(ref, data) {
+  const col = ref && ref.__col;
+  if (globalThis.__ESCRITOS__ && col) {
+    const clave = col + ':update';
+    if (!globalThis.__ESCRITOS__[clave]) globalThis.__ESCRITOS__[clave] = [];
+    globalThis.__ESCRITOS__[clave].push({ id: ref.__id, ...data });
+  }
+}
 export async function deleteDoc() {}
 export async function setDoc() {}
 export async function runTransaction(_db, fn) { return fn({ get: getDoc, set() {}, update() {} }); }
