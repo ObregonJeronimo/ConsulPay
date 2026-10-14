@@ -4,9 +4,10 @@ import Avatar from '../../components/ui/Avatar.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
 
-import { formatoARS } from '../../lib/constants.js';
+import { ESTADOS_PAGO_SESION, formatoARS } from '../../lib/constants.js';
 import { editarFechaPago, getCantidadSesiones, suscribirSesionesPagadas } from '../../lib/sesiones.js';
 
+import { MESES_CORTOS, montoCompacto } from './resumenAnual.js';
 import './IngresosPorMes.css';
 
 /* ============================================================
@@ -44,6 +45,12 @@ function nombreMesLargo(clave) {
   const [y, m] = clave.split('-').map(Number);
   if (!m || m < 1 || m > 12 || !y) return 'Sin fecha';
   return `${MESES[m - 1]} ${y}`;
+}
+/** '2026-07' -> 'jul 26'. Para las fichas de "sesiones de". */
+function etiquetaMes(clave) {
+  if (!clave || clave === 'sin-fecha') return 'sin fecha';
+  const [y, m] = clave.split('-').map(Number);
+  return `${MESES_CORTOS[m - 1]} ${String(y).slice(-2)}`;
 }
 function formatoDiaLargo(d) {
   return d.toLocaleDateString('es-AR', { weekday: 'short', day: '2-digit', month: 'short' });
@@ -116,7 +123,7 @@ const EditIcon = () => (
 /* ============================================================
    Componente principal
    ============================================================ */
-export default function IngresosPorMes({ consultorioId, uid, mapaProfesionales, mapaPacientes }) {
+export default function IngresosPorMes({ consultorioId, uid, anio, mapaProfesionales, mapaPacientes }) {
   const [sesiones, setSesiones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [mesesAbiertos, setMesesAbiertos] = useState(() => new Set());
@@ -132,12 +139,16 @@ export default function IngresosPorMes({ consultorioId, uid, mapaProfesionales, 
     });
   }, [consultorioId]);
 
-  // Agrupar por mes de fechaPago
+  // Agrupar por mes de fechaPago. Solo los del anio del selector de Pagos:
+  // antes se listaba toda la historia y el selector de arriba no hacia nada.
   const meses = useMemo(() => {
     const map = {};
     for (const s of sesiones) {
+      // Mismo filtro que el Resumen y el libro: los tres suman lo mismo.
+      if (s.estadoPago !== ESTADOS_PAGO_SESION.PAGADO) continue;
       const d = fechaDePago(s);
       if (!d) continue;
+      if (anio && d.getFullYear() !== anio) continue;
       const km = claveMes(d);
       if (!map[km]) map[km] = { clave: km, sesiones: [], total: 0, pacientes: new Set(), encuentros: 0 };
       map[km].sesiones.push(s);
@@ -148,7 +159,7 @@ export default function IngresosPorMes({ consultorioId, uid, mapaProfesionales, 
       map[km].encuentros += getCantidadSesiones(s);
     }
     return Object.values(map).sort((a, b) => b.clave.localeCompare(a.clave));
-  }, [sesiones]);
+  }, [sesiones, anio]);
 
   function toggleMes(clave) {
     setMesesAbiertos((prev) => {
@@ -170,7 +181,7 @@ export default function IngresosPorMes({ consultorioId, uid, mapaProfesionales, 
   if (meses.length === 0) {
     return (
       <div className="cp-ingresos-empty">
-        <p>Todavía no hay ingresos registrados.</p>
+        <p>{anio ? `No hay cobros registrados en ${anio}.` : 'Todavía no hay ingresos registrados.'}</p>
         <p className="cp-ingresos-empty__hint">
           Cuando marques sesiones como pagadas, vas a ver acá el registro de ingresos agrupado por mes.
         </p>
@@ -316,8 +327,6 @@ function FilaProfesional({ fila, mapaPacientes }) {
       .sort((a, b) => b.clave.localeCompare(a.clave));
   }, [fila]);
 
-  const variosMeses = desglose.length > 1;
-
   return (
     <div className={`cp-ingreso-prof ${abierto ? 'cp-ingreso-prof--abierto' : ''}`}>
       <button className="cp-ingreso-fila cp-ingreso-fila--btn" onClick={() => setAbierto((v) => !v)}>
@@ -331,11 +340,17 @@ function FilaProfesional({ fila, mapaPacientes }) {
         <Avatar initials={(fila.nombre[0] || '?').toUpperCase()} size={30} />
         <div className="cp-ingreso-fila__main">
           <span className="cp-ingreso-fila__nombre">{fila.nombre}</span>
+          {/* De que meses son las sesiones que se cobraron, con cuanto de cada
+              uno. Antes decia "3 meses" y habia que abrir la fila para saber
+              cuales; es la pregunta que se hace al conciliar. */}
           <span className="cp-ingreso-fila__sub">
             {fila.cantPacientes} paciente{fila.cantPacientes === 1 ? '' : 's'}
-            {variosMeses && (
-              <span className="cp-ingreso-fila__badge">{desglose.length} meses</span>
-            )}
+            {' · sesiones de'}
+            {[...desglose].reverse().map((m) => (
+              <span key={m.clave} className="cp-ingreso-fila__mes" title={`${formatoARS.format(m.total)} de sesiones de ${nombreMesLargo(m.clave)}`}>
+                {etiquetaMes(m.clave)} · {montoCompacto(m.total)}
+              </span>
+            ))}
           </span>
           {/* De lo que se cobro de este profesional, cuanto entro a cada
               caja. Es el dato que faltaba para saber quien tiene que

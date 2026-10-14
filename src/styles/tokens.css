@@ -36,6 +36,15 @@
   --cp-info: #3E6F8A;
   --cp-info-bg: #DDE7EE;
 
+  /* ---------- Graficos ----------
+     Ingresos y egresos en barras. NO son success/danger: verde y rojo lado
+     a lado se ven casi iguales para un daltonico deuteranope (dE 1,8 en
+     OKLab). Este par pasa los seis chequeos de paleta, con dE 17 en
+     protan/deutan. En los numeros de texto se sigue usando verde y rojo,
+     porque ahi el signo +/- ya distingue sin depender del color. */
+  --cp-chart-in: #2A6FA8;
+  --cp-chart-out: #C15F3C;
+
   /* ---------- Badges de planes premium ---------- */
   /* Plan Pro: dorado/ambar elegante (no chillon). Sobrio pero distintivo
      respecto al gris del Plan Free para que el cliente sienta el cambio. */

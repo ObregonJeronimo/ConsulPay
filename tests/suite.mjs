@@ -274,23 +274,35 @@ console.log('\n[8] Pagos del admin');
   globalThis.__CONS__ = { adminUids: ['A', 'R'], mpConfigs: {} };
   let r = await montar(Pagos, {});
   let tabs = [...r.cont.querySelectorAll('.cp-pagos-canal-btn')].map((b) => b.textContent.trim());
-  chequeo('MP apagado: sin pestanas MP ni Ambos',
-    !tabs.includes('Mercado Pago') && !tabs.includes('Ambos'), `(${tabs})`);
-
-  /* La pestana que contesta "como vengo este mes" es la que tiene que estar
-     puesta al entrar, y primera en la barra: es la que se mira todos los
-     dias, las otras son para revisar un canal puntual. */
-  chequeo('Ingresos y egresos es la primera pestana', tabs[0] === 'Ingresos y egresos', `(${tabs})`);
-  chequeo('y es la que abre por defecto',
-    r.cont.querySelector('.cp-pagos-canal-btn--active')?.textContent.trim() === 'Ingresos y egresos',
+  /* Resumen arriba de todo: es lo que se mira todos los dias. "Pagos
+     manuales" listaba pagos de Mercado Pago (sin MP quedaba vacia) y
+     "Ambos" sumaba dos canales que ahora suma el Resumen. */
+  chequeo('MP apagado: Resumen, Movimientos y Cobros por mes, en ese orden',
+    tabs.join('|') === 'Resumen|Movimientos|Cobros por mes', `(${tabs})`);
+  chequeo('ya no hay Pagos manuales ni Ambos', !tabs.includes('Pagos manuales') && !tabs.includes('Ambos'));
+  chequeo('abre en el Resumen',
+    r.cont.querySelector('.cp-pagos-canal-btn--active')?.textContent.trim() === 'Resumen',
     `(${r.cont.querySelector('.cp-pagos-canal-btn--active')?.textContent.trim()})`);
-  chequeo('al entrar ya se ve el libro, no la tabla de pagos', !!r.cont.querySelector('.cp-libro'));
+  chequeo('al entrar ya se ve el resumen del anio', !!r.cont.querySelector('.cp-rs'));
+  chequeo('las pestanas son pestanas para un lector de pantalla',
+    r.cont.querySelector('.cp-pagos-canal-toggle')?.getAttribute('role') === 'tablist'
+    && r.cont.querySelector('.cp-pagos-canal-btn--active')?.getAttribute('aria-selected') === 'true');
+
+  const label = () => r.cont.querySelector('.cp-mes-selector__label')?.textContent.trim();
+  chequeo('en el Resumen el periodo es el anio', label() === String(new Date().getFullYear()), `(${label()})`);
+  await act(async () => {
+    clic([...r.cont.querySelectorAll('.cp-pagos-canal-btn')].find((b) => b.textContent.trim() === 'Movimientos'));
+  });
+  chequeo('en Movimientos el periodo es el mes', /\d{4}/.test(label() || '') && label() !== String(new Date().getFullYear()),
+    `(${label()})`);
+  chequeo('y se ve el libro de caja', !!r.cont.querySelector('.cp-libro'));
 
   globalThis.__CONS__ = { adminUids: ['A'], mpConfigs: { primary: slot('A') } };
   r = await montar(Pagos, {});
   tabs = [...r.cont.querySelectorAll('.cp-pagos-canal-btn')].map((b) => b.textContent.trim());
-  chequeo('MP habilitado: aparecen', tabs.includes('Mercado Pago') && tabs.includes('Ambos'), `(${tabs})`);
-  chequeo('con MP prendido sigue primera', tabs[0] === 'Ingresos y egresos', `(${tabs})`);
+  chequeo('MP habilitado: aparece su pestana', tabs.includes('Mercado Pago'), `(${tabs})`);
+  chequeo('con MP prendido el Resumen sigue primero', tabs[0] === 'Resumen', `(${tabs})`);
+  chequeo('y tampoco vuelve Ambos', !tabs.includes('Ambos'), `(${tabs})`);
 }
 
 /* ============ 9. Directorio de admins ============ */
@@ -2543,6 +2555,202 @@ console.log('\n[31] Ingresos: profesional y fecha de sesion');
   const cssLibroAncho = fsLibro.readFileSync('../src/pages/admin/LibroCaja.css', 'utf8');
   chequeo('ninguna columna del libro usa ancho porcentual',
     !/\.cp-libro__(th|td)-[a-z]+[^{]*\{[^}]*width:\s*\d+%/s.test(cssLibroAncho));
+}
+
+/* ============ 32. Resumen de Pagos ============ */
+console.log('\n[32] Resumen de Pagos: el anio mes a mes');
+{
+  const { serieAnual, armarLibro } = await import('../src/lib/gastos.js');
+  const { default: ResumenPagos } = await import('../src/pages/admin/ResumenPagos.jsx');
+  const { default: LibroCaja } = await import('../src/pages/admin/LibroCaja.jsx');
+  const { default: IngresosPorMes } = await import('../src/pages/admin/IngresosPorMes.jsx');
+  const { default: Pagos } = await import('../src/pages/admin/Pagos.jsx');
+
+  /* 2025, un anio pasado: asi ningun mes es "el en curso" y el test no
+     depende de la fecha en que se corre. */
+  const T = (y, m, d, h = 12) => ({ toDate: () => new Date(y, m, d, h, 0) });
+  const ses = (id, estado, monto, receptor, fechaSesion, fechaPago, extra = {}) => ({
+    id, consultorioId: 'C1', estadoPago: estado, montoConsultorio: monto, receptorUid: receptor,
+    profesionalUid: 'PRO1', pacienteId: 'P0', cantidadSesiones: 4,
+    fecha: fechaSesion, ...(fechaPago ? { fechaPago } : {}), ...extra,
+  });
+  const datos = {
+    sesiones: [
+      // julio: dos cobros, uno a cada caja, de sesiones de junio
+      ses('a', 'pagado', 100000, 'A', T(2025, 5, 3), T(2025, 6, 2)),
+      ses('b', 'pagado', 50000, 'R', T(2025, 5, 10), T(2025, 6, 9)),
+      // agosto: sesiones que se deben y una de obra social sin monto
+      ses('c', 'debido', 30000, null, T(2025, 7, 5), null),
+      ses('d', 'debido', 20000, null, T(2025, 7, 20), null),
+      ses('e', 'pendiente_monto', 0, null, T(2025, 7, 22), null),
+      // otro anio: no tiene que aparecer en ningun lado
+      ses('z', 'pagado', 999999, 'A', T(2024, 11, 1), T(2024, 11, 20)),
+    ],
+    gastos: [
+      { id: 'g1', consultorioId: 'C1', fecha: '2025-07-15', monto: 40000, cuenta: 'A', motivo: 'Alquiler' },
+      { id: 'g2', consultorioId: 'C1', fecha: '2025-07-20', monto: 5000.4, cuenta: 'R', motivo: 'Luz' },
+    ],
+    pagos_consultorio: [],
+    usuarios: [
+      { id: 'A', uid: 'A', displayName: 'Adriana Barrozo', consultorioId: 'C1', rol: 'admin' },
+      { id: 'R', uid: 'R', displayName: 'Romina Sulaiman', consultorioId: 'C1', rol: 'admin' },
+      { id: 'PRO1', uid: 'PRO1', displayName: 'Muriel Serral', consultorioId: 'C1', rol: 'profesional' },
+    ],
+    pacientes: [{ id: 'P0', nombre: 'Delfina', apellido: 'Moyano', consultorioId: 'C1' }],
+  };
+  const cuentas = [{ id: 'A' }, { id: 'R' }];
+
+  // ---- la cuenta, sin pantalla ----
+  const libro = armarLibro({
+    sesionesPagadas: datos.sesiones.filter((x) => x.estadoPago === 'pagado'),
+    pagosMP: [], gastos: datos.gastos, cuentas,
+  });
+  const { meses, total } = serieAnual({ movimientos: libro.movimientos, sesiones: datos.sesiones, anio: 2025, cuentas });
+  chequeo('doce meses siempre', meses.length === 12);
+  chequeo('el ingreso va al mes del COBRO, no de la sesion',
+    meses[6].ingresos === 150000 && meses[5].ingresos === 0, `(jun ${meses[5].ingresos}, jul ${meses[6].ingresos})`);
+  chequeo('el egreso va al mes del gasto, con centavos', Math.abs(meses[6].egresos - 45000.4) < 1e-6, `(${meses[6].egresos})`);
+  chequeo('lo que se debe va al mes de la SESION', meses[7].aCobrar === 50000, `(${meses[7].aCobrar})`);
+  chequeo('las de obra social sin monto se cuentan aparte', meses[7].sinMonto === 1 && meses[7].aCobrar === 50000);
+  chequeo('cada caja por separado',
+    meses[6].porCuenta.A.ingresos === 100000 && meses[6].porCuenta.A.egresos === 40000
+    && meses[6].porCuenta.R.ingresos === 50000 && meses[6].porCuenta.R.egresos === 5000.4);
+  chequeo('lo de otro anio no se cuela', total.ingresos === 150000, `(${total.ingresos})`);
+  chequeo('cuenta sesiones y gastos del mes', meses[6].sesionesCobradas === 8 && meses[6].gastos === 2,
+    `(${meses[6].sesionesCobradas}, ${meses[6].gastos})`);
+
+  /* Las pagadas antes de que existiera fechaPago (en CALA, 262 sesiones y
+     casi siete millones): el libro las perdia porque quedaban sin fecha,
+     mientras Cobros por mes las ubicaba por updatedAt. Ahora todos igual. */
+  const vieja = { ...ses('v', 'pagado', 7000, null, T(2025, 4, 2), null), updatedAt: T(2025, 6, 25) };
+  const libroV = armarLibro({ sesionesPagadas: [vieja], pagosMP: [], gastos: [], cuentas });
+  const serieV = serieAnual({ movimientos: libroV.movimientos, sesiones: [], anio: 2025, cuentas });
+  chequeo('una pagada sin fechaPago no se pierde: cae en el mes de updatedAt',
+    serieV.meses[6].ingresos === 7000, `(${serieV.meses.map((m) => m.ingresos)})`);
+  chequeo('y si no tiene receptor va a "sin asignar", no desaparece',
+    serieV.meses[6].porCuenta.sin_asignar.ingresos === 7000);
+
+  // ---- la pantalla ----
+  globalThis.__DATA__ = datos;
+  let vioMes = null;
+  const { cont } = await montar(ResumenPagos, {
+    consultorioId: 'C1', consultorio: { adminUids: ['A', 'R'], mpConfigs: {} }, anio: 2025,
+    onVerMes: (m) => { vioMes = m; },
+  });
+  const plano = (n) => (n?.textContent || '').replace(/\s+/g, ' ').trim();
+  const kpis = [...cont.querySelectorAll('.cp-rs__kpi')].map(plano);
+  chequeo('cuatro cifras del anio', kpis.length === 4, `(${kpis.length})`);
+  chequeo('ingresos, egresos, saldo y a cobrar',
+    kpis[0].includes('150.000') && kpis[1].includes('45.000') && kpis[2].includes('105.000')
+    && kpis[3].includes('50.000') && kpis[3].includes('1 sesión sin monto'), `(${kpis})`);
+
+  const filas = [...cont.querySelectorAll('.cp-rs__tabla > .cp-rs__fila')];
+  const mesDe = (f) => plano(f.querySelector('.cp-rs__mes'));
+  /* Los meses vacios seguidos van en un solo renglon: enero-junio y
+     septiembre-diciembre. Julio y agosto, cada uno el suyo. */
+  chequeo('los meses vacios se juntan en tramos',
+    filas.map(mesDe).join('|') === 'Enero – junio|Julio|Agosto|Septiembre – diciembre|Total 2025',
+    `(${filas.map(mesDe).join('|')})`);
+  const julio = filas.find((f) => mesDe(f) === 'Julio');
+  const celda = (f, c) => plano(f.querySelector(`.cp-rs__c-${c}`));
+  chequeo('julio: ingresos, egresos y saldo completos, sin abreviar',
+    celda(julio, 'in') === '$ 150.000' && celda(julio, 'out') === '$ 45.000' && celda(julio, 'saldo') === '+$ 105.000',
+    `(${celda(julio, 'in')} | ${celda(julio, 'out')} | ${celda(julio, 'saldo')})`);
+  const agosto = filas.find((f) => mesDe(f) === 'Agosto');
+  chequeo('agosto: a cobrar y las sin monto', celda(agosto, 'cob').includes('$ 50.000') && celda(agosto, 'cob').includes('1 sin monto'),
+    `(${celda(agosto, 'cob')})`);
+  chequeo('en un anio pasado no hay mes "en curso"', !cont.querySelector('.cp-rs__badge'));
+  chequeo('fila de total', celda(filas[filas.length - 1], 'in') === '$ 150.000');
+
+  // En celular cada mes es un renglon de dos lineas: la linea extra no se
+  // tiene que leer dos veces con un lector de pantalla.
+  chequeo('la linea de celular lleva los cuatro numeros', plano(julio.querySelector('.cp-rs__m-linea')).includes('$ 45.000'));
+  chequeo('y esta oculta para el lector', julio.querySelector('.cp-rs__m-linea').getAttribute('aria-hidden') === 'true');
+
+  const btn = julio.querySelector('.cp-rs__toggle');
+  chequeo('el mes se abre con un boton', btn?.getAttribute('aria-expanded') === 'false');
+  await act(async () => { clic(btn); });
+  const detalle = cont.querySelector('.cp-rs__detalle');
+  chequeo('abrir julio muestra cada caja', !!detalle && plano(detalle).includes('Adriana') && plano(detalle).includes('Romina'));
+  chequeo('con su ingreso, egreso y saldo',
+    plano(detalle).includes('$ 100.000') && plano(detalle).includes('−$ 40.000') && plano(detalle).includes('+$ 60.000'),
+    `(${plano(detalle)})`);
+  chequeo('y dice cuanto se cobro y cuanto se gasto', plano(detalle).includes('8 sesiones cobradas · 2 gastos cargados'));
+  await act(async () => { clic(detalle.querySelector('.cp-rs__link')); });
+  chequeo('"Ver movimientos" lleva a ese mes', vioMes === 6, `(${vioMes})`);
+
+  const svg = cont.querySelector('.cp-rs__svg');
+  chequeo('el grafico tiene los doce meses', [...svg.querySelectorAll('.cp-rs__mes-eje')].length === 12);
+  chequeo('una barra por cada serie con datos',
+    svg.querySelectorAll('.cp-rs__bar-in').length === 1 && svg.querySelectorAll('.cp-rs__bar-out').length === 1);
+  chequeo('y remite a la tabla para leerlo sin verlo', /tabla/.test(svg.getAttribute('aria-label') || ''));
+
+  /* El par del grafico es el validado para daltonismo y no el verde/rojo de
+     los numeros, que lado a lado se confunde (dE 1,8). */
+  const fsR = await import('fs');
+  const tokens = fsR.readFileSync('../src/styles/tokens.css', 'utf8');
+  const cssRs = fsR.readFileSync('../src/pages/admin/ResumenPagos.css', 'utf8');
+  chequeo('el par del grafico vive en los tokens',
+    tokens.includes('--cp-chart-in: #2A6FA8') && tokens.includes('--cp-chart-out: #C15F3C'));
+  chequeo('las barras usan ese par y no success/danger',
+    /\.cp-rs__bar-in\s*\{[^}]*--cp-chart-in/.test(cssRs) && /\.cp-rs__bar-out\s*\{[^}]*--cp-chart-out/.test(cssRs)
+    && !/\.cp-rs__bar-[a-z]+\s*\{[^}]*--cp-(success|danger)/.test(cssRs));
+  /* Un container-type en la pagina la vuelve contenedor de los
+     position:fixed y los modales dejan de cubrir la pantalla. */
+  const cssPagos = fsR.readFileSync('../src/pages/admin/Pagos.css', 'utf8');
+  chequeo('la container query no esta en la pagina (romperia los modales)',
+    !/container-type/.test(cssPagos) && /\.cp-rs\s*\{[^}]*container-type/.test(cssRs));
+
+  // ---- el Resumen y el libro dicen lo mismo ----
+  const { cont: contLibro } = await montar(LibroCaja, {
+    consultorioId: 'C1', consultorio: { adminUids: ['A', 'R'], mpConfigs: {} }, uid: 'A', mes: new Date(2025, 6, 1),
+  });
+  const cierre = plano(contLibro.querySelector('.cp-libro__cierre'));
+  chequeo('el pie del libro de julio da lo mismo que el Resumen',
+    cierre.includes('150.000') && cierre.includes('45.000') && cierre.includes('105.000'), `(${cierre})`);
+  /* Las debidas no son ingresos aunque el stub las devuelva: el libro
+     filtra por estado igual que el Resumen. */
+  chequeo('lo que se debe no entra al libro como cobrado', !cierre.includes('200.000'));
+
+  // ---- Movimientos: filtro por tipo ----
+  const chipsTipo = [...contLibro.querySelectorAll('[aria-label="Filtrar por tipo"] .cp-libro__chip')];
+  chequeo('hay filtro Todo / Ingresos / Egresos', chipsTipo.map(plano).join('|') === 'Todo|Ingresos|Egresos');
+  await act(async () => { clic(chipsTipo[2]); });
+  const textoTabla = plano(contLibro.querySelector('tbody'));
+  chequeo('Egresos deja solo los gastos', textoTabla.includes('Alquiler') && !textoTabla.includes('Muriel'), `(${textoTabla.slice(0, 80)})`);
+  chequeo('y el pie suma solo lo filtrado',
+    /Ingresos\s*\$ 0\s*Egresos\s*−\$ 45\.000/.test(plano(contLibro.querySelector('.cp-libro__cierre'))),
+    `(${plano(contLibro.querySelector('.cp-libro__cierre'))})`);
+  chequeo('el boton de gasto va en la fila de filtros',
+    !!contLibro.querySelector('.cp-libro__filtros .cp-libro__nuevo') && !contLibro.querySelector('.cp-libro__bar'));
+
+  // ---- Cobros por mes: respeta el anio ----
+  const { cont: contCobros } = await montar(IngresosPorMes, {
+    consultorioId: 'C1', uid: 'A', anio: 2025, mapaProfesionales: {}, mapaPacientes: {},
+  });
+  const nombresMes = [...contCobros.querySelectorAll('.cp-ingreso-mes__nombre')].map(plano);
+  chequeo('Cobros por mes muestra solo el anio elegido', nombresMes.join('|') === 'julio 2025', `(${nombresMes})`);
+  const { cont: contVacio } = await montar(IngresosPorMes, {
+    consultorioId: 'C1', uid: 'A', anio: 2023, mapaProfesionales: {}, mapaPacientes: {},
+  });
+  chequeo('un anio sin cobros lo dice', plano(contVacio).includes('No hay cobros registrados en 2023'));
+
+  // ---- desde Pagos: del Resumen al libro de ese mes ----
+  const Y = new Date().getFullYear();
+  globalThis.__USER__ = { uid: 'A', consultorioId: 'C1' };
+  globalThis.__CONS__ = { adminUids: ['A', 'R'], mpConfigs: {} };
+  globalThis.__DATA__ = { ...datos, sesiones: [ses('h', 'pagado', 12000, 'A', T(Y, 0, 3), T(Y, 0, 10))], gastos: [] };
+  const r = await montar(Pagos, {});
+  const enero = [...r.cont.querySelectorAll('.cp-rs__fila')].find((f) => mesDe(f).startsWith('Enero') && !mesDe(f).includes('–'));
+  await act(async () => { clic(enero.querySelector('.cp-rs__toggle')); });
+  await act(async () => { clic(r.cont.querySelector('.cp-rs__link')); });
+  chequeo('"Ver movimientos de enero" cambia de pestana',
+    r.cont.querySelector('.cp-pagos-canal-btn--active')?.textContent.trim() === 'Movimientos');
+  chequeo('y deja el mes en enero de ese anio',
+    /enero/.test(r.cont.querySelector('.cp-mes-selector__label')?.textContent || '')
+    && (r.cont.querySelector('.cp-mes-selector__label')?.textContent || '').includes(String(Y)),
+    `(${r.cont.querySelector('.cp-mes-selector__label')?.textContent})`);
+  chequeo('y el libro muestra ese cobro', plano(r.cont.querySelector('.cp-libro__cierre')).includes('12.000'));
 }
 
 console.log(`\n${'='.repeat(52)}`);

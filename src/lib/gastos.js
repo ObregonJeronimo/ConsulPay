@@ -21,6 +21,7 @@ import {
   serverTimestamp, updateDoc, where,
 } from 'firebase/firestore';
 
+import { ESTADOS_PAGO_SESION } from './constants.js';
 import { db } from './firebase.js';
 
 /** Cuenta especial: lo cobrado por Mercado Pago, que no es de nadie en particular. */
@@ -97,9 +98,15 @@ export function armarLibro({ sesionesPagadas = [], pagosMP = [], gastos = [], cu
        del paciente desnormalizado, el consumidor lo resuelve contra el mapa
        de pacientes usando pacienteId; antes se colaba el nombre del admin
        como si fuera un paciente. */
+    /* Las sesiones pagadas antes de que existiera fechaPago no la tienen:
+       en CALA son 262, casi siete millones entre mayo y julio de 2026.
+       Con aFecha(s.fechaPago) sola quedaban con fecha vacia y no caian en
+       ningun mes: el libro y el Resumen las perdian mientras "Cobros por
+       mes" si las contaba. Se usa el mismo respaldo que ya usa aquella
+       vista (updatedAt), para que las tres digan lo mismo. */
     movimientos.push({
       id: `s_${s.id}`, tipo: 'ingreso', cuenta, monto,
-      fecha: aFecha(s.fechaPago), detalle: s.pacienteNombre || '',
+      fecha: aFecha(s.fechaPago || s.updatedAt), detalle: s.pacienteNombre || '',
       pacienteId: s.pacienteId || null,
       /* De quien vino la plata y de cuando es el trabajo que se esta
          cobrando. Son dos datos distintos de la fecha de pago: una sesion
@@ -143,6 +150,118 @@ export function armarLibro({ sesionesPagadas = [], pagosMP = [], gastos = [], cu
   }
 
   return { movimientos, totales };
+}
+
+/* ============================================================
+   Cajas
+   ============================================================ */
+
+/** "Adriana Barrozo" -> "Adriana": alcanza para distinguir las cajas. */
+export function nombreCorto(u) {
+  const n = u?.displayName || u?.email || '';
+  return n.split(/\s+/)[0] || 'Admin';
+}
+
+/**
+ * Las cajas del consultorio, en el orden en que se muestran: Mercado Pago
+ * (si corresponde) y despues un administrador por cada adminUid.
+ *
+ * Vive aca y no en cada pantalla porque el Resumen y el libro de caja
+ * tienen que mostrar exactamente las mismas columnas: si una cuenta
+ * Mercado Pago y la otra no, los totales por caja dejan de coincidir.
+ */
+export function cuentasDeCaja({ adminUids = [], miembros = [], conMP = false }) {
+  const porUid = Object.fromEntries(miembros.map((m) => [m.uid, m]));
+  const admins = adminUids.map((id) => ({
+    id,
+    nombre: porUid[id] ? nombreCorto(porUid[id]) : `Admin ${id.slice(0, 4)}`,
+    completo: porUid[id]?.displayName || porUid[id]?.email || id,
+  }));
+  const cajaMP = { id: CUENTA_MP, nombre: 'Mercado Pago', completo: 'Cobros por Mercado Pago' };
+  return conMP ? [cajaMP, ...admins] : admins;
+}
+
+/**
+ * Si hubo cobros por Mercado Pago entre dos fechas 'YYYY-MM-DD'.
+ *
+ * Con MP apagado la caja MP se esconde, salvo que en el periodo que se
+ * mira haya entrado plata por ahi: esconderla seria esconder plata.
+ */
+export function hayMPEnRango(pagosMP, desde, hasta) {
+  return pagosMP.some((pago) => {
+    // createdAt llega como Timestamp o, en docs viejos, como { seconds }.
+    const c = pago.createdAt;
+    const iso = aFecha(c && !c.toDate && c.seconds !== undefined ? new Date(c.seconds * 1000) : c);
+    return iso !== '' && iso >= desde && iso <= hasta;
+  });
+}
+
+/* ============================================================
+   Serie anual (pestana Resumen)
+   ============================================================ */
+
+function filaVacia(mes, ids) {
+  return {
+    mes, ingresos: 0, egresos: 0, aCobrar: 0, sinMonto: 0, sesionesCobradas: 0, gastos: 0,
+    porCuenta: Object.fromEntries(ids.map((id) => [id, { ingresos: 0, egresos: 0 }])),
+  };
+}
+
+/**
+ * Un anio mes por mes: lo que entro, lo que salio y lo que todavia se debe.
+ *
+ * Ingresos y egresos se toman de los movimientos de armarLibro, los mismos
+ * que lista el libro de caja: el Resumen no recalcula nada por su cuenta,
+ * asi que la fila de julio y el pie del libro de julio no pueden dar
+ * numeros distintos. Van por la fecha del movimiento — el cobro o el gasto.
+ *
+ * "A cobrar" va por el mes de la SESION, no del cobro: lo que interesa es
+ * cuanto del trabajo de septiembre todavia no se pago. Las sesiones de
+ * obra social que todavia no tienen monto se cuentan aparte (sinMonto):
+ * no se sabe cuanto van a liquidar, pero tampoco estan saldadas.
+ *
+ * @param {Array} movimientos - salida de armarLibro, de todos los meses
+ * @param {Array} sesiones - sesiones con fecha dentro del anio (cualquier estado)
+ * @param {number} anio
+ * @param {Array} cuentas - [{ id }]
+ * @returns {{ meses: Array, total: Object }}
+ */
+export function serieAnual({ movimientos = [], sesiones = [], anio, cuentas = [] }) {
+  const ids = [...cuentas.map((c) => c.id), 'sin_asignar'];
+  const meses = Array.from({ length: 12 }, (_, mes) => filaVacia(mes, ids));
+  const prefijo = `${anio}-`;
+
+  for (const mv of movimientos) {
+    if (!mv.fecha || !mv.fecha.startsWith(prefijo)) continue;
+    const fila = meses[Number(mv.fecha.slice(5, 7)) - 1];
+    if (!fila) continue;
+    const pc = fila.porCuenta[mv.cuenta] || (fila.porCuenta[mv.cuenta] = { ingresos: 0, egresos: 0 });
+    if (mv.tipo === 'ingreso') {
+      fila.ingresos += mv.monto; pc.ingresos += mv.monto;
+      if (mv.origen === 'sesion') fila.sesionesCobradas += mv.cantidad || 1;
+    } else {
+      fila.egresos += mv.monto; pc.egresos += mv.monto;
+      fila.gastos += 1;
+    }
+  }
+
+  for (const s of sesiones) {
+    const iso = aFecha(s.fecha);
+    if (!iso.startsWith(prefijo)) continue;
+    const fila = meses[Number(iso.slice(5, 7)) - 1];
+    if (s.estadoPago === ESTADOS_PAGO_SESION.DEBIDO) fila.aCobrar += Number(s.montoConsultorio) || 0;
+    else if (s.estadoPago === ESTADOS_PAGO_SESION.PENDIENTE_MONTO) fila.sinMonto += 1;
+  }
+
+  const total = filaVacia(null, ids);
+  for (const f of meses) {
+    for (const k of ['ingresos', 'egresos', 'aCobrar', 'sinMonto', 'sesionesCobradas', 'gastos']) total[k] += f[k];
+    for (const [id, v] of Object.entries(f.porCuenta)) {
+      const t = total.porCuenta[id] || (total.porCuenta[id] = { ingresos: 0, egresos: 0 });
+      t.ingresos += v.ingresos; t.egresos += v.egresos;
+    }
+  }
+  return { meses, total };
 }
 
 function aFecha(v) {

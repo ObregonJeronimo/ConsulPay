@@ -5,9 +5,9 @@ import Input from '../../components/ui/Input.jsx';
 import DualScrollTable from '../../components/ui/DualScrollTable.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
 import { useOverlayClose } from '../../hooks/useOverlayClose.js';
-import { formatoARS } from '../../lib/constants.js';
+import { ESTADOS_PAGO_SESION, formatoARS } from '../../lib/constants.js';
 import {
-  armarLibro, crearGasto, CUENTA_MP, eliminarGasto, suscribirGastos,
+  armarLibro, crearGasto, cuentasDeCaja, eliminarGasto, hayMPEnRango, suscribirGastos,
 } from '../../lib/gastos.js';
 import { nombrePaciente, suscribirPacientesConsultorio } from '../../lib/pacientes.js';
 import { suscribirMiembrosConsultorio } from '../../lib/profesionales.js';
@@ -55,14 +55,14 @@ function subSesiones(cantidad, rango) {
   return partes.join(' · ');
 }
 
+/** "+$ 1.000" o "$ 0": un cero con signo ("−$ 0") se lee como un monto. */
+function conSigno(signo, monto) {
+  return monto ? `${signo}${formatoARS.format(monto)}` : formatoARS.format(0);
+}
+
 /** Lo mismo para un cobro suelto, que tiene una sola fecha de sesion. */
 function subDeCobro(mv) {
   return subSesiones(mv.cantidad, mv.fechaSesion ? diaCorto(mv.fechaSesion) : '');
-}
-
-function nombreCorto(u) {
-  const n = u?.displayName || u?.email || '';
-  return n.split(/\s+/)[0] || 'Admin';
 }
 
 /**
@@ -83,6 +83,7 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
   const [pagosMP, setPagosMP] = useState([]);
   const [pacientes, setPacientes] = useState([]);
   const [filtroCaja, setFiltroCaja] = useState('todas');
+  const [filtroTipo, setFiltroTipo] = useState('todo'); // 'todo' | 'ingreso' | 'egreso'
   const [abiertos, setAbiertos] = useState(() => new Set());
   const [cargando, setCargando] = useState(true);
   const [nuevoAbierto, setNuevoAbierto] = useState(false);
@@ -128,35 +129,21 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
   // Cuentas: Mercado Pago + un administrador por cada adminUid del
   // consultorio. Se resuelve el nombre contra los miembros; si todavia no
   // cargaron, se muestra el uid recortado en vez de dejar la columna muda.
-  const cuentas = useMemo(() => {
-    const porUid = Object.fromEntries(miembros.map((m) => [m.uid, m]));
-    const admins = (consultorio?.adminUids || []).map((id) => ({
-      id,
-      nombre: porUid[id] ? nombreCorto(porUid[id]) : `Admin ${id.slice(0, 4)}`,
-      completo: porUid[id]?.displayName || porUid[id]?.email || id,
-    }));
-    /* La caja de Mercado Pago solo existe si MP esta habilitado (todos los
-       admins vincularon); si no, quedaba una card y una columna enteras
-       clavadas en cero. Excepcion: si ESTE MES tuvo cobros por MP, la caja
-       aparece igual, porque esconderla seria esconder plata que entro. Se
-       mira el mes en curso y no toda la historia: con MP apagado, un cobro
-       de marzo no tiene por que dejar una columna vacia en julio. */
-    const hayMPEsteMes = pagosMP.some((pago) => {
-      const f = pago.createdAt?.toDate ? pago.createdAt.toDate()
-        : (pago.createdAt?.seconds !== undefined ? new Date(pago.createdAt.seconds * 1000) : null);
-      if (!f) return false;
-      const p2 = (n) => String(n).padStart(2, '0');
-      const iso = `${f.getFullYear()}-${p2(f.getMonth() + 1)}-${p2(f.getDate())}`;
-      return iso >= rangoMes.desde && iso <= rangoMes.hasta;
-    });
-    const mpVisible = mpHabilitado(consultorio) || hayMPEsteMes;
-    const cajaMP = { id: CUENTA_MP, nombre: 'Mercado Pago', completo: 'Cobros por Mercado Pago' };
-    return mpVisible ? [cajaMP, ...admins] : admins;
-  }, [consultorio, miembros, pagosMP, rangoMes]);
+  /* La caja de Mercado Pago solo existe si MP esta habilitado (todos los
+     admins vincularon); si no, quedaba una card y una columna enteras
+     clavadas en cero. Excepcion: si ESTE MES tuvo cobros por MP, la caja
+     aparece igual, porque esconderla seria esconder plata que entro. Se
+     mira el mes en curso y no toda la historia: con MP apagado, un cobro
+     de marzo no tiene por que dejar una columna vacia en julio. */
+  const cuentas = useMemo(() => cuentasDeCaja({
+    adminUids: consultorio?.adminUids || [],
+    miembros,
+    conMP: mpHabilitado(consultorio) || hayMPEnRango(pagosMP, rangoMes.desde, rangoMes.hasta),
+  }), [consultorio, miembros, pagosMP, rangoMes]);
 
   const { movimientos, totales, columnas } = useMemo(() => {
     const libro = armarLibro({
-      sesionesPagadas: sesiones,
+      sesionesPagadas: sesiones.filter((s) => s.estadoPago === ESTADOS_PAGO_SESION.PAGADO),
       // Lo que efectivamente entro a la cuenta, ya descontado el cargo de MP.
       pagosMP: pagosMP.map((p) => ({ ...p, montoConsultorio: montoNetoEfectivo(p) })),
       gastos,
@@ -213,8 +200,9 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
   }), [movimientos, mapaPacientes, mapaMiembros]);
 
   const visibles = useMemo(
-    () => (filtroCaja === 'todas' ? conNombre : conNombre.filter((mv) => mv.cuenta === filtroCaja)),
-    [conNombre, filtroCaja],
+    () => conNombre.filter((mv) => (filtroCaja === 'todas' || mv.cuenta === filtroCaja)
+      && (filtroTipo === 'todo' || mv.tipo === filtroTipo)),
+    [conNombre, filtroCaja, filtroTipo],
   );
 
   /* Agrupacion: los cobros de sesiones del mismo dia, la misma caja y el
@@ -284,24 +272,26 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
   return (
     <div className="cp-libro">
       {/* El mes lo manda Pagos.jsx. Antes LibroCaja tenia su propio state y
-          se renderizaba un segundo selector que no hablaba con el de arriba. */}
-      <div className="cp-libro__bar">
-        <Button variant="primary" onClick={() => setNuevoAbierto(true)}>+ Registrar gasto</Button>
-      </div>
+          se renderizaba un segundo selector que no hablaba con el de arriba.
 
-      {/* Resumen por caja */}
+          Todo lo que va antes de la tabla entra en dos renglones bajos: las
+          cajas en una franja y, abajo, filtros y boton. Antes eran ~280px de
+          cards y chips antes de la primera fila, y la tabla arrancaba debajo
+          del pliegue. */}
       <div className="cp-libro__resumen">
         {columnas.map((c) => {
           const t = totales[c.id] || { ingresos: 0, egresos: 0, saldo: 0 };
           return (
             <div key={c.id} className="cp-libro__caja" title={c.completo}>
-              <div className="cp-libro__caja-nombre">{c.nombre}</div>
+              <div className="cp-libro__caja-izq">
+                <div className="cp-libro__caja-nombre">{c.nombre}</div>
+                <div className="cp-libro__caja-detalle">
+                  <span className={t.ingresos ? 'cp-libro__in' : ''}>{conSigno('+', t.ingresos)}</span>
+                  <span className={t.egresos ? 'cp-libro__out' : ''}>{conSigno('−', t.egresos)}</span>
+                </div>
+              </div>
               <div className={`cp-libro__caja-saldo ${t.saldo < 0 ? 'cp-libro__caja-saldo--neg' : ''}`}>
                 {formatoARS.format(t.saldo)}
-              </div>
-              <div className="cp-libro__caja-detalle">
-                <span className="cp-libro__in">+{formatoARS.format(t.ingresos)}</span>
-                <span className="cp-libro__out">−{formatoARS.format(t.egresos)}</span>
               </div>
             </div>
           );
@@ -312,37 +302,57 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
           caja. Aquella dejaba 2 de cada 3 celdas vacias y obligaba a barrer
           la fila para encontrar el numero. Ahora hay una sola columna de
           monto y, si queres leer una caja sola, la filtras. */}
-      {columnas.length > 1 && (
-        <div className="cp-libro__filtros" role="group" aria-label="Filtrar por caja">
-          <button
-            type="button"
-            className={`cp-libro__chip ${filtroCaja === 'todas' ? 'cp-libro__chip--on' : ''}`}
-            onClick={() => setFiltroCaja('todas')}
-            aria-pressed={filtroCaja === 'todas'}
-          >
-            Todas
-          </button>
-          {columnas.map((c) => (
+      <div className="cp-libro__filtros">
+        {columnas.length > 1 && (
+          <div className="cp-libro__chips" role="group" aria-label="Filtrar por caja">
             <button
-              key={c.id}
               type="button"
-              className={`cp-libro__chip ${filtroCaja === c.id ? 'cp-libro__chip--on' : ''}`}
-              onClick={() => setFiltroCaja(c.id)}
-              aria-pressed={filtroCaja === c.id}
-              title={c.completo}
+              className={`cp-libro__chip ${filtroCaja === 'todas' ? 'cp-libro__chip--on' : ''}`}
+              onClick={() => setFiltroCaja('todas')}
+              aria-pressed={filtroCaja === 'todas'}
             >
-              {c.nombre}
+              Todas las cajas
+            </button>
+            {columnas.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                className={`cp-libro__chip ${filtroCaja === c.id ? 'cp-libro__chip--on' : ''}`}
+                onClick={() => setFiltroCaja(c.id)}
+                aria-pressed={filtroCaja === c.id}
+                title={c.completo}
+              >
+                {c.nombre}
+              </button>
+            ))}
+          </div>
+        )}
+        {/* Ver solo los gastos del mes era la pregunta que obligaba a barrer
+            la tabla entera buscando las filas rojas. */}
+        <div className="cp-libro__chips" role="group" aria-label="Filtrar por tipo">
+          {[['todo', 'Todo'], ['ingreso', 'Ingresos'], ['egreso', 'Egresos']].map(([id, txt]) => (
+            <button
+              key={id}
+              type="button"
+              className={`cp-libro__chip ${filtroTipo === id ? 'cp-libro__chip--on' : ''}`}
+              onClick={() => setFiltroTipo(id)}
+              aria-pressed={filtroTipo === id}
+            >
+              {txt}
             </button>
           ))}
         </div>
-      )}
+        <Button variant="primary" size="sm" className="cp-libro__nuevo" onClick={() => setNuevoAbierto(true)}>
+          + Registrar gasto
+        </Button>
+      </div>
 
       {visibles.length === 0 ? (
         <div className="cp-libro__vacio">
-          {filtroCaja === 'todas'
+          {filtroCaja === 'todas' && filtroTipo === 'todo'
             ? `No hay movimientos en ${MESES[mes.getMonth()]}. Los ingresos aparecen solos
                cuando marcás sesiones como pagadas; los gastos se cargan con el botón de arriba.`
-            : 'Esa caja no tuvo movimientos este mes.'}
+            : `No hay movimientos con esos filtros en ${MESES[mes.getMonth()]}.`}
         </div>
       ) : (
         <>
@@ -484,15 +494,21 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
           </DualScrollTable>
 
           {/* Cierre del mes. Antes esto vivia en un tfoot con colSpan y los
-              numeros terminaban pegados al ultimo total de columna. */}
+              numeros terminaban pegados al ultimo total de columna. Queda
+              pegado al pie de la pantalla mientras se recorre la lista
+              (ver el CSS) y suma solo lo que dejan ver los filtros. */}
           <div className="cp-libro__cierre">
             <div className="cp-libro__cierre-item">
               <span className="cp-libro__cierre-label">Ingresos</span>
-              <span className="cp-libro__cierre-valor cp-libro__in">+{formatoARS.format(totalesVisibles.ingresos)}</span>
+              <span className={`cp-libro__cierre-valor ${totalesVisibles.ingresos ? 'cp-libro__in' : ''}`}>
+                {conSigno('+', totalesVisibles.ingresos)}
+              </span>
             </div>
             <div className="cp-libro__cierre-item">
               <span className="cp-libro__cierre-label">Egresos</span>
-              <span className="cp-libro__cierre-valor cp-libro__out">−{formatoARS.format(totalesVisibles.egresos)}</span>
+              <span className={`cp-libro__cierre-valor ${totalesVisibles.egresos ? 'cp-libro__out' : ''}`}>
+                {conSigno('−', totalesVisibles.egresos)}
+              </span>
             </div>
             <div className="cp-libro__cierre-item cp-libro__cierre-item--saldo">
               <span className="cp-libro__cierre-label">Saldo</span>

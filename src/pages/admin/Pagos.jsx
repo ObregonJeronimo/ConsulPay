@@ -8,10 +8,11 @@ import Spinner from '../../components/ui/Spinner.jsx';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useConsultorio } from '../../hooks/useConsultorio.js';
 import { useOverlayClose } from '../../hooks/useOverlayClose.js';
-import { ESTADOS_PAGO_SESION, formatoARS } from '../../lib/constants.js';
+import { formatoARS } from '../../lib/constants.js';
 import { suscribirPacientesConsultorio } from '../../lib/pacientes.js';
 import IngresosPorMes from './IngresosPorMes.jsx';
 import LibroCaja from './LibroCaja.jsx';
+import ResumenPagos from './ResumenPagos.jsx';
 import { mpHabilitado } from '../../lib/mpIntegracion.js';
 import {
   labelEstadoPago,
@@ -25,7 +26,6 @@ import {
   finDeMes,
   inicioDeMes,
   nombreDelMes,
-  suscribirSesionesConsultorio,
 } from '../../lib/sesiones.js';
 
 import './Pagos.css';
@@ -67,28 +67,37 @@ export default function PagosAdmin() {
   const consultorioId = user?.consultorioId;
 
   const [pagos, setPagos] = useState([]);
-  const [sesiones, setSesiones] = useState([]);
   const [profesionales, setProfesionales] = useState([]);
   const [pacientes, setPacientes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filtroEstado, setFiltroEstado] = useState('todos');
-  /* Arranca en el libro y no en los pagos manuales: es la unica pestana
-     que responde "como vengo este mes" de una, con ingresos y egresos
-     de las dos cajas juntos. Las otras son para mirar un canal puntual. */
-  const [filtroCanal, setFiltroCanal] = useState('libro'); // 'libro' | 'mp' | 'manual' | 'ambos' | 'ingresos'
+  /* Arranca en el Resumen: es la unica vista que contesta "como venimos"
+     de un vistazo, con el anio entero. Las otras son para bajar al detalle.
+       resumen     -> el anio mes a mes (ResumenPagos)
+       movimientos -> el libro de caja de un mes (LibroCaja)
+       cobros      -> que se cobro cada mes y de que sesiones (IngresosPorMes)
+       mp          -> pagos por Mercado Pago, solo si MP esta habilitado
+     "Pagos manuales" y "Ambos" se fueron: la primera listaba pagos de MP
+     (sin MP quedaba siempre vacia) y sus dos cifras utiles — lo cobrado y
+     lo pendiente — ahora estan en el Resumen. */
+  const [vista, setVista] = useState('resumen');
   // MP solo se ofrece si TODOS los admins vincularon su cuenta. Ver
   // mpHabilitado(): con una sola conectada los cobros del mes que le toca
   // a la otra no tienen destino, asi que la opcion no debe existir.
   const mpActivo = mpHabilitado(consultorio);
 
-  // Si MP se desvincula estando parado en una pestana de MP, la vista
-  // quedaria mostrando un canal que ya no existe. Se vuelve a manuales.
+  // Si MP se desvincula estando parado en esa pestana, la vista quedaria
+  // mostrando un canal que ya no existe. Se vuelve al Resumen.
   useEffect(() => {
-    if (!mpActivo && (filtroCanal === 'mp' || filtroCanal === 'ambos')) {
-      setFiltroCanal('manual');
-    }
-  }, [mpActivo, filtroCanal]);
+    if (!mpActivo && vista === 'mp') setVista('resumen');
+  }, [mpActivo, vista]);
+
+  /* Un solo periodo para todas las vistas: el Resumen mira el anio de este
+     mes y Movimientos el mes. Asi "Ver movimientos de julio" desde el
+     Resumen y volver no pierde el anio, y cambiar de anio en el Resumen
+     deja Movimientos parado en ese mismo anio. */
   const [mes, setMes] = useState(() => inicioDeMes(new Date()));
+  const anio = mes.getFullYear();
   const [pagoSeleccionado, setPagoSeleccionado] = useState(null);
 
   /* ---- Suscripciones live ---- */
@@ -100,14 +109,6 @@ export default function PagosAdmin() {
       setLoading(false);
     });
   }, [consultorioId]);
-
-  // Sesiones del mes para calcular las marcadas como pagadas manualmente
-  useEffect(() => {
-    if (!consultorioId) return;
-    const desde = inicioDeMes(mes);
-    const hasta = finDeMes(mes);
-    return suscribirSesionesConsultorio(consultorioId, setSesiones, { desde, hasta });
-  }, [consultorioId, mes]);
 
   useEffect(() => {
     if (!consultorioId) return;
@@ -173,184 +174,112 @@ export default function PagosAdmin() {
     return { aprobados, pendientes, totalRecibido, totalComision, totalFeeMP, pagosSinFeeDetails };
   }, [pagosDelMes]);
 
-  // Stats de sesiones marcadas como "Pagadas" manualmente en el mes
-  // (distinto de los pagos MP — estas se marcaron con el botón ✓ sin pasar por MP)
-  const statsMes = useMemo(() => {
-    let totalMarcadas = 0;      // monto que el consultorio recibe de sesiones marcadas
-    let cantMarcadas = 0;
-    let totalDebe = 0;          // lo que todavia deben (sesiones en estado 'debido')
-
-    for (const s of sesiones) {
-      if (s.estadoPago === ESTADOS_PAGO_SESION.PAGADO) {
-        totalMarcadas += s.montoConsultorio || 0;
-        cantMarcadas += 1;
-      } else if (s.estadoPago === ESTADOS_PAGO_SESION.DEBIDO) {
-        totalDebe += s.montoConsultorio || 0;
-      }
-    }
-
-    const totalCombinado = stats.totalRecibido + totalMarcadas;
-    return { totalMarcadas, cantMarcadas, totalDebe, totalCombinado };
-  }, [sesiones, stats.totalRecibido]);
 
   /* ---- Renders ---- */
 
-  if (loading && pagos.length === 0) {
-    return (
-      <div className="cp-pagos-admin">
-        <div style={{ padding: 60, display: 'flex', justifyContent: 'center' }}>
-          <Spinner size={24} label="Cargando pagos…" />
-        </div>
-      </div>
-    );
-  }
+  const SUBTITULOS = {
+    resumen: 'Cómo viene el consultorio, mes a mes.',
+    movimientos: 'Cada peso que entró y salió en el mes, por caja.',
+    cobros: 'Qué cobró el consultorio cada mes, de qué profesional y de qué sesiones.',
+    mp: 'Cobros por Mercado Pago del mes, con el cargo de MP descontado.',
+  };
+  const PESTANAS = [
+    ['resumen', 'Resumen'],
+    ['movimientos', 'Movimientos'],
+    ['cobros', 'Cobros por mes'],
+    ...(mpActivo ? [['mp', 'Mercado Pago']] : []),
+  ];
+  // Resumen y Cobros recorren el anio; Movimientos y MP, un mes.
+  const porAnio = vista === 'resumen' || vista === 'cobros';
 
   return (
     <div className="cp-pagos-admin">
       <header className="cp-page-header">
         <div>
-          <h1 className="cp-page-title">Pagos recibidos</h1>
-          <p className="cp-page-sub">
-            Ingresos del consultorio por canal de cobro.
-          </p>
+          <h1 className="cp-page-title">Pagos</h1>
+          <p className="cp-page-sub">{SUBTITULOS[vista]}</p>
         </div>
-        <SelectorMes mes={mes} setMes={setMes} />
+        {porAnio
+          ? <SelectorAnio mes={mes} setMes={setMes} />
+          : <SelectorMes mes={mes} setMes={setMes} />}
       </header>
 
-      {/* Toggle canal + resumen del mes */}
       <div className="cp-pagos-canal-wrap">
-        {/* Pestanas: el libro primero, despues cada canal por separado */}
-        <div className="cp-pagos-canal-toggle">
-          <button
-            type="button"
-            className={`cp-pagos-canal-btn ${filtroCanal === 'libro' ? 'cp-pagos-canal-btn--active' : ''}`}
-            onClick={() => setFiltroCanal('libro')}
-          >
-            Ingresos y egresos
-          </button>
-          <button
-            type="button"
-            className={`cp-pagos-canal-btn ${filtroCanal === 'manual' ? 'cp-pagos-canal-btn--active' : ''}`}
-            onClick={() => setFiltroCanal('manual')}
-          >
-            Pagos manuales
-          </button>
-          {mpActivo && (
-            <>
-              <button
-                type="button"
-                className={`cp-pagos-canal-btn ${filtroCanal === 'mp' ? 'cp-pagos-canal-btn--active' : ''}`}
-                onClick={() => setFiltroCanal('mp')}
-              >
-                Mercado Pago
-              </button>
-              <button
-                type="button"
-                className={`cp-pagos-canal-btn ${filtroCanal === 'ambos' ? 'cp-pagos-canal-btn--active' : ''}`}
-                onClick={() => setFiltroCanal('ambos')}
-              >
-                Ambos
-              </button>
-            </>
-          )}
-          <button
-            type="button"
-            className={`cp-pagos-canal-btn ${filtroCanal === 'ingresos' ? 'cp-pagos-canal-btn--active' : ''}`}
-            onClick={() => setFiltroCanal('ingresos')}
-          >
-            Ingresos por mes
-          </button>
+        <div className="cp-pagos-canal-toggle" role="tablist" aria-label="Vistas de pagos">
+          {PESTANAS.map(([id, txt]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={vista === id}
+              className={`cp-pagos-canal-btn ${vista === id ? 'cp-pagos-canal-btn--active' : ''}`}
+              onClick={() => setVista(id)}
+            >
+              {txt}
+            </button>
+          ))}
         </div>
-
-        {/* Stats según canal seleccionado */}
-        {filtroCanal !== 'ingresos' && filtroCanal !== 'libro' && (<>
-        <div className="cp-pagos-resumen-mes">
-          {(filtroCanal === 'ambos') && (
-            <div className="cp-pagos-resumen-mes__card cp-pagos-resumen-mes__card--total">
-              <div className="cp-pagos-resumen-mes__label">Total en {nombreDelMes(mes)}</div>
-              <div className="cp-pagos-resumen-mes__value">
-                {formatoARS.format(statsMes.totalCombinado)}
-              </div>
-              <div className="cp-pagos-resumen-mes__hint">MP + marcado pagado</div>
-            </div>
-          )}
-
-          {(filtroCanal === 'mp' || filtroCanal === 'ambos') && (
-            <>
-              <div className="cp-pagos-resumen-mes__card">
-                <div className="cp-pagos-resumen-mes__label">Vía Mercado Pago</div>
-                <div className="cp-pagos-resumen-mes__value">
-                  {formatoARS.format(stats.totalRecibido)}
-                </div>
-                <div className="cp-pagos-resumen-mes__hint">
-                  {stats.aprobados} pago{stats.aprobados === 1 ? '' : 's'} aprobado{stats.aprobados === 1 ? '' : 's'}
-                </div>
-              </div>
-              <div className="cp-pagos-resumen-mes__card">
-                <div className="cp-pagos-resumen-mes__label">Cargo Mercado Pago</div>
-                <div className="cp-pagos-resumen-mes__value">
-                  {formatoARS.format(stats.totalFeeMP)}
-                </div>
-                <div className="cp-pagos-resumen-mes__hint">
-                  {stats.pendientes > 0 && `${stats.pendientes} en proceso · `}tarifa MP
-                </div>
-              </div>
-            </>
-          )}
-
-          {(filtroCanal === 'manual' || filtroCanal === 'ambos') && (
-            <>
-              <div className="cp-pagos-resumen-mes__card cp-pagos-resumen-mes__card--marcado">
-                <div className="cp-pagos-resumen-mes__label">Marcado como pagado</div>
-                <div className="cp-pagos-resumen-mes__value">
-                  {formatoARS.format(statsMes.totalMarcadas)}
-                </div>
-                <div className="cp-pagos-resumen-mes__hint">
-                  {statsMes.cantMarcadas} sesión{statsMes.cantMarcadas === 1 ? '' : 'es'} marcada{statsMes.cantMarcadas === 1 ? '' : 's'}
-                </div>
-              </div>
-              <div className="cp-pagos-resumen-mes__card cp-pagos-resumen-mes__card--debe">
-                <div className="cp-pagos-resumen-mes__label">Pendiente de cobro</div>
-                <div className="cp-pagos-resumen-mes__value">
-                  {formatoARS.format(statsMes.totalDebe)}
-                </div>
-                <div className="cp-pagos-resumen-mes__hint">sesiones que aún deben</div>
-              </div>
-            </>
-          )}
-        </div>
-
-        {stats.pagosSinFeeDetails > 0 && (filtroCanal === 'mp' || filtroCanal === 'ambos') && (
-          <p className="cp-pagos-nota-asterisco">
-            * Hay {stats.pagosSinFeeDetails} pago{stats.pagosSinFeeDetails === 1 ? '' : 's'} sin desglose
-            completo de cargos de Mercado Pago. El total es aproximado.
-          </p>
-        )}
-        </>
-        )}
       </div>
 
-      {filtroCanal === 'libro' ? (
+      {vista === 'resumen' && (
+        <ResumenPagos
+          consultorioId={consultorioId}
+          consultorio={consultorio}
+          anio={anio}
+          onVerMes={(m) => { setMes(new Date(anio, m, 1)); setVista('movimientos'); }}
+        />
+      )}
+
+      {vista === 'movimientos' && (
         <LibroCaja
           consultorioId={consultorioId}
           consultorio={consultorio}
           uid={user?.uid}
           mes={mes}
         />
-      ) : filtroCanal === 'ingresos' ? (
+      )}
+
+      {vista === 'cobros' && (
         <IngresosPorMes
           consultorioId={consultorioId}
           uid={user?.uid}
+          anio={anio}
           mapaProfesionales={mapaProfesionales}
           mapaPacientes={mapaPacientes}
         />
+      )}
+
+      {vista === 'mp' && (loading && pagos.length === 0 ? (
+        <div style={{ padding: 60, display: 'flex', justifyContent: 'center' }}>
+          <Spinner size={24} label="Cargando pagos…" />
+        </div>
       ) : (
       <>
+      <div className="cp-pagos-resumen-mes">
+        <div className="cp-pagos-resumen-mes__card">
+          <div className="cp-pagos-resumen-mes__label">Vía Mercado Pago</div>
+          <div className="cp-pagos-resumen-mes__value">
+            {formatoARS.format(stats.totalRecibido)}
+          </div>
+          <div className="cp-pagos-resumen-mes__hint">
+            {stats.aprobados} pago{stats.aprobados === 1 ? '' : 's'} aprobado{stats.aprobados === 1 ? '' : 's'}
+          </div>
+        </div>
+        <div className="cp-pagos-resumen-mes__card">
+          <div className="cp-pagos-resumen-mes__label">Cargo Mercado Pago</div>
+          <div className="cp-pagos-resumen-mes__value">
+            {formatoARS.format(stats.totalFeeMP)}
+          </div>
+          <div className="cp-pagos-resumen-mes__hint">
+            {stats.pendientes > 0 && `${stats.pendientes} en proceso · `}tarifa MP
+          </div>
+        </div>
+      </div>
+
       {stats.pagosSinFeeDetails > 0 && (
         <p className="cp-pagos-nota-asterisco">
           * Hay {stats.pagosSinFeeDetails} pago{stats.pagosSinFeeDetails === 1 ? '' : 's'} sin desglose
-          completo de cargos de Mercado Pago (pagos creados antes de esta versión). El total recibido
-          de esos pagos es aproximado.
+          completo de cargos de Mercado Pago. El total es aproximado.
         </p>
       )}
 
@@ -461,7 +390,7 @@ export default function PagosAdmin() {
         </DualScrollTable>
       )}
       </>
-      )}
+      ))}
 
       {pagoSeleccionado && (
         <DetallePagoModal
@@ -654,7 +583,7 @@ function SelectorMes({ mes, setMes }) {
   const esEsteMes = inicioDeMes(new Date()).getTime() === mes.getTime();
 
   return (
-    <div className="cp-mes-selector">
+    <div className="cp-mes-selector cp-pagos-periodo">
       <button
         type="button"
         className="cp-mes-selector__btn"
@@ -675,6 +604,50 @@ function SelectorMes({ mes, setMes }) {
       >
         ›
       </button>
+      {!esEsteMes && (
+        <button type="button" className="cp-mes-selector__hoy" onClick={() => setMes(inicioDeMes(new Date()))}>
+          Hoy
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Mismo control que el de mes, pero de a un anio. Mueve el mismo `mes` que
+ * usa Movimientos (ver PagosAdmin): pasar a otro anio deja el mismo mes del
+ * calendario, salvo que en el anio en curso ese mes todavia no haya llegado.
+ */
+function SelectorAnio({ mes, setMes }) {
+  const hoy = new Date();
+  const anio = mes.getFullYear();
+  const esEsteAnio = anio === hoy.getFullYear();
+
+  function ir(a) {
+    const m = a === hoy.getFullYear() ? Math.min(mes.getMonth(), hoy.getMonth()) : mes.getMonth();
+    setMes(new Date(a, m, 1));
+  }
+
+  return (
+    <div className="cp-mes-selector cp-pagos-periodo">
+      <button type="button" className="cp-mes-selector__btn" onClick={() => ir(anio - 1)} aria-label="Año anterior">
+        ‹
+      </button>
+      <span className="cp-mes-selector__label">{anio}</span>
+      <button
+        type="button"
+        className="cp-mes-selector__btn"
+        onClick={() => ir(anio + 1)}
+        disabled={esEsteAnio}
+        aria-label="Año siguiente"
+      >
+        ›
+      </button>
+      {!esEsteAnio && (
+        <button type="button" className="cp-mes-selector__hoy" onClick={() => setMes(inicioDeMes(new Date()))}>
+          Hoy
+        </button>
+      )}
     </div>
   );
 }

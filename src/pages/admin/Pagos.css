@@ -2,8 +2,11 @@
    Pagos recibidos (admin)
    ============================================================ */
 
+/* 1240 y no 1100: el Resumen pone cifras, grafico y una tabla de cinco
+   columnas en la misma pantalla, y en un monitor comun sobraba aire a la
+   derecha mientras la tabla se apretaba. */
 .cp-pagos-admin {
-  max-width: 1100px;
+  max-width: 1240px;
 }
 
 /* Stats arriba */
@@ -438,6 +441,12 @@
   display: flex;
   flex-direction: column;
   gap: var(--cp-space-4);
+  margin: 16px 0 14px;
+}
+
+/* En notebooks bajas cada pixel de alto cuenta para que el Resumen entre. */
+@media (max-height: 820px) and (min-width: 641px) {
+  .cp-pagos-canal-wrap { margin: 12px 0 12px; }
 }
 
 .cp-pagos-canal-toggle {
@@ -479,6 +488,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--cp-space-4);
+  margin-bottom: var(--cp-space-4);
 }
 
 .cp-pagos-resumen-mes__card {
@@ -504,10 +514,17 @@
 }
 
 @media (max-width: 640px) {
+  /* Cuatro pestanas no siempre entran en 375px: se deslizan en vez de
+     partirse o desbordar la pagina. */
   .cp-pagos-canal-toggle {
     width: 100%;
     justify-content: stretch;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
   }
+
+  .cp-pagos-canal-toggle::-webkit-scrollbar { display: none; }
 
   .cp-pagos-canal-btn {
     flex: 1;
