@@ -2630,6 +2630,26 @@ console.log('\n[32] Resumen de Pagos: el anio mes a mes');
   chequeo('y si no tiene receptor va a "sin asignar", no desaparece',
     serieV.meses[6].porCuenta.sin_asignar.ingresos === 7000);
 
+  /* Y se muestra como lo que es: nadie marco quien cobro. "Sin asignar"
+     sonaba a algo pendiente de repartir. */
+  globalThis.__DATA__ = {
+    ...datos,
+    sesiones: [vieja, ses('w', 'pagado', 3000, 'A', T(2025, 6, 1), T(2025, 6, 5))],
+    gastos: [],
+  };
+  const { cont: contSin } = await montar(LibroCaja, {
+    consultorioId: 'C1', consultorio: { adminUids: ['A', 'R'], mpConfigs: {} }, uid: 'A', mes: new Date(2025, 6, 1),
+  });
+  const cajasSin = [...contSin.querySelectorAll('.cp-libro__caja-nombre')].map((n) => n.textContent.trim());
+  chequeo('el libro dice "No se marcó quién cobró"', cajasSin.includes('No se marcó quién cobró'), `(${cajasSin})`);
+  chequeo('y ya no dice "Sin asignar"', !contSin.textContent.includes('Sin asignar'));
+  const { cont: contChips } = await montar(IngresosPorMes, {
+    consultorioId: 'C1', uid: 'A', anio: 2025, mapaProfesionales: {}, mapaPacientes: {},
+  });
+  const chips = [...contChips.querySelectorAll('.cp-receptor__nombre')].map((n) => n.textContent.trim());
+  chequeo('en Cobros por mes la ficha va entera, no "No"',
+    chips.includes('No se marcó quién cobró') && !chips.includes('No'), `(${chips})`);
+
   // ---- la pantalla ----
   globalThis.__DATA__ = datos;
   let vioMes = null;

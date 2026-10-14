@@ -21,7 +21,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Spinner from '../../components/ui/Spinner.jsx';
 import { ESTADOS_PAGO_SESION, formatoARS } from '../../lib/constants.js';
 import {
-  armarLibro, cuentasDeCaja, hayMPEnRango, serieAnual, suscribirGastos,
+  armarLibro, CAJA_SIN_RECEPTOR, cuentasDeCaja, hayMPEnRango, serieAnual, suscribirGastos,
 } from '../../lib/gastos.js';
 import { mpHabilitado } from '../../lib/mpIntegracion.js';
 import { montoNetoEfectivo, suscribirPagosDelConsultorio } from '../../lib/pagos.js';
@@ -265,8 +265,8 @@ function LineaMobile({ m }) {
 function FilaMes({ m, hoy, abierto, cuentas, onAlternar, onVerMes }) {
   const saldo = m.ingresos - m.egresos;
   const idDetalle = `cp-rs-detalle-${m.mes}`;
-  // Solo las cajas que se movieron ese mes, mas "sin asignar" si hubo.
-  const cajas = [...cuentas, { id: 'sin_asignar', nombre: 'Sin asignar' }]
+  // Las cajas de los admins, mas la de "no se marco quien cobro" si ese mes hubo.
+  const cajas = [...cuentas, CAJA_SIN_RECEPTOR]
     .map((c) => ({ ...c, ...(m.porCuenta[c.id] || { ingresos: 0, egresos: 0 }) }))
     .filter((c) => c.id !== 'sin_asignar' || c.ingresos || c.egresos);
 

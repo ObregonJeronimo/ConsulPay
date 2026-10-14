@@ -27,6 +27,19 @@ import { db } from './firebase.js';
 /** Cuenta especial: lo cobrado por Mercado Pago, que no es de nadie en particular. */
 export const CUENTA_MP = 'mp';
 
+/**
+ * La plata que entro sin que nadie marcara quien la recibio: sesiones
+ * pagadas antes de que se guardara el receptor (en CALA, 125 de mayo de
+ * 2026). Antes se llamaba "Sin asignar", que sonaba a algo pendiente de
+ * repartir; lo que paso es que no se registro, y eso es lo que dice.
+ * El id queda igual: es lo que usan armarLibro y serieAnual.
+ */
+export const CAJA_SIN_RECEPTOR = {
+  id: 'sin_asignar',
+  nombre: 'No se marcó quién cobró',
+  completo: 'No se marcó quién recibió el dinero',
+};
+
 export function suscribirGastos(consultorioId, callback) {
   if (!consultorioId) return () => {};
   const q = query(collection(db, 'gastos'), where('consultorioId', '==', consultorioId));

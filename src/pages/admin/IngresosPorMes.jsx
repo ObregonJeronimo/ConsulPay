@@ -5,6 +5,7 @@ import Button from '../../components/ui/Button.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
 
 import { ESTADOS_PAGO_SESION, formatoARS } from '../../lib/constants.js';
+import { CAJA_SIN_RECEPTOR } from '../../lib/gastos.js';
 import { editarFechaPago, getCantidadSesiones, suscribirSesionesPagadas } from '../../lib/sesiones.js';
 
 import { MESES_CORTOS, montoCompacto } from './resumenAnual.js';
@@ -71,7 +72,12 @@ function desglosePorReceptor(sesiones) {
   for (const s of sesiones) {
     const uid = s.receptorUid || 'sin_asignar';
     if (!map[uid]) {
-      map[uid] = { uid, nombre: s.receptorNombre || 'Sin asignar', total: 0 };
+      /* "No se marco quien cobro" solo cuando de verdad no hay receptor. Si
+         hay uid pero falta el nombre, el receptor se sabe: va como en el
+         libro ("Admin" + el uid recortado), no como plata sin duenio. */
+      const nombre = s.receptorNombre
+        || (s.receptorUid ? `Admin ${s.receptorUid.slice(0, 4)}` : CAJA_SIN_RECEPTOR.nombre);
+      map[uid] = { uid, nombre, total: 0 };
     }
     map[uid].total += s.montoConsultorio || 0;
   }
@@ -85,8 +91,16 @@ function ChipsReceptores({ sesiones, compacto }) {
   return (
     <div className={`cp-receptores ${compacto ? 'cp-receptores--compacto' : ''}`}>
       {filas.map((f) => (
-        <span key={f.uid} className="cp-receptor" title={`Cobrado por ${f.nombre}`}>
-          <span className="cp-receptor__nombre">{f.nombre.split(/\s+/)[0]}</span>
+        <span
+          key={f.uid}
+          className="cp-receptor"
+          title={f.uid === CAJA_SIN_RECEPTOR.id ? CAJA_SIN_RECEPTOR.completo : `Cobrado por ${f.nombre}`}
+        >
+          {/* De un admin alcanza el primer nombre; la de sin receptor va
+              entera, o quedaria diciendo solo "No". */}
+          <span className="cp-receptor__nombre">
+            {f.uid === CAJA_SIN_RECEPTOR.id ? f.nombre : f.nombre.split(/\s+/)[0]}
+          </span>
           <span className="cp-receptor__monto">{formatoARS.format(f.total)}</span>
         </span>
       ))}

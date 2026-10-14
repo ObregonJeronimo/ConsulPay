@@ -7,7 +7,7 @@ import Spinner from '../../components/ui/Spinner.jsx';
 import { useOverlayClose } from '../../hooks/useOverlayClose.js';
 import { ESTADOS_PAGO_SESION, formatoARS } from '../../lib/constants.js';
 import {
-  armarLibro, crearGasto, cuentasDeCaja, eliminarGasto, hayMPEnRango, suscribirGastos,
+  armarLibro, CAJA_SIN_RECEPTOR, crearGasto, cuentasDeCaja, eliminarGasto, hayMPEnRango, suscribirGastos,
 } from '../../lib/gastos.js';
 import { nombrePaciente, suscribirPacientesConsultorio } from '../../lib/pacientes.js';
 import { suscribirMiembrosConsultorio } from '../../lib/profesionales.js';
@@ -156,7 +156,7 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
     const tot = {};
     const cols = [...cuentas];
     if (delMes.some((mv) => mv.cuenta === 'sin_asignar')) {
-      cols.push({ id: 'sin_asignar', nombre: 'Sin asignar', completo: 'Cobros sin receptor registrado' });
+      cols.push(CAJA_SIN_RECEPTOR);
     }
     for (const c of cols) tot[c.id] = { ingresos: 0, egresos: 0, saldo: 0 };
     for (const mv of delMes) {
@@ -371,7 +371,7 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
                 {filas.map((f) => {
                   if (f.tipo === 'grupo') {
                     const abierto = abiertos.has(f.clave);
-                    const caja = columnas.find((c) => c.id === f.cuenta)?.nombre ?? 'Sin asignar';
+                    const caja = columnas.find((c) => c.id === f.cuenta)?.nombre ?? CAJA_SIN_RECEPTOR.nombre;
                     /* El titular de la fila es el profesional que pago, no el
                        recuento de cobros: es el dato con el que se concilia
                        contra la planilla que el consultorio lleva a mano. */
@@ -440,7 +440,7 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
 
                   const mv = f.mv;
                   const esIngreso = mv.tipo === 'ingreso';
-                  const caja = columnas.find((c) => c.id === mv.cuenta)?.nombre ?? 'Sin asignar';
+                  const caja = columnas.find((c) => c.id === mv.cuenta)?.nombre ?? CAJA_SIN_RECEPTOR.nombre;
                   const signo = esIngreso ? '+' : '−';
                   /* Un cobro suelto no tiene fila de grupo arriba que ponga el
                      nombre, asi que el profesional viaja en el renglon de
