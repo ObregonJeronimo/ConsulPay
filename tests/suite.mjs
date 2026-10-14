@@ -277,10 +277,20 @@ console.log('\n[8] Pagos del admin');
   chequeo('MP apagado: sin pestanas MP ni Ambos',
     !tabs.includes('Mercado Pago') && !tabs.includes('Ambos'), `(${tabs})`);
 
+  /* La pestana que contesta "como vengo este mes" es la que tiene que estar
+     puesta al entrar, y primera en la barra: es la que se mira todos los
+     dias, las otras son para revisar un canal puntual. */
+  chequeo('Ingresos y egresos es la primera pestana', tabs[0] === 'Ingresos y egresos', `(${tabs})`);
+  chequeo('y es la que abre por defecto',
+    r.cont.querySelector('.cp-pagos-canal-btn--active')?.textContent.trim() === 'Ingresos y egresos',
+    `(${r.cont.querySelector('.cp-pagos-canal-btn--active')?.textContent.trim()})`);
+  chequeo('al entrar ya se ve el libro, no la tabla de pagos', !!r.cont.querySelector('.cp-libro'));
+
   globalThis.__CONS__ = { adminUids: ['A'], mpConfigs: { primary: slot('A') } };
   r = await montar(Pagos, {});
   tabs = [...r.cont.querySelectorAll('.cp-pagos-canal-btn')].map((b) => b.textContent.trim());
   chequeo('MP habilitado: aparecen', tabs.includes('Mercado Pago') && tabs.includes('Ambos'), `(${tabs})`);
+  chequeo('con MP prendido sigue primera', tabs[0] === 'Ingresos y egresos', `(${tabs})`);
 }
 
 /* ============ 9. Directorio de admins ============ */
@@ -2447,6 +2457,92 @@ console.log('\n[30] Rechazar todas las solicitudes de un grupo');
 
   delete globalThis.__ESCRITOS__;
   await act(async () => { rootR.unmount(); });
+}
+
+/* ============ 31. De quien vino el ingreso y de cuando ============ */
+console.log('\n[31] Ingresos: profesional y fecha de sesion');
+{
+  const { default: LibroCaja } = await import('../src/pages/admin/LibroCaja.jsx');
+  /* El caso real: sesiones de julio que se cobran en octubre, y dos
+     profesionales que cobran el mismo dia en la misma caja. */
+  const ses = (id, monto, prof, pid, diaPago, mesSes, diaSes, c = 1) => ({
+    id, consultorioId: 'C1', estadoPago: 'pagado', montoConsultorio: monto, receptorUid: 'A',
+    profesionalUid: prof, pacienteId: pid, cantidadSesiones: c,
+    fechaPago: { toDate: () => new Date(2026, 9, diaPago, 12, 0) },
+    fecha: { toDate: () => new Date(2026, mesSes, diaSes, 10, 0) },
+  });
+  globalThis.__DATA__ = {
+    sesiones: [
+      ses('a', 10000, 'PRO1', 'P0', 2, 6, 3, 8),
+      ses('b', 20000, 'PRO1', 'P1', 2, 6, 15, 4),
+      ses('c', 30000, 'PRO2', 'P2', 2, 6, 20, 2),
+    ],
+    gastos: [],
+    pagos_consultorio: [],
+    usuarios: [
+      { id: 'A', uid: 'A', displayName: 'Adriana Barrozo', consultorioId: 'C1', rol: 'admin' },
+      { id: 'PRO1', uid: 'PRO1', displayName: 'Muriel Serral', consultorioId: 'C1', rol: 'profesional' },
+      { id: 'PRO2', uid: 'PRO2', displayName: 'Josefina Sosa', consultorioId: 'C1', rol: 'profesional' },
+    ],
+    pacientes: [
+      { id: 'P0', nombre: 'Delfina', apellido: 'Moyano', consultorioId: 'C1' },
+      { id: 'P1', nombre: 'Lucas', apellido: 'Peralta', consultorioId: 'C1' },
+      { id: 'P2', nombre: 'Ana', apellido: 'Alvarez', consultorioId: 'C1' },
+    ],
+  };
+  const { cont } = await montar(LibroCaja, {
+    consultorioId: 'C1', consultorio: { adminUids: ['A'], mpConfigs: {} }, uid: 'A', mes: new Date(2026, 9, 1),
+  });
+
+  const principales = () => [...cont.querySelectorAll('tbody .cp-libro__principal')]
+    .map((n) => n.textContent.trim());
+  const subs = () => [...cont.querySelectorAll('tbody .cp-libro__sub')].map((n) => n.textContent.trim());
+
+  /* Dos profesionales cobrando el mismo dia a la misma caja son DOS filas:
+     antes caian en un solo renglon y el nombre no se podia mostrar. */
+  chequeo('el profesional titula la fila de ingreso',
+    principales().includes('Muriel Serral'), `(${principales()})`);
+  const filasRaiz = () => [...cont.querySelectorAll('tbody tr')]
+    .filter((tr) => !tr.classList.contains('cp-libro__fila--hija'));
+  chequeo('no mezcla dos profesionales del mismo dia', (() => {
+    const raiz = filasRaiz();
+    const deMuriel = raiz.filter((tr) => tr.textContent.includes('Muriel Serral'));
+    const deJosefina = raiz.filter((tr) => tr.textContent.includes('Josefina Sosa'));
+    return raiz.length === 2 && deMuriel.length === 1 && deJosefina.length === 1
+      && deMuriel[0] !== deJosefina[0];
+  })(), `(${filasRaiz().length} filas)`);
+
+  /* La fila de Muriel agrupa 2 cobros; la de Josefina es una sola, asi que
+     no tiene fila de grupo y el nombre viaja en el renglon de apoyo. */
+  chequeo('el grupo cuenta cobros y sesiones',
+    subs().some((t) => t.includes('2 cobros') && t.includes('12 sesiones')), `(${subs()})`);
+  chequeo('el cobro suelto igual dice el profesional',
+    subs().some((t) => t.startsWith('Josefina Sosa')), `(${subs()})`);
+
+  /* Lo que el mes no decia: la plata de octubre es trabajo de julio. */
+  chequeo('muestra la fecha de la sesion, no solo la del pago',
+    subs().some((t) => t.includes('ses. 03/07–15/07')), `(${subs()})`);
+  chequeo('un solo dia de sesion no se muestra como rango',
+    subs().some((t) => t.includes('ses. 20/07') && !t.includes('–')), `(${subs()})`);
+
+  const fechasFila = [...cont.querySelectorAll('tbody td.cp-libro__td-fecha')]
+    .map((n) => n.textContent.trim()).filter(Boolean);
+  chequeo('la columna fecha sigue siendo la del pago',
+    fechasFila.every((f) => f === '02/10'), `(${fechasFila})`);
+
+  // El desglose de un grupo nombra al paciente, que es lo que el grupo tapa.
+  await act(async () => { clic(cont.querySelector('.cp-libro__toggle')); });
+  chequeo('el desglose nombra a los pacientes',
+    principales().includes('Moyano, Delfina') && principales().includes('Peralta, Lucas'),
+    `(${principales()})`);
+
+  /* El ancho: .cp-table se dimensiona con min-width: max-content, asi que un
+     ancho porcentual en una columna se resuelve contra el ancho de la propia
+     tabla y la infla. Que no vuelva a entrar. */
+  const fsLibro = await import('fs');
+  const cssLibroAncho = fsLibro.readFileSync('../src/pages/admin/LibroCaja.css', 'utf8');
+  chequeo('ninguna columna del libro usa ancho porcentual',
+    !/\.cp-libro__(th|td)-[a-z]+[^{]*\{[^}]*width:\s*\d+%/s.test(cssLibroAncho));
 }
 
 console.log(`\n${'='.repeat(52)}`);

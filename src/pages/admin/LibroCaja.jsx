@@ -31,6 +31,34 @@ function diaCorto(iso) {
   return `${d}/${m}`;
 }
 
+/**
+ * De cuando es el trabajo que se esta cobrando.
+ *
+ * La fecha de la fila es la del PAGO, y en este consultorio una sesion de
+ * julio se liquida en octubre: sin esto la plata aparece sin decir de que
+ * mes viene. Si el grupo abarca varios dias se muestra el rango, que es lo
+ * que se compara contra la planilla.
+ */
+function rangoSesiones(items) {
+  const fechas = items.map((i) => i.fechaSesion).filter(Boolean).sort();
+  if (fechas.length === 0) return '';
+  const desde = diaCorto(fechas[0]);
+  const hasta = diaCorto(fechas[fechas.length - 1]);
+  return desde === hasta ? desde : `${desde}–${hasta}`;
+}
+
+/** Texto de apoyo de una fila de ingreso: sesiones cobradas y de cuando son. */
+function subSesiones(cantidad, rango) {
+  const partes = [];
+  if (cantidad > 0) partes.push(`${cantidad} ${cantidad === 1 ? 'sesión' : 'sesiones'}`);
+  if (rango) partes.push(`ses. ${rango}`);
+  return partes.join(' · ');
+}
+
+/** Lo mismo para un cobro suelto, que tiene una sola fecha de sesion. */
+function subDeCobro(mv) {
+  return subSesiones(mv.cantidad, mv.fechaSesion ? diaCorto(mv.fechaSesion) : '');
+}
 
 function nombreCorto(u) {
   const n = u?.displayName || u?.email || '';
@@ -158,33 +186,60 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
     return m;
   }, [pacientes]);
 
+  const mapaMiembros = useMemo(() => {
+    const m = {};
+    for (const u of miembros) m[u.uid] = u;
+    return m;
+  }, [miembros]);
+
   /* Los movimientos ya resueltos para mostrar: el nombre del paciente sale
      del mapa; si el paciente fue borrado o la sesion no lo tiene, se dice
-     "Sesión cobrada" y no el nombre de un administrador. */
+     "Sesión cobrada" y no el nombre de un administrador.
+
+     El profesional sale del mismo padron de miembros. La sesion guarda el
+     uid y no el nombre, asi que si no se resuelve aca la fila dice de que
+     paciente vino la plata pero no quien la trajo, que es la mitad que
+     falta para conciliar contra la planilla del consultorio. */
   const conNombre = useMemo(() => movimientos.map((mv) => {
     if (mv.origen !== 'sesion') return mv;
     const pac = mapaPacientes[mv.pacienteId];
     const nombre = pac ? nombrePaciente(pac) : (mv.detalle || 'Sesión cobrada');
-    return { ...mv, detalle: nombre };
-  }), [movimientos, mapaPacientes]);
+    const prof = mapaMiembros[mv.profesionalUid];
+    return {
+      ...mv,
+      detalle: nombre,
+      profesionalNombre: prof?.displayName || prof?.email || '',
+    };
+  }), [movimientos, mapaPacientes, mapaMiembros]);
 
   const visibles = useMemo(
     () => (filtroCaja === 'todas' ? conNombre : conNombre.filter((mv) => mv.cuenta === filtroCaja)),
     [conNombre, filtroCaja],
   );
 
-  /* Agrupacion: los cobros de sesiones del mismo dia y la misma caja se
-     juntan en una linea sola. Un dia de cobranza son 14 sesiones sueltas y
-     leerlas de a una no aporta nada; el desglose queda a un click. Los
-     gastos y los cobros por MP NO se agrupan: cada uno tiene su motivo. */
+  /* Agrupacion: los cobros de sesiones del mismo dia, la misma caja y el
+     MISMO PROFESIONAL se juntan en una linea sola. Un dia de cobranza son
+     14 sesiones sueltas y leerlas de a una no aporta nada; el desglose
+     queda a un click.
+
+     El profesional entra en la clave porque es lo que la fila contesta:
+     un dia de cobranza es "vino Muriel y pago lo suyo", no una bolsa de
+     cobros sin dueño. Cuando dos profesionales pagan el mismo dia a la
+     misma caja, antes caian en un solo renglon y el nombre no se podia
+     mostrar sin mentir; ahora son dos renglones, cada uno con su nombre.
+
+     Los gastos y los cobros por MP NO se agrupan: cada uno tiene su motivo. */
   const filas = useMemo(() => {
     const out = [];
     const grupos = new Map();
     for (const mv of visibles) {
       if (mv.origen !== 'sesion') { out.push({ tipo: 'simple', mv }); continue; }
-      const clave = `${mv.fecha}|${mv.cuenta}`;
+      const clave = `${mv.fecha}|${mv.cuenta}|${mv.profesionalUid || 'sin'}`;
       if (!grupos.has(clave)) {
-        const g = { tipo: 'grupo', clave, fecha: mv.fecha, cuenta: mv.cuenta, monto: 0, sesiones: 0, items: [] };
+        const g = {
+          tipo: 'grupo', clave, fecha: mv.fecha, cuenta: mv.cuenta,
+          profesionalNombre: mv.profesionalNombre, monto: 0, sesiones: 0, items: [],
+        };
         grupos.set(clave, g);
         out.push(g);
       }
@@ -307,6 +362,12 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
                   if (f.tipo === 'grupo') {
                     const abierto = abiertos.has(f.clave);
                     const caja = columnas.find((c) => c.id === f.cuenta)?.nombre ?? 'Sin asignar';
+                    /* El titular de la fila es el profesional que pago, no el
+                       recuento de cobros: es el dato con el que se concilia
+                       contra la planilla que el consultorio lleva a mano. */
+                    const titulo = f.profesionalNombre || 'Cobros de sesiones';
+                    const sub = [`${f.items.length} cobros`, subSesiones(f.sesiones, rangoSesiones(f.items))]
+                      .filter(Boolean).join(' · ');
                     return [
                       <tr key={f.clave} className="cp-libro__fila cp-libro__fila--grupo">
                         <td data-label="Fecha" className="cp-libro__td-fecha">{diaCorto(f.fecha)}</td>
@@ -318,7 +379,10 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
                             aria-expanded={abierto}
                           >
                             <span className={`cp-libro__chevron ${abierto ? 'cp-libro__chevron--on' : ''}`} aria-hidden="true">›</span>
-                            {f.items.length} cobros · {f.sesiones} {f.sesiones === 1 ? 'sesión' : 'sesiones'}
+                            <span className="cp-libro__concepto">
+                              <span className="cp-libro__principal">{titulo}</span>
+                              <span className="cp-libro__sub">{sub}</span>
+                            </span>
                           </button>
                         </td>
                         <td data-label="Caja" className="cp-libro__td-caja">{caja}</td>
@@ -327,11 +391,9 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
                         <td className="cp-td-mobile-main" onClick={() => alternar(f.clave)}>
                           <div className="cp-libro__m-top">
                             <span className="cp-libro__m-fecha">{diaCorto(f.fecha)}</span>
-                            <span className="cp-libro__m-detalle">
-                              {f.items.length} cobros · {f.sesiones} {f.sesiones === 1 ? 'sesión' : 'sesiones'}
-                            </span>
+                            <span className="cp-libro__m-detalle">{titulo}</span>
                           </div>
-                          <div className="cp-libro__m-bot">{caja}</div>
+                          <div className="cp-libro__m-bot">{sub} · {caja}</div>
                         </td>
                         <td className="cp-td-mobile-badge">
                           <span className="cp-libro__in">+{formatoARS.format(f.monto)}</span>
@@ -343,10 +405,10 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
                           <td className="cp-libro__td-fecha" />
                           <td data-label="Concepto" className="cp-libro__td-detalle">
                             <span className="cp-libro__guion" aria-hidden="true">↳</span>
-                            {mv.detalle}
-                            {mv.cantidad > 1 && (
-                              <span className="cp-libro__cant"> · {mv.cantidad} sesiones</span>
-                            )}
+                            <span className="cp-libro__concepto">
+                              <span className="cp-libro__principal">{mv.detalle}</span>
+                              <span className="cp-libro__sub">{subDeCobro(mv)}</span>
+                            </span>
                           </td>
                           <td />
                           <td data-label="Monto" className="cp-num cp-libro__in">+{formatoARS.format(mv.monto)}</td>
@@ -355,6 +417,7 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
                             <div className="cp-libro__m-top">
                               <span className="cp-libro__m-detalle">↳ {mv.detalle}</span>
                             </div>
+                            <div className="cp-libro__m-bot">{subDeCobro(mv)}</div>
                           </td>
                           <td className="cp-td-mobile-badge">
                             <span className="cp-libro__in">+{formatoARS.format(mv.monto)}</span>
@@ -369,16 +432,25 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
                   const esIngreso = mv.tipo === 'ingreso';
                   const caja = columnas.find((c) => c.id === mv.cuenta)?.nombre ?? 'Sin asignar';
                   const signo = esIngreso ? '+' : '−';
+                  /* Un cobro suelto no tiene fila de grupo arriba que ponga el
+                     nombre, asi que el profesional viaja en el renglon de
+                     apoyo: sin el, la fila dice de que paciente vino la plata
+                     pero no quien la trajo. */
+                  const sub = mv.origen === 'sesion'
+                    ? [mv.profesionalNombre, subDeCobro(mv)].filter(Boolean).join(' · ')
+                    : '';
                   return (
                     <tr key={mv.id} className="cp-libro__fila">
                       <td data-label="Fecha" className="cp-libro__td-fecha">{diaCorto(mv.fecha)}</td>
                       <td data-label="Concepto">
-                        {mv.detalle}
-                        {mv.origen === 'sesion' && mv.cantidad > 1 && (
-                          <span className="cp-libro__cant"> · {mv.cantidad} sesiones</span>
-                        )}
-                        {mv.origen === 'gasto' && <span className="cp-libro__tag">gasto</span>}
-                        {mv.origen === 'mp' && <span className="cp-libro__tag">Mercado Pago</span>}
+                        <span className="cp-libro__concepto">
+                          <span className="cp-libro__principal">
+                            {mv.detalle}
+                            {mv.origen === 'gasto' && <span className="cp-libro__tag">gasto</span>}
+                            {mv.origen === 'mp' && <span className="cp-libro__tag">Mercado Pago</span>}
+                          </span>
+                          {sub && <span className="cp-libro__sub">{sub}</span>}
+                        </span>
                       </td>
                       <td data-label="Caja" className="cp-libro__td-caja">{caja}</td>
                       <td data-label="Monto" className={`cp-num ${esIngreso ? 'cp-libro__in' : 'cp-libro__out'}`}>
@@ -396,7 +468,7 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
                           <span className="cp-libro__m-fecha">{diaCorto(mv.fecha)}</span>
                           <span className="cp-libro__m-detalle">{mv.detalle}</span>
                         </div>
-                        <div className="cp-libro__m-bot">{caja}</div>
+                        <div className="cp-libro__m-bot">{sub ? `${sub} · ${caja}` : caja}</div>
                       </td>
                       <td className="cp-td-mobile-badge">
                         <span className={esIngreso ? 'cp-libro__in' : 'cp-libro__out'}>

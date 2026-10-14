@@ -64,16 +64,61 @@
 .cp-libro__out { color: var(--cp-danger); }
 
 /* ---- Tabla ---- */
+/* Sin width: la tabla se dimensiona con min-width: max-content (ver
+   .cp-table), asi que un ancho porcentual aca se resuelve contra el ancho
+   de la propia tabla y la infla hasta 100 veces la columna. El nowrap ya
+   deja estas columnas en lo justo. */
 .cp-libro__tabla .cp-libro__th-fecha,
 .cp-libro__tabla .cp-libro__td-fecha {
   white-space: nowrap;
   font-family: var(--cp-font-mono);
   font-size: 12.5px;
+  vertical-align: top;
+  padding-top: 13px;
 }
 
 .cp-libro__td-detalle {
   color: var(--cp-text-muted);
   font-size: 13px;
+}
+
+/* Caja y monto se alinean con el renglon de ARRIBA, no con el centro de la
+   fila: el importe es del movimiento que titula la fila, y centrado entre
+   los dos renglones parecia pertenecer tanto al de arriba como al de abajo.
+   Alineados, la tabla se lee como una grilla y el ojo baja por los numeros. */
+.cp-libro__tabla tbody .cp-libro__td-caja,
+.cp-libro__tabla tbody .cp-num {
+  vertical-align: top;
+  padding-top: 13px;
+}
+
+/* ---- Concepto en dos renglones ----
+   Arriba QUE es el movimiento (el profesional que pago, el paciente, el
+   motivo del gasto) y abajo el apoyo que antes no estaba: cuantas sesiones
+   son y de que fecha. Van apilados y no en columnas propias porque son
+   datos de ancho muy variable — "Belen Herrera Portugal" contra "CEC" — y
+   una columna por cada uno deja la tabla llena de aire. Apilado, cada fila
+   ocupa lo que necesita y la grilla no se mueve. */
+.cp-libro__concepto {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  text-align: left;
+}
+
+.cp-libro__principal {
+  font-size: 13.5px;
+  color: var(--cp-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cp-libro__sub {
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--cp-text-faint);
+  font-variant-numeric: tabular-nums;
 }
 
 /* El fondo verde/rojo por fila se saco a proposito: en un mes normal casi
@@ -133,7 +178,7 @@
   color: var(--cp-text);
   cursor: pointer;
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 7px;
   text-align: left;
 }
@@ -149,6 +194,7 @@
   color: var(--cp-text-faint);
   font-size: 15px;
   line-height: 1;
+  margin-top: 3px;
   transition: transform var(--cp-dur-fast) var(--cp-ease);
 }
 
@@ -159,12 +205,18 @@
   font-size: 13px;
 }
 
+/* Un grupo puede tener 14 cobros: con el alto de una fila normal el
+   desglose obliga a scrollear para ver de donde salio un solo numero. */
+.cp-libro__tabla tbody .cp-libro__fila--hija td {
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
 .cp-libro__guion {
   color: var(--cp-text-faint);
   margin-right: 6px;
 }
 
-.cp-libro__cant,
 .cp-libro__tag {
   color: var(--cp-text-faint);
   font-size: 12px;

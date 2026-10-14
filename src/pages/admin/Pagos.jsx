@@ -72,7 +72,10 @@ export default function PagosAdmin() {
   const [pacientes, setPacientes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filtroEstado, setFiltroEstado] = useState('todos');
-  const [filtroCanal, setFiltroCanal] = useState('manual'); // 'mp' | 'manual' | 'ambos'
+  /* Arranca en el libro y no en los pagos manuales: es la unica pestana
+     que responde "como vengo este mes" de una, con ingresos y egresos
+     de las dos cajas juntos. Las otras son para mirar un canal puntual. */
+  const [filtroCanal, setFiltroCanal] = useState('libro'); // 'libro' | 'mp' | 'manual' | 'ambos' | 'ingresos'
   // MP solo se ofrece si TODOS los admins vincularon su cuenta. Ver
   // mpHabilitado(): con una sola conectada los cobros del mes que le toca
   // a la otra no tienen destino, asi que la opcion no debe existir.
@@ -216,8 +219,15 @@ export default function PagosAdmin() {
 
       {/* Toggle canal + resumen del mes */}
       <div className="cp-pagos-canal-wrap">
-        {/* Toggle MP / Manual / Ambos */}
+        {/* Pestanas: el libro primero, despues cada canal por separado */}
         <div className="cp-pagos-canal-toggle">
+          <button
+            type="button"
+            className={`cp-pagos-canal-btn ${filtroCanal === 'libro' ? 'cp-pagos-canal-btn--active' : ''}`}
+            onClick={() => setFiltroCanal('libro')}
+          >
+            Ingresos y egresos
+          </button>
           <button
             type="button"
             className={`cp-pagos-canal-btn ${filtroCanal === 'manual' ? 'cp-pagos-canal-btn--active' : ''}`}
@@ -249,13 +259,6 @@ export default function PagosAdmin() {
             onClick={() => setFiltroCanal('ingresos')}
           >
             Ingresos por mes
-          </button>
-          <button
-            type="button"
-            className={`cp-pagos-canal-btn ${filtroCanal === 'libro' ? 'cp-pagos-canal-btn--active' : ''}`}
-            onClick={() => setFiltroCanal('libro')}
-          >
-            Ingresos y egresos
           </button>
         </div>
 

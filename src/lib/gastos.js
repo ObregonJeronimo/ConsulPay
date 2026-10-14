@@ -75,7 +75,8 @@ export async function eliminarGasto(gastoId) {
  * Une ingresos y egresos en un unico listado cronologico y calcula los
  * totales por cuenta.
  *
- * @param {Array} sesionesPagadas - con fechaPago, montoConsultorio y receptorUid
+ * @param {Array} sesionesPagadas - con fechaPago, fecha, montoConsultorio,
+ *   receptorUid y profesionalUid
  * @param {Array} pagosMP - pagos de Mercado Pago aprobados
  * @param {Array} gastos
  * @param {Array} cuentas - [{ id, nombre }] en el orden en que se muestran
@@ -100,6 +101,12 @@ export function armarLibro({ sesionesPagadas = [], pagosMP = [], gastos = [], cu
       id: `s_${s.id}`, tipo: 'ingreso', cuenta, monto,
       fecha: aFecha(s.fechaPago), detalle: s.pacienteNombre || '',
       pacienteId: s.pacienteId || null,
+      /* De quien vino la plata y de cuando es el trabajo que se esta
+         cobrando. Son dos datos distintos de la fecha de pago: una sesion
+         de julio se liquida en octubre, asi que sin fechaSesion la fila
+         dice cuando entro el dinero pero no de que mes es. */
+      profesionalUid: s.profesionalUid || null,
+      fechaSesion: aFecha(s.fecha),
       cantidad: Number(s.cantidadSesiones) > 0 ? Math.floor(Number(s.cantidadSesiones)) : 1,
       origen: 'sesion',
     });

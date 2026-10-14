@@ -26,7 +26,7 @@ Sale con código 1 si algo falla, así que sirve para un pre-push hook.
 5. Marcar como pagado — selección multi-mes y desglose
 6. Aprobación del admin — precarga de lo declarado por el profesional
 7. Mis pagos — sección de MP condicionada
-8. Pagos del admin — pestañas MP condicionadas
+8. Pagos del admin — pestañas MP condicionadas, y cuál abre primero
 9. Directorio de admins — alta, baja y siembra al crear el consultorio
 10. Planilla de pacientes — xlsx válido, escapes XML, filtro por método de pago
 11. Método renombrado — nombre vivo por id, porcentaje histórico intacto
@@ -49,6 +49,7 @@ Sale con código 1 si algo falla, así que sirve para un pre-push hook.
 28. Copiar la tabla de sesiones — solo admin, formato y filtros
 29. Fecha de pago — visible en la fila, en las dos vistas
 30. Rechazar en lote — confirmación, motivo y lo que se escribe
+31. Ingresos del libro — de qué profesional vino la plata y de cuándo es la sesión
 
 ## Límite conocido
 
