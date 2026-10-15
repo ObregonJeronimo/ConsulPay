@@ -71,13 +71,6 @@
 .cp-bill__in { color: var(--cp-success); }
 .cp-bill__out { color: var(--cp-danger); }
 
-.cp-bill__nota {
-  margin-top: 6px;
-  font-size: 11.5px;
-  line-height: 1.5;
-  color: var(--cp-text-faint);
-}
-
 .cp-bill__aviso {
   margin-top: 6px;
   padding: 7px 12px;

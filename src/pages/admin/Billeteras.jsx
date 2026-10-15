@@ -13,19 +13,6 @@ import { formatoARS } from '../../lib/constants.js';
 
 import './Billeteras.css';
 
-/** '2026-10-03' -> '2/10': el dia ANTERIOR, que es al cierre del cual se cargo el saldo. */
-function diaDelCorte(desde) {
-  const [y, m, d] = desde.split('-').map(Number);
-  const f = new Date(y, m - 1, d - 1);
-  return `${f.getDate()}/${f.getMonth() + 1}`;
-}
-
-/** '2026-10-03' -> '3/10' */
-function diaCorto(iso) {
-  const [, m, d] = iso.split('-').map(Number);
-  return `${d}/${m}`;
-}
-
 const pesos = (v) => formatoARS.format(Math.round(v));
 /** Como en el libro: un cero va sin signo, "−$ 0" se lee como un monto. */
 const conSigno = (signo, v) => (Math.round(v) ? `${signo}${pesos(v)}` : pesos(0));
@@ -37,8 +24,7 @@ const conSigno = (signo, v) => (Math.round(v) ? `${signo}${pesos(v)}` : pesos(0)
  */
 export default function Billeteras({ resultado, delMes, nombreMes }) {
   if (!resultado || resultado.billeteras.length === 0) return null;
-  const { desde, billeteras, sinReceptor } = resultado;
-  const corte = diaDelCorte(desde);
+  const { billeteras, sinReceptor } = resultado;
 
   return (
     <section className="cp-bill" aria-label="Billeteras">
@@ -53,9 +39,12 @@ export default function Billeteras({ resultado, delMes, nombreMes }) {
               <div className={`cp-bill__saldo ${b.saldo < 0 ? 'cp-bill__saldo--neg' : ''}`}>
                 {b.saldo < 0 ? '−' : ''}{pesos(Math.abs(b.saldo))}
               </div>
-              {/* De donde sale el numero: sin esto la billetera es un acto de fe. */}
+              {/* De donde sale el numero: sin esto la billetera es un acto de fe.
+                  Sin fechas de corte a la vista: a quien la mira le importa
+                  cuanto tiene y como se llego, no desde que dia se cuenta
+                  (eso queda en la nota del consultorio, para quien la cargue). */}
               <div className="cp-bill__cuenta">
-                <span>Tenía {pesos(b.inicial)} al {corte}</span>
+                <span>Saldo inicial {pesos(b.inicial)}</span>
                 <span className={b.ingresos ? 'cp-bill__in' : ''}>{conSigno('+', b.ingresos)} cobrado</span>
                 <span className={b.egresos ? 'cp-bill__out' : ''}>{conSigno('−', b.egresos)} gastado</span>
               </div>
@@ -71,14 +60,9 @@ export default function Billeteras({ resultado, delMes, nombreMes }) {
         })}
       </div>
 
-      <p className="cp-bill__nota">
-        Plata del consultorio que tiene cada admin hoy: lo que tenía al cierre del {corte}, más lo
-        cobrado y menos lo gastado desde el {diaCorto(desde)}.
-      </p>
       {sinReceptor > 0 && (
         <p className="cp-bill__aviso" role="note">
-          Desde el {diaCorto(desde)} se cobraron {pesos(sinReceptor)} sin marcar quién los recibió:
-          no están en ninguna billetera.
+          Hay {pesos(sinReceptor)} cobrados sin marcar quién los recibió: no están en ninguna billetera.
         </p>
       )}
     </section>

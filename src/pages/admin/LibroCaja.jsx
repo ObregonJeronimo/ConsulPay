@@ -255,6 +255,14 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
     return out.map((f) => (f.tipo === 'grupo' && f.items.length === 1 ? { tipo: 'simple', mv: f.items[0] } : f));
   }, [visibles]);
 
+  // De que es el total del pie: "las dos cajas", "Romina", "solo gastos de Adriana".
+  const nombreCaja = columnas.find((c) => c.id === filtroCaja)?.nombre;
+  const cajas = filtroCaja === 'todas'
+    ? (columnas.length === 2 ? 'las dos cajas' : 'todas las cajas')
+    : nombreCaja;
+  const alcanceDelCierre = filtroTipo === 'todo' ? cajas
+    : `solo ${filtroTipo === 'ingreso' ? 'cobros' : 'gastos'} · ${cajas}`;
+
   const totalesVisibles = useMemo(() => {
     let ingresos = 0; let egresos = 0;
     for (const mv of visibles) {
@@ -530,6 +538,13 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
               pegado al pie de la pantalla mientras se recorre la lista
               (ver el CSS) y suma solo lo que dejan ver los filtros. */}
           <div className="cp-libro__cierre">
+            {/* Que se esta sumando, dicho arriba de los numeros: sin esto un
+                "-$ 2.417.852" se leia como plata que se debe, cuando es lo
+                que entro menos lo que salio en el mes, en las cajas filtradas. */}
+            <div className="cp-libro__cierre-titulo">
+              <span className="cp-libro__cierre-mes">{MESES[mes.getMonth()]}</span>
+              <span className="cp-libro__cierre-alcance">{alcanceDelCierre}</span>
+            </div>
             <div className="cp-libro__cierre-item">
               <span className="cp-libro__cierre-label">Ingresos</span>
               <span className={`cp-libro__cierre-valor ${totalesVisibles.ingresos ? 'cp-libro__in' : ''}`}>
@@ -543,7 +558,7 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
               </span>
             </div>
             <div className="cp-libro__cierre-item cp-libro__cierre-item--saldo">
-              <span className="cp-libro__cierre-label">Saldo</span>
+              <span className="cp-libro__cierre-label">Resultado del mes</span>
               <span className={`cp-libro__cierre-valor ${totalesVisibles.saldo < 0 ? 'cp-libro__out' : ''}`}>
                 {formatoARS.format(totalesVisibles.saldo)}
               </span>

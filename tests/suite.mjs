@@ -2857,11 +2857,14 @@ console.log('\n[33] Billeteras: cuanto tiene cada admin');
   chequeo('una tarjeta por admin', tarjetas.length === 2, `(${tarjetas.length})`);
   chequeo('Adriana: saldo y de donde sale',
     tarjetas[0].includes('Billetera de Adriana') && tarjetas[0].includes('$ 2.177.057')
-    && tarjetas[0].includes('Tenía $ 2.117.057 al 2/7') && tarjetas[0].includes('+$ 100.000 cobrado')
+    && tarjetas[0].includes('Saldo inicial $ 2.117.057') && tarjetas[0].includes('+$ 100.000 cobrado')
     && tarjetas[0].includes('−$ 40.000 gastado'), `(${tarjetas[0]})`);
   chequeo('Romina sin movimientos queda en su saldo inicial', tarjetas[1].includes('$ 1.691.514'), `(${tarjetas[1]})`);
-  chequeo('dice desde cuando se cuenta', plano(cont.querySelector('.cp-bill__nota')).includes('al cierre del 2/7')
-    && plano(cont.querySelector('.cp-bill__nota')).includes('desde el 3/7'));
+  /* Las admins saben como se cargo el saldo; a la vista solo importa cuanto
+     tienen y como se llego. La fecha del corte no se muestra. */
+  chequeo('las tarjetas no hablan de fechas de corte',
+    !cont.querySelector('.cp-bill__nota') && !/\d+\/7/.test(plano(cont.querySelector('.cp-bill'))),
+    `(${plano(cont.querySelector('.cp-bill'))})`);
   chequeo('avisa lo cobrado sin marcar quien lo recibio',
     plano(cont.querySelector('.cp-bill__aviso')).includes('$ 7.000'), `(${plano(cont.querySelector('.cp-bill__aviso'))})`);
 
@@ -2876,6 +2879,10 @@ console.log('\n[33] Billeteras: cuanto tiene cada admin');
   chequeo('en Movimientos tambien van primero', contLibro.querySelector('.cp-libro')?.firstElementChild?.classList.contains('cp-bill'));
   const tLibro = [...contLibro.querySelectorAll('.cp-bill__card')].map(plano);
   chequeo('con la linea del mes que se mira', tLibro[0].includes('En julio: +$ 100.000 · −$ 40.000'), `(${tLibro[0]})`);
+  const pie = plano(contLibro.querySelector('.cp-libro__cierre'));
+  // Julio tiene tres cajas aca (las dos admins y "no se marco quien cobro").
+  chequeo('el pie dice de que mes y de que cajas es', /^julio\s*todas las cajas/i.test(pie), `(${pie})`);
+  chequeo('y dice "Resultado del mes", no "Saldo"', pie.includes('Resultado del mes') && !/Saldo/.test(pie), `(${pie})`);
   const sueltas = [...contLibro.querySelectorAll('.cp-libro__caja-nombre')].map(plano);
   chequeo('las cajas de admin no se repiten como tarjeta chica',
     !sueltas.includes('Adriana') && !sueltas.includes('Romina'), `(${sueltas})`);
