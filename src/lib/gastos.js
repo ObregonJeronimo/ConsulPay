@@ -124,7 +124,8 @@ export function armarLibro({ sesionesPagadas = [], pagosMP = [], gastos = [], cu
        vista (updatedAt), para que las tres digan lo mismo. */
     movimientos.push({
       id: `s_${s.id}`, tipo: 'ingreso', cuenta, monto,
-      fecha: aFecha(s.fechaPago || s.updatedAt), detalle: s.pacienteNombre || '',
+      fecha: aFecha(s.fechaPago || s.updatedAt), orden: aMillis(s.fechaPago || s.updatedAt),
+      detalle: s.pacienteNombre || '',
       pacienteId: s.pacienteId || null,
       /* De quien vino la plata y de cuando es el trabajo que se esta
          cobrando. Son dos datos distintos de la fecha de pago: una sesion
@@ -142,7 +143,8 @@ export function armarLibro({ sesionesPagadas = [], pagosMP = [], gastos = [], cu
     if (monto === 0) continue;
     movimientos.push({
       id: `mp_${p.id}`, tipo: 'ingreso', cuenta: CUENTA_MP, monto,
-      fecha: aFecha(p.createdAt), detalle: p.profesionalNombre || 'Cobro por Mercado Pago',
+      fecha: aFecha(p.createdAt), orden: aMillis(p.createdAt),
+      detalle: p.profesionalNombre || 'Cobro por Mercado Pago',
       origen: 'mp',
     });
   }
@@ -151,12 +153,16 @@ export function armarLibro({ sesionesPagadas = [], pagosMP = [], gastos = [], cu
     movimientos.push({
       id: `g_${g.id}`, gastoId: g.id, tipo: 'egreso',
       cuenta: idsValidos.has(g.cuenta) ? g.cuenta : 'sin_asignar',
-      monto: Number(g.monto) || 0, fecha: g.fecha, detalle: g.motivo, origen: 'gasto',
+      monto: Number(g.monto) || 0, fecha: g.fecha, orden: aMillis(g.createdAt),
+      detalle: g.motivo, origen: 'gasto',
       enSaldoInicial: typeof g.enSaldoInicial === 'boolean' ? g.enSaldoInicial : null,
     });
   }
 
-  movimientos.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+  /* Por dia y, dentro del dia, por orden de carga. Antes solo por dia: los
+     del mismo dia quedaban en el orden en que Firestore devuelve los docs
+     (por id, o sea al azar) y lo recien cargado aparecia en el medio. */
+  movimientos.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || '') || a.orden - b.orden);
 
   const totales = {};
   for (const c of [...cuentas, { id: 'sin_asignar' }]) {
@@ -350,6 +356,19 @@ export function saldosDeBilletera({ config, movimientos = [], cuentas = [] }) {
   for (const b of billeteras) b.saldo = b.inicial + b.ingresos - b.egresos;
 
   return { desde, billeteras, sinReceptor };
+}
+
+/**
+ * Momento de carga en ms, para ordenar dentro de un mismo dia. Un gasto
+ * recien creado todavia no tiene la hora del servidor (serverTimestamp
+ * pendiente): va al final, que es donde termina cuando llega.
+ */
+function aMillis(v) {
+  if (!v) return Number.MAX_SAFE_INTEGER;
+  const d = v.toDate ? v.toDate()
+    : (v.seconds !== undefined ? new Date(v.seconds * 1000) : (v instanceof Date ? v : new Date(v)));
+  const t = d.getTime();
+  return Number.isNaN(t) ? Number.MAX_SAFE_INTEGER : t;
 }
 
 function aFecha(v) {

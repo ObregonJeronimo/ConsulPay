@@ -2619,6 +2619,16 @@ console.log('\n[32] Resumen de Pagos: el anio mes a mes');
   chequeo('cuenta sesiones y gastos del mes', meses[6].sesionesCobradas === 8 && meses[6].gastos === 2,
     `(${meses[6].sesionesCobradas}, ${meses[6].gastos})`);
 
+  /* Dentro del mismo dia, orden de carga: lo ultimo que se cargo va ultimo.
+     Antes quedaba el orden en que Firestore devuelve los docs (por id, al azar). */
+  const g = (id, motivo, creado) => ({ id, consultorioId: 'C1', fecha: '2025-07-14', monto: 1, cuenta: 'A', motivo,
+    createdAt: creado === null ? null : { toDate: () => new Date(2025, 6, 14, 10, creado) } });
+  const orden = armarLibro({ sesionesPagadas: [], pagosMP: [], cuentas,
+    gastos: [g('z1', 'Jack', 30), g('a1', 'barrilete', 10), g('m1', 'recien creado', null), g('b1', 'Corralon', 20)] })
+    .movimientos.map((m) => m.detalle);
+  chequeo('mismo dia: por orden de carga, lo recien creado al final',
+    orden.join('|') === 'barrilete|Corralon|Jack|recien creado', `(${orden})`);
+
   /* Las pagadas antes de que existiera fechaPago (en CALA, 262 sesiones y
      casi siete millones): el libro las perdia porque quedaban sin fecha,
      mientras Cobros por mes las ubicaba por updatedAt. Ahora todos igual. */
