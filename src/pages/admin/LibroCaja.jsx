@@ -480,6 +480,15 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
                           <span className="cp-libro__principal">
                             {mv.detalle}
                             {mv.origen === 'gasto' && <span className="cp-libro__tag">gasto</span>}
+                            {/* Se ve en el libro, pero la billetera no lo vuelve a restar. */}
+                            {mv.enSaldoInicial === true && (
+                              <span
+                                className="cp-libro__tag"
+                                title="Ya estaba descontado en el saldo de partida de la billetera: no se vuelve a restar."
+                              >
+                                ya en saldo inicial
+                              </span>
+                            )}
                             {mv.origen === 'mp' && <span className="cp-libro__tag">Mercado Pago</span>}
                           </span>
                           {sub && <span className="cp-libro__sub">{sub}</span>}

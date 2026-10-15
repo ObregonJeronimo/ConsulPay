@@ -2805,6 +2805,21 @@ console.log('\n[33] Billeteras: cuanto tiene cada admin');
   chequeo('un uid que ya no es admin no tiene billetera', !de('X') && r.billeteras.length === 2);
   chequeo('lo cobrado sin receptor desde el corte se avisa aparte', r.sinReceptor === 5000, `(${r.sinReceptor})`);
 
+  /* La fecha no siempre alcanza: un gasto del dia del corte puede estar ya
+     adentro del saldo de partida (en CALA, la reunion del 3/10) y uno
+     anterior puede no estarlo. La marca del gasto le gana a la fecha. */
+  const conMarca = (fecha, monto, enSaldoInicial) => ({ ...mv(fecha, 'A', 'egreso', monto), enSaldoInicial });
+  const r3 = saldosDeBilletera({
+    config, cuentas, movimientos: [
+      conMarca('2025-07-03', 13100, true),   // ya estaba en el saldo: NO se resta
+      conMarca('2025-07-01', 53400, false),  // anterior y no estaba: SI se resta
+      conMarca('2025-07-05', 1000, null),    // sin marca: decide la fecha (si)
+      conMarca('2025-07-01', 7, null),       // sin marca y anterior: no
+    ],
+  });
+  chequeo('la marca "ya en saldo inicial" le gana a la fecha',
+    r3.billeteras.find((b) => b.id === 'A').egresos === 54400, `(${r3.billeteras.find((b) => b.id === 'A').egresos})`);
+
   // ---- en pantalla ----
   const T = (y, m, d) => ({ toDate: () => new Date(y, m, d, 12, 0) });
   globalThis.__DATA__ = {
@@ -2855,6 +2870,21 @@ console.log('\n[33] Billeteras: cuanto tiene cada admin');
   chequeo('las cajas de admin no se repiten como tarjeta chica',
     !sueltas.includes('Adriana') && !sueltas.includes('Romina'), `(${sueltas})`);
   chequeo('la de "no se marcó quién cobró" sigue a la vista', sueltas.includes('No se marcó quién cobró'), `(${sueltas})`);
+
+  // El libro lo muestra igual, con una etiqueta que dice por que no resta.
+  const datosBase = globalThis.__DATA__;
+  globalThis.__DATA__ = {
+    ...globalThis.__DATA__,
+    gastos: [{ id: 'gr', consultorioId: 'C1', fecha: '2025-07-03', monto: 13100, cuenta: 'A', motivo: 'reunion', enSaldoInicial: true }],
+  };
+  const { cont: contMarca } = await montar(LibroCaja, {
+    consultorioId: 'C1', consultorio: cons, uid: 'A', mes: new Date(2025, 6, 1),
+  });
+  chequeo('el libro lista el gasto marcado con su etiqueta', /reunion\s*gasto\s*ya en saldo inicial/.test(plano(contMarca.querySelector('tbody'))),
+    `(${plano(contMarca.querySelector('tbody')).slice(0, 120)})`);
+  chequeo('y la billetera no lo resta', plano(contMarca.querySelector('.cp-bill__card')).includes('$ 0 gastado'),
+    `(${plano(contMarca.querySelector('.cp-bill__card'))})`);
+  globalThis.__DATA__ = datosBase; // el resto de la seccion usa los datos de arriba
 
   // En un mes pasado la billetera sigue siendo la de hoy.
   const { cont: contJunio } = await montar(LibroCaja, {

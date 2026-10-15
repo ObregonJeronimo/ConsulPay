@@ -14,6 +14,11 @@
  *                 guardar negativos invita a sumar mal en cualquier query.
  *     cuenta   -> 'mp' | uid del admin de cuya caja salio
  *     motivo   -> texto libre ("alquiler", "epec", "papitas, gaseosas")
+ *     enSaldoInicial -> opcional, solo para la billetera (ver saldosDeBilletera).
+ *                 true: ya estaba descontado en el saldo de partida aunque
+ *                 su fecha sea posterior al corte; false: no estaba, aunque
+ *                 sea anterior. Sin el campo, decide la fecha. El libro lo
+ *                 muestra igual: es un gasto del mes como cualquier otro.
  */
 
 import {
@@ -147,6 +152,7 @@ export function armarLibro({ sesionesPagadas = [], pagosMP = [], gastos = [], cu
       id: `g_${g.id}`, gastoId: g.id, tipo: 'egreso',
       cuenta: idsValidos.has(g.cuenta) ? g.cuenta : 'sin_asignar',
       monto: Number(g.monto) || 0, fecha: g.fecha, detalle: g.motivo, origen: 'gasto',
+      enSaldoInicial: typeof g.enSaldoInicial === 'boolean' ? g.enSaldoInicial : null,
     });
   }
 
@@ -304,6 +310,13 @@ export function serieAnual({ movimientos = [], sesiones = [], anio, cuentas = []
  * billetera, pero tampoco se puede esconder: se devuelve aparte
  * (sinReceptor) para avisarlo.
  *
+ * El corte por fecha no siempre alcanza: en CALA el saldo de partida salio
+ * de una planilla cuyo ultimo renglon antes del saldo era un gasto del 3/10
+ * (una reunion), y los gastos del mismo 3/10 que vienen despues no estaban.
+ * Para esos casos el gasto lleva enSaldoInicial (ver el modelo arriba), que
+ * le gana a la fecha. Va en el gasto y no en una lista aparte de ajustes:
+ * si se borra o se corrige el gasto, su efecto en la billetera lo sigue.
+ *
  * @param {Object} config - consultorio.billeteras (o null si no se cargo)
  * @param {Array} movimientos - salida de armarLibro, de todos los meses
  * @param {Array} cuentas - [{ id, nombre, completo }]
@@ -322,7 +335,11 @@ export function saldosDeBilletera({ config, movimientos = [], cuentas = [] }) {
 
   let sinReceptor = 0;
   for (const mv of movimientos) {
-    if (!mv.fecha || mv.fecha < desde) continue;
+    if (!mv.fecha) continue;
+    const cuenta = mv.enSaldoInicial === true ? false
+      : mv.enSaldoInicial === false ? true
+        : mv.fecha >= desde;
+    if (!cuenta) continue;
     const b = idx[mv.cuenta];
     if (!b) {
       if (mv.cuenta === CAJA_SIN_RECEPTOR.id && mv.tipo === 'ingreso') sinReceptor += mv.monto;
