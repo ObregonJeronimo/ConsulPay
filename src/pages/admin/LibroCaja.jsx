@@ -1,20 +1,18 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import Button from '../../components/ui/Button.jsx';
 import Input from '../../components/ui/Input.jsx';
 import DualScrollTable from '../../components/ui/DualScrollTable.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
+import { useDatosPagos } from '../../hooks/useDatosPagos.js';
 import { useOverlayClose } from '../../hooks/useOverlayClose.js';
-import { ESTADOS_PAGO_SESION, formatoARS } from '../../lib/constants.js';
+import { formatoARS } from '../../lib/constants.js';
 import {
   armarLibro, CAJA_SIN_RECEPTOR, crearGasto, cuentasDeCaja, eliminarGasto, hayMPEnRango, saldosDeBilletera,
-  suscribirGastos,
 } from '../../lib/gastos.js';
-import { nombrePaciente, suscribirPacientesConsultorio } from '../../lib/pacientes.js';
-import { suscribirMiembrosConsultorio } from '../../lib/profesionales.js';
-import { montoNetoEfectivo, suscribirPagosDelConsultorio } from '../../lib/pagos.js';
+import { nombrePaciente } from '../../lib/pacientes.js';
+import { montoNetoEfectivo } from '../../lib/pagos.js';
 import { mpHabilitado } from '../../lib/mpIntegracion.js';
-import { suscribirSesionesPagadas } from '../../lib/sesiones.js';
 
 import Billeteras from './Billeteras.jsx';
 import './LibroCaja.css';
@@ -78,49 +76,17 @@ function subDeCobro(mv) {
  * pagadas, que guardan quien recibio la plata. Lo unico que se carga son
  * los gastos, que el sistema no tiene forma de deducir.
  */
-export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
-  const [gastos, setGastos] = useState([]);
-  const [sesiones, setSesiones] = useState([]);
-  const [miembros, setMiembros] = useState([]);
-  const [pagosMP, setPagosMP] = useState([]);
-  const [pacientes, setPacientes] = useState([]);
+export default function LibroCaja({ consultorioId, consultorio, uid, mes, datos }) {
+  // Pagos pasa los datos ya pedidos; montado solo, los pide el.
+  const propios = useDatosPagos(datos ? null : consultorioId);
+  const {
+    gastos, pagadas: sesiones, miembros, pacientes, pagosAprobados: pagosMP, sesionesListas,
+  } = datos || propios;
+  const cargando = !sesionesListas;
   const [filtroCaja, setFiltroCaja] = useState('todas');
   const [filtroTipo, setFiltroTipo] = useState('todo'); // 'todo' | 'ingreso' | 'egreso'
   const [abiertos, setAbiertos] = useState(() => new Set());
-  const [cargando, setCargando] = useState(true);
   const [nuevoAbierto, setNuevoAbierto] = useState(false);
-
-  useEffect(() => {
-    if (!consultorioId) return undefined;
-    return suscribirGastos(consultorioId, setGastos);
-  }, [consultorioId]);
-
-  useEffect(() => {
-    if (!consultorioId) return undefined;
-    setCargando(true);
-    return suscribirSesionesPagadas(consultorioId, (d) => { setSesiones(d); setCargando(false); });
-  }, [consultorioId]);
-
-  useEffect(() => {
-    if (!consultorioId) return undefined;
-    return suscribirMiembrosConsultorio(consultorioId, setMiembros);
-  }, [consultorioId]);
-
-  // Los movimientos de sesion guardan pacienteId, no el nombre. Sin esto el
-  // detalle quedaba vacio o, peor, mostraba el nombre del admin receptor.
-  useEffect(() => {
-    if (!consultorioId) return undefined;
-    return suscribirPacientesConsultorio(consultorioId, setPacientes);
-  }, [consultorioId]);
-
-  // Cobros por Mercado Pago: son la otra fuente de ingresos y van a su
-  // propia caja. Sin esto la columna existia pero marcaba siempre cero.
-  useEffect(() => {
-    if (!consultorioId) return undefined;
-    return suscribirPagosDelConsultorio(consultorioId, (data) => {
-      setPagosMP(data.filter((p) => p.estado === 'aprobado'));
-    });
-  }, [consultorioId]);
 
   const rangoMes = useMemo(() => {
     const y = mes.getFullYear(); const m = String(mes.getMonth() + 1).padStart(2, '0');
@@ -145,7 +111,7 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
 
   const { movimientos, totales, columnas, todos } = useMemo(() => {
     const libro = armarLibro({
-      sesionesPagadas: sesiones.filter((s) => s.estadoPago === ESTADOS_PAGO_SESION.PAGADO),
+      sesionesPagadas: sesiones,
       // Lo que efectivamente entro a la cuenta, ya descontado el cargo de MP.
       pagosMP: pagosMP.map((p) => ({ ...p, montoConsultorio: montoNetoEfectivo(p) })),
       gastos,

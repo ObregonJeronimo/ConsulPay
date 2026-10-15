@@ -7,9 +7,9 @@ import Spinner from '../../components/ui/Spinner.jsx';
 
 import { useAuth } from '../../hooks/useAuth.js';
 import { useConsultorio } from '../../hooks/useConsultorio.js';
+import { useDatosPagos } from '../../hooks/useDatosPagos.js';
 import { useOverlayClose } from '../../hooks/useOverlayClose.js';
 import { formatoARS } from '../../lib/constants.js';
-import { suscribirPacientesConsultorio } from '../../lib/pacientes.js';
 import IngresosPorMes from './IngresosPorMes.jsx';
 import LibroCaja from './LibroCaja.jsx';
 import ResumenPagos from './ResumenPagos.jsx';
@@ -17,11 +17,9 @@ import { mpHabilitado } from '../../lib/mpIntegracion.js';
 import {
   labelEstadoPago,
   montoNetoEfectivo,
-  suscribirPagosDelConsultorio,
   tieneFeeDetails,
   tonoEstadoPago,
 } from '../../lib/pagos.js';
-import { suscribirProfesionales } from '../../lib/profesionales.js';
 import {
   finDeMes,
   inicioDeMes,
@@ -66,10 +64,11 @@ export default function PagosAdmin() {
   const { consultorio } = useConsultorio();
   const consultorioId = user?.consultorioId;
 
-  const [pagos, setPagos] = useState([]);
-  const [profesionales, setProfesionales] = useState([]);
-  const [pacientes, setPacientes] = useState([]);
-  const [loading, setLoading] = useState(true);
+  /* Todo lo que usan las pestanas se pide una sola vez aca: cambiar de
+     pestana no vuelve a leer Firestore (ver useDatosPagos). */
+  const datos = useDatosPagos(consultorioId);
+  const { pagos, pacientes } = datos;
+  const loading = !datos.pagosListos;
   const [filtroEstado, setFiltroEstado] = useState('todos');
   /* Arranca en el Resumen: es la unica vista que contesta "como venimos"
      de un vistazo, con el anio entero. Las otras son para bajar al detalle.
@@ -100,31 +99,13 @@ export default function PagosAdmin() {
   const anio = mes.getFullYear();
   const [pagoSeleccionado, setPagoSeleccionado] = useState(null);
 
-  /* ---- Suscripciones live ---- */
-  useEffect(() => {
-    if (!consultorioId) return;
-    setLoading(true);
-    return suscribirPagosDelConsultorio(consultorioId, (data) => {
-      setPagos(data);
-      setLoading(false);
-    });
-  }, [consultorioId]);
-
-  useEffect(() => {
-    if (!consultorioId) return;
-    return suscribirProfesionales(consultorioId, setProfesionales);
-  }, [consultorioId]);
-
-  useEffect(() => {
-    if (!consultorioId) return;
-    return suscribirPacientesConsultorio(consultorioId, setPacientes);
-  }, [consultorioId]);
-
+  // Los miembros incluyen a los profesionales (y a los admins, que no molestan
+  // en un mapa por uid): antes era una suscripcion aparte solo para esto.
   const mapaProfesionales = useMemo(() => {
     const m = {};
-    for (const p of profesionales) m[p.uid] = p;
+    for (const p of datos.miembros) m[p.uid] = p;
     return m;
-  }, [profesionales]);
+  }, [datos.miembros]);
 
   const mapaPacientes = useMemo(() => {
     const m = {};
@@ -225,6 +206,7 @@ export default function PagosAdmin() {
         <ResumenPagos
           consultorioId={consultorioId}
           consultorio={consultorio}
+          datos={datos}
           anio={anio}
           onVerMes={(m) => { setMes(new Date(anio, m, 1)); setVista('movimientos'); }}
         />
@@ -234,6 +216,7 @@ export default function PagosAdmin() {
         <LibroCaja
           consultorioId={consultorioId}
           consultorio={consultorio}
+          datos={datos}
           uid={user?.uid}
           mes={mes}
         />
@@ -243,6 +226,7 @@ export default function PagosAdmin() {
         <IngresosPorMes
           consultorioId={consultorioId}
           uid={user?.uid}
+          datos={datos}
           anio={anio}
           mapaProfesionales={mapaProfesionales}
           mapaPacientes={mapaPacientes}

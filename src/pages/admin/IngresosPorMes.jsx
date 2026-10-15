@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import Avatar from '../../components/ui/Avatar.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -6,7 +6,8 @@ import Spinner from '../../components/ui/Spinner.jsx';
 
 import { ESTADOS_PAGO_SESION, formatoARS } from '../../lib/constants.js';
 import { CAJA_SIN_RECEPTOR } from '../../lib/gastos.js';
-import { editarFechaPago, getCantidadSesiones, suscribirSesionesPagadas } from '../../lib/sesiones.js';
+import { useDatosPagos } from '../../hooks/useDatosPagos.js';
+import { editarFechaPago, getCantidadSesiones } from '../../lib/sesiones.js';
 
 import { MESES_CORTOS, montoCompacto } from './resumenAnual.js';
 import './IngresosPorMes.css';
@@ -137,21 +138,14 @@ const EditIcon = () => (
 /* ============================================================
    Componente principal
    ============================================================ */
-export default function IngresosPorMes({ consultorioId, uid, anio, mapaProfesionales, mapaPacientes }) {
-  const [sesiones, setSesiones] = useState([]);
-  const [loading, setLoading] = useState(true);
+export default function IngresosPorMes({ consultorioId, uid, anio, mapaProfesionales, mapaPacientes, datos }) {
+  // Pagos pasa los datos ya pedidos; montado solo, los pide el.
+  const propios = useDatosPagos(datos ? null : consultorioId);
+  const { pagadas: sesiones, sesionesListas } = datos || propios;
+  const loading = !sesionesListas;
   const [mesesAbiertos, setMesesAbiertos] = useState(() => new Set());
   const [vistaDetalle, setVistaDetalle] = useState({}); // claveMes -> 'profesional' | 'dia' | 'sueltas'
   const [editando, setEditando] = useState(null); // sesion en edición de fecha
-
-  useEffect(() => {
-    if (!consultorioId) return;
-    setLoading(true);
-    return suscribirSesionesPagadas(consultorioId, (data) => {
-      setSesiones(data);
-      setLoading(false);
-    });
-  }, [consultorioId]);
 
   // Agrupar por mes de fechaPago. Solo los del anio del selector de Pagos:
   // antes se listaba toda la historia y el selector de arriba no hacia nada.

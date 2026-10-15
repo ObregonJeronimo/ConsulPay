@@ -481,6 +481,23 @@ export function suscribirSesionesConsultorio(consultorioId, callback, filtros = 
 }
 
 /**
+ * TODAS las sesiones del consultorio, en cualquier estado, en una sola
+ * suscripcion. La usa Pagos (ver hooks/useDatosPagos.js) para alimentar sus
+ * pestanas a la vez: las pagadas son los ingresos y las que se deben, lo
+ * que falta cobrar. Sin orderBy a proposito: un orderBy deja afuera a los
+ * documentos que no tienen ese campo, y aca no puede faltar ninguna.
+ */
+export function suscribirSesionesDelConsultorio(consultorioId, callback) {
+  const q = query(collection(db, 'sesiones'), where('consultorioId', '==', consultorioId));
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+  }, (err) => {
+    console.error('Error en suscripción de sesiones del consultorio:', err);
+    callback([]);
+  });
+}
+
+/**
  * Suscribe a TODAS las sesiones pagadas del consultorio (sin filtro de mes).
  * Se usa para el registro de ingresos por mes, que agrupa por fechaPago
  * (no por la fecha de la sesión). El agrupamiento se hace en el cliente.

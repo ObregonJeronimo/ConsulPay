@@ -52,6 +52,7 @@ Sale con código 1 si algo falla, así que sirve para un pre-push hook.
 31. Ingresos del libro — de qué profesional vino la plata y de cuándo es la sesión
 32. Resumen de Pagos — serie anual, tramos vacíos, cajas, gráfico, igual al libro
 33. Billeteras — saldo inicial al corte, cobros y gastos desde entonces, en Resumen y Movimientos
+34. Lecturas de Firestore — Pagos escucha cada colección una sola vez, aunque se cambie de pestaña
 
 ## Límite conocido
 

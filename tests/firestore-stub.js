@@ -7,6 +7,12 @@ export function where() { return {}; }
 export function orderBy() { return {}; }
 export function limit() { return {}; }
 export function onSnapshot(q, cb) {
+  /* Cuenta las escuchas por coleccion cuando el test lo pide
+     (globalThis.__ESCUCHAS__ = {}): cada una es una lectura por documento
+     en Firestore real, asi que es lo que hay que mantener bajo. */
+  if (globalThis.__ESCUCHAS__ && q && q.__col) {
+    globalThis.__ESCUCHAS__[q.__col] = (globalThis.__ESCUCHAS__[q.__col] || 0) + 1;
+  }
   const raw = (globalThis.__DATA__ && globalThis.__DATA__[q && q.__col]) || [];
   const snap = { docs: raw.map((d) => ({ id: d.id, data: () => d })), size: raw.length, forEach(f) { this.docs.forEach(f); } };
   if (typeof cb === 'function') cb(snap); else if (cb && typeof cb.next === 'function') cb.next(snap);
@@ -50,6 +56,11 @@ export function arrayRemove(...v) { return v; }
 export const Timestamp = { fromDate: (d) => ({ toDate: () => d }), now: () => ({ toDate: () => new Date() }) };
 export function increment(n) { return n; }
 export function initializeApp() { return {}; }
+export function initializeFirestore() { return {}; }
+export function persistentLocalCache() { return {}; }
+export function persistentMultipleTabManager() { return {}; }
+export async function terminate() {}
+export async function clearIndexedDbPersistence() {}
 export function getFirestore() { return {}; }
 export function getAuth() { return {}; }
 export class GoogleAuthProvider { static credential() { return {}; } }

@@ -2916,6 +2916,31 @@ console.log('\n[33] Billeteras: cuanto tiene cada admin');
   chequeo('el texto no nombra a ningun consultorio', !/CALA/.test(jsxB));
 }
 
+/* ============ 34. Lecturas de Firestore en Pagos ============ */
+console.log('\n[34] Lecturas: Pagos pide los datos una sola vez');
+{
+  const { default: Pagos } = await import('../src/pages/admin/Pagos.jsx');
+  globalThis.__USER__ = { uid: 'A', consultorioId: 'C1' };
+  globalThis.__CONS__ = { adminUids: ['A', 'R'], mpConfigs: {} };
+  globalThis.__DATA__ = { sesiones: [], gastos: [], pagos_consultorio: [], usuarios: [], pacientes: [] };
+  globalThis.__ESCUCHAS__ = {};
+  const { cont } = await montar(Pagos, {});
+  const ir = async (t) => {
+    await act(async () => { clic([...cont.querySelectorAll('.cp-pagos-canal-btn')].find((b) => b.textContent.trim() === t)); });
+  };
+  const alAbrir = { ...globalThis.__ESCUCHAS__ };
+  await ir('Movimientos'); await ir('Cobros por mes'); await ir('Resumen'); await ir('Movimientos');
+  const e = globalThis.__ESCUCHAS__;
+  /* Cada escucha es una lectura por documento en Firestore real: antes
+     cada pestana abria las suyas y recorrer Pagos leia la coleccion de
+     sesiones entera varias veces. */
+  chequeo('abrir Pagos escucha las sesiones una sola vez', alAbrir.sesiones === 1, `(${JSON.stringify(alAbrir)})`);
+  chequeo('recorrer las pestanas no vuelve a pedirlas', e.sesiones === 1, `(${JSON.stringify(e)})`);
+  chequeo('ni los gastos, pagos, usuarios o pacientes',
+    e.gastos === 1 && e.pagos_consultorio === 1 && e.usuarios === 1 && e.pacientes === 1, `(${JSON.stringify(e)})`);
+  delete globalThis.__ESCUCHAS__;
+}
+
 console.log(`\n${'='.repeat(52)}`);
 console.log(`${ok} chequeos OK, ${fallos.length} fallas`);
 if (fallos.length) { console.log('FALLAN:'); fallos.forEach((f) => console.log('  - ' + f)); }

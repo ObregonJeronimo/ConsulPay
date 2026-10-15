@@ -19,14 +19,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import Spinner from '../../components/ui/Spinner.jsx';
-import { ESTADOS_PAGO_SESION, formatoARS } from '../../lib/constants.js';
+import { useDatosPagos } from '../../hooks/useDatosPagos.js';
+import { formatoARS } from '../../lib/constants.js';
 import {
-  armarLibro, CAJA_SIN_RECEPTOR, cuentasDeCaja, hayMPEnRango, saldosDeBilletera, serieAnual, suscribirGastos,
+  armarLibro, CAJA_SIN_RECEPTOR, cuentasDeCaja, hayMPEnRango, saldosDeBilletera, serieAnual,
 } from '../../lib/gastos.js';
 import { mpHabilitado } from '../../lib/mpIntegracion.js';
-import { montoNetoEfectivo, suscribirPagosDelConsultorio } from '../../lib/pagos.js';
-import { suscribirMiembrosConsultorio } from '../../lib/profesionales.js';
-import { suscribirSesionesConsultorio, suscribirSesionesPagadas } from '../../lib/sesiones.js';
+import { montoNetoEfectivo } from '../../lib/pagos.js';
 
 import Billeteras from './Billeteras.jsx';
 import { MESES_CORTOS } from './resumenAnual.js';
@@ -55,47 +54,12 @@ function pasoRedondo(v) {
   return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p;
 }
 
-export default function ResumenPagos({ consultorioId, consultorio, anio, onVerMes }) {
-  const [pagadas, setPagadas] = useState([]);
-  const [delAnio, setDelAnio] = useState([]);
-  const [gastos, setGastos] = useState([]);
-  const [pagosMP, setPagosMP] = useState([]);
-  const [miembros, setMiembros] = useState([]);
-  const [cargando, setCargando] = useState(true);
+export default function ResumenPagos({ consultorioId, consultorio, anio, onVerMes, datos }) {
+  // Pagos pasa los datos ya pedidos; montada sola, los pide ella.
+  const propios = useDatosPagos(datos ? null : consultorioId);
+  const { pagadas, sesiones: delAnio, gastos, pagosAprobados: pagosMP, miembros, sesionesListas } = datos || propios;
+  const cargando = !sesionesListas;
   const [abiertos, setAbiertos] = useState(() => new Set());
-
-  useEffect(() => {
-    if (!consultorioId) return undefined;
-    setCargando(true);
-    return suscribirSesionesPagadas(consultorioId, (d) => { setPagadas(d); setCargando(false); });
-  }, [consultorioId]);
-
-  // Lo que todavia se debe va por el mes de la sesion: hacen falta las
-  // sesiones del anio en cualquier estado, no solo las pagadas.
-  useEffect(() => {
-    if (!consultorioId) return undefined;
-    return suscribirSesionesConsultorio(consultorioId, setDelAnio, {
-      desde: new Date(anio, 0, 1, 0, 0, 0),
-      hasta: new Date(anio, 11, 31, 23, 59, 59),
-    });
-  }, [consultorioId, anio]);
-
-  useEffect(() => {
-    if (!consultorioId) return undefined;
-    return suscribirGastos(consultorioId, setGastos);
-  }, [consultorioId]);
-
-  useEffect(() => {
-    if (!consultorioId) return undefined;
-    return suscribirPagosDelConsultorio(consultorioId, (data) => {
-      setPagosMP(data.filter((p) => p.estado === 'aprobado'));
-    });
-  }, [consultorioId]);
-
-  useEffect(() => {
-    if (!consultorioId) return undefined;
-    return suscribirMiembrosConsultorio(consultorioId, setMiembros);
-  }, [consultorioId]);
 
   // Cambiar de anio cierra lo que estaba abierto: julio de otro anio es otro mes.
   useEffect(() => { setAbiertos(new Set()); }, [anio]);
@@ -107,8 +71,7 @@ export default function ResumenPagos({ consultorioId, consultorio, anio, onVerMe
   }), [consultorio, miembros, pagosMP, anio]);
 
   const libro = useMemo(() => armarLibro({
-    // Mismo filtro que el libro de caja, para que los dos sumen lo mismo.
-    sesionesPagadas: pagadas.filter((s) => s.estadoPago === ESTADOS_PAGO_SESION.PAGADO),
+    sesionesPagadas: pagadas,
     pagosMP: pagosMP.map((p) => ({ ...p, montoConsultorio: montoNetoEfectivo(p) })),
     gastos,
     cuentas,
