@@ -7,7 +7,8 @@ import Spinner from '../../components/ui/Spinner.jsx';
 import { useOverlayClose } from '../../hooks/useOverlayClose.js';
 import { ESTADOS_PAGO_SESION, formatoARS } from '../../lib/constants.js';
 import {
-  armarLibro, CAJA_SIN_RECEPTOR, crearGasto, cuentasDeCaja, eliminarGasto, hayMPEnRango, suscribirGastos,
+  armarLibro, CAJA_SIN_RECEPTOR, crearGasto, cuentasDeCaja, eliminarGasto, hayMPEnRango, saldosDeBilletera,
+  suscribirGastos,
 } from '../../lib/gastos.js';
 import { nombrePaciente, suscribirPacientesConsultorio } from '../../lib/pacientes.js';
 import { suscribirMiembrosConsultorio } from '../../lib/profesionales.js';
@@ -15,6 +16,7 @@ import { montoNetoEfectivo, suscribirPagosDelConsultorio } from '../../lib/pagos
 import { mpHabilitado } from '../../lib/mpIntegracion.js';
 import { suscribirSesionesPagadas } from '../../lib/sesiones.js';
 
+import Billeteras from './Billeteras.jsx';
 import './LibroCaja.css';
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
@@ -141,7 +143,7 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
     conMP: mpHabilitado(consultorio) || hayMPEnRango(pagosMP, rangoMes.desde, rangoMes.hasta),
   }), [consultorio, miembros, pagosMP, rangoMes]);
 
-  const { movimientos, totales, columnas } = useMemo(() => {
+  const { movimientos, totales, columnas, todos } = useMemo(() => {
     const libro = armarLibro({
       sesionesPagadas: sesiones.filter((s) => s.estadoPago === ESTADOS_PAGO_SESION.PAGADO),
       // Lo que efectivamente entro a la cuenta, ya descontado el cargo de MP.
@@ -164,7 +166,7 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
       if (mv.tipo === 'ingreso') { t.ingresos += mv.monto; t.saldo += mv.monto; }
       else { t.egresos += mv.monto; t.saldo -= mv.monto; }
     }
-    return { movimientos: delMes, totales: tot, columnas: cols };
+    return { movimientos: delMes, totales: tot, columnas: cols, todos: libro.movimientos };
   }, [sesiones, pagosMP, gastos, cuentas, rangoMes]);
 
   const mapaPacientes = useMemo(() => {
@@ -172,6 +174,19 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
     for (const p of pacientes) m[p.id] = p;
     return m;
   }, [pacientes]);
+
+  /* La billetera es de hoy y se calcula sobre TODOS los movimientos, no
+     solo los del mes que se mira: en un mes pasado sigue diciendo cuanto
+     tiene cada una ahora. Lo del mes va como linea aparte en la tarjeta. */
+  const billeteras = useMemo(
+    () => saldosDeBilletera({ config: consultorio?.billeteras, movimientos: todos, cuentas }),
+    [consultorio, todos, cuentas],
+  );
+  // Las cajas que no son billetera de nadie (Mercado Pago, "no se marco
+  // quien cobro") siguen como tarjetas chicas, para no perder su total.
+  const cajasSueltas = billeteras
+    ? columnas.filter((c) => !billeteras.billeteras.some((b) => b.id === c.id))
+    : columnas;
 
   const mapaMiembros = useMemo(() => {
     const m = {};
@@ -278,8 +293,15 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
           cajas en una franja y, abajo, filtros y boton. Antes eran ~280px de
           cards y chips antes de la primera fila, y la tabla arrancaba debajo
           del pliegue. */}
+      <Billeteras
+        resultado={billeteras}
+        delMes={(id) => totales[id] || { ingresos: 0, egresos: 0 }}
+        nombreMes={MESES[mes.getMonth()]}
+      />
+
+      {cajasSueltas.length > 0 && (
       <div className="cp-libro__resumen">
-        {columnas.map((c) => {
+        {cajasSueltas.map((c) => {
           const t = totales[c.id] || { ingresos: 0, egresos: 0, saldo: 0 };
           return (
             <div key={c.id} className="cp-libro__caja" title={c.completo}>
@@ -297,6 +319,7 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes }) {
           );
         })}
       </div>
+      )}
 
       {/* Filtro por caja: reemplaza a la vieja matriz de una columna por
           caja. Aquella dejaba 2 de cada 3 celdas vacias y obligaba a barrer

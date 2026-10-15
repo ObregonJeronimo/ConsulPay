@@ -21,13 +21,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Spinner from '../../components/ui/Spinner.jsx';
 import { ESTADOS_PAGO_SESION, formatoARS } from '../../lib/constants.js';
 import {
-  armarLibro, CAJA_SIN_RECEPTOR, cuentasDeCaja, hayMPEnRango, serieAnual, suscribirGastos,
+  armarLibro, CAJA_SIN_RECEPTOR, cuentasDeCaja, hayMPEnRango, saldosDeBilletera, serieAnual, suscribirGastos,
 } from '../../lib/gastos.js';
 import { mpHabilitado } from '../../lib/mpIntegracion.js';
 import { montoNetoEfectivo, suscribirPagosDelConsultorio } from '../../lib/pagos.js';
 import { suscribirMiembrosConsultorio } from '../../lib/profesionales.js';
 import { suscribirSesionesConsultorio, suscribirSesionesPagadas } from '../../lib/sesiones.js';
 
+import Billeteras from './Billeteras.jsx';
 import { MESES_CORTOS } from './resumenAnual.js';
 import './ResumenPagos.css';
 
@@ -105,16 +106,25 @@ export default function ResumenPagos({ consultorioId, consultorio, anio, onVerMe
     conMP: mpHabilitado(consultorio) || hayMPEnRango(pagosMP, `${anio}-01-01`, `${anio}-12-31`),
   }), [consultorio, miembros, pagosMP, anio]);
 
-  const { meses, total } = useMemo(() => {
-    const libro = armarLibro({
-      // Mismo filtro que el libro de caja, para que los dos sumen lo mismo.
-      sesionesPagadas: pagadas.filter((s) => s.estadoPago === ESTADOS_PAGO_SESION.PAGADO),
-      pagosMP: pagosMP.map((p) => ({ ...p, montoConsultorio: montoNetoEfectivo(p) })),
-      gastos,
-      cuentas,
-    });
-    return serieAnual({ movimientos: libro.movimientos, sesiones: delAnio, anio, cuentas });
-  }, [pagadas, pagosMP, gastos, cuentas, delAnio, anio]);
+  const libro = useMemo(() => armarLibro({
+    // Mismo filtro que el libro de caja, para que los dos sumen lo mismo.
+    sesionesPagadas: pagadas.filter((s) => s.estadoPago === ESTADOS_PAGO_SESION.PAGADO),
+    pagosMP: pagosMP.map((p) => ({ ...p, montoConsultorio: montoNetoEfectivo(p) })),
+    gastos,
+    cuentas,
+  }), [pagadas, pagosMP, gastos, cuentas]);
+
+  const { meses, total } = useMemo(
+    () => serieAnual({ movimientos: libro.movimientos, sesiones: delAnio, anio, cuentas }),
+    [libro, delAnio, anio, cuentas],
+  );
+
+  // La billetera es de hoy, no del anio que se esta mirando: mirar 2025 no
+  // cambia cuanto tiene cada una ahora.
+  const billeteras = useMemo(
+    () => saldosDeBilletera({ config: consultorio?.billeteras, movimientos: libro.movimientos, cuentas }),
+    [consultorio, libro, cuentas],
+  );
 
   const hoy = new Date();
   const mesActual = hoy.getFullYear() === anio ? hoy.getMonth() : -1;
@@ -139,6 +149,8 @@ export default function ResumenPagos({ consultorioId, consultorio, anio, onVerMe
 
   return (
     <div className="cp-rs">
+      <Billeteras resultado={billeteras} />
+
       <div className="cp-rs__banda">
         <div className="cp-rs__kpis">
           <Cifra

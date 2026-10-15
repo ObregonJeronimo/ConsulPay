@@ -277,6 +277,64 @@ export function serieAnual({ movimientos = [], sesiones = [], anio, cuentas = []
   return { meses, total };
 }
 
+/* ============================================================
+   Billeteras
+   ============================================================ */
+
+/**
+ * Cuanta plata del consultorio tiene cada admin HOY.
+ *
+ * El libro dice lo que entro y salio en un periodo; la billetera dice lo
+ * que cada una tiene en la mano. Para eso hace falta un punto de partida
+ * que el sistema no puede deducir: cuanto tenia cada una en una fecha. Se
+ * carga una sola vez en el consultorio:
+ *
+ *   consultorios/{id}.billeteras
+ *     desde   -> 'YYYY-MM-DD', primer dia que cuenta. El saldo cargado es
+ *                el del CIERRE del dia anterior: en CALA, desde '2026-10-03'
+ *                con lo que tenia cada una al terminar el 2/10.
+ *     saldos  -> { [uid]: number } saldo de partida de cada admin
+ *     nota    -> de donde salieron los numeros, para quien lo mire despues
+ *
+ * A partir de ahi se suman los cobros y se restan los gastos de la caja de
+ * cada una, tomados de armarLibro: los mismos movimientos que lista el
+ * libro, asi la billetera no puede contradecirlo.
+ *
+ * Lo cobrado sin que nadie marcara quien lo recibio no es de ninguna
+ * billetera, pero tampoco se puede esconder: se devuelve aparte
+ * (sinReceptor) para avisarlo.
+ *
+ * @param {Object} config - consultorio.billeteras (o null si no se cargo)
+ * @param {Array} movimientos - salida de armarLibro, de todos los meses
+ * @param {Array} cuentas - [{ id, nombre, completo }]
+ * @returns {null | { desde, billeteras: Array, sinReceptor: number }}
+ */
+export function saldosDeBilletera({ config, movimientos = [], cuentas = [] }) {
+  if (!config?.desde || !config?.saldos) return null;
+  const { desde, saldos } = config;
+  const porId = Object.fromEntries(cuentas.map((c) => [c.id, c]));
+
+  const billeteras = Object.keys(saldos)
+    // Un admin que ya no esta en el consultorio no tiene billetera que mostrar.
+    .filter((id) => porId[id])
+    .map((id) => ({ ...porId[id], inicial: Number(saldos[id]) || 0, ingresos: 0, egresos: 0, saldo: 0 }));
+  const idx = Object.fromEntries(billeteras.map((b) => [b.id, b]));
+
+  let sinReceptor = 0;
+  for (const mv of movimientos) {
+    if (!mv.fecha || mv.fecha < desde) continue;
+    const b = idx[mv.cuenta];
+    if (!b) {
+      if (mv.cuenta === CAJA_SIN_RECEPTOR.id && mv.tipo === 'ingreso') sinReceptor += mv.monto;
+      continue;
+    }
+    if (mv.tipo === 'ingreso') b.ingresos += mv.monto; else b.egresos += mv.monto;
+  }
+  for (const b of billeteras) b.saldo = b.inicial + b.ingresos - b.egresos;
+
+  return { desde, billeteras, sinReceptor };
+}
+
 function aFecha(v) {
   if (!v) return '';
   const d = v.toDate ? v.toDate() : (v instanceof Date ? v : new Date(v));

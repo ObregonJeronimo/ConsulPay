@@ -2773,6 +2773,102 @@ console.log('\n[32] Resumen de Pagos: el anio mes a mes');
   chequeo('y el libro muestra ese cobro', plano(r.cont.querySelector('.cp-libro__cierre')).includes('12.000'));
 }
 
+/* ============ 33. Billeteras ============ */
+console.log('\n[33] Billeteras: cuanto tiene cada admin');
+{
+  const { saldosDeBilletera } = await import('../src/lib/gastos.js');
+  const { default: ResumenPagos } = await import('../src/pages/admin/ResumenPagos.jsx');
+  const { default: LibroCaja } = await import('../src/pages/admin/LibroCaja.jsx');
+  const fsB = await import('fs');
+
+  const cuentas = [{ id: 'A', nombre: 'Adriana' }, { id: 'R', nombre: 'Romina' }];
+  /* El saldo cargado es el del CIERRE del 2/7: cuenta desde el 3/7 inclusive.
+     Lo del 2/7 ya estaba adentro del saldo y no se vuelve a sumar. */
+  const config = { desde: '2025-07-03', saldos: { A: 1000000, R: 500000, X: 9 } };
+  const mv = (fecha, cuenta, tipo, monto) => ({ fecha, cuenta, tipo, monto, origen: tipo === 'ingreso' ? 'sesion' : 'gasto' });
+  const r = saldosDeBilletera({
+    config, cuentas, movimientos: [
+      mv('2025-07-02', 'A', 'ingreso', 77777),          // el dia del corte: ya estaba en el saldo
+      mv('2025-07-03', 'A', 'ingreso', 100000),         // el primer dia que cuenta
+      mv('2025-07-10', 'A', 'egreso', 58444.31),        // con centavos
+      mv('2025-08-01', 'R', 'ingreso', 20000),
+      mv('2025-08-02', 'R', 'egreso', 600000),          // la deja en negativo
+      mv('2025-07-15', 'sin_asignar', 'ingreso', 5000), // nadie marco quien cobro
+      mv('2025-06-30', 'sin_asignar', 'ingreso', 9999), // antes del corte: no se avisa
+    ],
+  });
+  const de = (id) => r.billeteras.find((b) => b.id === id);
+  chequeo('sin saldo cargado no hay billeteras', saldosDeBilletera({ config: null, movimientos: [], cuentas }) === null);
+  chequeo('lo del dia del corte no se suma dos veces', de('A').ingresos === 100000, `(${de('A').ingresos})`);
+  chequeo('saldo = inicial + cobrado - gastado', Math.abs(de('A').saldo - 1041555.69) < 1e-6, `(${de('A').saldo})`);
+  chequeo('puede quedar en negativo y se dice', de('R').saldo === -80000, `(${de('R').saldo})`);
+  chequeo('un uid que ya no es admin no tiene billetera', !de('X') && r.billeteras.length === 2);
+  chequeo('lo cobrado sin receptor desde el corte se avisa aparte', r.sinReceptor === 5000, `(${r.sinReceptor})`);
+
+  // ---- en pantalla ----
+  const T = (y, m, d) => ({ toDate: () => new Date(y, m, d, 12, 0) });
+  globalThis.__DATA__ = {
+    sesiones: [
+      { id: 's1', consultorioId: 'C1', estadoPago: 'pagado', montoConsultorio: 100000, receptorUid: 'A',
+        profesionalUid: 'P', pacienteId: 'P0', cantidadSesiones: 1, fecha: T(2025, 5, 1), fechaPago: T(2025, 6, 3) },
+      { id: 's2', consultorioId: 'C1', estadoPago: 'pagado', montoConsultorio: 7000, receptorUid: null,
+        profesionalUid: 'P', pacienteId: 'P0', cantidadSesiones: 1, fecha: T(2025, 5, 1), fechaPago: T(2025, 6, 4) },
+    ],
+    gastos: [{ id: 'g', consultorioId: 'C1', fecha: '2025-07-10', monto: 40000, cuenta: 'A', motivo: 'Luz' }],
+    pagos_consultorio: [],
+    usuarios: [
+      { id: 'A', uid: 'A', displayName: 'Adriana Barrozo', consultorioId: 'C1', rol: 'admin' },
+      { id: 'R', uid: 'R', displayName: 'Romina Sulaiman', consultorioId: 'C1', rol: 'admin' },
+    ],
+    pacientes: [{ id: 'P0', nombre: 'Delfina', apellido: 'Moyano', consultorioId: 'C1' }],
+  };
+  const cons = { adminUids: ['A', 'R'], mpConfigs: {}, billeteras: { desde: '2025-07-03', saldos: { A: 2117057, R: 1691514 } } };
+  const plano = (n) => (n?.textContent || '').replace(/\s+/g, ' ').trim();
+
+  const { cont } = await montar(ResumenPagos, { consultorioId: 'C1', consultorio: cons, anio: 2025 });
+  const primero = cont.querySelector('.cp-rs')?.firstElementChild;
+  chequeo('en el Resumen las billeteras son lo primero', primero?.classList.contains('cp-bill'));
+  const tarjetas = [...cont.querySelectorAll('.cp-bill__card')].map(plano);
+  chequeo('una tarjeta por admin', tarjetas.length === 2, `(${tarjetas.length})`);
+  chequeo('Adriana: saldo y de donde sale',
+    tarjetas[0].includes('Billetera de Adriana') && tarjetas[0].includes('$ 2.177.057')
+    && tarjetas[0].includes('Tenía $ 2.117.057 al 2/7') && tarjetas[0].includes('+$ 100.000 cobrado')
+    && tarjetas[0].includes('−$ 40.000 gastado'), `(${tarjetas[0]})`);
+  chequeo('Romina sin movimientos queda en su saldo inicial', tarjetas[1].includes('$ 1.691.514'), `(${tarjetas[1]})`);
+  chequeo('dice desde cuando se cuenta', plano(cont.querySelector('.cp-bill__nota')).includes('al cierre del 2/7')
+    && plano(cont.querySelector('.cp-bill__nota')).includes('desde el 3/7'));
+  chequeo('avisa lo cobrado sin marcar quien lo recibio',
+    plano(cont.querySelector('.cp-bill__aviso')).includes('$ 7.000'), `(${plano(cont.querySelector('.cp-bill__aviso'))})`);
+
+  const { cont: sinConfig } = await montar(ResumenPagos, {
+    consultorioId: 'C1', consultorio: { adminUids: ['A', 'R'], mpConfigs: {} }, anio: 2025,
+  });
+  chequeo('sin saldo cargado no se muestra nada', !sinConfig.querySelector('.cp-bill'));
+
+  const { cont: contLibro } = await montar(LibroCaja, {
+    consultorioId: 'C1', consultorio: cons, uid: 'A', mes: new Date(2025, 6, 1),
+  });
+  chequeo('en Movimientos tambien van primero', contLibro.querySelector('.cp-libro')?.firstElementChild?.classList.contains('cp-bill'));
+  const tLibro = [...contLibro.querySelectorAll('.cp-bill__card')].map(plano);
+  chequeo('con la linea del mes que se mira', tLibro[0].includes('En julio: +$ 100.000 · −$ 40.000'), `(${tLibro[0]})`);
+  const sueltas = [...contLibro.querySelectorAll('.cp-libro__caja-nombre')].map(plano);
+  chequeo('las cajas de admin no se repiten como tarjeta chica',
+    !sueltas.includes('Adriana') && !sueltas.includes('Romina'), `(${sueltas})`);
+  chequeo('la de "no se marcó quién cobró" sigue a la vista', sueltas.includes('No se marcó quién cobró'), `(${sueltas})`);
+
+  // En un mes pasado la billetera sigue siendo la de hoy.
+  const { cont: contJunio } = await montar(LibroCaja, {
+    consultorioId: 'C1', consultorio: cons, uid: 'A', mes: new Date(2025, 5, 1),
+  });
+  chequeo('mirar otro mes no cambia la billetera',
+    plano(contJunio.querySelector('.cp-bill__card')).includes('$ 2.177.057')
+    && plano(contJunio.querySelector('.cp-bill__card')).includes('En junio: $ 0 · $ 0'));
+
+  // ConsulPay lo usan otros consultorios: nada de nombres propios en el texto.
+  const jsxB = fsB.readFileSync('../src/pages/admin/Billeteras.jsx', 'utf8');
+  chequeo('el texto no nombra a ningun consultorio', !/CALA/.test(jsxB));
+}
+
 console.log(`\n${'='.repeat(52)}`);
 console.log(`${ok} chequeos OK, ${fallos.length} fallas`);
 if (fallos.length) { console.log('FALLAN:'); fallos.forEach((f) => console.log('  - ' + f)); }

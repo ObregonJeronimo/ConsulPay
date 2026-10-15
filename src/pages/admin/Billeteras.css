@@ -1,0 +1,99 @@
+/* ============================================================
+   Billeteras — cuanto tiene cada admin
+   ----------------------------------------------------------------
+   Lo primero que se lee en la pagina: tarjetas medianas, el saldo en
+   grande y una linea chica con la cuenta que lo explica. Mas grandes que
+   las cifras del anio a proposito: son la respuesta, las otras el contexto.
+   ============================================================ */
+
+.cp-bill { margin-bottom: 12px; }
+
+.cp-bill__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.cp-bill__card {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 14px 18px 13px;
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border-strong);
+  border-left: 3px solid var(--cp-accent);
+  border-radius: var(--cp-radius-lg);
+}
+
+.cp-bill__titulo {
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--cp-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cp-bill__saldo {
+  font-family: var(--cp-font-mono);
+  font-size: 27px;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  font-variant-numeric: tabular-nums;
+  color: var(--cp-text);
+  white-space: nowrap;
+}
+
+.cp-bill__saldo--neg { color: var(--cp-danger); }
+
+/* La cuenta que explica el saldo: tres datos en una linea que se parte
+   sola si no entra, en vez de cortarse. */
+.cp-bill__cuenta,
+.cp-bill__mes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--cp-text-muted);
+}
+
+.cp-bill__mes {
+  margin-top: 3px;
+  padding-top: 5px;
+  border-top: 1px dashed var(--cp-border-strong);
+  display: block;
+}
+
+.cp-bill__in { color: var(--cp-success); }
+.cp-bill__out { color: var(--cp-danger); }
+
+.cp-bill__nota {
+  margin-top: 6px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--cp-text-faint);
+}
+
+.cp-bill__aviso {
+  margin-top: 6px;
+  padding: 7px 12px;
+  font-size: 12px;
+  color: var(--cp-warning);
+  background: var(--cp-warning-bg);
+  border-radius: var(--cp-radius-md);
+}
+
+/* Notebooks bajas: misma informacion, un poco menos de aire, para que el
+   Resumen siga entrando. */
+@media (max-height: 820px) and (min-width: 641px) {
+  .cp-bill__card { padding: 10px 16px 10px; }
+  .cp-bill__saldo { font-size: 23px; }
+}
+
+@media (max-width: 640px) {
+  .cp-bill__saldo { font-size: 24px; }
+}
