@@ -30,7 +30,9 @@ import {
   signOut as firebaseSignOut,
   updateProfile,
 } from 'firebase/auth';
-import { doc, getDoc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
+import {
+  clearIndexedDbPersistence, doc, getDoc, onSnapshot, serverTimestamp, setDoc, terminate,
+} from 'firebase/firestore';
 
 import { auth, db, googleProvider } from './firebase.js';
 import { ESTADOS_USUARIO, ROLES } from './constants.js';
@@ -125,6 +127,20 @@ export async function registerWithEmail(email, password, displayName) {
 
 export async function signOut() {
   await firebaseSignOut(auth);
+  /* La cache persistente de Firestore (ver lib/firebase.js) guarda en el
+     navegador lo que se leyo: pacientes, sesiones, montos. Al salir se
+     borra, para que en una computadora compartida no quede nada. Para
+     borrarla hay que cerrar Firestore primero, y un Firestore cerrado no se
+     puede volver a usar: por eso se recarga la pagina, que arranca de cero
+     en la pantalla de ingreso. Si hay otra pestana con la app abierta, el
+     borrado falla (la base esta en uso) y queda para cuando se cierren todas. */
+  try {
+    await terminate(db);
+    await clearIndexedDbPersistence(db);
+  } catch (e) {
+    console.warn('No se pudo borrar la cache local de Firestore:', e);
+  }
+  window.location.replace('/');
 }
 
 /**
