@@ -86,7 +86,7 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes, datos 
   const [filtroCaja, setFiltroCaja] = useState('todas');
   const [filtroTipo, setFiltroTipo] = useState('todo'); // 'todo' | 'ingreso' | 'egreso'
   const [abiertos, setAbiertos] = useState(() => new Set());
-  const [nuevoAbierto, setNuevoAbierto] = useState(false);
+  const [nuevo, setNuevo] = useState(null); // null | 'egreso' | 'ingreso': que formulario esta abierto
 
   const rangoMes = useMemo(() => {
     const y = mes.getFullYear(); const m = String(mes.getMonth() + 1).padStart(2, '0');
@@ -246,7 +246,8 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes, datos 
   }
 
   async function borrar(mv) {
-    if (!confirm(`¿Eliminar el gasto "${mv.detalle}"?`)) return;
+    const que = mv.origen === 'manual' ? 'el ingreso' : 'el gasto';
+    if (!confirm(`¿Eliminar ${que} "${mv.detalle}"?`)) return;
     try { await eliminarGasto(mv.gastoId); } catch (e) { alert(e.message); }
   }
 
@@ -339,16 +340,25 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes, datos 
             </button>
           ))}
         </div>
-        <Button variant="primary" size="sm" className="cp-libro__nuevo" onClick={() => setNuevoAbierto(true)}>
-          + Registrar gasto
-        </Button>
+        {/* Ingreso al lado del gasto y con el mismo formulario: casi todo lo
+            que entra son sesiones cobradas, pero a veces entra plata por otro
+            lado y no habia donde anotarla. Secundario a proposito: es el caso
+            raro, y asi no se confunde con el de todos los dias. */}
+        <div className="cp-libro__nuevo">
+          <Button variant="secondary" size="sm" onClick={() => setNuevo('ingreso')}>
+            + Registrar ingreso
+          </Button>
+          <Button variant="primary" size="sm" onClick={() => setNuevo('egreso')}>
+            + Registrar gasto
+          </Button>
+        </div>
       </div>
 
       {visibles.length === 0 ? (
         <div className="cp-libro__vacio">
           {filtroCaja === 'todas' && filtroTipo === 'todo'
             ? `No hay movimientos en ${MESES[mes.getMonth()]}. Los ingresos aparecen solos
-               cuando marcás sesiones como pagadas; los gastos se cargan con el botón de arriba.`
+               cuando marcás sesiones como pagadas; los gastos y otros ingresos se cargan con los botones de arriba.`
             : `No hay movimientos con esos filtros en ${MESES[mes.getMonth()]}.`}
         </div>
       ) : (
@@ -454,6 +464,7 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes, datos 
                           <span className="cp-libro__principal">
                             {mv.detalle}
                             {mv.origen === 'gasto' && <span className="cp-libro__tag">gasto</span>}
+                            {mv.origen === 'manual' && <span className="cp-libro__tag">ingreso</span>}
                             {/* Se ve en el libro, pero la billetera no lo vuelve a restar. */}
                             {mv.enSaldoInicial === true && (
                               <span
@@ -473,7 +484,7 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes, datos 
                         {signo}{formatoARS.format(mv.monto)}
                       </td>
                       <td>
-                        {mv.origen === 'gasto' && (
+                        {(mv.origen === 'gasto' || mv.origen === 'manual') && (
                           <button type="button" className="cp-libro__del" onClick={() => borrar(mv)}
                             title="Eliminar gasto" aria-label="Eliminar gasto">×</button>
                         )}
@@ -533,12 +544,13 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes, datos 
         </>
       )}
 
-      {nuevoAbierto && (
+      {nuevo && (
         <GastoModal
+          tipo={nuevo}
           consultorioId={consultorioId}
           uid={uid}
           cuentas={cuentas}
-          onClose={() => setNuevoAbierto(false)}
+          onClose={() => setNuevo(null)}
         />
       )}
     </div>
@@ -548,7 +560,25 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes, datos 
 /* ============================================================
    Modal: registrar un gasto
    ============================================================ */
-function GastoModal({ consultorioId, uid, cuentas, onClose }) {
+/* Textos del formulario segun lo que se registra. El formulario es uno
+   solo: un ingreso manual se carga igual que un gasto, cambia el sentido. */
+const TEXTOS = {
+  egreso: {
+    titulo: 'Registrar gasto',
+    sub: 'Queda anotado en el libro del mes, restando de la caja que elijas.',
+    placeholder: 'Ej: alquiler, EPEC, insumos',
+    error: 'No se pudo registrar el gasto.',
+  },
+  ingreso: {
+    titulo: 'Registrar ingreso',
+    sub: 'Para plata que entra sin ser una sesión cobrada. Queda anotado en el libro del mes, sumando a la caja que elijas.',
+    placeholder: 'Ej: diferencia de entrada, reintegro',
+    error: 'No se pudo registrar el ingreso.',
+  },
+};
+
+function GastoModal({ tipo = 'egreso', consultorioId, uid, cuentas, onClose }) {
+  const t = TEXTOS[tipo] || TEXTOS.egreso;
   const overlayProps = useOverlayClose(onClose);
   const [fecha, setFecha] = useState(hoyISO());
   const [monto, setMonto] = useState('');
@@ -561,10 +591,10 @@ function GastoModal({ consultorioId, uid, cuentas, onClose }) {
     setError('');
     setSubmitting(true);
     try {
-      await crearGasto(consultorioId, { fecha, monto, cuenta, motivo }, uid);
+      await crearGasto(consultorioId, { fecha, monto, cuenta, motivo, tipo }, uid);
       onClose();
     } catch (e) {
-      setError(e.message || 'No se pudo registrar el gasto.');
+      setError(e.message || t.error);
       setSubmitting(false);
     }
   }
@@ -573,12 +603,12 @@ function GastoModal({ consultorioId, uid, cuentas, onClose }) {
     <div className="cp-modal-overlay" {...overlayProps}>
       <div className="cp-modal" onClick={(e) => e.stopPropagation()}>
         <button className="cp-modal__close" onClick={onClose} aria-label="Cerrar">×</button>
-        <h2 className="cp-modal__title">Registrar gasto</h2>
+        <h2 className="cp-modal__title">{t.titulo}</h2>
         <p className="cp-modal__sub">
           {/* 'caja' y no 'cuenta': es la palabra que usa toda la pantalla —el
               filtro, la columna de la tabla, las tarjetas de arriba—. Dos
               nombres para la misma cosa obligan a traducir mentalmente. */}
-          Queda anotado en el libro del mes, restando de la caja que elijas.
+          {t.sub}
         </p>
 
         {/* El orden sigue lo que la persona tiene en la cabeza al registrar
@@ -610,7 +640,7 @@ function GastoModal({ consultorioId, uid, cuentas, onClose }) {
             id="g-motivo"
             label="Motivo"
             value={motivo}
-            placeholder="Ej: alquiler, EPEC, insumos"
+            placeholder={t.placeholder}
             onChange={(e) => setMotivo(e.target.value)}
           />
 
@@ -641,7 +671,7 @@ function GastoModal({ consultorioId, uid, cuentas, onClose }) {
         <div className="cp-modal__actions">
           <Button variant="ghost" onClick={onClose} disabled={submitting}>Cancelar</Button>
           <Button variant="primary" onClick={guardar} disabled={submitting}>
-            {submitting ? <><Spinner size={14} /> Guardando…</> : 'Registrar gasto'}
+            {submitting ? <><Spinner size={14} /> Guardando…</> : t.titulo}
           </Button>
         </div>
       </div>

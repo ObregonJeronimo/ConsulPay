@@ -1,10 +1,17 @@
 /**
- * Gastos del consultorio (egresos del libro de caja)
+ * Movimientos cargados a mano en el libro de caja: gastos y, desde el
+ * 19/10/2026, ingresos que no vienen de una sesion.
  *
- * Los INGRESOS no viven acá: salen solos de las sesiones marcadas como
- * pagadas (cada una guarda receptorUid, o sea de qué caja entró) y de los
- * pagos de Mercado Pago. Este modulo cubre la otra mitad, que el sistema
- * no puede deducir: la plata que sale.
+ * Casi todos los ingresos salen solos de las sesiones marcadas como
+ * pagadas (cada una guarda receptorUid, o sea de que caja entro) y de los
+ * pagos de Mercado Pago. Lo que el sistema no puede deducir se carga aca:
+ * la plata que sale y la que entra por otro lado (en CALA, la primera fue
+ * "$5.000 pago de diferencia entrada").
+ *
+ * Los ingresos manuales viven en la misma coleccion que los gastos, con
+ * tipo 'ingreso': las reglas de Firestore ya validan estos campos y no hubo
+ * que tocarlas. La coleccion se sigue llamando gastos por compatibilidad;
+ * todo el que la lee pasa por armarLibro, que es quien los separa.
  *
  *   /gastos/{gastoId}
  *     consultorioId
@@ -12,8 +19,10 @@
  *                 comparar dias como texto evita lios de zona horaria)
  *     monto    -> number positivo. El signo lo pone la vista, no el dato:
  *                 guardar negativos invita a sumar mal en cualquier query.
- *     cuenta   -> 'mp' | uid del admin de cuya caja salio
+ *     cuenta   -> 'mp' | uid del admin de cuya caja salio (o a cuya caja entro)
  *     motivo   -> texto libre ("alquiler", "epec", "papitas, gaseosas")
+ *     tipo     -> 'egreso' | 'ingreso'. Los docs anteriores no lo tienen:
+ *                 sin el campo es un gasto.
  *     enSaldoInicial -> opcional, solo para la billetera (ver saldosDeBilletera).
  *                 true: ya estaba descontado en el saldo de partida aunque
  *                 su fecha sea posterior al corte; false: no estaba, aunque
@@ -56,17 +65,22 @@ export function suscribirGastos(consultorioId, callback) {
   });
 }
 
-function validar({ monto, fecha, cuenta, motivo }) {
+function validar({ monto, fecha, cuenta, motivo, tipo }) {
   const n = Number(monto);
+  const esIngreso = tipo === 'ingreso';
   if (!Number.isFinite(n) || n <= 0) throw new Error('El monto tiene que ser mayor a cero.');
   if (!fecha) throw new Error('Elegí una fecha.');
-  if (!cuenta) throw new Error('Elegí de qué caja salió.');
+  if (!cuenta) throw new Error(esIngreso ? 'Elegí a qué caja entró.' : 'Elegí de qué caja salió.');
   if (!String(motivo || '').trim()) throw new Error('Escribí un motivo.');
-  return { monto: Math.round(n * 100) / 100, fecha, cuenta, motivo: String(motivo).trim() };
+  return {
+    monto: Math.round(n * 100) / 100, fecha, cuenta, motivo: String(motivo).trim(),
+    // Solo si vino: editar un movimiento sin decir el tipo no lo cambia.
+    ...(tipo ? { tipo: esIngreso ? 'ingreso' : 'egreso' } : {}),
+  };
 }
 
 export async function crearGasto(consultorioId, datos, creadoPorUid) {
-  const limpio = validar(datos);
+  const limpio = validar({ ...datos, tipo: datos.tipo || 'egreso' });
   const ref = await addDoc(collection(db, 'gastos'), {
     ...limpio,
     consultorioId,
@@ -150,11 +164,14 @@ export function armarLibro({ sesionesPagadas = [], pagosMP = [], gastos = [], cu
   }
 
   for (const g of gastos) {
+    // Un ingreso cargado a mano suma como un cobro, pero no es de una
+    // sesion: origen 'manual', para que no se agrupe con los cobros del dia.
+    const esIngreso = g.tipo === 'ingreso';
     movimientos.push({
-      id: `g_${g.id}`, gastoId: g.id, tipo: 'egreso',
+      id: `g_${g.id}`, gastoId: g.id, tipo: esIngreso ? 'ingreso' : 'egreso',
       cuenta: idsValidos.has(g.cuenta) ? g.cuenta : 'sin_asignar',
       monto: Number(g.monto) || 0, fecha: g.fecha, orden: aMillis(g.createdAt),
-      detalle: g.motivo, origen: 'gasto',
+      detalle: g.motivo, origen: esIngreso ? 'manual' : 'gasto',
       enSaldoInicial: typeof g.enSaldoInicial === 'boolean' ? g.enSaldoInicial : null,
     });
   }

@@ -158,8 +158,8 @@
   gap: 6px;
 }
 
-/* El boton se va al final de la fila; si no entra, baja solo. */
-.cp-libro__nuevo { margin-left: auto; }
+/* Los botones se van al final de la fila; si no entran, bajan solos. */
+.cp-libro__nuevo { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
 
 .cp-libro__chip {
   border: 1px solid var(--cp-border);
@@ -457,4 +457,5 @@
 @media (max-width: 560px) {
   .cp-libro__cierre { justify-content: space-between; gap: 14px; padding: 10px 14px; }
   .cp-libro__nuevo { margin-left: 0; width: 100%; }
+  .cp-libro__nuevo > * { flex: 1; }
 }

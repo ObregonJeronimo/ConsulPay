@@ -2941,6 +2941,89 @@ console.log('\n[34] Lecturas: Pagos pide los datos una sola vez');
   delete globalThis.__ESCUCHAS__;
 }
 
+/* ============ 35. Ingresos cargados a mano ============ */
+console.log('\n[35] Registrar ingreso: el mismo formulario, suma en vez de restar');
+{
+  const { armarLibro } = await import('../src/lib/gastos.js');
+  const { default: LibroCaja } = await import('../src/pages/admin/LibroCaja.jsx');
+  const plano = (n) => (n?.textContent || '').replace(/\s+/g, ' ').trim();
+  // El setter del prototipo del propio elemento: sirve para input y textarea.
+  const escribir = (el, valor) => {
+    if (!el) throw new Error('escribir: no encontre el campo');
+    const setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value').set;
+    setter.call(el, valor);
+    el.dispatchEvent(new el.ownerDocument.defaultView.Event('input', { bubbles: true }));
+  };
+
+  // ---- la cuenta ----
+  const mv = armarLibro({ sesionesPagadas: [], pagosMP: [], cuentas: [{ id: 'R' }], gastos: [
+    { id: 'i1', consultorioId: 'C1', fecha: '2026-10-19', monto: 5000, cuenta: 'R', motivo: 'pago de diferencia entrada', tipo: 'ingreso' },
+    { id: 'g1', consultorioId: 'C1', fecha: '2026-10-19', monto: 100, cuenta: 'R', motivo: 'viejo sin tipo' },
+  ] }).movimientos;
+  chequeo('un ingreso manual entra como ingreso', mv[0].tipo === 'ingreso' && mv[0].origen === 'manual', `(${mv[0].tipo}/${mv[0].origen})`);
+  chequeo('un gasto viejo sin tipo sigue siendo gasto', mv[1].tipo === 'egreso' && mv[1].origen === 'gasto');
+
+  // ---- el formulario ----
+  /* Por atributo y no por '#id': quedan abiertos formularios de otras secciones
+     con los mismos ids, y jsdom resuelve '#id' contra el primero de la pagina. */
+  globalThis.__DATA__ = { sesiones: [], gastos: [], pagos_consultorio: [], pacientes: [],
+    usuarios: [{ id: 'A', uid: 'A', displayName: 'Adriana Barrozo', consultorioId: 'C1', rol: 'admin' },
+               { id: 'R', uid: 'R', displayName: 'Romina Sulaiman', consultorioId: 'C1', rol: 'admin' }] };
+  const props = { consultorioId: 'C1', consultorio: { adminUids: ['A', 'R'], mpConfigs: {} }, uid: 'A', mes: new Date(2026, 9, 1) };
+  const { cont } = await montar(LibroCaja, props);
+  const boton = (txt) => [...cont.querySelectorAll('.cp-libro__nuevo button')].find((b) => b.textContent.includes(txt));
+  chequeo('al lado de Registrar gasto hay Registrar ingreso', !!boton('Registrar ingreso') && !!boton('Registrar gasto'));
+  await act(async () => { clic(boton('Registrar ingreso')); });
+  const modal = cont.querySelector('.cp-modal');
+  chequeo('abre el mismo formulario, titulado para ingreso',
+    plano(modal.querySelector('.cp-modal__title')) === 'Registrar ingreso' && modal.querySelectorAll('.cp-field').length === 4);
+  chequeo('dice que suma a la caja', /sumando a la caja/.test(plano(modal.querySelector('.cp-modal__sub'))));
+  globalThis.__ESCRITOS__ = {};
+  await act(async () => {
+    escribir(modal.querySelector('[id="g-monto"]'), '5000');
+    escribir(modal.querySelector('[id="g-motivo"]'), 'pago de diferencia entrada');
+  });
+  await act(async () => {
+    clic([...modal.querySelectorAll('.cp-modal__actions button')].find((b) => plano(b) === 'Registrar ingreso'));
+  });
+  const escrito = (globalThis.__ESCRITOS__.gastos || [])[0];
+  chequeo('se guarda con tipo ingreso, monto y caja', escrito?.tipo === 'ingreso' && escrito?.monto === 5000 && escrito?.cuenta === 'A',
+    `(${JSON.stringify(escrito)})`);
+
+  await act(async () => { clic(boton('Registrar gasto')); });
+  globalThis.__ESCRITOS__ = {};
+  const modalG = cont.querySelector('.cp-modal');
+  await act(async () => {
+    escribir(modalG.querySelector('[id="g-monto"]'), '700');
+    escribir(modalG.querySelector('[id="g-motivo"]'), 'azucar');
+  });
+  await act(async () => {
+    clic([...modalG.querySelectorAll('.cp-modal__actions button')].find((b) => plano(b) === 'Registrar gasto'));
+  });
+  chequeo('el gasto se sigue guardando como gasto', (globalThis.__ESCRITOS__.gastos || [])[0]?.tipo === 'egreso');
+  delete globalThis.__ESCRITOS__;
+
+  // ---- en el libro y la billetera ----
+  globalThis.__DATA__ = { ...globalThis.__DATA__, gastos: [
+    { id: 'i1', consultorioId: 'C1', fecha: '2026-10-19', monto: 5000, cuenta: 'R', motivo: 'pago de diferencia entrada', tipo: 'ingreso' },
+    { id: 'g1', consultorioId: 'C1', fecha: '2026-10-19', monto: 52616, cuenta: 'R', motivo: 'Domo' },
+  ] };
+  const consB = { adminUids: ['A', 'R'], mpConfigs: {}, billeteras: { desde: '2026-10-03', saldos: { A: 0, R: 0 } } };
+  const { cont: c2 } = await montar(LibroCaja, { ...props, consultorio: consB });
+  const filaIng = [...c2.querySelectorAll('tbody tr')].find((tr) => plano(tr).includes('pago de diferencia entrada'));
+  chequeo('en el libro aparece con la etiqueta ingreso', /pago de diferencia entrada\s*ingreso/.test(plano(filaIng)), `(${plano(filaIng)})`);
+  chequeo('en verde y sumando', filaIng.querySelector('td.cp-num')?.classList.contains('cp-libro__in')
+    && plano(filaIng.querySelector('td.cp-num')) === '+$ 5.000', `(${plano(filaIng.querySelector('td.cp-num'))})`);
+  chequeo('y se puede borrar como un gasto', !!filaIng.querySelector('.cp-libro__del'));
+  const romi = [...c2.querySelectorAll('.cp-bill__card')].map(plano).find((x) => x.includes('Romina'));
+  chequeo('la billetera lo suma como cobrado', romi.includes('+$ 5.000 cobrado') && romi.includes('−$ 47.616'), `(${romi})`);
+  const chipsTipo = [...c2.querySelectorAll('[aria-label="Filtrar por tipo"] .cp-libro__chip')];
+  await act(async () => { clic(chipsTipo[1]); }); // Ingresos
+  chequeo('el filtro Ingresos lo muestra', plano(c2.querySelector('tbody')).includes('pago de diferencia entrada'));
+  await act(async () => { clic(chipsTipo[2]); }); // Egresos
+  chequeo('y el de Egresos no', !plano(c2.querySelector('tbody')).includes('pago de diferencia entrada'));
+}
+
 console.log(`\n${'='.repeat(52)}`);
 console.log(`${ok} chequeos OK, ${fallos.length} fallas`);
 if (fallos.length) { console.log('FALLAN:'); fallos.forEach((f) => console.log('  - ' + f)); }
