@@ -247,6 +247,92 @@
   border-radius: var(--cp-radius-pill);
 }
 
+/* ============================================================
+   Densidad de la tabla (Normal / Compacta / Muy compacta)
+   ----------------------------------------------------------------
+   Normal es lo de arriba y no se toca. Las otras dos solo achican aire y
+   letra, sin sacar ningun dato. Piso de lectura: nada baja de 11px.
+   ============================================================ */
+.cp-libro__densidad {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-pill);
+}
+
+.cp-libro__densidad-btn {
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--cp-text-muted);
+  padding: 4px 10px;
+  border-radius: var(--cp-radius-pill);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.cp-libro__densidad-btn:hover { color: var(--cp-text); }
+.cp-libro__densidad-btn--on { background: var(--cp-surface-sunken); color: var(--cp-text); font-weight: 500; }
+.cp-libro__densidad-btn:focus-visible { outline: none; box-shadow: var(--cp-shadow-focus); }
+
+/* ---- Compacta: los mismos dos renglones, con menos aire ---- */
+.cp-libro--compacta .cp-libro__tabla thead th { padding-top: 7px; padding-bottom: 7px; }
+.cp-libro--compacta .cp-libro__tabla tbody td { padding-top: 5px; padding-bottom: 5px; }
+.cp-libro--compacta .cp-libro__tabla .cp-libro__td-fecha,
+.cp-libro--compacta .cp-libro__tabla tbody .cp-libro__td-caja,
+.cp-libro--compacta .cp-libro__tabla tbody .cp-num { padding-top: 6px; }
+.cp-libro--compacta .cp-libro__tabla tbody .cp-libro__fila--hija td { padding-top: 3px; padding-bottom: 3px; }
+.cp-libro--compacta .cp-libro__principal { font-size: 13px; }
+.cp-libro--compacta .cp-libro__sub { font-size: 11px; line-height: 1.25; }
+.cp-libro--compacta .cp-libro__tag { padding: 0 6px; font-size: 11px; }
+
+/* ---- Muy compacta: un renglon por movimiento ----
+   El detalle va al lado del nombre. La tabla deja de medir lo que su
+   linea mas larga (min-width: max-content de .cp-table) y se ajusta al
+   ancho disponible: si el detalle no entra al lado, baja solo, en vez de
+   abrir un scroll horizontal. */
+.cp-libro--muy-compacta .cp-libro__tabla { min-width: 0; }
+.cp-libro--muy-compacta .cp-libro__tabla thead th { padding-top: 6px; padding-bottom: 6px; }
+.cp-libro--muy-compacta .cp-libro__tabla tbody td { padding-top: 3px; padding-bottom: 3px; vertical-align: middle; }
+.cp-libro--muy-compacta .cp-libro__tabla .cp-libro__td-fecha,
+.cp-libro--muy-compacta .cp-libro__tabla tbody .cp-libro__td-caja,
+.cp-libro--muy-compacta .cp-libro__tabla tbody .cp-num { padding-top: 3px; vertical-align: middle; }
+.cp-libro--muy-compacta .cp-libro__tabla tbody .cp-libro__fila--hija td { padding-top: 2px; padding-bottom: 2px; }
+.cp-libro--muy-compacta .cp-libro__concepto {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 8px;
+  row-gap: 0;
+}
+.cp-libro--muy-compacta .cp-libro__principal { font-size: 12.5px; }
+.cp-libro--muy-compacta .cp-libro__sub { font-size: 11px; line-height: 1.3; }
+.cp-libro--muy-compacta .cp-libro__sub::before { content: '·'; margin-right: 8px; }
+.cp-libro--muy-compacta .cp-libro__toggle { align-items: center; }
+.cp-libro--muy-compacta .cp-libro__chevron { margin-top: 0; }
+.cp-libro--muy-compacta .cp-libro__tag { padding: 0 5px; font-size: 11px; margin-left: 6px; }
+.cp-libro--muy-compacta .cp-libro__tabla .cp-libro__td-fecha { font-size: 12px; }
+.cp-libro--muy-compacta .cp-libro__tabla tbody .cp-num,
+.cp-libro--muy-compacta .cp-libro__td-caja { font-size: 12px; }
+.cp-libro--muy-compacta .cp-libro__del { font-size: 14px; padding: 0 4px; }
+
+/* Hasta 1024px la tabla es una lista de tarjetas (ver .cp-compact-list en
+   shared-ui): ahi se achica el aire de cada tarjeta y entre tarjetas. */
+@media (max-width: 1024px) {
+  .cp-libro--compacta .cp-compact-list tbody { gap: 4px; }
+  .cp-libro--compacta .cp-compact-list tr { min-height: 50px; padding: 7px 10px; }
+  .cp-libro--muy-compacta .cp-compact-list tbody { gap: 3px; }
+  .cp-libro--muy-compacta .cp-compact-list tr { min-height: 0; padding: 5px 10px; }
+  .cp-libro--muy-compacta .cp-libro__m-bot { margin-top: 0; }
+}
+
+@media (max-width: 560px) {
+  .cp-libro__densidad { order: 3; }
+}
+
 /* ---- Cierre del mes ---- */
 /* Pegado al pie de la pantalla mientras se recorre la lista: con 30
    movimientos la tabla no entra entera, pero la respuesta — cuanto entro,

@@ -3024,6 +3024,43 @@ console.log('\n[35] Registrar ingreso: el mismo formulario, suma en vez de resta
   chequeo('y el de Egresos no', !plano(c2.querySelector('tbody')).includes('pago de diferencia entrada'));
 }
 
+/* ============ 36. Densidad de la tabla de Movimientos ============ */
+console.log('\n[36] Densidad: Normal por defecto, Compacta y Muy compacta');
+{
+  const { default: LibroCaja } = await import('../src/pages/admin/LibroCaja.jsx');
+  const fsD = await import('fs');
+  try { dom.window.localStorage.clear(); } catch { /* sin almacenamiento */ }
+  globalThis.__DATA__ = { sesiones: [], pagos_consultorio: [], pacientes: [],
+    gastos: [{ id: 'g', consultorioId: 'C1', fecha: '2026-10-05', monto: 1000, cuenta: 'A', motivo: 'luz' }],
+    usuarios: [{ id: 'A', uid: 'A', displayName: 'Adriana Barrozo', consultorioId: 'C1', rol: 'admin' }] };
+  const props = { consultorioId: 'C1', consultorio: { adminUids: ['A'], mpConfigs: {} }, uid: 'A', mes: new Date(2026, 9, 1) };
+  const raiz = (c) => c.querySelector('.cp-libro');
+  const opciones = (c) => [...c.querySelectorAll('[aria-label="Densidad de la tabla"] button')];
+
+  const { cont } = await montar(LibroCaja, props);
+  chequeo('hay tres opciones', opciones(cont).map((b) => b.textContent.trim()).join('|') === 'Normal|Compacta|Muy compacta');
+  chequeo('por defecto se ve como siempre (Normal)',
+    !/cp-libro--/.test(raiz(cont).className) && opciones(cont)[0].getAttribute('aria-pressed') === 'true');
+  await act(async () => { clic(opciones(cont)[1]); });
+  chequeo('Compacta achica la tabla', raiz(cont).classList.contains('cp-libro--compacta'));
+  await act(async () => { clic(opciones(cont)[2]); });
+  chequeo('Muy compacta tambien', raiz(cont).classList.contains('cp-libro--muy-compacta'));
+  const { cont: otra } = await montar(LibroCaja, props);
+  chequeo('la eleccion se recuerda al volver', raiz(otra).classList.contains('cp-libro--muy-compacta'));
+  await act(async () => { clic(opciones(otra)[0]); });
+  chequeo('y Normal vuelve a la de siempre', !/cp-libro--/.test(raiz(otra).className));
+
+  /* Compactas pero legibles: ninguna letra de esas dos vistas baja de 11px. */
+  const css = fsD.readFileSync('../src/pages/admin/LibroCaja.css', 'utf8');
+  const tam = [...css.matchAll(/\.cp-libro--(?:muy-)?compacta[^{]*\{[^}]*font-size:\s*([\d.]+)px/g)].map((m) => Number(m[1]));
+  chequeo('ninguna letra compacta baja de 11px', tam.length > 0 && Math.min(...tam) >= 11, `(${tam})`);
+  /* Con el detalle al lado del nombre, la tabla no puede medir su linea mas
+     larga (min-width: max-content) o abriria un scroll horizontal. */
+  chequeo('Muy compacta se ajusta al ancho en vez de abrir scroll',
+    /\.cp-libro--muy-compacta \.cp-libro__tabla\s*\{\s*min-width:\s*0/.test(css));
+  try { dom.window.localStorage.clear(); } catch { /* sin almacenamiento */ }
+}
+
 console.log(`\n${'='.repeat(52)}`);
 console.log(`${ok} chequeos OK, ${fallos.length} fallas`);
 if (fallos.length) { console.log('FALLAN:'); fallos.forEach((f) => console.log('  - ' + f)); }

@@ -55,6 +55,27 @@ function subSesiones(cantidad, rango) {
   return partes.join(' · ');
 }
 
+/* Densidad de la tabla. Normal es la de siempre y la que ve quien entra
+   por primera vez; Compacta y Muy compacta son para quien prefiere ver
+   mas movimientos por pantalla. Se recuerda por navegador: es una
+   preferencia de quien mira, no del consultorio. */
+const DENSIDADES = [['normal', 'Normal'], ['compacta', 'Compacta'], ['muy-compacta', 'Muy compacta']];
+const CLAVE_DENSIDAD = 'cp-libro-densidad';
+
+function leerDensidad() {
+  try {
+    const v = window.localStorage.getItem(CLAVE_DENSIDAD);
+    return DENSIDADES.some(([id]) => id === v) ? v : 'normal';
+  } catch {
+    // Ventana privada o almacenamiento bloqueado: se usa la de siempre.
+    return 'normal';
+  }
+}
+
+function guardarDensidad(v) {
+  try { window.localStorage.setItem(CLAVE_DENSIDAD, v); } catch { /* sin almacenamiento: dura la visita */ }
+}
+
 /** "+$ 1.000" o "$ 0": un cero con signo ("−$ 0") se lee como un monto. */
 function conSigno(signo, monto) {
   return monto ? `${signo}${formatoARS.format(monto)}` : formatoARS.format(0);
@@ -87,6 +108,8 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes, datos 
   const [filtroTipo, setFiltroTipo] = useState('todo'); // 'todo' | 'ingreso' | 'egreso'
   const [abiertos, setAbiertos] = useState(() => new Set());
   const [nuevo, setNuevo] = useState(null); // null | 'egreso' | 'ingreso': que formulario esta abierto
+  const [densidad, setDensidad] = useState(leerDensidad);
+  function elegirDensidad(v) { setDensidad(v); guardarDensidad(v); }
 
   const rangoMes = useMemo(() => {
     const y = mes.getFullYear(); const m = String(mes.getMonth() + 1).padStart(2, '0');
@@ -260,7 +283,7 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes, datos 
   }
 
   return (
-    <div className="cp-libro">
+    <div className={`cp-libro ${densidad === 'normal' ? '' : `cp-libro--${densidad}`}`}>
       {/* El mes lo manda Pagos.jsx. Antes LibroCaja tenia su propio state y
           se renderizaba un segundo selector que no hablaba con el de arriba.
 
@@ -335,6 +358,21 @@ export default function LibroCaja({ consultorioId, consultorio, uid, mes, datos 
               className={`cp-libro__chip ${filtroTipo === id ? 'cp-libro__chip--on' : ''}`}
               onClick={() => setFiltroTipo(id)}
               aria-pressed={filtroTipo === id}
+            >
+              {txt}
+            </button>
+          ))}
+        </div>
+        {/* Como se ve la tabla, no que se ve: por eso va separado de los
+            filtros y con otro estilo (no se pinta de color al elegirlo). */}
+        <div className="cp-libro__densidad" role="group" aria-label="Densidad de la tabla">
+          {DENSIDADES.map(([id, txt]) => (
+            <button
+              key={id}
+              type="button"
+              className={`cp-libro__densidad-btn ${densidad === id ? 'cp-libro__densidad-btn--on' : ''}`}
+              onClick={() => elegirDensidad(id)}
+              aria-pressed={densidad === id}
             >
               {txt}
             </button>
