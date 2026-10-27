@@ -1005,6 +1005,49 @@
 }
 .cp-copiar-tabla:hover { color: var(--cp-text); border-color: var(--cp-border-strong); }
 .cp-copiar-tabla:focus-visible { outline: none; box-shadow: var(--cp-shadow-focus); }
+.cp-copiar-tabla[aria-expanded="true"] { color: var(--cp-text); border-color: var(--cp-border-strong); }
+
+/* El menu de "Copiar lista": las dos formas de copiar. Mismo aspecto que
+   el de ActionMenu, pero con texto como disparador. */
+.cp-copiar-tabla-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.cp-copiar-tabla__flecha {
+  margin-left: 6px;
+  font-size: 10px;
+}
+
+.cp-copiar-tabla__menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  padding: 4px;
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius-md);
+  box-shadow: 0 8px 24px -4px rgba(0,0,0,0.14), 0 2px 8px -2px rgba(0,0,0,0.08);
+}
+
+.cp-copiar-tabla__opcion {
+  padding: 9px 12px;
+  border: none;
+  border-radius: var(--cp-radius-sm);
+  background: transparent;
+  color: var(--cp-text);
+  font-family: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cp-copiar-tabla__opcion:hover { background: var(--cp-surface-hover); }
+.cp-copiar-tabla__opcion:focus-visible { outline: none; box-shadow: var(--cp-shadow-focus); }
 
 /* El boton de copiar y el contador comparten la punta derecha del header. */
 .cp-sel__head-fin {

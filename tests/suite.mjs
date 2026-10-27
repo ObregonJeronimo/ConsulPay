@@ -2188,7 +2188,24 @@ console.log('\n[28] Copiar la lista de pacientes de la tabla');
     configurable: true,
     value: { writeText: (txt) => { copiado = txt; return Promise.resolve(); } },
   });
+
+  /* "Copiar lista" abre un menu con dos formas: con estado y total, o
+     solo la lista. Tocar el boton solo no copia nada. */
+  copiado = '';
   await act(async () => { clic(boton); });
+  chequeo('tocar Copiar lista abre el menu y todavia no copia',
+    !!r.cont.querySelector('.cp-copiar-tabla__menu') && copiado === '');
+  chequeo('el menu ofrece las dos formas, la de siempre primero',
+    [...r.cont.querySelectorAll('.cp-copiar-tabla__opcion')].map((b) => b.textContent).join('|')
+      === 'Con Pago / NoPago y total|Solo pacientes y sesiones');
+  const copiarLista = async (forma) => {
+    if (!r.cont.querySelector('.cp-copiar-tabla__menu')) {
+      await act(async () => { clic(r.cont.querySelector('.cp-copiar-tabla')); });
+    }
+    await act(async () => { clic(r.cont.querySelector(`.cp-copiar-tabla__opcion[data-forma="${forma}"]`)); });
+  };
+  await copiarLista('con-estado');
+  chequeo('elegir una forma cierra el menu', !r.cont.querySelector('.cp-copiar-tabla__menu'));
 
   const lineas = copiado.split('\n');
   const mesEsperado = (() => {
@@ -2241,6 +2258,28 @@ console.log('\n[28] Copiar la lista de pacientes de la tabla');
   chequeo('el total va separado de la lista',
     copiado.split('\n').at(-2) === '', `(${JSON.stringify(copiado.split('\n').slice(-3))})`);
 
+  /* ---- La otra forma: solo pacientes y cantidades ---- */
+  const conEstado = copiado;
+  await copiarLista('solo-lista');
+  chequeo('solo lista: mismo titulo y mismas filas',
+    copiado.split('\n')[0] === `${mesEsperado}:` && filasCopia(copiado).length === 3, `(${copiado})`);
+  chequeo('solo lista: cada linea es numero, paciente y cantidad, sin estado',
+    filasCopia(copiado).every((l) => /^\d+- [^()]+\(\d+\)$/.test(l)), `(${filasCopia(copiado)})`);
+  chequeo('solo lista: sin total ni plata',
+    !copiado.includes('Total') && !copiado.includes('$') && !copiado.endsWith('\n'), `(${copiado})`);
+  chequeo('solo lista: mismo orden que la version con estado',
+    filasCopia(copiado).join('|') === filasCopia(conEstado).map((l) => l.replace(/ \S+$/, '')).join('|'),
+    `(${filasCopia(copiado)})`);
+
+  // Escape cierra el menu sin copiar
+  copiado = '';
+  await act(async () => { clic(r.cont.querySelector('.cp-copiar-tabla')); });
+  await act(async () => {
+    dom.window.document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape' }));
+  });
+  chequeo('Escape cierra el menu sin copiar',
+    !r.cont.querySelector('.cp-copiar-tabla__menu') && copiado === '');
+
   /* ---- El boton de copiar una fila sola ---- */
   const copiarFilaDe = (ape) => [...r.cont.querySelectorAll('.cp-sesiones-tabla__row')]
     .find((tr) => (tr.querySelector('.cp-prof-name')?.textContent || '').includes(ape))
@@ -2275,7 +2314,7 @@ console.log('\n[28] Copiar la lista de pacientes de la tabla');
     selProfC.value = 'BE';
     selProfC.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
   });
-  await act(async () => { clic(r.cont.querySelector('.cp-copiar-tabla')); });
+  await copiarLista('con-estado');
   chequeo('respeta el filtro de profesional',
     filasCopia(copiado).length === 2 && !copiado.includes('Catalina'),
     `(${copiado.replace(/\n/g, ' | ')})`);

@@ -46,7 +46,7 @@ Sale con código 1 si algo falla, así que sirve para un pre-push hook.
 25. Mis solicitudes del profesional — el reparto de lo que se liquida
 26. Grupos de solicitudes — los totales alineados entre sí
 27. Planilla anual — grilla de carga, validaciones y lo que se escribe
-28. Copiar la tabla de sesiones — solo admin, formato y filtros
+28. Copiar la tabla de sesiones — solo admin, formato y filtros, con estado o solo la lista
 29. Fecha de pago — visible en la fila, en las dos vistas
 30. Rechazar en lote — confirmación, motivo y lo que se escribe
 31. Ingresos del libro — de qué profesional vino la plata y de cuándo es la sesión

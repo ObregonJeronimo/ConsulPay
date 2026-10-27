@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import ActionMenu from '../../components/ui/ActionMenu.jsx';
@@ -776,15 +776,23 @@ const ORDEN_ESTADO_LISTA = {
   [ESTADOS_PAGO_SESION.DEBIDO]: 2,
 };
 
-function textoTablaSesiones(sesiones, mapaPacientes, mes) {
+/* conEstado false es la lista pelada (paciente y cantidad, sin Pago/NoPago
+   ni total), para pasarle al profesional o a la obra social sin mostrar
+   quien debe. Mantiene el mismo orden que la otra: asi las dos versiones
+   de un mismo mes se pueden comparar renglon por renglon. */
+function textoTablaSesiones(sesiones, mapaPacientes, mes, { conEstado = true } = {}) {
   const ordenadas = [...sesiones].sort(
     (a, b) => (ORDEN_ESTADO_LISTA[a.estadoPago] ?? 9) - (ORDEN_ESTADO_LISTA[b.estadoPago] ?? 9),
   );
   const lineas = ordenadas.map((s, i) => {
     const nombre = nombreYApellido(mapaPacientes[s.pacienteId], s.pacienteNombre);
+    const base = `${i + 1}- ${nombre}(${getCantidadSesiones(s)})`;
+    if (!conEstado) return base;
     const estado = ESTADO_EN_LISTA[s.estadoPago] || s.estadoPago;
-    return `${i + 1}- ${nombre}(${getCantidadSesiones(s)}) ${estado}`;
+    return `${base} ${estado}`;
   });
+
+  if (!conEstado) return `${nombreDeMesSolo(mes)}:\n${lineas.join('\n')}`;
 
   /* Cierra con lo que todavia no entro, en la parte del consultorio: es el
      numero que se busca despues de leer la lista. Las de obra social sin
@@ -848,11 +856,39 @@ function BotonCopiarFila({ sesion, mapaPacientes }) {
   );
 }
 
+/* Dos formas de copiar la misma lista, elegidas en el momento: con el
+   estado de cada uno y el total (para el consultorio) o solo pacientes y
+   cantidades (para mandar afuera). */
+const FORMAS_DE_COPIAR = [
+  { id: 'con-estado', titulo: 'Con Pago / NoPago y total', conEstado: true },
+  { id: 'solo-lista', titulo: 'Solo pacientes y sesiones', conEstado: false },
+];
+
 function BotonCopiarTabla({ sesiones, mapaPacientes, mes }) {
   const [copiado, setCopiado] = useState(false);
+  const [abierto, setAbierto] = useState(false);
+  const ref = useRef(null);
 
-  function copiar() {
-    navigator.clipboard.writeText(textoTablaSesiones(sesiones, mapaPacientes, mes)).then(() => {
+  // Se cierra al tocar afuera o con Escape, como cualquier menu.
+  useEffect(() => {
+    if (!abierto) return undefined;
+    function afuera(e) {
+      if (ref.current && !ref.current.contains(e.target)) setAbierto(false);
+    }
+    function escape(e) { if (e.key === 'Escape') setAbierto(false); }
+    document.addEventListener('mousedown', afuera);
+    document.addEventListener('touchstart', afuera);
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('mousedown', afuera);
+      document.removeEventListener('touchstart', afuera);
+      document.removeEventListener('keydown', escape);
+    };
+  }, [abierto]);
+
+  function copiar(conEstado) {
+    setAbierto(false);
+    navigator.clipboard.writeText(textoTablaSesiones(sesiones, mapaPacientes, mes, { conEstado })).then(() => {
       setCopiado(true);
       setTimeout(() => setCopiado(false), 2000);
     }).catch(() => {
@@ -861,14 +897,35 @@ function BotonCopiarTabla({ sesiones, mapaPacientes, mes }) {
   }
 
   return (
-    <button
-      type="button"
-      className="cp-copiar-tabla"
-      onClick={copiar}
-      title={`Copiar los ${sesiones.length} pacientes de la tabla con su cantidad de sesiones`}
-    >
-      {copiado ? '¡Copiado!' : 'Copiar lista'}
-    </button>
+    <div className="cp-copiar-tabla-wrap" ref={ref}>
+      <button
+        type="button"
+        className="cp-copiar-tabla"
+        onClick={() => setAbierto((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={abierto}
+        title={`Copiar los ${sesiones.length} pacientes de la tabla con su cantidad de sesiones`}
+      >
+        {copiado ? '¡Copiado!' : 'Copiar lista'}
+        <span className="cp-copiar-tabla__flecha" aria-hidden="true">▾</span>
+      </button>
+      {abierto && (
+        <div className="cp-copiar-tabla__menu" role="menu">
+          {FORMAS_DE_COPIAR.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              role="menuitem"
+              className="cp-copiar-tabla__opcion"
+              data-forma={f.id}
+              onClick={() => copiar(f.conEstado)}
+            >
+              {f.titulo}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
