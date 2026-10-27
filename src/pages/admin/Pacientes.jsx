@@ -34,6 +34,9 @@ import { suscribirProfesionales } from '../../lib/profesionales.js';
 
 import './Pacientes.css';
 
+// TEMPORAL — ver exportarPlanillaPorMetodo.
+const PAUSA_ENTRE_DESCARGAS_MS = 400;
+
 /* ============================================================
    Íconos
    ============================================================ */
@@ -244,7 +247,7 @@ export default function Pacientes() {
      No aplica los filtros de la pantalla: el metodo se elige en el modal,
      asi lo que se descarga no depende de como quedo la vista.
      Cuando no haga falta mas, se borra este bloque, el modal y el boton. */
-  function exportarPlanillaPacientes(metodoId) {
+  function armarPlanillaPacientes(metodoId, fecha) {
     const elegidos = metodoId === 'todos'
       ? pacientesActivos
       // Un paciente con APROSS + particular entra en las dos planillas: en
@@ -262,21 +265,43 @@ export default function Pacientes() {
       ...nombres.map((n) => [n, '']),
     ];
 
-    const hoy = new Date();
-    const p2 = (n) => String(n).padStart(2, '0');
-    const fecha = `${hoy.getFullYear()}-${p2(hoy.getMonth() + 1)}-${p2(hoy.getDate())}`;
-
     const metodo = metodos.find((m) => m.id === metodoId);
     const etiqueta = metodo ? metodo.nombre : 'todos';
     // El nombre del metodo va al archivo y a la solapa: si se imprimen
     // varias planillas juntas, hay que poder distinguirlas.
     const sufijo = etiqueta.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
-    descargarBlob(
-      construirXlsx(filas, { hoja: metodo ? metodo.nombre : 'Pacientes', anchos: [38, 30] }),
-      `pacientes-${sufijo}-${fecha}.xlsx`,
-    );
+    return {
+      blob: construirXlsx(filas, { hoja: metodo ? metodo.nombre : 'Pacientes', anchos: [38, 30] }),
+      nombre: `pacientes-${sufijo}-${fecha}.xlsx`,
+    };
+  }
+
+  function fechaDeHoy() {
+    const hoy = new Date();
+    const p2 = (n) => String(n).padStart(2, '0');
+    return `${hoy.getFullYear()}-${p2(hoy.getMonth() + 1)}-${p2(hoy.getDate())}`;
+  }
+
+  function exportarPlanillaPacientes(metodoId) {
+    const { blob, nombre } = armarPlanillaPacientes(metodoId, fechaDeHoy());
+    descargarBlob(blob, nombre);
     setPlanillaAbierta(false);
+  }
+
+  /* Un archivo por metodo, para repartirle a cada profesional el suyo sin
+     tener que abrir el modal cinco veces. Los metodos sin pacientes no
+     generan archivo: una planilla vacia solo confunde.
+     Las descargas van espaciadas: si salen todas en el mismo instante,
+     Chrome se queda con la primera y descarta el resto. */
+  async function exportarPlanillaPorMetodo(metodoIds) {
+    const fecha = fechaDeHoy();
+    setPlanillaAbierta(false);
+    for (let i = 0; i < metodoIds.length; i += 1) {
+      if (i > 0) await new Promise((res) => setTimeout(res, PAUSA_ENTRE_DESCARGAS_MS));
+      const { blob, nombre } = armarPlanillaPacientes(metodoIds[i], fecha);
+      descargarBlob(blob, nombre);
+    }
   }
 
   const activosTotal = pacientesActivos.length;
@@ -478,6 +503,7 @@ export default function Pacientes() {
           pacientes={pacientesActivos}
           metodos={metodos}
           onDescargar={exportarPlanillaPacientes}
+          onDescargarPorMetodo={exportarPlanillaPorMetodo}
           onCerrar={() => setPlanillaAbierta(false)}
         />
       )}
@@ -802,7 +828,7 @@ function PacientesTabla({
 
    Se borra junto con exportarPlanillaPacientes y su boton.
    ============================================================ */
-function PlanillaModal({ pacientes, metodos, onDescargar, onCerrar }) {
+function PlanillaModal({ pacientes, metodos, onDescargar, onDescargarPorMetodo, onCerrar }) {
   const [elegido, setElegido] = useState('todos');
   const overlayProps = useOverlayClose(onCerrar);
 
@@ -820,6 +846,9 @@ function PlanillaModal({ pacientes, metodos, onDescargar, onCerrar }) {
     { id: 'todos', nombre: 'Todos los pacientes' },
     ...metodos.map((m) => ({ id: m.id, nombre: m.nombre })),
   ];
+
+  // Solo los metodos que tienen a alguien: uno vacio no baja archivo.
+  const conPacientes = metodos.filter((m) => (conteos[m.id] ?? 0) > 0).map((m) => m.id);
 
   return (
     <div className="cp-modal-overlay" {...overlayProps}>
@@ -859,6 +888,25 @@ function PlanillaModal({ pacientes, metodos, onDescargar, onCerrar }) {
         <p className="cp-planilla-nota">
           Un paciente con más de un método aparece en la planilla de cada uno.
         </p>
+
+        {conPacientes.length > 1 && (
+          <div className="cp-planilla-separadas">
+            <div className="cp-planilla-separadas__texto">
+              <span className="cp-planilla-separadas__titulo">Un Excel por cada método</span>
+              <span className="cp-planilla-separadas__detalle">
+                {conPacientes.length} archivos, uno por lista. El navegador puede
+                pedir permiso para bajar varios a la vez.
+              </span>
+            </div>
+            <Button
+              variant="secondary"
+              type="button"
+              onClick={() => onDescargarPorMetodo(conPacientes)}
+            >
+              Descargar {conPacientes.length} archivos
+            </Button>
+          </div>
+        )}
 
         <div className="cp-modal__actions">
           <Button variant="secondary" type="button" onClick={onCerrar}>Cancelar</Button>

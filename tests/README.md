@@ -28,7 +28,7 @@ Sale con código 1 si algo falla, así que sirve para un pre-push hook.
 7. Mis pagos — sección de MP condicionada
 8. Pagos del admin — Resumen primero, período por vista, pestaña de MP condicionada
 9. Directorio de admins — alta, baja y siembra al crear el consultorio
-10. Planilla de pacientes — xlsx válido, escapes XML, filtro por método de pago
+10. Planilla de pacientes — xlsx válido, escapes XML, filtro por método de pago, un archivo por método
 11. Método renombrado — nombre vivo por id, porcentaje histórico intacto
 12. Navegación de meses — futuros habilitados en los modales de cobro
 13. Selector de mes — estilos compartidos, visibles en las cinco pantallas

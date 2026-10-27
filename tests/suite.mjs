@@ -410,11 +410,14 @@ console.log('\n[10] Planilla de pacientes (xlsx)');
 
   // Interceptar la descarga sin escribir a disco
   let capturado = null; let nombreArchivo = null;
+  const blobsBajados = []; const archivosBajados = [];
   const crearURL = dom.window.URL.createObjectURL;
-  dom.window.URL.createObjectURL = (b) => { capturado = b; return 'blob:fake'; };
+  dom.window.URL.createObjectURL = (b) => { capturado = b; blobsBajados.push(b); return 'blob:fake'; };
   dom.window.URL.revokeObjectURL = () => {};
   global.URL = dom.window.URL;
-  dom.window.HTMLAnchorElement.prototype.click = function () { if (this.download) nombreArchivo = this.download; };
+  dom.window.HTMLAnchorElement.prototype.click = function () {
+    if (this.download) { nombreArchivo = this.download; archivosBajados.push(this.download); }
+  };
 
   const r = await montar(Pacientes, {});
   const abrir = () => clic([...r.cont.querySelectorAll('button')].find((b) => b.textContent.includes('Descargar planilla')));
@@ -468,6 +471,31 @@ console.log('\n[10] Planilla de pacientes (xlsx)');
   chequeo('planilla completa trae los 6 activos', todos.nombres.length === 6, `(${todos.nombres.length})`);
   chequeo('el archivado no aparece en ninguna',
     ![...apross.nombres, ...part.nombres, ...todos.nombres].some((n) => n.includes('Archivado')));
+
+  // ---- Un Excel por metodo: el modal quedo abierto despues de bajar()
+  const btnSeparadas = [...r.cont.querySelectorAll('.cp-planilla-separadas button')][0];
+  chequeo('ofrece bajar un archivo por metodo',
+    !!btnSeparadas && btnSeparadas.textContent.includes('Descargar 2 archivos'), `(${btnSeparadas?.textContent})`);
+  blobsBajados.length = 0; archivosBajados.length = 0;
+  await act(async () => {
+    clic(btnSeparadas);
+    // Las descargas salen espaciadas (400 ms): esperar a que terminen todas.
+    await new Promise((res) => setTimeout(res, 1000));
+  });
+  chequeo('baja un archivo por cada metodo con pacientes (OSDE vacio no)',
+    archivosBajados.length === 2
+    && archivosBajados[0].startsWith('pacientes-apross-')
+    && archivosBajados[1].startsWith('pacientes-particular-'), `(${archivosBajados})`);
+  const hojasSeparadas = await Promise.all(blobsBajados.map(async (b) => {
+    const xml = new TextDecoder().decode(new Uint8Array(await b.arrayBuffer()));
+    const hoja = xml.slice(xml.indexOf('<sheetData>'), xml.indexOf('</sheetData>'));
+    return [...hoja.matchAll(/<t xml:space="preserve">([^<]*)<\/t>/g)].map((m) => m[1]).slice(2);
+  }));
+  chequeo('cada archivo trae solo su lista',
+    hojasSeparadas[0]?.length === 4 && hojasSeparadas[1]?.length === 3
+    && !hojasSeparadas[1].some((n) => n.includes('Zarate')), `(${hojasSeparadas.map((h) => h.length)})`);
+  chequeo('el modal se cierra al bajar los archivos',
+    !r.cont.querySelector('.cp-planilla-opciones'));
 
   dom.window.URL.createObjectURL = crearURL;
 }
